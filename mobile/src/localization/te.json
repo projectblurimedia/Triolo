@@ -1,0 +1,27 @@
+{
+  "common": {
+    "appName": "స్థానిక సేవలు",
+    "continue": "కొనసాగించు",
+    "cancel": "రద్దు చేయి",
+    "retry": "మళ్ళీ ప్రయత్నించు",
+    "loading": "లోడ్ అవుతోంది..."
+  },
+  "auth": {
+    "welcomeTitle": "మీ దగ్గర విశ్వసనీయ కార్మికులు మరియు దుకాణాలను కనుగొనండి",
+    "fullNameLabel": "పూర్తి పేరు",
+    "mobileNumberLabel": "మొబైల్ నంబర్",
+    "otpLabel": "OTP నమోదు చేయండి",
+    "sendOtp": "OTP పంపండి",
+    "verifyOtp": "OTP నిర్ధారించండి",
+    "login": "లాగిన్",
+    "register": "నమోదు చేసుకోండి",
+    "roleUser": "నేను కస్టమర్‌ని",
+    "roleWorker": "నేను కార్మికుడిని",
+    "roleBusiness": "నేను వ్యాపారవేత్తను"
+  },
+  "settings": {
+    "language": "భాష",
+    "english": "ఇంగ్లీష్",
+    "telugu": "తెలుగు"
+  }
+}

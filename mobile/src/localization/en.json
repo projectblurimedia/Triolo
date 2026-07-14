@@ -1,0 +1,27 @@
+{
+  "common": {
+    "appName": "Local Services",
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "loading": "Loading..."
+  },
+  "auth": {
+    "welcomeTitle": "Find trusted workers and shops near you",
+    "fullNameLabel": "Full Name",
+    "mobileNumberLabel": "Mobile Number",
+    "otpLabel": "Enter OTP",
+    "sendOtp": "Send OTP",
+    "verifyOtp": "Verify OTP",
+    "login": "Log In",
+    "register": "Register",
+    "roleUser": "I'm a Customer",
+    "roleWorker": "I'm a Worker",
+    "roleBusiness": "I'm a Business"
+  },
+  "settings": {
+    "language": "Language",
+    "english": "English",
+    "telugu": "Telugu"
+  }
+}
