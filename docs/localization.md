@@ -54,6 +54,10 @@ An announcement can carry content in one language, the other, or both. Data shap
 - Error messages shown to the user are resolved from `error.code` via a client-side mapping (`errorMessages.ts`), never from the raw API `message` string.
 - New screens/features must ship with both `en` and `te` keys added in the same change — an English-only string is treated the same as a bug.
 
+## Plural Rules (Intl.PluralRules)
+
+Some JS engines used by React Native (older Hermes/JSC builds) don't ship `Intl.PluralRules`, which i18next needs to pick the correct plural form per language — Telugu has its own plural rules, distinct from English's. `mobile/src/localization/i18n.ts` detects a missing `Intl.PluralRules` and loads the `@formatjs/intl-pluralrules` polyfill plus `en`/`te` locale data before initializing i18next, so plural-based keys resolve correctly regardless of engine. Add the corresponding locale-data import here for any new language that ends up using plural-form keys.
+
 ## Adding a New Language Later
 
 1. Add the language code to `SUPPORTED_LANGUAGES` in `mobile/src/localization/i18n.ts`.

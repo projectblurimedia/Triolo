@@ -4,6 +4,15 @@ import * as Localization from 'expo-localization';
 import en from './en.json';
 import te from './te.json';
 
+// Hermes/older JSC builds lack Intl.PluralRules; without it i18next silently
+// falls back to a less-accurate plural format. Telugu has its own plural rules,
+// so polyfill rather than rely on the fallback.
+if (typeof Intl === 'undefined' || typeof (Intl as { PluralRules?: unknown }).PluralRules === 'undefined') {
+  require('@formatjs/intl-pluralrules/polyfill');
+  require('@formatjs/intl-pluralrules/locale-data/en');
+  require('@formatjs/intl-pluralrules/locale-data/te');
+}
+
 export const SUPPORTED_LANGUAGES = ['en', 'te'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
