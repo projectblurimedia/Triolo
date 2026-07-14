@@ -42,3 +42,30 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Boot smoke test
+        # tsc alone doesn't rewrite "@/" path aliases in the compiled output, so a
+        # clean build can still crash at runtime (MODULE_NOT_FOUND) in ways typecheck
+        # and unit tests never exercise. Actually boot the compiled server and hit
+        # /health (no DB access needed) to catch that class of bug in CI.
+        run: |
+          NODE_ENV=production PORT=4000 \
+          DATABASE_URL=postgres://user:pass@localhost:5432/ci_placeholder \
+          JWT_ACCESS_SECRET=ci-smoke-test-secret \
+          JWT_REFRESH_SECRET=ci-smoke-test-refresh-secret \
+          node dist/server.js &
+          SERVER_PID=$!
+          success=0
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:4000/health > /dev/null; then
+              success=1
+              break
+            fi
+            sleep 1
+          done
+          kill $SERVER_PID 2>/dev/null || true
+          if [ "$success" -ne 1 ]; then
+            echo "Server failed to boot and respond on /health within 10s"
+            exit 1
+          fi
+          echo "Boot smoke test passed"
