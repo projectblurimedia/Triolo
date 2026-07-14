@@ -8,9 +8,12 @@ import te from './te.json';
 // falls back to a less-accurate plural format. Telugu has its own plural rules,
 // so polyfill rather than rely on the fallback.
 if (typeof Intl === 'undefined' || typeof (Intl as { PluralRules?: unknown }).PluralRules === 'undefined') {
-  require('@formatjs/intl-pluralrules/polyfill');
-  require('@formatjs/intl-pluralrules/locale-data/en');
-  require('@formatjs/intl-pluralrules/locale-data/te');
+  // The package's exports map requires the literal ".js" suffix — it does no
+  // extension resolution, so omitting it silently falls back to file-based
+  // resolution (with a Metro warning) rather than a clean exports-map hit.
+  require('@formatjs/intl-pluralrules/polyfill.js');
+  require('@formatjs/intl-pluralrules/locale-data/en.js');
+  require('@formatjs/intl-pluralrules/locale-data/te.js');
 }
 
 export const SUPPORTED_LANGUAGES = ['en', 'te'] as const;
