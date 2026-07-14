@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { TextField } from '@/components/TextField';
 import { Button } from '@/components/Button';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { colors, typography } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
 import { useRequestRegistrationOtp } from '@/hooks/useAuthMutations';
-import { ApiError } from '@/services/apiClient';
+import { useSettingsStore } from '@/state/settingsStore';
+import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export function RegisterScreen({ route, navigation }: Props) {
   const { t } = useTranslation();
   const { role } = route.params;
+  const language = useSettingsStore((state) => state.language);
   const [fullName, setFullName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -23,10 +26,10 @@ export function RegisterScreen({ route, navigation }: Props) {
   const handleSubmit = () => {
     setError(null);
     requestOtp.mutate(
-      { fullName, mobileNumber, role },
+      { fullName, mobileNumber, role, preferredLanguage: language },
       {
         onSuccess: () => navigation.navigate('Otp', { mode: 'registration', mobileNumber }),
-        onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong'),
+        onError: (err) => setError(getLocalizedErrorMessage(err, t)),
       },
     );
   };
@@ -34,6 +37,9 @@ export function RegisterScreen({ route, navigation }: Props) {
   return (
     <ScreenContainer>
       <Text style={styles.heading}>{t('auth.register')}</Text>
+      <View style={styles.languageRow}>
+        <LanguageSwitcher />
+      </View>
       <TextField label={t('auth.fullNameLabel')} value={fullName} onChangeText={setFullName} />
       <TextField
         label={t('auth.mobileNumberLabel')}
@@ -49,6 +55,7 @@ export function RegisterScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  heading: { ...typography.heading, marginBottom: 24 },
+  heading: { ...typography.heading, marginBottom: 16 },
+  languageRow: { marginBottom: 24 },
   error: { ...typography.caption, color: colors.error, marginBottom: 12 },
 });

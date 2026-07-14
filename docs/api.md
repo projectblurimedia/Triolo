@@ -7,7 +7,7 @@ Conventions: see [[.cloud/api-guidelines.md]]. Base path: `/api/v1`.
 ### POST /auth/register/request-otp
 Request OTP for a new account.
 - Auth: none
-- Body: `{ fullName: string, mobileNumber: string, role: "user" | "worker" | "business_owner" }`
+- Body: `{ fullName: string, mobileNumber: string, role: "user" | "worker" | "business_owner", preferredLanguage?: "en" | "te" }` — `preferredLanguage` defaults to `en` if omitted; the client should always send the app's currently active language (see `docs/localization.md`).
 - 200: `{ success: true, message: "OTP sent", data: { mobileNumber } }`
 - 409: mobile number already registered
 
@@ -49,8 +49,17 @@ Revoke the current refresh token.
 ### GET /auth/me
 Return the authenticated account's basic info.
 - Auth: Bearer access token
-- 200: `{ success: true, data: { id, fullName, mobileNumber, role, status } }`
+- 200: `{ success: true, data: { id, fullName, mobileNumber, role, status, preferredLanguage } }`
+
+### PATCH /auth/me/language
+Update the authenticated account's language preference.
+- Auth: Bearer access token
+- Body: `{ preferredLanguage: "en" | "te" }`
+- 200: `{ success: true, message: "Language updated", data: { preferredLanguage } }`
+- 400: unsupported language code
 
 ---
+
+**Localization note**: `message` fields and validation error text on any endpoint are for logs/debugging, not for display — the client resolves `error.code` to a localized string itself. See `docs/localization.md`.
 
 Further modules (Users, Workers, Businesses, Booking, Orders, Notifications, Admin) documented here as they're implemented — never left to drift from the actual routes.

@@ -1,6 +1,6 @@
 # Database Design
 
-PostgreSQL. Normalized schema; foreign keys enforce relationships; index columns used in frequent filters (mobile_number, profession, business_category, service_area, status fields).
+PostgreSQL, UTF-8 encoding (Postgres default). All free-text columns (names, addresses, shopping list items, reviews, business names, worker descriptions) accept full Unicode/Telugu input unmodified — never constrained to ASCII. Normalized schema; foreign keys enforce relationships; index columns used in frequent filters (mobile_number, profession, business_category, service_area, status fields). See `docs/localization.md` for the language-related data model (account language preference, future category/notification/announcement translation pattern).
 
 ## Entity Overview
 
@@ -33,6 +33,7 @@ PostgreSQL. Normalized schema; foreign keys enforce relationships; index columns
 | mobile_number | varchar(15) UNIQUE | indexed |
 | role | enum(user, worker, business_owner, business_staff, admin) | |
 | status | enum(active, pending_verification, suspended, blocked) | default active for `user`, `pending_verification` for worker/business |
+| preferred_language | enum `app_language` (en, te, ...) | authoritative language for this account; see `docs/localization.md`. Enum so adding a language later is `ALTER TYPE ... ADD VALUE`, no migration of existing rows. |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 
@@ -43,6 +44,9 @@ PostgreSQL. Normalized schema; foreign keys enforce relationships; index columns
 | mobile_number | varchar(15) | indexed |
 | otp_hash | text | hashed, never stored plain |
 | purpose | enum(registration, login) | |
+| full_name | text nullable | registration only |
+| role | account_role nullable | registration only |
+| preferred_language | app_language nullable | registration only — carries the app's active language at registration time so the account is created with it already set |
 | expires_at | timestamptz | |
 | consumed_at | timestamptz nullable | single-use |
 | attempt_count | int | rate-limit guard |

@@ -7,11 +7,14 @@ Mobile OTP is the only credential for Users, Workers, and Businesses. JWT access
 ## Registration Flow
 
 ```
-POST /api/v1/auth/register/request-otp   { fullName, mobileNumber, role }
+POST /api/v1/auth/register/request-otp   { fullName, mobileNumber, role, preferredLanguage? }
 POST /api/v1/auth/register/verify-otp    { mobileNumber, otp }
   → creates account (status: active for user, pending_verification for worker/business)
+  → preferred_language set from the registration request (defaults to 'en')
   → issues access + refresh JWT
 ```
+
+`preferredLanguage` is carried through the OTP record between the two steps (see `docs/database.md` §otp_verifications) so it's available when the account row is actually created. See `docs/localization.md` for the full language-preference model, including how it syncs with device storage and `PATCH /auth/me/language`.
 
 Workers/Businesses then call their profile-completion endpoints (`/api/v1/workers/profile`, `/api/v1/businesses/profile`) — see respective module docs once implemented.
 

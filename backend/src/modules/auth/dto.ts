@@ -1,9 +1,10 @@
-import { AccountRole } from './interfaces';
+import { AccountRole, PreferredLanguage } from './interfaces';
 
 export interface RequestRegistrationOtpDto {
   fullName: string;
   mobileNumber: string;
   role: AccountRole;
+  preferredLanguage?: PreferredLanguage;
 }
 
 export interface VerifyRegistrationOtpDto {
@@ -26,4 +27,8 @@ export interface RefreshTokenDto {
 
 export interface LogoutDto {
   refreshToken: string;
+}
+
+export interface UpdateLanguageDto {
+  preferredLanguage: PreferredLanguage;
 }

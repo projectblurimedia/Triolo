@@ -6,7 +6,7 @@ See [[.cloud/testing-rules.md]] for the enforced workflow. This file tracks what
 
 | Module | Unit | Integration | API | Notes |
 |---|---|---|---|---|
-| Auth | done (26 tests) | not written | not written | Unit tests cover OTP hashing, JWT/refresh-token mechanics, and full `AuthService` logic via a mocked repository. Integration/API tests need a real `TEST_DATABASE_URL` Postgres instance, which wasn't available when this was scaffolded — add them before production use. |
+| Auth | done (29 tests) | not written | not written | Unit tests cover OTP hashing, JWT/refresh-token mechanics, and full `AuthService` logic via a mocked repository, including preferred-language capture at registration and the `updateLanguage` flow. Integration/API tests need a real `TEST_DATABASE_URL` Postgres instance, which wasn't available when this was scaffolded — add them before production use. |
 
 Update this table as each module's tests land — do not let it drift from `backend/src/modules/*/tests/`.
 

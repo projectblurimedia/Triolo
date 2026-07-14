@@ -4,12 +4,18 @@ export type AccountStatus = 'active' | 'pending_verification' | 'suspended' | 'b
 
 export type OtpPurpose = 'registration' | 'login';
 
+/** See docs/localization.md. Adding a language later only requires a new value here + a mobile resource file. */
+export type PreferredLanguage = 'en' | 'te';
+
+export const SUPPORTED_LANGUAGES: PreferredLanguage[] = ['en', 'te'];
+
 export interface Account {
   id: string;
   fullName: string;
   mobileNumber: string;
   role: AccountRole;
   status: AccountStatus;
+  preferredLanguage: PreferredLanguage;
   createdAt: Date;
   updatedAt: Date;
 }

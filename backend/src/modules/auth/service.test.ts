@@ -13,6 +13,7 @@ function createMockRepository(): MockRepository {
     findAccountByMobile: jest.fn(),
     findAccountById: jest.fn(),
     createAccount: jest.fn(),
+    updatePreferredLanguage: jest.fn(),
     createOtp: jest.fn(),
     findLatestActiveOtp: jest.fn(),
     incrementOtpAttempts: jest.fn(),
@@ -30,6 +31,7 @@ function buildAccount(overrides: Partial<Account> = {}): Account {
     mobileNumber: '9876543210',
     role: 'user',
     status: 'active',
+    preferredLanguage: 'en',
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -57,8 +59,29 @@ describe('AuthService.requestRegistrationOtp', () => {
     await service.requestRegistrationOtp({ fullName: 'A', mobileNumber: '9876543210', role: 'worker' });
 
     expect(repo.createOtp).toHaveBeenCalledWith(
-      expect.objectContaining({ mobileNumber: '9876543210', purpose: 'registration', fullName: 'A', role: 'worker' }),
+      expect.objectContaining({
+        mobileNumber: '9876543210',
+        purpose: 'registration',
+        fullName: 'A',
+        role: 'worker',
+        preferredLanguage: 'en',
+      }),
     );
+  });
+
+  it('stores the requested preferred language when explicitly provided', async () => {
+    const repo = createMockRepository();
+    repo.findAccountByMobile.mockResolvedValue(null);
+    const service = new AuthService(repo as unknown as AuthRepository);
+
+    await service.requestRegistrationOtp({
+      fullName: 'A',
+      mobileNumber: '9876543210',
+      role: 'user',
+      preferredLanguage: 'te',
+    });
+
+    expect(repo.createOtp).toHaveBeenCalledWith(expect.objectContaining({ preferredLanguage: 'te' }));
   });
 });
 
@@ -73,18 +96,19 @@ describe('AuthService.verifyRegistrationOtp', () => {
       purpose: 'registration',
       fullName: 'A',
       role: 'user',
+      preferredLanguage: 'te',
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
       attemptCount: 0,
     });
     repo.findAccountByMobile.mockResolvedValue(null);
-    repo.createAccount.mockResolvedValue(buildAccount({ status: 'active', role: 'user' }));
+    repo.createAccount.mockResolvedValue(buildAccount({ status: 'active', role: 'user', preferredLanguage: 'te' }));
 
     const service = new AuthService(repo as unknown as AuthRepository);
     const result = await service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' });
 
     expect(repo.createAccount).toHaveBeenCalledWith(
-      expect.objectContaining({ role: 'user', status: 'active' }),
+      expect.objectContaining({ role: 'user', status: 'active', preferredLanguage: 'te' }),
     );
     expect(result.tokens.accessToken).toBeDefined();
     expect(result.tokens.refreshToken).toContain('.');
@@ -100,6 +124,7 @@ describe('AuthService.verifyRegistrationOtp', () => {
       purpose: 'registration',
       fullName: 'A Worker',
       role: 'worker',
+      preferredLanguage: 'en',
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
       attemptCount: 0,
@@ -299,6 +324,31 @@ describe('AuthService.refreshAccessToken', () => {
     const service = new AuthService(repo as unknown as AuthRepository);
 
     await expect(service.refreshAccessToken({ refreshToken: token })).rejects.toMatchObject({ statusCode: 401 });
+  });
+});
+
+describe('AuthService.updateLanguage', () => {
+  it('throws not found for an unknown account id', async () => {
+    const repo = createMockRepository();
+    repo.findAccountById.mockResolvedValue(null);
+    const service = new AuthService(repo as unknown as AuthRepository);
+
+    await expect(service.updateLanguage('missing', { preferredLanguage: 'te' })).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(repo.updatePreferredLanguage).not.toHaveBeenCalled();
+  });
+
+  it('updates and returns the account with the new language', async () => {
+    const repo = createMockRepository();
+    repo.findAccountById.mockResolvedValue(buildAccount({ preferredLanguage: 'en' }));
+    repo.updatePreferredLanguage.mockResolvedValue(buildAccount({ preferredLanguage: 'te' }));
+
+    const service = new AuthService(repo as unknown as AuthRepository);
+    const result = await service.updateLanguage('account-1', { preferredLanguage: 'te' });
+
+    expect(repo.updatePreferredLanguage).toHaveBeenCalledWith('account-1', 'te');
+    expect(result.preferredLanguage).toBe('te');
   });
 });
 

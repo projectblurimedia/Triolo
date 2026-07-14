@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import { AccountRole, AuthAccount } from '@/state/authStore';
+import { AccountLanguage, AccountRole, AuthAccount } from '@/state/authStore';
 
 interface AuthTokens {
   accessToken: string;
@@ -11,8 +11,12 @@ interface AuthResponse extends AuthTokens {
 }
 
 export const authService = {
-  requestRegistrationOtp: (params: { fullName: string; mobileNumber: string; role: AccountRole }) =>
-    apiClient.post<{ mobileNumber: string }>('/auth/register/request-otp', params),
+  requestRegistrationOtp: (params: {
+    fullName: string;
+    mobileNumber: string;
+    role: AccountRole;
+    preferredLanguage: AccountLanguage;
+  }) => apiClient.post<{ mobileNumber: string }>('/auth/register/request-otp', params),
 
   verifyRegistrationOtp: (params: { mobileNumber: string; otp: string }) =>
     apiClient.post<AuthResponse>('/auth/register/verify-otp', params),
@@ -26,4 +30,7 @@ export const authService = {
   logout: (refreshToken: string) => apiClient.post<null>('/auth/logout', { refreshToken }),
 
   me: () => apiClient.get<AuthAccount>('/auth/me', true),
+
+  updateLanguage: (preferredLanguage: AccountLanguage) =>
+    apiClient.patch<{ preferredLanguage: AccountLanguage }>('/auth/me/language', { preferredLanguage }, true),
 };

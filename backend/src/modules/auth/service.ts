@@ -17,6 +17,7 @@ import {
   RefreshTokenDto,
   RequestLoginOtpDto,
   RequestRegistrationOtpDto,
+  UpdateLanguageDto,
   VerifyLoginOtpDto,
   VerifyRegistrationOtpDto,
 } from './dto';
@@ -40,6 +41,7 @@ export class AuthService {
       purpose: 'registration',
       fullName: dto.fullName,
       role: dto.role,
+      preferredLanguage: dto.preferredLanguage ?? 'en',
       expiresAt: otpExpiryDate(),
     });
 
@@ -64,6 +66,7 @@ export class AuthService {
       mobileNumber: dto.mobileNumber,
       role: otpRecord.role,
       status,
+      preferredLanguage: otpRecord.preferredLanguage ?? 'en',
     });
 
     const tokens = await this.issueTokens(account);
@@ -153,6 +156,14 @@ export class AuthService {
       throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
     }
     return account;
+  }
+
+  async updateLanguage(accountId: string, dto: UpdateLanguageDto): Promise<Account> {
+    const account = await this.repository.findAccountById(accountId);
+    if (!account) {
+      throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
+    }
+    return this.repository.updatePreferredLanguage(accountId, dto.preferredLanguage);
   }
 
   private async consumeValidOtp(mobileNumber: string, otp: string, purpose: 'registration' | 'login') {

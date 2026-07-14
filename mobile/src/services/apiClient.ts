@@ -85,4 +85,5 @@ async function tryRefreshAccessToken(): Promise<boolean> {
 export const apiClient = {
   get: <T>(path: string, auth = false) => rawRequest<T>(path, { method: 'GET', auth }),
   post: <T>(path: string, body?: unknown, auth = false) => rawRequest<T>(path, { method: 'POST', body, auth }),
+  patch: <T>(path: string, body?: unknown, auth = false) => rawRequest<T>(path, { method: 'PATCH', body, auth }),
 };

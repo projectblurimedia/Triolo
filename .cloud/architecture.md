@@ -102,6 +102,15 @@ Firebase Cloud Messaging via a dedicated `notifications` service — never trigg
 
 PostgreSQL, normalized. Core entities: users, workers, businesses, business_staff, worker_profiles, business_profiles, bookings, orders, order_items, notifications, reviews, ratings, verification_requests, audit_logs. Foreign keys enforce relationships; index mobile_number, profession, business_category, service_area (and other frequently-filtered columns). Full DDL lives in `docs/database.md` / `database/migrations/`.
 
+## Localization Architecture
+
+Language is a core architectural concern, not a display-layer afterthought — see `docs/localization.md` for the full model. The load-bearing points for any module you build:
+
+- `accounts.preferred_language` is the authoritative per-account language; local device storage is a convenience cache synced from it after login.
+- APIs are language-independent — never branch business logic on language, never localize API `message`/error text server-side for the client to display. The mobile client maps `error.code` → localized string itself.
+- Anything the backend composes and pushes to a user unprompted (notifications, admin announcements) *is* language-aware, but via per-language template lookups keyed by the recipient's `preferred_language` — not translation-on-the-fly.
+- Reference/category data (worker professions, business categories) is stored as a stable language-independent code with per-language label lookups, never as translated strings that get re-translated for display.
+
 ## Future Microservices Migration
 
 When a module needs independent scaling (e.g., Notifications or Search under load), extract it because:

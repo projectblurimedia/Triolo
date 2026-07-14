@@ -8,7 +8,7 @@ import { Button } from '@/components/Button';
 import { colors, typography } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
 import { useRequestLoginOtp } from '@/hooks/useAuthMutations';
-import { ApiError } from '@/services/apiClient';
+import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -24,7 +24,7 @@ export function LoginScreen({ navigation }: Props) {
       { mobileNumber },
       {
         onSuccess: () => navigation.navigate('Otp', { mode: 'login', mobileNumber }),
-        onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong'),
+        onError: (err) => setError(getLocalizedErrorMessage(err, t)),
       },
     );
   };

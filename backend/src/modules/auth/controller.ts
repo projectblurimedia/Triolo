@@ -44,6 +44,14 @@ export class AuthController {
     const account = await this.service.getAccount(req.account.accountId);
     return ok(res, toPublicAccount(account));
   });
+
+  updateLanguage = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    const account = await this.service.updateLanguage(req.account.accountId, req.body);
+    return ok(res, { preferredLanguage: account.preferredLanguage }, 'Language updated');
+  });
 }
 
 function toPublicAccount(account: {
@@ -52,6 +60,7 @@ function toPublicAccount(account: {
   mobileNumber: string;
   role: string;
   status: string;
+  preferredLanguage: string;
 }) {
   return {
     id: account.id,
@@ -59,5 +68,6 @@ function toPublicAccount(account: {
     mobileNumber: account.mobileNumber,
     role: account.role,
     status: account.status,
+    preferredLanguage: account.preferredLanguage,
   };
 }

@@ -4,7 +4,8 @@
     "continue": "Continue",
     "cancel": "Cancel",
     "retry": "Retry",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "logout": "Log Out"
   },
   "auth": {
     "welcomeTitle": "Find trusted workers and shops near you",
@@ -23,5 +24,23 @@
     "language": "Language",
     "english": "English",
     "telugu": "Telugu"
+  },
+  "languageSelect": {
+    "title": "Choose your language",
+    "subtitle": "You can change this anytime in Settings.",
+    "continue": "Continue"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "MOBILE_ALREADY_REGISTERED": "This mobile number is already registered.",
+    "ACCOUNT_NOT_FOUND": "No account found for this mobile number.",
+    "OTP_NOT_FOUND": "No active OTP found. Please request a new one.",
+    "OTP_EXPIRED": "Your OTP has expired. Please request a new one.",
+    "OTP_ATTEMPTS_EXCEEDED": "Too many incorrect attempts. Please request a new OTP.",
+    "OTP_INVALID": "Incorrect OTP. Please try again.",
+    "OTP_CONTEXT_MISSING": "Something went wrong with registration. Please start again.",
+    "ACCOUNT_NOT_ACTIVE": "This account has been suspended or blocked.",
+    "VALIDATION_ERROR": "Please check the details you entered.",
+    "RATE_LIMITED": "Too many attempts. Please wait a bit and try again."
   }
 }

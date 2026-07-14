@@ -1,10 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
 import { authService } from '@/services/authService';
-import { useAuthStore, AccountRole } from '@/state/authStore';
+import { useAuthStore, AccountLanguage, AccountRole } from '@/state/authStore';
 
 export function useRequestRegistrationOtp() {
   return useMutation({
-    mutationFn: (params: { fullName: string; mobileNumber: string; role: AccountRole }) =>
+    mutationFn: (params: { fullName: string; mobileNumber: string; role: AccountRole; preferredLanguage: AccountLanguage }) =>
       authService.requestRegistrationOtp(params),
   });
 }
@@ -37,5 +37,12 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => authService.logout(refreshToken ?? ''),
     onSettled: () => clearSession(),
+  });
+}
+
+/** Syncs a local language change to the account once logged in. See docs/localization.md. */
+export function useUpdateAccountLanguage() {
+  return useMutation({
+    mutationFn: (preferredLanguage: AccountLanguage) => authService.updateLanguage(preferredLanguage),
   });
 }

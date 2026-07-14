@@ -49,6 +49,15 @@ feature/<module>-<short-description>
 - PRs required for any non-trivial change; code review before merge to `develop`; `develop` → `main` only after tests pass.
 - Update docs and changelog as part of the same PR that implements the feature — not a follow-up.
 
+## Localization
+
+No feature is complete without English + Telugu support — this is architecture, not polish. See `docs/localization.md` for the full model. Practical rules:
+
+- No hardcoded user-visible strings in mobile components — always a translation key.
+- Every new key ships with both `en` and `te` values in the same change.
+- Client-displayed error/validation messages come from a `error.code` → localized-string mapping, never the raw API `message`.
+- Backend business logic never branches on language; language only affects notification/announcement template selection and (later) category label lookups.
+
 ## Definition of Done (per feature)
 
 A feature is not complete until:
@@ -58,3 +67,4 @@ A feature is not complete until:
 3. Regression tests across existing features still pass.
 4. Related docs (`docs/*.md`, `.cloud/project-context.md`) are updated.
 5. No known security gaps for the feature's scope.
+6. English + Telugu are both present for any new user-visible text (see Localization above).

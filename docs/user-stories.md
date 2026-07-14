@@ -62,4 +62,16 @@
 ## Localization
 
 **US-18** As a user, I can switch the app language between English and Telugu from settings.
-- AC: All screens reflect the selected language without requiring app restart or re-login; preference persists across sessions.
+- AC: All screens reflect the selected language without requiring app restart or re-login; preference persists across sessions; if logged in, the change is also saved to my account so it follows me to a new device.
+
+**US-19** As a first-time user, I'm asked to pick a language before I see anything else in the app.
+- AC: Device locale pre-selects a sensible default (English or Telugu), but the user must actively confirm/choose before proceeding; the choice is remembered for future launches without asking again.
+
+**US-20** As a user registering an account, I can confirm/change my language during registration.
+- AC: The language active at the moment of registration is sent with the registration request and becomes the new account's stored `preferred_language`.
+
+**US-21** As a returning user logging in on a new device, the app matches the language tied to my account rather than the new device's locale.
+- AC: On successful login, the account's `preferred_language` (from the backend) overrides local device language state.
+
+**US-22** As a user, any error or validation message I see is in my selected language, never raw English text from the server.
+- AC: The client maps `error.code` to a localized string; unmapped codes fall back to a generic localized "something went wrong" message rather than displaying the raw API `message`.

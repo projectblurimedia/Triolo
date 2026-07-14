@@ -8,7 +8,7 @@ import { Button } from '@/components/Button';
 import { colors, typography } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
 import { useVerifyLoginOtp, useVerifyRegistrationOtp } from '@/hooks/useAuthMutations';
-import { ApiError } from '@/services/apiClient';
+import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Otp'>;
 
@@ -29,7 +29,7 @@ export function OtpScreen({ route }: Props) {
       {
         // Successful verification updates the auth store; RootNavigator
         // automatically switches to the app stack once accessToken is set.
-        onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong'),
+        onError: (err) => setError(getLocalizedErrorMessage(err, t)),
       },
     );
   };

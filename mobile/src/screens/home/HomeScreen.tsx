@@ -3,17 +3,16 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { Button } from '@/components/Button';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { colors, typography } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
-import { useSettingsStore } from '@/state/settingsStore';
-import { useLogout } from '@/hooks/useAuthMutations';
+import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 
 export function HomeScreen() {
   const { t } = useTranslation();
   const account = useAuthStore((state) => state.account);
-  const language = useSettingsStore((state) => state.language);
-  const setLanguage = useSettingsStore((state) => state.setLanguage);
   const logout = useLogout();
+  const updateLanguage = useUpdateAccountLanguage();
 
   return (
     <ScreenContainer>
@@ -27,20 +26,12 @@ export function HomeScreen() {
       ) : null}
 
       <View style={styles.languageRow}>
-        <Text style={styles.label}>{t('settings.language')}:</Text>
-        <Button
-          label={t('settings.english')}
-          onPress={() => setLanguage('en')}
-          disabled={language === 'en'}
-        />
-        <Button
-          label={t('settings.telugu')}
-          onPress={() => setLanguage('te')}
-          disabled={language === 'te'}
-        />
+        <Text style={styles.label}>{t('settings.language')}</Text>
+        {/* Persists locally immediately; also synced to the account so it follows the user to a new device. */}
+        <LanguageSwitcher onChange={(language) => updateLanguage.mutate(language)} />
       </View>
 
-      <Button label="Log out" onPress={() => logout.mutate()} loading={logout.isPending} />
+      <Button label={t('common.logout')} onPress={() => logout.mutate()} loading={logout.isPending} />
     </ScreenContainer>
   );
 }

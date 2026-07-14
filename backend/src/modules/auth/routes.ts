@@ -11,6 +11,7 @@ import {
   refreshTokenSchema,
   requestLoginOtpSchema,
   requestRegistrationOtpSchema,
+  updateLanguageSchema,
   verifyLoginOtpSchema,
   verifyRegistrationOtpSchema,
 } from './validation';
@@ -48,3 +49,4 @@ authRouter.post(
 authRouter.post('/refresh', validateBody(refreshTokenSchema), controller.refresh);
 authRouter.post('/logout', validateBody(logoutSchema), controller.logout);
 authRouter.get('/me', authenticate, controller.me);
+authRouter.patch('/me/language', authenticate, validateBody(updateLanguageSchema), controller.updateLanguage);

@@ -7,6 +7,7 @@ CREATE TABLE otp_verifications (
   purpose otp_purpose NOT NULL,
   full_name TEXT,
   role account_role,
+  preferred_language app_language,
   expires_at TIMESTAMPTZ NOT NULL,
   consumed_at TIMESTAMPTZ,
   attempt_count INT NOT NULL DEFAULT 0,

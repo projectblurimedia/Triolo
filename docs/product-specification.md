@@ -225,7 +225,7 @@ Super Admin, Operations Admin, Verification Admin, Support Admin, Finance Admin 
 - Cancellation locks once business review (orders) or PIN verification (bookings) begins; only business/admin can act past that point.
 - Business staff operate on one shared, real-time-synced dashboard with permission-scoped actions.
 - Location is village/town-based for MVP; architecture must allow GPS to be added later without redesigning search, booking, or order logic.
-- UI must support English and Telugu from launch.
+- UI must support English and Telugu from launch, chosen at first app launch, re-offered at registration, and changeable anytime in Settings — see `docs/localization.md` for the full model (account-level language preference, notification/announcement translation pattern, category code/label pattern for Worker/Business search). No feature is complete without both languages shipped in the same change.
 
 ## 6. Notifications Summary
 
