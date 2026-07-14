@@ -15,13 +15,14 @@ Development → Testing → Staging → Production
 
 Docker for the backend (and PostgreSQL locally via `docker-compose`). `docker/` holds Dockerfiles and compose configuration once the backend is scaffolded enough to containerize meaningfully.
 
-## CI/CD (planned)
+## CI/CD
 
-GitHub Actions pipeline (`.github/workflows/`):
-1. Install deps, lint, typecheck.
-2. Run unit + integration + API tests.
-3. Build.
-4. On merge to `main`: deploy to staging automatically; production deploy is a manual/approved step.
+GitHub Actions (`.github/workflows/`), one workflow per app since they have independent dependency trees:
+
+- `backend-ci.yml`: on push/PR touching `backend/**` — install, lint, typecheck, unit test, build.
+- `mobile-ci.yml`: on push/PR touching `mobile/**` — install, typecheck, `expo export --platform web` as a bundle sanity check.
+
+Both currently run against `main`. Integration/API tests will be added to `backend-ci.yml` (with a Postgres service container) once those tests exist — see `docs/testing.md`. Staging/production deploy steps are not yet wired up; add them here when the deploy target (Section "Hosting (MVP)") is decided.
 
 ## Environment Variables
 
