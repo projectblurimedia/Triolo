@@ -61,7 +61,11 @@
     "tagline": "Order from your local shops"
   },
   "profile": {
-    "tagline": "Your account and settings"
+    "tagline": "Your profile overview",
+    "menuTitle": "Settings",
+    "ratingValue": "4.8",
+    "ratingCount": "126 reviews",
+    "postsTitle": "Recent Work"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",

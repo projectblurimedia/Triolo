@@ -10,6 +10,7 @@ import { ServicesScreen } from '@/screens/services/ServicesScreen';
 import { BazaarScreen } from '@/screens/bazaar/BazaarScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { GradientHeader } from '@/components/GradientHeader';
+import { ProfileHeader } from '@/components/ProfileHeader';
 import { fonts, headerGradient, useThemeColors } from '@/theme';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -125,7 +126,16 @@ export function AppNavigator() {
       />
       <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: titles.Services }} />
       <Tab.Screen name="Bazaar" component={BazaarScreen} options={{ tabBarLabel: titles.Bazaar }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: titles.Profile }} />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: titles.Profile,
+          // Profile's menu icon opens language/theme/logout in a modal instead of
+          // showing them inline — keeps the main screen focused on the account itself.
+          header: () => <ProfileHeader title={titles.Profile} subtitle={subtitles.Profile} />,
+        }}
+      />
     </Tab.Navigator>
   );
 }

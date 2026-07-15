@@ -21,7 +21,8 @@ The app expects the backend running locally at `http://localhost:4000` (see `src
 src/
   screens/        auth/ (LanguageSelect, Welcome, Register, Login, Otp), home/ (Home), services/ (Services),
                   bazaar/ (Bazaar), profile/ (Profile)
-  components/     Button, TextField, ScreenContainer, LanguageSwitcher, ThemeSwitcher, GradientHeader
+  components/     Button, TextField, ScreenContainer, LanguageSwitcher, ThemeSwitcher, GradientHeader,
+                  ProfileHeader, ProfileMenuModal
   navigation/     RootNavigator (language + theme hydration gate → auth vs. app), AuthNavigator (stack),
                   AppNavigator (bottom tabs)
   services/       apiClient (fetch wrapper, auto access-token refresh on 401), authService
@@ -37,7 +38,9 @@ src/
 
 Full registration/login flow against the backend Auth module: role selection → OTP request → OTP verify → session persisted (AsyncStorage). Access-token refresh on 401 is wired in `apiClient`.
 
-**Post-login app shell**: a 4-tab bottom navigator (Home, Services, Bazaar, Profile) via `@react-navigation/bottom-tabs`, each screen topped with a `GradientHeader` (brand gradient `#0055D3` → `#1D76FA`, see `theme/colors.ts`). ("Bazaar" — the shop-ordering tab was originally named "Shoppify"; renamed to avoid trademark confusion with Shopify, and it translates naturally to Telugu, "బజార్", unlike "Shoppify". "Services" — originally a "Search" tab; the free-text search input moved to Home, and this tab is now for browsing by service category instead.) Services and Bazaar are placeholders until the Worker/Business search and shopping-list modules are built. Profile holds the account card, language switcher, theme switcher, and logout (moved out of Home, which is now a dashboard greeting plus a search bar and filter chips — also not wired to anything real yet). Tab icons via `@expo/vector-icons` (`FontAwesome5`, solid glyphs — the free tier has no outline counterpart for most of these).
+**Post-login app shell**: a 4-tab bottom navigator (Home, Services, Bazaar, Profile) via `@react-navigation/bottom-tabs`, each screen topped with a `GradientHeader` (brand gradient `#0055D3` → `#1D76FA`, see `theme/colors.ts`). ("Bazaar" — the shop-ordering tab was originally named "Shoppify"; renamed to avoid trademark confusion with Shopify, and it translates naturally to Telugu, "బజార్", unlike "Shoppify". "Services" — originally a "Search" tab; the free-text search input moved to Home, and this tab is now for browsing by service category instead.) Services and Bazaar are placeholders until the Worker/Business search and shopping-list modules are built. Home is a dashboard greeting plus a search bar and filter chips (not wired to anything real yet). Tab icons via `@expo/vector-icons` (`FontAwesome5`, solid glyphs — the free tier has no outline counterpart for most of these).
+
+**Profile**: the account card (avatar initial in a brand-gradient circle, name/mobile/role/status) is the focus of the screen body. Worker and business accounts (`worker`/`business_owner`/`business_staff`) additionally see a static ratings summary and a "Recent Work" row of placeholder post cards — plain `user` accounts see neither, since they don't apply. Language, theme, and logout moved out of the main body entirely — Profile's header has its own menu icon (`ProfileHeader`, not the shared per-tab header) that opens `ProfileMenuModal`, a bottom sheet holding `LanguageSwitcher`, `ThemeSwitcher`, and the logout `Button`, keeping the main screen focused on the account/profile itself.
 
 **Home search**: a search input (`home.searchPlaceholder`) and four toggleable filter chips (Services, Shops, Top Rated, Nearby — local UI state only, not wired to a real search yet) sit below the greeting, styled consistently with the rest of the app (active chip uses the brand gradient, same as `LanguageSwitcher`/`ThemeSwitcher`/`Button`).
 
