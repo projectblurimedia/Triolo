@@ -34,7 +34,12 @@ export function AppNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        header: () => <GradientHeader title={titles[route.name as keyof MainTabParamList]} />,
+        header: () => (
+          <GradientHeader
+            title={titles[route.name as keyof MainTabParamList]}
+            leadingIcon={ICONS[route.name as keyof MainTabParamList].active}
+          />
+        ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
