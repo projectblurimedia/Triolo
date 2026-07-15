@@ -5,13 +5,13 @@ import { ScreenContainer } from '@/components/ScreenContainer';
 import { typography, useThemeColors } from '@/theme';
 
 /** Placeholder until the Business shopping-list/ordering module is built (see .cloud/project-context.md). */
-export function ShoppifyScreen() {
+export function BazaarScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <Text style={[styles.placeholder, { color: colors.textMuted }]}>{t('shoppify.comingSoon')}</Text>
+      <Text style={[styles.placeholder, { color: colors.textMuted }]}>{t('bazaar.comingSoon')}</Text>
     </ScreenContainer>
   );
 }

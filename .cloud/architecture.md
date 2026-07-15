@@ -56,7 +56,7 @@ Feature-based, mirroring backend modules:
 
 ```
 src/
-  screens/        (auth, home, search, shoppify, user, worker, business, orders, booking, notifications, profile, settings, admin)
+  screens/        (auth, home, search, bazaar, user, worker, business, orders, booking, notifications, profile, settings, admin)
   components/     (shared: buttons, cards, inputs, dialogs, loaders, icons, GradientHeader)
   navigation/     RootNavigator (language + theme hydration gate → auth vs. app), AuthNavigator (stack),
                   AppNavigator (bottom tabs)
@@ -70,7 +70,7 @@ src/
   assets/
 ```
 
-Post-login navigation is a bottom tab bar (`@react-navigation/bottom-tabs`): Home, Search, Shoppify, Profile. Every tab screen is topped by the shared `GradientHeader` component (brand gradient, currently `#0055D3` → `#1D76FA`, constant across themes) — new tabs/screens follow this same header pattern rather than each screen rolling its own. `GradientHeader` supports `showBack` (circular icon-only back button, used on Auth-stack screens instead of the platform-default header) and `actions` (circular right-side icon buttons, currently only Home's notifications/messages/menu). Search and Shoppify are placeholders until the Worker/Business search and shopping-list modules exist; their content should replace the placeholder in place, not add new tabs, unless a product decision changes the tab set.
+Post-login navigation is a bottom tab bar (`@react-navigation/bottom-tabs`): Home, Search, Bazaar, Profile. ("Bazaar" — the shop-ordering tab was originally named "Shoppify"; renamed to avoid trademark confusion with Shopify and because it reads more naturally in both English and Telugu, "బజార్".) Every tab screen is topped by the shared `GradientHeader` component (brand gradient, currently `#0055D3` → `#1D76FA`, constant across themes) — new tabs/screens follow this same header pattern rather than each screen rolling its own. `GradientHeader` supports `showBack` (circular icon-only back button, used on Auth-stack screens instead of the platform-default header), `leadingIcon` (decorative brand icon, currently only Home), and `actions` (circular right-side icon buttons, currently only Home's notifications/messages/menu). Search and Bazaar are placeholders until the Worker/Business search and shopping-list modules exist; their content should replace the placeholder in place, not add new tabs, unless a product decision changes the tab set.
 
 **Light/dark theme**: only `background`/`surface`/`text`/`textMuted`/`border` vary between `lightColors` and `darkColors` (`theme/colors.ts`) — brand colors (primary, secondary, success/warning/error, the header gradient) stay constant in both. Any component that renders one of the theme-dependent keys must read it from `useThemeColors()` inside the component body (so it re-renders on theme change), never from the static `colors` export — `StyleSheet.create()` at module scope can't be reactive, so theme-dependent values are applied via inline `style={[...]}` overrides, not baked into the stylesheet. `themeStore` only persists the user's choice (`system`/`light`/`dark`); `useThemeColors()` resolves `system` against the device's live scheme on every render.
 

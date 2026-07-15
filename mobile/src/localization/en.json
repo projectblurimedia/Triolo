@@ -37,7 +37,7 @@
   "tabs": {
     "home": "Home",
     "search": "Search",
-    "shoppify": "Shoppify",
+    "bazaar": "Bazaar",
     "profile": "Profile"
   },
   "home": {
@@ -50,7 +50,7 @@
   "search": {
     "comingSoon": "Worker and business search is coming soon."
   },
-  "shoppify": {
+  "bazaar": {
     "comingSoon": "Shop ordering is coming soon."
   },
   "errors": {

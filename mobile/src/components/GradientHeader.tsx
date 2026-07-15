@@ -16,53 +16,56 @@ interface GradientHeaderProps {
   title: string;
   /** Circular icon-only back button on the left, calling navigation.goBack(). */
   showBack?: boolean;
+  /** Decorative brand icon before the title (e.g. Home) — ignored when showBack is set. */
+  leadingIcon?: keyof typeof Ionicons.glyphMap;
   /** Right-side icon buttons — e.g. Home's notifications/messages/menu. */
   actions?: HeaderAction[];
 }
 
 /** Brand header used on every top-level screen — see docs/localization.md for why title is passed pre-translated. */
-export function GradientHeader({ title, showBack, actions }: GradientHeaderProps) {
+export function GradientHeader({ title, showBack, leadingIcon, actions }: GradientHeaderProps) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
 
   return (
-    <LinearGradient
-      colors={headerGradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.container, { paddingTop: insets.top + 14 }]}
-    >
-      <View style={styles.row}>
-        {showBack ? (
-          <Pressable
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Back"
-            hitSlop={8}
-            style={styles.iconButton}
-          >
-            <Ionicons name="arrow-back" size={20} color={colors.white} />
-          </Pressable>
-        ) : null}
+    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
+      <View style={[styles.content, { paddingTop: insets.top + 14 }]}>
+        <View style={styles.row}>
+          {showBack ? (
+            <Pressable
+              onPress={() => navigation.goBack()}
+              accessibilityLabel="Back"
+              hitSlop={8}
+              style={styles.iconButton}
+            >
+              <Ionicons name="arrow-back" size={22} color={colors.white} />
+            </Pressable>
+          ) : leadingIcon ? (
+            <View style={styles.iconButton}>
+              <Ionicons name={leadingIcon} size={22} color={colors.white} />
+            </View>
+          ) : null}
 
-        <Text style={[styles.title, showBack && styles.titleWithBack]} numberOfLines={1}>
-          {title}
-        </Text>
+          <Text style={[styles.title, (showBack || leadingIcon) && styles.titleWithLeading]} numberOfLines={1}>
+            {title}
+          </Text>
 
-        {actions && actions.length > 0 ? (
-          <View style={styles.actions}>
-            {actions.map((action) => (
-              <Pressable
-                key={action.accessibilityLabel}
-                onPress={action.onPress}
-                accessibilityLabel={action.accessibilityLabel}
-                hitSlop={8}
-                style={styles.iconButton}
-              >
-                <Ionicons name={action.icon} size={19} color={colors.white} />
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+          {actions && actions.length > 0 ? (
+            <View style={styles.actions}>
+              {actions.map((action) => (
+                <Pressable
+                  key={action.accessibilityLabel}
+                  onPress={action.onPress}
+                  accessibilityLabel={action.accessibilityLabel}
+                  hitSlop={8}
+                  style={styles.iconButton}
+                >
+                  <Ionicons name={action.icon} size={21} color={colors.white} />
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.accent} />
@@ -70,11 +73,13 @@ export function GradientHeader({ title, showBack, actions }: GradientHeaderProps
   );
 }
 
-const ICON_BUTTON_SIZE = 38;
+const ICON_BUTTON_SIZE = 40;
 
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
+  },
+  content: {
     paddingBottom: 16,
   },
   row: {
@@ -86,7 +91,7 @@ const styles = StyleSheet.create({
     color: colors.white,
     flex: 1,
   },
-  titleWithBack: {
+  titleWithLeading: {
     marginLeft: 12,
   },
   actions: {
@@ -105,7 +110,6 @@ const styles = StyleSheet.create({
   },
   accent: {
     height: 3,
-    marginTop: 14,
     marginHorizontal: -16,
     backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },

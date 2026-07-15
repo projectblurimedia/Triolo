@@ -4,7 +4,7 @@
  * per theme. See useThemeColors() and .cloud/architecture.md.
  */
 const brand = {
-  primary: '#0055D3',
+  primary: '#1d9bf0',
   primaryLight: '#1D76FA',
   secondary: '#F59E0B',
   success: '#16A34A',

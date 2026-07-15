@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format: date, module, s
 
 ## Unreleased
 
+- **Header fixes and polish**: `GradientHeader`'s bottom accent line was rendering with leftover padding beneath it (floating inside the header instead of sitting flush at the actual bottom edge) — restructured the layout so it's flush now. Header icons (back button, action buttons) sized up slightly for legibility. Renamed the "Shoppify" tab to **Bazaar** — "Shoppify" was too close to the Shopify trademark, and "Bazaar" also translates naturally to Telugu (`బజార్`) where "Shoppify" had to stay untranslated as a pseudo-brand name. `colors.primary` changed to `#1d9bf0` (buttons, active tab tint, active pill backgrounds); the header's linear gradient (`#0055D3` → `#1D76FA`) is intentionally unchanged. Home's header now shows a decorative compass icon beside the "Triolo" brand text.
+
 - Project scaffolded: documentation set (`docs/`), AI/engineering instructions (`.cloud/`), folder structure, initial repo setup.
 - **Auth module** (backend): mobile OTP registration/login for User/Worker/Business, JWT access tokens, rotating refresh tokens, `GET /me`. See `docs/api.md`, `docs/authentication.md`, `docs/database.md`. 26 unit tests passing; integration/API tests pending a real Postgres test instance.
 - **Mobile baseline** (`mobile/`): Expo + TypeScript scaffold with the full feature-based folder structure, working registration/login flow against the Auth module, English/Telugu language switching, and access-token refresh handling. See `mobile/README.md`.

@@ -37,7 +37,7 @@
   "tabs": {
     "home": "హోమ్",
     "search": "సెర్చ్",
-    "shoppify": "Shoppify",
+    "bazaar": "బజార్",
     "profile": "ప్రొఫైల్"
   },
   "home": {
@@ -50,7 +50,7 @@
   "search": {
     "comingSoon": "వర్కర్లు మరియు షాప్‌ల సెర్చ్ త్వరలో వస్తుంది."
   },
-  "shoppify": {
+  "bazaar": {
     "comingSoon": "షాపింగ్ ఆర్డర్ చేసే సదుపాయం త్వరలో వస్తుంది."
   },
   "errors": {

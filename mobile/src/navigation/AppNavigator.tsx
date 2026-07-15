@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { MainTabParamList } from './types';
 import { HomeScreen } from '@/screens/home/HomeScreen';
 import { SearchScreen } from '@/screens/search/SearchScreen';
-import { ShoppifyScreen } from '@/screens/shoppify/ShoppifyScreen';
+import { BazaarScreen } from '@/screens/bazaar/BazaarScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { GradientHeader } from '@/components/GradientHeader';
 import { fonts, useThemeColors } from '@/theme';
@@ -16,7 +16,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const ICONS: Record<keyof MainTabParamList, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
   Home: { active: 'home', inactive: 'home-outline' },
   Search: { active: 'search', inactive: 'search-outline' },
-  Shoppify: { active: 'storefront', inactive: 'storefront-outline' },
+  Bazaar: { active: 'storefront', inactive: 'storefront-outline' },
   Profile: { active: 'person', inactive: 'person-outline' },
 };
 
@@ -27,7 +27,7 @@ export function AppNavigator() {
   const titles: Record<keyof MainTabParamList, string> = {
     Home: t('tabs.home'),
     Search: t('tabs.search'),
-    Shoppify: t('tabs.shoppify'),
+    Bazaar: t('tabs.bazaar'),
     Profile: t('tabs.profile'),
   };
 
@@ -61,12 +61,13 @@ export function AppNavigator() {
         component={HomeScreen}
         options={{
           tabBarLabel: titles.Home,
-          // Home shows the app brand instead of the tab title, plus quick actions.
-          // Notifications/Messages/Menu have no destination yet — Notifications and
-          // in-app chat aren't built (see .cloud/project-context.md pending modules).
+          // Home shows the app brand (with a decorative logo icon) instead of the tab
+          // title, plus quick actions. Notifications/Messages/Menu have no destination
+          // yet — Notifications and in-app chat aren't built (see .cloud/project-context.md).
           header: () => (
             <GradientHeader
               title={t('common.appName')}
+              leadingIcon="compass"
               actions={[
                 { icon: 'notifications-outline', accessibilityLabel: t('home.notifications') },
                 { icon: 'chatbubble-ellipses-outline', accessibilityLabel: t('home.messages') },
@@ -77,7 +78,7 @@ export function AppNavigator() {
         }}
       />
       <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: titles.Search }} />
-      <Tab.Screen name="Shoppify" component={ShoppifyScreen} options={{ tabBarLabel: titles.Shoppify }} />
+      <Tab.Screen name="Bazaar" component={BazaarScreen} options={{ tabBarLabel: titles.Bazaar }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: titles.Profile }} />
     </Tab.Navigator>
   );
