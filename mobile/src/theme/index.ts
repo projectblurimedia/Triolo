@@ -1,2 +1,2 @@
-export { colors } from './colors';
-export { typography } from './typography';
+export { colors, headerGradient } from './colors';
+export { typography, fonts } from './typography';

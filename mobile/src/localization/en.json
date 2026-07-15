@@ -30,6 +30,22 @@
     "subtitle": "You can change this anytime in Settings.",
     "continue": "Continue"
   },
+  "tabs": {
+    "home": "Home",
+    "search": "Search",
+    "shoppify": "Shoppify",
+    "profile": "Profile"
+  },
+  "home": {
+    "greeting": "Hi {{name}}",
+    "subtitle": "Here's what's happening nearby."
+  },
+  "search": {
+    "comingSoon": "Worker and business search is coming soon."
+  },
+  "shoppify": {
+    "comingSoon": "Shop ordering is coming soon."
+  },
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "MOBILE_ALREADY_REGISTERED": "This mobile number is already registered.",

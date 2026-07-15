@@ -56,18 +56,20 @@ Feature-based, mirroring backend modules:
 
 ```
 src/
-  screens/        (auth, home, user, worker, business, orders, booking, notifications, profile, settings, admin)
-  components/     (shared: buttons, cards, inputs, dialogs, loaders, icons)
-  navigation/
+  screens/        (auth, home, search, shoppify, user, worker, business, orders, booking, notifications, profile, settings, admin)
+  components/     (shared: buttons, cards, inputs, dialogs, loaders, icons, GradientHeader)
+  navigation/     RootNavigator (language gate → auth vs. app), AuthNavigator (stack), AppNavigator (bottom tabs)
   services/       (API clients per module)
   hooks/
   state/          (Zustand stores)
-  theme/
+  theme/          (colors incl. brand gradient, typography/fonts — Poppins app-wide)
   localization/   (en, te)
   utils/
   constants/
   assets/
 ```
+
+Post-login navigation is a bottom tab bar (`@react-navigation/bottom-tabs`): Home, Search, Shoppify, Profile. Every tab screen is topped by the shared `GradientHeader` component (brand gradient, currently `#0055D3` → `#1D76FA`) — new tabs/screens follow this same header pattern rather than each screen rolling its own. Search and Shoppify are placeholders until the Worker/Business search and shopping-list modules exist; their content should replace the placeholder in place, not add new tabs, unless a product decision changes the tab set.
 
 ## Auth Flow
 

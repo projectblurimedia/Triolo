@@ -7,6 +7,9 @@ export type AuthStackParamList = {
   Otp: { mode: 'registration' | 'login'; mobileNumber: string };
 };
 
-export type AppStackParamList = {
+export type MainTabParamList = {
   Home: undefined;
+  Search: undefined;
+  Shoppify: undefined;
+  Profile: undefined;
 };

@@ -1,6 +1,6 @@
 export const colors = {
-  primary: '#0F766E',
-  primaryDark: '#0B5A54',
+  primary: '#0055D3',
+  primaryLight: '#1D76FA',
   secondary: '#F59E0B',
   background: '#FFFFFF',
   surface: '#F3F4F6',
@@ -10,4 +10,8 @@ export const colors = {
   success: '#16A34A',
   warning: '#D97706',
   error: '#DC2626',
+  white: '#FFFFFF',
 } as const;
+
+/** Brand gradient used on all headers — see GradientHeader component. */
+export const headerGradient = ['#0055D3', '#1D76FA'] as const;

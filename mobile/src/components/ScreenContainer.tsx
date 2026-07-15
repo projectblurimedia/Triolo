@@ -1,11 +1,21 @@
 import React, { PropsWithChildren } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Edge, SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/theme';
 
-export function ScreenContainer({ children }: PropsWithChildren) {
+interface ScreenContainerProps {
+  /**
+   * Which edges to pad. Defaults to all four for standalone screens (e.g. auth).
+   * Tab screens sit below a GradientHeader and above the tab bar, both of which
+   * already handle their own top/bottom insets — pass edges={['left','right']}
+   * there to avoid doubling that padding.
+   */
+  edges?: Edge[];
+}
+
+export function ScreenContainer({ children, edges = ['top', 'right', 'bottom', 'left'] }: PropsWithChildren<ScreenContainerProps>) {
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={edges}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
