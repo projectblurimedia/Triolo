@@ -1,7 +1,8 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { MainTabParamList } from './types';
 import { HomeScreen } from '@/screens/home/HomeScreen';
@@ -9,16 +10,20 @@ import { SearchScreen } from '@/screens/search/SearchScreen';
 import { BazaarScreen } from '@/screens/bazaar/BazaarScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { GradientHeader } from '@/components/GradientHeader';
-import { fonts, useThemeColors } from '@/theme';
+import { fonts, headerGradient, useThemeColors } from '@/theme';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const ICONS: Record<keyof MainTabParamList, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
-  Home: { active: 'home', inactive: 'home-outline' },
-  Search: { active: 'search', inactive: 'search-outline' },
-  Bazaar: { active: 'storefront', inactive: 'storefront-outline' },
-  Profile: { active: 'person', inactive: 'person-outline' },
+// FontAwesome5's free tier only ships these as solid glyphs (no outline variant) —
+// active vs. inactive is differentiated by the gradient pill below, not icon shape.
+const ICONS: Record<keyof MainTabParamList, keyof typeof FontAwesome5.glyphMap> = {
+  Home: 'home',
+  Search: 'search',
+  Bazaar: 'store',
+  Profile: 'user',
 };
+
+const ACTIVE_PILL_SIZE = 40;
 
 export function AppNavigator() {
   const { t } = useTranslation();
@@ -37,27 +42,51 @@ export function AppNavigator() {
         header: () => (
           <GradientHeader
             title={titles[route.name as keyof MainTabParamList]}
-            leadingIcon={ICONS[route.name as keyof MainTabParamList].active}
+            leadingIcon={ICONS[route.name as keyof MainTabParamList]}
           />
         ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
+        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12, marginTop: 2 },
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+          height: Platform.OS === 'ios' ? 92 : 72,
+          paddingTop: 10,
+          paddingBottom: Platform.OS === 'ios' ? 30 : 14,
           backgroundColor: colors.background,
           borderTopWidth: 0,
-          elevation: 12,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          elevation: 16,
           shadowColor: '#000',
-          shadowOpacity: 0.08,
-          shadowOffset: { width: 0, height: -2 },
-          shadowRadius: 8,
+          shadowOpacity: 0.1,
+          shadowOffset: { width: 0, height: -4 },
+          shadowRadius: 12,
         },
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused, size }) => {
           const icon = ICONS[route.name as keyof MainTabParamList];
-          return <Ionicons name={focused ? icon.active : icon.inactive} size={size} color={color} />;
+          if (focused) {
+            return (
+              <LinearGradient
+                colors={headerGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  width: ACTIVE_PILL_SIZE,
+                  height: ACTIVE_PILL_SIZE,
+                  borderRadius: ACTIVE_PILL_SIZE / 2,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <FontAwesome5 name={icon} size={size - 5} color={colors.white} solid />
+              </LinearGradient>
+            );
+          }
+          return (
+            <View style={{ width: ACTIVE_PILL_SIZE, height: ACTIVE_PILL_SIZE, justifyContent: 'center', alignItems: 'center' }}>
+              <FontAwesome5 name={icon} size={size - 5} color={colors.textMuted} solid />
+            </View>
+          );
         },
       })}
     >
@@ -74,9 +103,9 @@ export function AppNavigator() {
               title={t('common.appName')}
               leadingIcon="compass"
               actions={[
-                { icon: 'notifications-outline', accessibilityLabel: t('home.notifications') },
-                { icon: 'chatbubble-ellipses-outline', accessibilityLabel: t('home.messages') },
-                { icon: 'menu-outline', accessibilityLabel: t('home.menu') },
+                { icon: 'bell', accessibilityLabel: t('home.notifications') },
+                { icon: 'comment-dots', accessibilityLabel: t('home.messages') },
+                { icon: 'bars', accessibilityLabel: t('home.menu') },
               ]}
             />
           ),

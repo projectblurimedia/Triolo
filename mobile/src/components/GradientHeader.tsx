@@ -1,13 +1,13 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, headerGradient, typography } from '@/theme';
+import { colors, fonts, headerGradient, typography } from '@/theme';
 
 export interface HeaderAction {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: keyof typeof FontAwesome5.glyphMap;
   accessibilityLabel: string;
   onPress?: () => void;
 }
@@ -17,7 +17,7 @@ interface GradientHeaderProps {
   /** Circular icon-only back button on the left, calling navigation.goBack(). */
   showBack?: boolean;
   /** Decorative brand icon before the title (e.g. Home) — ignored when showBack is set. */
-  leadingIcon?: keyof typeof Ionicons.glyphMap;
+  leadingIcon?: keyof typeof FontAwesome5.glyphMap;
   /** Right-side icon buttons — e.g. Home's notifications/messages/menu. */
   actions?: HeaderAction[];
 }
@@ -38,15 +38,15 @@ export function GradientHeader({ title, showBack, leadingIcon, actions }: Gradie
               hitSlop={8}
               style={styles.iconButton}
             >
-              <Ionicons name="arrow-back" size={22} color={colors.white} />
+              <FontAwesome5 name="arrow-left" size={18} color={colors.white} />
             </Pressable>
           ) : leadingIcon ? (
             <View style={styles.iconButton}>
-              <Ionicons name={leadingIcon} size={22} color={colors.white} />
+              <FontAwesome5 name={leadingIcon} size={18} color={colors.white} />
             </View>
           ) : null}
 
-          <Text style={[styles.title, (showBack || leadingIcon) && styles.titleWithLeading]} numberOfLines={1}>
+          <Text style={[styles.title, Boolean(showBack || leadingIcon) && styles.titleWithLeading]} numberOfLines={1}>
             {title}
           </Text>
 
@@ -60,7 +60,7 @@ export function GradientHeader({ title, showBack, leadingIcon, actions }: Gradie
                   hitSlop={8}
                   style={styles.iconButton}
                 >
-                  <Ionicons name={action.icon} size={21} color={colors.white} />
+                  <FontAwesome5 name={action.icon} size={17} color={colors.white} />
                 </Pressable>
               ))}
             </View>
@@ -88,6 +88,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.heading,
+    fontFamily: fonts.medium,
     color: colors.white,
     flex: 1,
   },
