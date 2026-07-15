@@ -78,6 +78,8 @@ Post-login navigation is a bottom tab bar (`@react-navigation/bottom-tabs`): Hom
 
 **Light/dark theme**: only `background`/`surface`/`text`/`textMuted`/`border` vary between `lightColors` and `darkColors` (`theme/colors.ts`, currently `#F9FCFF`/`#0c0f14` background/text swapped between the two) — brand colors (primary, secondary, success/warning/error, the header gradient) stay constant in both. Any component that renders one of the theme-dependent keys must read it from `useThemeColors()` inside the component body (so it re-renders on theme change), never from the static `colors` export — `StyleSheet.create()` at module scope can't be reactive, so theme-dependent values are applied via inline `style={[...]}` overrides, not baked into the stylesheet. `themeStore` only persists the user's choice (`system`/`light`/`dark`); `useThemeColors()` resolves `system` against the device's live scheme on every render.
 
+`RootNavigator.tsx` also passes a `theme` to `<NavigationContainer>` built from `useThemeColors()` (based on React Navigation's own `DefaultTheme`/`DarkTheme`) — without this, React Navigation's hardcoded default (light) background shows through anywhere screen content doesn't fully cover it (this is what caused the tab bar's rounded-corner artifact in dark mode; it wasn't an Android rendering quirk, despite two earlier attempts assuming it was). Any future navigator added at the root level inherits this automatically; don't reintroduce a bare `<NavigationContainer>` without the `theme` prop.
+
 ## Auth Flow
 
 1. Mobile number entered → OTP sent.
