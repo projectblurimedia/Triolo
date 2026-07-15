@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
-import { typography, useThemeColors } from '@/theme';
+import { fonts, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 
 export function HomeScreen() {
@@ -21,6 +21,6 @@ export function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  greeting: { ...typography.heading, marginTop: 20, marginBottom: 8 },
-  subtitle: { ...typography.body },
+  greeting: { fontSize: 22, fontFamily: fonts.medium, marginTop: 20, marginBottom: 8 },
+  subtitle: { fontSize: 15, fontFamily: fonts.regular },
 });

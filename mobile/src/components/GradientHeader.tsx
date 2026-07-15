@@ -14,6 +14,8 @@ export interface HeaderAction {
 
 interface GradientHeaderProps {
   title: string;
+  /** Short tagline under the title — fills otherwise-empty headers (e.g. Search, Bazaar, Profile). */
+  subtitle?: string;
   /** Circular icon-only back button on the left, calling navigation.goBack(). */
   showBack?: boolean;
   /** Decorative brand icon before the title (e.g. Home) — ignored when showBack is set. */
@@ -23,9 +25,10 @@ interface GradientHeaderProps {
 }
 
 /** Brand header used on every top-level screen — see docs/localization.md for why title is passed pre-translated. */
-export function GradientHeader({ title, showBack, leadingIcon, actions }: GradientHeaderProps) {
+export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions }: GradientHeaderProps) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const hasLeading = Boolean(showBack || leadingIcon);
 
   return (
     <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
@@ -46,9 +49,16 @@ export function GradientHeader({ title, showBack, leadingIcon, actions }: Gradie
             </View>
           ) : null}
 
-          <Text style={[styles.title, Boolean(showBack || leadingIcon) && styles.titleWithLeading]} numberOfLines={1}>
-            {title}
-          </Text>
+          <View style={[styles.titleGroup, hasLeading && styles.titleGroupWithLeading]}>
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+            {subtitle ? (
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
 
           {actions && actions.length > 0 ? (
             <View style={styles.actions}>
@@ -86,14 +96,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  title: {
-    ...typography.heading,
-    fontFamily: fonts.medium,
-    color: colors.white,
+  titleGroup: {
     flex: 1,
   },
-  titleWithLeading: {
+  titleGroupWithLeading: {
     marginLeft: 12,
+  },
+  title: {
+    ...typography.heading,
+    fontFamily: fonts.semiBold,
+    color: colors.white,
+  },
+  subtitle: {
+    ...typography.caption,
+    color: 'rgba(255, 255, 255, 0.82)',
+    marginTop: 2,
   },
   actions: {
     flexDirection: 'row',

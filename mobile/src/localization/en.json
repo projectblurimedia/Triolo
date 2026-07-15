@@ -48,10 +48,15 @@
     "menu": "Menu"
   },
   "search": {
-    "comingSoon": "Worker and business search is coming soon."
+    "comingSoon": "Worker and business search is coming soon.",
+    "tagline": "Find workers and shops near you"
   },
   "bazaar": {
-    "comingSoon": "Shop ordering is coming soon."
+    "comingSoon": "Shop ordering is coming soon.",
+    "tagline": "Order from your local shops"
+  },
+  "profile": {
+    "tagline": "Your account and settings"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",
