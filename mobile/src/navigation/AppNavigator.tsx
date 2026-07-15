@@ -64,7 +64,11 @@ export function AppNavigator() {
           borderTopWidth: 0,
           borderTopLeftRadius: TAB_BAR_RADIUS,
           borderTopRightRadius: TAB_BAR_RADIUS,
-          overflow: 'hidden',
+          // Deliberately no overflow:'hidden' here — combined with elevation, Android
+          // often fails to clip rounded corners, leaving a default white artifact
+          // showing through at the corners (invisible in light mode, glaring in dark).
+          // The actual rounded fill lives in tabBarBackground below instead, on a view
+          // with no elevation of its own, where the clip reliably works.
           elevation: 16,
           shadowColor: '#000',
           shadowOpacity: 0.1,
@@ -77,17 +81,16 @@ export function AppNavigator() {
         // Fills with `surface` (not `background`) so the bar reads as a distinct
         // elevated panel instead of blending into the screen content behind it.
         tabBarBackground: () => (
-          <View style={{ flex: 1, backgroundColor: colors.surface }}>
-            <LinearGradient
-              colors={headerGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                height: 4,
-                borderTopLeftRadius: TAB_BAR_RADIUS,
-                borderTopRightRadius: TAB_BAR_RADIUS,
-              }}
-            />
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: TAB_BAR_RADIUS,
+              borderTopRightRadius: TAB_BAR_RADIUS,
+              overflow: 'hidden',
+            }}
+          >
+            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 4 }} />
           </View>
         ),
         // Default tab button shows an Android ripple / iOS opacity dim on press —
