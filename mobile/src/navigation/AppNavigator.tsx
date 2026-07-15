@@ -60,15 +60,15 @@ export function AppNavigator() {
           height: Platform.OS === 'ios' ? 92 : 76,
           paddingTop: 8,
           paddingBottom: Platform.OS === 'ios' ? 30 : 18,
-          backgroundColor: 'transparent',
+          // A transparent background on an elevated Android view falls back to a
+          // default (light) fill wherever the rounded-corner clip doesn't perfectly
+          // cover the rectangular shadow bounds — exactly the corner artifact seen in
+          // dark mode. Coloring this view itself with `surface` removes the mismatch:
+          // whatever peeks through at the corners is now the correct theme color.
+          backgroundColor: colors.surface,
           borderTopWidth: 0,
           borderTopLeftRadius: TAB_BAR_RADIUS,
           borderTopRightRadius: TAB_BAR_RADIUS,
-          // Deliberately no overflow:'hidden' here — combined with elevation, Android
-          // often fails to clip rounded corners, leaving a default white artifact
-          // showing through at the corners (invisible in light mode, glaring in dark).
-          // The actual rounded fill lives in tabBarBackground below instead, on a view
-          // with no elevation of its own, where the clip reliably works.
           elevation: 16,
           shadowColor: '#000',
           shadowOpacity: 0.1,
