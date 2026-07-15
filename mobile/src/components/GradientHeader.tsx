@@ -106,11 +106,13 @@ const styles = StyleSheet.create({
     ...typography.heading,
     fontFamily: fonts.semiBold,
     color: colors.white,
+    lineHeight: 24,
   },
   subtitle: {
     ...typography.caption,
     color: 'rgba(255, 255, 255, 0.82)',
-    marginTop: 2,
+    lineHeight: 14,
+    marginTop: 0,
   },
   actions: {
     flexDirection: 'row',

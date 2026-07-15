@@ -30,7 +30,7 @@ export interface ThemeColors {
 
 export const lightColors: ThemeColors = {
   ...brand,
-  background: '#ECEDEE',
+  background: '#F9FCFF',
   surface: '#FFFFFF',
   text: '#0c0f14',
   textMuted: '#5B6472',
@@ -41,7 +41,7 @@ export const darkColors: ThemeColors = {
   ...brand,
   background: '#0c0f14',
   surface: '#1A1F27',
-  text: '#ECEDEE',
+  text: '#F9FCFF',
   textMuted: '#9AA3AF',
   border: '#2A303B',
 };

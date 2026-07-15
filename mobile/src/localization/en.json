@@ -41,6 +41,7 @@
     "profile": "Profile"
   },
   "home": {
+    "tagline": "Local services, one tap away",
     "greeting": "Hi {{name}}",
     "subtitle": "Here's what's happening nearby.",
     "notifications": "Notifications",

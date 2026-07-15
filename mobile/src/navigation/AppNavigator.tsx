@@ -15,7 +15,7 @@ import { fonts, headerGradient, useThemeColors } from '@/theme';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // FontAwesome5's free tier only ships these as solid glyphs (no outline variant) —
-// active vs. inactive is shown via color + the glow indicator below, not icon shape.
+// active vs. inactive is shown via color only, not icon shape.
 const ICONS: Record<keyof MainTabParamList, keyof typeof FontAwesome5.glyphMap> = {
   Home: 'home',
   Search: 'search',
@@ -54,11 +54,12 @@ export function AppNavigator() {
         ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12, marginTop: 6 },
+        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 13, marginTop: 4 },
+        tabBarItemStyle: { paddingVertical: 2 },
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 92 : 72,
-          paddingTop: 14,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 14,
+          height: Platform.OS === 'ios' ? 86 : 64,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
           backgroundColor: 'transparent',
           borderTopWidth: 0,
           borderTopLeftRadius: TAB_BAR_RADIUS,
@@ -70,11 +71,21 @@ export function AppNavigator() {
           shadowOffset: { width: 0, height: -4 },
           shadowRadius: 12,
         },
-        // Custom background so the top edge can carry a gradient line (a native
-        // border can't be a gradient) instead of a flat borderTopColor.
+        // Custom background so the top edge can carry a gradient line (a native border
+        // can't be a gradient) whose own corners are rounded to match the tab bar's,
+        // instead of a flat strip that gets hard-clipped where the corner curve starts.
         tabBarBackground: () => (
           <View style={{ flex: 1, backgroundColor: colors.background }}>
-            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 2 }} />
+            <LinearGradient
+              colors={headerGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                height: 4,
+                borderTopLeftRadius: TAB_BAR_RADIUS,
+                borderTopRightRadius: TAB_BAR_RADIUS,
+              }}
+            />
           </View>
         ),
         // Default tab button shows an Android ripple / iOS opacity dim on press —
@@ -82,30 +93,7 @@ export function AppNavigator() {
         tabBarButton: ({ ref: _ref, ...rest }) => <Pressable {...rest} android_ripple={{ color: 'transparent' }} />,
         tabBarIcon: ({ focused, size }) => {
           const icon = ICONS[route.name as keyof MainTabParamList];
-          return (
-            <View style={{ alignItems: 'center', justifyContent: 'flex-end', width: 44, height: size + 14 }}>
-              {focused ? (
-                <LinearGradient
-                  colors={headerGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    width: 28,
-                    height: 4,
-                    borderRadius: 2,
-                    shadowColor: colors.primary,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.9,
-                    shadowRadius: 6,
-                    elevation: 6,
-                  }}
-                />
-              ) : null}
-              <FontAwesome5 name={icon} size={size - 4} color={focused ? colors.primary : colors.textMuted} solid />
-            </View>
-          );
+          return <FontAwesome5 name={icon} size={size - 2} color={focused ? colors.primary : colors.textMuted} solid />;
         },
       })}
     >
@@ -120,6 +108,7 @@ export function AppNavigator() {
           header: () => (
             <GradientHeader
               title={t('common.appName')}
+              subtitle={t('home.tagline')}
               leadingIcon="compass"
               actions={[
                 { icon: 'bell', accessibilityLabel: t('home.notifications') },
