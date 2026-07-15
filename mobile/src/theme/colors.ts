@@ -31,7 +31,7 @@ export interface ThemeColors {
 export const lightColors: ThemeColors = {
   ...brand,
   background: '#F9FCFF',
-  surface: '#DCE6F2',
+  surface: '#f2f8ff',
   text: '#0c0f14',
   textMuted: '#5B6472',
   border: '#D8DADD',
