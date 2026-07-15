@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { MainTabParamList } from './types';
 import { HomeScreen } from '@/screens/home/HomeScreen';
-import { SearchScreen } from '@/screens/search/SearchScreen';
+import { ServicesScreen } from '@/screens/services/ServicesScreen';
 import { BazaarScreen } from '@/screens/bazaar/BazaarScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { GradientHeader } from '@/components/GradientHeader';
@@ -18,7 +18,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 // active vs. inactive is shown via color only, not icon shape.
 const ICONS: Record<keyof MainTabParamList, keyof typeof FontAwesome5.glyphMap> = {
   Home: 'home',
-  Search: 'search',
+  Services: 'concierge-bell',
   Bazaar: 'store',
   Profile: 'user',
 };
@@ -31,13 +31,13 @@ export function AppNavigator() {
 
   const titles: Record<keyof MainTabParamList, string> = {
     Home: t('tabs.home'),
-    Search: t('tabs.search'),
+    Services: t('tabs.services'),
     Bazaar: t('tabs.bazaar'),
     Profile: t('tabs.profile'),
   };
 
   const subtitles: Partial<Record<keyof MainTabParamList, string>> = {
-    Search: t('search.tagline'),
+    Services: t('services.tagline'),
     Bazaar: t('bazaar.tagline'),
     Profile: t('profile.tagline'),
   };
@@ -57,9 +57,9 @@ export function AppNavigator() {
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11, lineHeight: 13, marginTop: 4 },
         tabBarItemStyle: { paddingVertical: 2 },
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 86 : 64,
+          height: Platform.OS === 'ios' ? 92 : 76,
           paddingTop: 8,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          paddingBottom: Platform.OS === 'ios' ? 30 : 18,
           backgroundColor: 'transparent',
           borderTopWidth: 0,
           borderTopLeftRadius: TAB_BAR_RADIUS,
@@ -74,8 +74,10 @@ export function AppNavigator() {
         // Custom background so the top edge can carry a gradient line (a native border
         // can't be a gradient) whose own corners are rounded to match the tab bar's,
         // instead of a flat strip that gets hard-clipped where the corner curve starts.
+        // Fills with `surface` (not `background`) so the bar reads as a distinct
+        // elevated panel instead of blending into the screen content behind it.
         tabBarBackground: () => (
-          <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flex: 1, backgroundColor: colors.surface }}>
             <LinearGradient
               colors={headerGradient}
               start={{ x: 0, y: 0 }}
@@ -103,8 +105,8 @@ export function AppNavigator() {
         options={{
           tabBarLabel: titles.Home,
           // Home shows the app brand (with a decorative logo icon) instead of the tab
-          // title, plus quick actions. Notifications/Messages/Menu have no destination
-          // yet — Notifications and in-app chat aren't built (see .cloud/project-context.md).
+          // title, plus quick actions. Notifications has no destination yet — the
+          // Notifications module isn't built (see .cloud/project-context.md).
           header: () => (
             <GradientHeader
               title={t('common.appName')}
@@ -112,14 +114,13 @@ export function AppNavigator() {
               leadingIcon="compass"
               actions={[
                 { icon: 'bell', accessibilityLabel: t('home.notifications') },
-                { icon: 'comment-dots', accessibilityLabel: t('home.messages') },
                 { icon: 'bars', accessibilityLabel: t('home.menu') },
               ]}
             />
           ),
         }}
       />
-      <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: titles.Search }} />
+      <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: titles.Services }} />
       <Tab.Screen name="Bazaar" component={BazaarScreen} options={{ tabBarLabel: titles.Bazaar }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: titles.Profile }} />
     </Tab.Navigator>
