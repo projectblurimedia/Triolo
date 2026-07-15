@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Local Services",
+    "appName": "Triolo",
     "continue": "Continue",
     "cancel": "Cancel",
     "retry": "Retry",
@@ -38,7 +38,10 @@
   },
   "home": {
     "greeting": "Hi {{name}}",
-    "subtitle": "Here's what's happening nearby."
+    "subtitle": "Here's what's happening nearby.",
+    "notifications": "Notifications",
+    "messages": "Messages",
+    "menu": "Menu"
   },
   "search": {
     "comingSoon": "Worker and business search is coming soon."

@@ -12,7 +12,21 @@ export function createApp(): Express {
   app.use(helmet());
   app.use(cors());
   app.use(express.json());
-  app.use(pinoHttp({ logger, autoLogging: process.env.NODE_ENV !== 'test' }));
+  app.use(
+    pinoHttp({
+      logger,
+      autoLogging: process.env.NODE_ENV !== 'test',
+      customSuccessMessage: (req, res) => `${req.method} ${req.url} -> ${res.statusCode}`,
+      customErrorMessage: (req, res, err) => `${req.method} ${req.url} -> ${res.statusCode} (${err.message})`,
+      // The success/error message above already has method/url/status. The default req/res
+      // objects would otherwise dump every header — including Authorization, which must
+      // never be logged (see .cloud/development-rules.md) — so drop them entirely.
+      serializers: {
+        req: () => undefined,
+        res: () => undefined,
+      },
+    }),
+  );
 
   app.get('/health', (_req, res) => {
     res.status(200).json({ success: true, message: 'OK', data: { status: 'healthy' } });

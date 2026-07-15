@@ -55,7 +55,26 @@ export function AppNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: titles.Home }} />
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          tabBarLabel: titles.Home,
+          // Home shows the app brand instead of the tab title, plus quick actions.
+          // Notifications/Messages/Menu have no destination yet — Notifications and
+          // in-app chat aren't built (see .cloud/project-context.md pending modules).
+          header: () => (
+            <GradientHeader
+              title={t('common.appName')}
+              actions={[
+                { icon: 'notifications-outline', accessibilityLabel: t('home.notifications') },
+                { icon: 'chatbubble-ellipses-outline', accessibilityLabel: t('home.messages') },
+                { icon: 'menu-outline', accessibilityLabel: t('home.menu') },
+              ]}
+            />
+          ),
+        }}
+      />
       <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: titles.Search }} />
       <Tab.Screen name="Shoppify" component={ShoppifyScreen} options={{ tabBarLabel: titles.Shoppify }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: titles.Profile }} />
