@@ -9,7 +9,7 @@ import { SearchScreen } from '@/screens/search/SearchScreen';
 import { ShoppifyScreen } from '@/screens/shoppify/ShoppifyScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { GradientHeader } from '@/components/GradientHeader';
-import { colors, fonts } from '@/theme';
+import { fonts, useThemeColors } from '@/theme';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -22,6 +22,7 @@ const ICONS: Record<keyof MainTabParamList, { active: keyof typeof Ionicons.glyp
 
 export function AppNavigator() {
   const { t } = useTranslation();
+  const { colors } = useThemeColors();
 
   const titles: Record<keyof MainTabParamList, string> = {
     Home: t('tabs.home'),

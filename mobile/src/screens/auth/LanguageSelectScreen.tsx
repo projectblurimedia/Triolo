@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { Button } from '@/components/Button';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
-import { colors, typography } from '@/theme';
+import { typography, useThemeColors } from '@/theme';
 import { useSettingsStore } from '@/state/settingsStore';
 
 /**
@@ -14,13 +14,14 @@ import { useSettingsStore } from '@/state/settingsStore';
  */
 export function LanguageSelectScreen() {
   const { t } = useTranslation();
+  const { colors } = useThemeColors();
   const confirmLanguage = useSettingsStore((state) => state.confirmLanguage);
 
   return (
     <ScreenContainer>
       <View style={styles.content}>
-        <Text style={styles.title}>{t('languageSelect.title')}</Text>
-        <Text style={styles.subtitle}>{t('languageSelect.subtitle')}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('languageSelect.title')}</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('languageSelect.subtitle')}</Text>
         <View style={styles.switcher}>
           <LanguageSwitcher />
         </View>
@@ -32,7 +33,7 @@ export function LanguageSelectScreen() {
 
 const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'center' },
-  title: { ...typography.heading, color: colors.text, textAlign: 'center', marginBottom: 8 },
-  subtitle: { ...typography.body, color: colors.textMuted, textAlign: 'center', marginBottom: 32 },
+  title: { ...typography.heading, textAlign: 'center', marginBottom: 8 },
+  subtitle: { ...typography.body, textAlign: 'center', marginBottom: 32 },
   switcher: { alignItems: 'center', marginBottom: 40 },
 });

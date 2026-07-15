@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, headerGradient, typography } from '@/theme';
 
@@ -13,13 +14,16 @@ export interface HeaderAction {
 
 interface GradientHeaderProps {
   title: string;
-  /** Right-side icon buttons — e.g. Home's notifications/messages/menu. Omit for a plain title header. */
+  /** Circular icon-only back button on the left, calling navigation.goBack(). */
+  showBack?: boolean;
+  /** Right-side icon buttons — e.g. Home's notifications/messages/menu. */
   actions?: HeaderAction[];
 }
 
 /** Brand header used on every top-level screen — see docs/localization.md for why title is passed pre-translated. */
-export function GradientHeader({ title, actions }: GradientHeaderProps) {
+export function GradientHeader({ title, showBack, actions }: GradientHeaderProps) {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
 
   return (
     <LinearGradient
@@ -29,7 +33,21 @@ export function GradientHeader({ title, actions }: GradientHeaderProps) {
       style={[styles.container, { paddingTop: insets.top + 14 }]}
     >
       <View style={styles.row}>
-        <Text style={styles.title}>{title}</Text>
+        {showBack ? (
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityLabel="Back"
+            hitSlop={8}
+            style={styles.iconButton}
+          >
+            <Ionicons name="arrow-back" size={20} color={colors.white} />
+          </Pressable>
+        ) : null}
+
+        <Text style={[styles.title, showBack && styles.titleWithBack]} numberOfLines={1}>
+          {title}
+        </Text>
+
         {actions && actions.length > 0 ? (
           <View style={styles.actions}>
             {actions.map((action) => (
@@ -38,37 +56,57 @@ export function GradientHeader({ title, actions }: GradientHeaderProps) {
                 onPress={action.onPress}
                 accessibilityLabel={action.accessibilityLabel}
                 hitSlop={8}
-                style={styles.actionButton}
+                style={styles.iconButton}
               >
-                <Ionicons name={action.icon} size={22} color={colors.white} />
+                <Ionicons name={action.icon} size={19} color={colors.white} />
               </Pressable>
             ))}
           </View>
         ) : null}
       </View>
+
+      <View style={styles.accent} />
     </LinearGradient>
   );
 }
 
+const ICON_BUTTON_SIZE = 38;
+
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 16,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   title: {
     ...typography.heading,
     color: colors.white,
+    flex: 1,
+  },
+  titleWithBack: {
+    marginLeft: 12,
   },
   actions: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 8,
   },
-  actionButton: {
-    padding: 2,
+  iconButton: {
+    width: ICON_BUTTON_SIZE,
+    height: ICON_BUTTON_SIZE,
+    borderRadius: ICON_BUTTON_SIZE / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.32)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  accent: {
+    height: 3,
+    marginTop: 14,
+    marginHorizontal: -16,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
 });

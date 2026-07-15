@@ -4,12 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { Button } from '@/components/Button';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
-import { colors, typography } from '@/theme';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import { typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 
 export function ProfileScreen() {
   const { t } = useTranslation();
+  const { colors } = useThemeColors();
   const account = useAuthStore((state) => state.account);
   const logout = useLogout();
   const updateLanguage = useUpdateAccountLanguage();
@@ -17,19 +19,24 @@ export function ProfileScreen() {
   return (
     <ScreenContainer edges={['left', 'right']}>
       {account ? (
-        <View style={styles.card}>
-          <Text style={styles.name}>{account.fullName}</Text>
-          <Text style={styles.meta}>{account.mobileNumber}</Text>
-          <Text style={styles.meta}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.name, { color: colors.text }]}>{account.fullName}</Text>
+          <Text style={[styles.meta, { color: colors.textMuted }]}>{account.mobileNumber}</Text>
+          <Text style={[styles.meta, { color: colors.textMuted }]}>
             {account.role} · {account.status}
           </Text>
         </View>
       ) : null}
 
-      <View style={styles.languageRow}>
-        <Text style={styles.label}>{t('settings.language')}</Text>
+      <View style={styles.section}>
+        <Text style={[styles.label, { color: colors.textMuted }]}>{t('settings.language')}</Text>
         {/* Persists locally immediately; also synced to the account so it follows the user to a new device. */}
         <LanguageSwitcher onChange={(language) => updateLanguage.mutate(language)} />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.label, { color: colors.textMuted }]}>{t('settings.theme')}</Text>
+        <ThemeSwitcher />
       </View>
 
       <Button label={t('common.logout')} onPress={() => logout.mutate()} loading={logout.isPending} />
@@ -39,14 +46,13 @@ export function ProfileScreen() {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 16,
     marginTop: 20,
     marginBottom: 24,
   },
-  name: { ...typography.subheading, color: colors.text },
-  meta: { ...typography.body, color: colors.textMuted, marginTop: 4 },
-  languageRow: { gap: 10, marginBottom: 24 },
-  label: { ...typography.body, color: colors.textMuted },
+  name: { ...typography.subheading },
+  meta: { ...typography.body, marginTop: 4 },
+  section: { gap: 10, marginBottom: 24 },
+  label: { ...typography.body },
 });

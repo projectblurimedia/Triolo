@@ -30,8 +30,7 @@ export function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <ScreenContainer>
-      <Text style={styles.heading}>{t('auth.login')}</Text>
+    <ScreenContainer edges={['left', 'right', 'bottom']}>
       <TextField
         label={t('auth.mobileNumberLabel')}
         value={mobileNumber}
@@ -46,6 +45,5 @@ export function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  heading: { ...typography.heading, marginBottom: 24 },
   error: { ...typography.caption, color: colors.error, marginBottom: 12 },
 });

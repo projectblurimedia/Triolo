@@ -23,7 +23,11 @@
   "settings": {
     "language": "Language",
     "english": "English",
-    "telugu": "Telugu"
+    "telugu": "Telugu",
+    "theme": "Theme",
+    "themeSystem": "System Default",
+    "themeLight": "Light",
+    "themeDark": "Dark"
   },
   "languageSelect": {
     "title": "Choose your language",

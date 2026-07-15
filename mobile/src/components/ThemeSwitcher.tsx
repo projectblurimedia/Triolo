@@ -2,36 +2,28 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { typography, useThemeColors } from '@/theme';
-import { useSettingsStore } from '@/state/settingsStore';
-import { SupportedLanguage } from '@/localization/i18n';
+import { useThemeStore, ThemeMode } from '@/state/themeStore';
 
-const OPTIONS: { code: SupportedLanguage; labelKey: string }[] = [
-  { code: 'en', labelKey: 'settings.english' },
-  { code: 'te', labelKey: 'settings.telugu' },
+const OPTIONS: { mode: ThemeMode; labelKey: string }[] = [
+  { mode: 'system', labelKey: 'settings.themeSystem' },
+  { mode: 'light', labelKey: 'settings.themeLight' },
+  { mode: 'dark', labelKey: 'settings.themeDark' },
 ];
 
-interface LanguageSwitcherProps {
-  /** Called after the local language state updates (e.g. to sync to the backend). */
-  onChange?: (language: SupportedLanguage) => void;
-}
-
-export function LanguageSwitcher({ onChange }: LanguageSwitcherProps) {
+export function ThemeSwitcher() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const language = useSettingsStore((state) => state.language);
-  const setLanguage = useSettingsStore((state) => state.setLanguage);
+  const mode = useThemeStore((state) => state.mode);
+  const setMode = useThemeStore((state) => state.setMode);
 
   return (
     <View style={styles.row}>
       {OPTIONS.map((option) => {
-        const isActive = language === option.code;
+        const isActive = mode === option.mode;
         return (
           <Pressable
-            key={option.code}
-            onPress={() => {
-              setLanguage(option.code);
-              onChange?.(option.code);
-            }}
+            key={option.mode}
+            onPress={() => setMode(option.mode)}
             style={[
               styles.pill,
               { borderColor: colors.border },
@@ -47,12 +39,12 @@ export function LanguageSwitcher({ onChange }: LanguageSwitcherProps) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 10 },
+  row: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   pill: {
     borderWidth: 1,
     borderRadius: 20,
     paddingVertical: 8,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
   },
   label: { ...typography.body },
 });

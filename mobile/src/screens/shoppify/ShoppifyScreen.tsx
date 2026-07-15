@@ -2,19 +2,20 @@ import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
-import { colors, typography } from '@/theme';
+import { typography, useThemeColors } from '@/theme';
 
 /** Placeholder until the Business shopping-list/ordering module is built (see .cloud/project-context.md). */
 export function ShoppifyScreen() {
   const { t } = useTranslation();
+  const { colors } = useThemeColors();
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <Text style={styles.placeholder}>{t('shoppify.comingSoon')}</Text>
+      <Text style={[styles.placeholder, { color: colors.textMuted }]}>{t('shoppify.comingSoon')}</Text>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  placeholder: { ...typography.body, color: colors.textMuted, marginTop: 20, textAlign: 'center' },
+  placeholder: { ...typography.body, marginTop: 20, textAlign: 'center' },
 });

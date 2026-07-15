@@ -35,8 +35,7 @@ export function OtpScreen({ route }: Props) {
   };
 
   return (
-    <ScreenContainer>
-      <Text style={styles.heading}>{t('auth.otpLabel')}</Text>
+    <ScreenContainer edges={['left', 'right', 'bottom']}>
       <TextField
         label={t('auth.otpLabel')}
         value={otp}
@@ -51,6 +50,5 @@ export function OtpScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  heading: { ...typography.heading, marginBottom: 24 },
   error: { ...typography.caption, color: colors.error, marginBottom: 12 },
 });

@@ -23,7 +23,11 @@
   "settings": {
     "language": "భాష",
     "english": "ఇంగ్లీష్",
-    "telugu": "తెలుగు"
+    "telugu": "తెలుగు",
+    "theme": "థీమ్",
+    "themeSystem": "సిస్టమ్ డిఫాల్ట్",
+    "themeLight": "లైట్",
+    "themeDark": "డార్క్"
   },
   "languageSelect": {
     "title": "మీ భాషను ఎంచుకోండి",

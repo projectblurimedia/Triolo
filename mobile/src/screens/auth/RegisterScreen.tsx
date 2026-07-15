@@ -35,8 +35,7 @@ export function RegisterScreen({ route, navigation }: Props) {
   };
 
   return (
-    <ScreenContainer>
-      <Text style={styles.heading}>{t('auth.register')}</Text>
+    <ScreenContainer edges={['left', 'right', 'bottom']}>
       <View style={styles.languageRow}>
         <LanguageSwitcher />
       </View>
@@ -55,7 +54,6 @@ export function RegisterScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  heading: { ...typography.heading, marginBottom: 16 },
   languageRow: { marginBottom: 24 },
   error: { ...typography.caption, color: colors.error, marginBottom: 12 },
 });

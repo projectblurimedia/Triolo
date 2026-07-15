@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
-import { colors, typography } from '@/theme';
+import { colors, typography, useThemeColors } from '@/theme';
 
 interface TextFieldProps extends TextInputProps {
   label: string;
@@ -8,12 +8,19 @@ interface TextFieldProps extends TextInputProps {
 }
 
 export function TextField({ label, error, style, ...inputProps }: TextFieldProps) {
+  const { colors: themeColors } = useThemeColors();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: themeColors.textMuted }]}>{label}</Text>
       <TextInput
-        style={[styles.input, error ? styles.inputError : null, style]}
-        placeholderTextColor={colors.textMuted}
+        style={[
+          styles.input,
+          { borderColor: themeColors.border, color: themeColors.text },
+          error ? styles.inputError : null,
+          style,
+        ]}
+        placeholderTextColor={themeColors.textMuted}
         {...inputProps}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -23,15 +30,13 @@ export function TextField({ label, error, style, ...inputProps }: TextFieldProps
 
 const styles = StyleSheet.create({
   container: { marginBottom: 16 },
-  label: { ...typography.caption, color: colors.textMuted, marginBottom: 6 },
+  label: { ...typography.caption, marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     ...typography.body,
-    color: colors.text,
   },
   inputError: { borderColor: colors.error },
   error: { ...typography.caption, color: colors.error, marginTop: 4 },

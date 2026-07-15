@@ -1,7 +1,7 @@
 import React, { PropsWithChildren } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { Edge, SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '@/theme';
+import { useThemeColors } from '@/theme';
 
 interface ScreenContainerProps {
   /**
@@ -14,8 +14,10 @@ interface ScreenContainerProps {
 }
 
 export function ScreenContainer({ children, edges = ['top', 'right', 'bottom', 'left'] }: PropsWithChildren<ScreenContainerProps>) {
+  const { colors } = useThemeColors();
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={edges}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={edges}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -27,6 +29,6 @@ export function ScreenContainer({ children, edges = ['top', 'right', 'bottom', '
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
+  safeArea: { flex: 1 },
   flex: { flex: 1, padding: 20 },
 });
