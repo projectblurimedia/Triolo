@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 4,
   },
   iconButton: {
     width: ICON_BUTTON_SIZE,

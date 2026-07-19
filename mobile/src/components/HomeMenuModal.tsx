@@ -34,16 +34,21 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
 
   useEffect(() => {
     if (!rendered) return;
+    // Opening uses a spring for a bit of bounce; closing uses a fixed-duration timing
+    // instead — a spring's settle tail is unpredictable (can run well past its visual
+    // "arrival"), and since the native Modal stays mounted (and keeps swallowing all
+    // touches, including the header's own menu button) until this animation reports
+    // `finished`, a slow/uncertain close made reopening immediately after feel broken.
+    // A short, fixed timing means the Modal frees up input again reliably and quickly.
+    const slideAnimation = visible
+      ? Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 60, friction: 12 })
+      : Animated.timing(translateX, { toValue: DRAWER_WIDTH, duration: 200, useNativeDriver: true });
+
     Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: visible ? 0 : DRAWER_WIDTH,
-        useNativeDriver: true,
-        tension: 60,
-        friction: 12,
-      }),
+      slideAnimation,
       Animated.timing(backdropOpacity, {
         toValue: visible ? 1 : 0,
-        duration: visible ? 300 : 200,
+        duration: visible ? 250 : 200,
         useNativeDriver: true,
       }),
     ]).start(({ finished }) => {
