@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { Button } from './Button';
@@ -28,7 +28,7 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: colors.text }]}>{t('profile.menuTitle')}</Text>
             <Pressable onPress={onClose} hitSlop={8} accessibilityLabel={t('common.cancel')}>
-              <FontAwesome5 name="times" size={18} color={colors.textMuted} />
+              <FontAwesome6 name="xmark" size={18} color={colors.textMuted} />
             </Pressable>
           </View>
 

@@ -50,7 +50,9 @@ export default function App() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <RootNavigator />
-        <StatusBar style="auto" />
+        {/* Always light — the app's persistent top chrome is the blue gradient header,
+            so status-bar text/icons need to read against that, not the body theme. */}
+        <StatusBar style="light" />
       </QueryClientProvider>
     </SafeAreaProvider>
   );

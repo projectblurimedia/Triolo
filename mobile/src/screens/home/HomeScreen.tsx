@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { fonts, headerGradient, useThemeColors } from '@/theme';
@@ -9,8 +9,8 @@ import { useAuthStore } from '@/state/authStore';
 
 type FilterKey = 'services' | 'shops' | 'topRated' | 'nearby';
 
-const FILTERS: { key: FilterKey; icon: keyof typeof FontAwesome5.glyphMap; labelKey: string }[] = [
-  { key: 'services', icon: 'concierge-bell', labelKey: 'home.filterServices' },
+const FILTERS: { key: FilterKey; icon: keyof typeof FontAwesome6.glyphMap; labelKey: string }[] = [
+  { key: 'services', icon: 'screwdriver-wrench', labelKey: 'home.filterServices' },
   { key: 'shops', icon: 'store', labelKey: 'home.filterShops' },
   { key: 'topRated', icon: 'star', labelKey: 'home.filterTopRated' },
   { key: 'nearby', icon: 'map-marker-alt', labelKey: 'home.filterNearby' },
@@ -37,7 +37,7 @@ export function HomeScreen() {
       <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('home.subtitle')}</Text>
 
       <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <FontAwesome5 name="search" size={15} color={colors.textMuted} solid />
+        <FontAwesome6 name="magnifying-glass" size={15} color={colors.textMuted} solid />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
           placeholder={t('home.searchPlaceholder')}
@@ -59,12 +59,12 @@ export function HomeScreen() {
                   end={{ x: 1, y: 0 }}
                   style={styles.filterChip}
                 >
-                  <FontAwesome5 name={filter.icon} size={11} color={colors.white} solid />
+                  <FontAwesome6 name={filter.icon} size={11} color={colors.white} solid />
                   <Text style={[styles.filterLabel, { color: colors.white }]}>{t(filter.labelKey)}</Text>
                 </LinearGradient>
               ) : (
                 <View style={[styles.filterChip, styles.filterChipInactive, { borderColor: colors.border }]}>
-                  <FontAwesome5 name={filter.icon} size={11} color={colors.textMuted} solid />
+                  <FontAwesome6 name={filter.icon} size={11} color={colors.textMuted} solid />
                   <Text style={[styles.filterLabel, { color: colors.text }]}>{t(filter.labelKey)}</Text>
                 </View>
               )}

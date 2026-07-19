@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
@@ -39,7 +39,7 @@ export function ProfileScreen() {
       {isProfessional ? (
         <>
           <View style={[styles.ratingCard, { backgroundColor: colors.surface }]}>
-            <FontAwesome5 name="star" size={22} color={colors.secondary} solid />
+            <FontAwesome6 name="star" size={22} color={colors.secondary} solid />
             <View style={styles.ratingInfo}>
               <Text style={[styles.ratingValue, { color: colors.text }]}>{t('profile.ratingValue')}</Text>
               <Text style={[styles.ratingCount, { color: colors.textMuted }]}>{t('profile.ratingCount')}</Text>
@@ -50,7 +50,7 @@ export function ProfileScreen() {
           <View style={styles.postsRow}>
             {[0, 1, 2].map((i) => (
               <View key={i} style={[styles.postCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <FontAwesome5 name="image" size={20} color={colors.textMuted} solid />
+                <FontAwesome6 name="image" size={20} color={colors.textMuted} solid />
               </View>
             ))}
           </View>

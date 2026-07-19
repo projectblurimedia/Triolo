@@ -1,13 +1,13 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, headerGradient, typography } from '@/theme';
 
 export interface HeaderAction {
-  icon: keyof typeof FontAwesome5.glyphMap;
+  icon: keyof typeof FontAwesome6.glyphMap;
   accessibilityLabel: string;
   onPress?: () => void;
 }
@@ -19,7 +19,7 @@ interface GradientHeaderProps {
   /** Circular icon-only back button on the left, calling navigation.goBack(). */
   showBack?: boolean;
   /** Decorative brand icon before the title (e.g. Home) — ignored when showBack is set. */
-  leadingIcon?: keyof typeof FontAwesome5.glyphMap;
+  leadingIcon?: keyof typeof FontAwesome6.glyphMap;
   /** Right-side icon buttons — e.g. Home's notifications/messages/menu. */
   actions?: HeaderAction[];
 }
@@ -41,11 +41,11 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
               hitSlop={8}
               style={styles.iconButton}
             >
-              <FontAwesome5 name="arrow-left" size={18} color={colors.white} />
+              <FontAwesome6 name="arrow-left" size={18} color={colors.white} />
             </Pressable>
           ) : leadingIcon ? (
             <View style={styles.iconButton}>
-              <FontAwesome5 name={leadingIcon} size={18} color={colors.white} />
+              <FontAwesome6 name={leadingIcon} size={18} color={colors.white} />
             </View>
           ) : null}
 
@@ -70,7 +70,7 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
                   hitSlop={8}
                   style={styles.iconButton}
                 >
-                  <FontAwesome5 name={action.icon} size={17} color={colors.white} />
+                  <FontAwesome6 name={action.icon} size={17} color={colors.white} />
                 </Pressable>
               ))}
             </View>

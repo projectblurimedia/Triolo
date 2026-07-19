@@ -1,7 +1,7 @@
 import React from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome6 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { MainTabParamList } from './types';
@@ -15,11 +15,11 @@ import { fonts, headerGradient, useThemeColors } from '@/theme';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// FontAwesome5's free tier only ships these as solid glyphs (no outline variant) —
+// FontAwesome6's free tier only ships these as solid glyphs (no outline variant) —
 // active vs. inactive is shown via color only, not icon shape.
-const ICONS: Record<keyof MainTabParamList, keyof typeof FontAwesome5.glyphMap> = {
+const ICONS: Record<keyof MainTabParamList, keyof typeof FontAwesome6.glyphMap> = {
   Home: 'home',
-  Services: 'concierge-bell',
+  Services: 'screwdriver-wrench',
   Bazaar: 'store',
   Profile: 'user',
 };
@@ -99,7 +99,7 @@ export function AppNavigator() {
         tabBarButton: ({ ref: _ref, ...rest }) => <Pressable {...rest} android_ripple={{ color: 'transparent' }} />,
         tabBarIcon: ({ focused, size }) => {
           const icon = ICONS[route.name as keyof MainTabParamList];
-          return <FontAwesome5 name={icon} size={size - 2} color={focused ? colors.primary : colors.textMuted} solid />;
+          return <FontAwesome6 name={icon} size={size - 2} color={focused ? colors.primary : colors.textMuted} solid />;
         },
       })}
     >
@@ -115,7 +115,7 @@ export function AppNavigator() {
             <GradientHeader
               title={t('common.appName')}
               subtitle={t('home.tagline')}
-              leadingIcon="compass"
+              leadingIcon="shapes"
               actions={[
                 { icon: 'bell', accessibilityLabel: t('home.notifications') },
                 { icon: 'bars', accessibilityLabel: t('home.menu') },
