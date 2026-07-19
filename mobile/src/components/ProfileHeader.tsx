@@ -19,7 +19,7 @@ export function ProfileHeader({ title, subtitle }: ProfileHeaderProps) {
         title={title}
         subtitle={subtitle}
         leadingIcon="user"
-        actions={[{ icon: 'ellipsis-v', accessibilityLabel: t('profile.menuTitle'), onPress: () => setMenuVisible(true) }]}
+        actions={[{ icon: 'ellipsis-vertical', accessibilityLabel: t('profile.menuTitle'), onPress: () => setMenuVisible(true) }]}
       />
       <ProfileMenuModal visible={menuVisible} onClose={() => setMenuVisible(false)} />
     </>
