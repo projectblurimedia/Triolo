@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.85;
 
 interface HomeMenuModalProps {
@@ -19,8 +19,21 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const { colors } = useThemeColors();
   const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
+  // The native <Modal> must stay mounted for the full closing animation — unmounting
+  // it the instant `visible` flips false (by binding it directly to the prop) cuts the
+  // slide-out short, leaving translateX at whatever mid-animation value it was
+  // interrupted at. The next open then springs in from that stale position instead of
+  // fully off-screen, which is why only the very first open ever looked smooth.
+  const [rendered, setRendered] = useState(visible);
 
   useEffect(() => {
+    if (visible) {
+      setRendered(true);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!rendered) return;
     Animated.parallel([
       Animated.spring(translateX, {
         toValue: visible ? 0 : DRAWER_WIDTH,
@@ -33,8 +46,12 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
         duration: visible ? 300 : 200,
         useNativeDriver: true,
       }),
-    ]).start();
-  }, [visible]);
+    ]).start(({ finished }) => {
+      if (!visible && finished) {
+        setRendered(false);
+      }
+    });
+  }, [visible, rendered]);
 
   // Worker/Business registration for an already-logged-in User account isn't built
   // yet (see .cloud/project-context.md — Worker/Business modules are still pending),
@@ -62,7 +79,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={rendered} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.container}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
           <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity }]} />
@@ -126,8 +143,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: 0,
+    bottom: 0,
     width: DRAWER_WIDTH,
-    height: SCREEN_HEIGHT,
     borderTopLeftRadius: 20,
     borderBottomLeftRadius: 20,
     overflow: 'hidden',
