@@ -18,7 +18,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 // FontAwesome6's free tier only ships these as solid glyphs (no outline variant) —
 // active vs. inactive is shown via color only, not icon shape.
 const ICONS: Record<keyof MainTabParamList, keyof typeof FontAwesome6.glyphMap> = {
-  Home: 'home',
+  Home: 'house',
   Services: 'screwdriver-wrench',
   Bazaar: 'store',
   Profile: 'user',

@@ -13,7 +13,7 @@ const FILTERS: { key: FilterKey; icon: keyof typeof FontAwesome6.glyphMap; label
   { key: 'services', icon: 'screwdriver-wrench', labelKey: 'home.filterServices' },
   { key: 'shops', icon: 'store', labelKey: 'home.filterShops' },
   { key: 'topRated', icon: 'star', labelKey: 'home.filterTopRated' },
-  { key: 'nearby', icon: 'map-marker-alt', labelKey: 'home.filterNearby' },
+  { key: 'nearby', icon: 'location-dot', labelKey: 'home.filterNearby' },
 ];
 
 export function HomeScreen() {
