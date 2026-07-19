@@ -52,6 +52,17 @@
     "filterTopRated": "Top Rated",
     "filterNearby": "Nearby"
   },
+  "homeMenu": {
+    "title": "Triolo",
+    "subtitle": "Grow with Triolo",
+    "growSection": "Grow With Triolo",
+    "registerWorkerTitle": "Register as a Worker",
+    "registerWorkerSubtitle": "Offer your skills and get booked nearby",
+    "registerBusinessTitle": "Have a Shop? Register Your Business",
+    "registerBusinessSubtitle": "List your shop and start taking orders",
+    "comingSoonTitle": "Coming Soon",
+    "comingSoonMessage": "This will be available soon. Stay tuned!"
+  },
   "services": {
     "comingSoon": "Browsing services by category is coming soon.",
     "tagline": "Browse workers by category"

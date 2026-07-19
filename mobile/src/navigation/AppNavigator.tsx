@@ -10,6 +10,7 @@ import { ServicesScreen } from '@/screens/services/ServicesScreen';
 import { BazaarScreen } from '@/screens/bazaar/BazaarScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { GradientHeader } from '@/components/GradientHeader';
+import { HomeHeader } from '@/components/HomeHeader';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { fonts, headerGradient, useThemeColors } from '@/theme';
 
@@ -110,18 +111,12 @@ export function AppNavigator() {
           tabBarLabel: titles.Home,
           // Home shows the app brand (with a decorative logo icon) instead of the tab
           // title, plus quick actions. Notifications has no destination yet — the
-          // Notifications module isn't built (see .cloud/project-context.md).
-          header: () => (
-            <GradientHeader
-              title={t('common.appName')}
-              subtitle={t('home.tagline')}
-              leadingIcon="shapes"
-              actions={[
-                { icon: 'bell', accessibilityLabel: t('home.notifications') },
-                { icon: 'bars', accessibilityLabel: t('home.menu') },
-              ]}
-            />
-          ),
+          // Notifications module isn't built (see .cloud/project-context.md). The menu
+          // icon opens a drawer with Worker/Business onboarding entry points — needs
+          // its own local state (drawer visibility), which a stateless header render
+          // function here can't hold, so it's a wrapper component (HomeHeader) instead,
+          // same pattern as ProfileHeader.
+          header: () => <HomeHeader title={t('common.appName')} subtitle={t('home.tagline')} />,
         }}
       />
       <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: titles.Services }} />
