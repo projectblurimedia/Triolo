@@ -41,7 +41,7 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
               hitSlop={8}
               style={styles.iconButton}
             >
-              <FontAwesome6 name="arrow-left" size={18} color={colors.white} solid />
+              <FontAwesome6 name="chevron-left" size={18} color={colors.white} solid />
             </Pressable>
           ) : leadingIcon ? (
             <View style={styles.iconButton}>

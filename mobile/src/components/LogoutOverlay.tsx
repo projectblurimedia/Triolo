@@ -3,49 +3,35 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { LoadingIndicator } from './LoadingIndicator';
 import { fonts, headerGradient, typography } from '@/theme';
 
 const RING_SIZE = 96;
-const DOT_SIZE = 10;
-const DOT_COUNT = 3;
 
 /**
  * Full-screen overlay shown for the duration of the logout request — rendered at the
  * app root (see App.tsx) so it draws above whichever navigator is mounted. Deliberately
- * a distinct visual moment (three dots orbiting the brand mark, not a spinner reuse) —
- * every other loading affordance in the app is either Button's inline ActivityIndicator
- * or a button-level spinner, and logging out is the one transition where the whole
- * screen is about to change underneath the user, so it gets its own full-screen beat.
+ * a distinct visual moment — every other loading affordance in the app is the smaller
+ * inline LoadingIndicator (e.g. Button's loading state), and logging out is the one
+ * transition where the whole screen is about to change underneath the user, so it gets
+ * its own full-screen beat: the same orbiting-dots motif at a larger scale, plus a
+ * pulsing center mark unique to this full-screen variant.
  */
 export function LogoutOverlay() {
   const { t } = useTranslation();
-  const rotation = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const rotateLoop = Animated.loop(
-      Animated.timing(rotation, {
-        toValue: 1,
-        duration: 1800,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
         Animated.timing(pulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ]),
     );
-    rotateLoop.start();
     pulseLoop.start();
-    return () => {
-      rotateLoop.stop();
-      pulseLoop.stop();
-    };
-  }, [rotation, pulse]);
+    return () => pulseLoop.stop();
+  }, [pulse]);
 
-  const spin = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const markScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
 
   return (
@@ -53,25 +39,9 @@ export function LogoutOverlay() {
       <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
       <View style={styles.center}>
         <View style={styles.ring}>
-          <Animated.View style={[styles.orbit, { transform: [{ rotate: spin }] }]}>
-            {Array.from({ length: DOT_COUNT }).map((_, index) => {
-              const angle = (360 / DOT_COUNT) * index;
-              return (
-                <View
-                  key={index}
-                  style={[
-                    styles.dot,
-                    {
-                      transform: [
-                        { rotate: `${angle}deg` },
-                        { translateY: -(RING_SIZE / 2) },
-                      ],
-                    },
-                  ]}
-                />
-              );
-            })}
-          </Animated.View>
+          <View style={styles.orbit}>
+            <LoadingIndicator size={RING_SIZE} dotSize={10} color="rgba(255, 255, 255, 0.85)" duration={1800} />
+          </View>
           <Animated.View style={[styles.mark, { transform: [{ scale: markScale }] }]}>
             <FontAwesome6 name="shapes" size={28} color="#FFFFFF" solid />
           </Animated.View>
@@ -99,13 +69,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  dot: {
-    position: 'absolute',
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
   },
   mark: {
     width: 56,

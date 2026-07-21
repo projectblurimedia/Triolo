@@ -22,7 +22,8 @@ src/
   screens/        auth/ (LanguageSelect, Welcome, Register, Login, Otp), home/ (Home), services/ (Services),
                   bazaar/ (Bazaar), profile/ (Profile)
   components/     Button, TextField, ScreenContainer, LanguageSwitcher, ThemePickerModal, LogoutConfirmModal,
-                  LogoutOverlay, GradientHeader, ProfileHeader, ProfileMenuModal, HomeHeader, HomeMenuModal
+                  LogoutOverlay, LoadingIndicator, GradientHeader, ProfileHeader, ProfileMenuModal, HomeHeader,
+                  HomeMenuModal
   navigation/     RootNavigator (language + theme hydration gate → auth vs. app), AuthNavigator (stack),
                   AppNavigator (bottom tabs)
   services/       apiClient (fetch wrapper, auto access-token refresh on 401), authService

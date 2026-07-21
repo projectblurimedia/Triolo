@@ -1,6 +1,7 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { LoadingIndicator } from './LoadingIndicator';
 import { colors, headerGradient, typography } from '@/theme';
 
 interface ButtonProps {
@@ -16,7 +17,7 @@ export function Button({ label, onPress, loading, disabled }: ButtonProps) {
   return (
     <Pressable onPress={onPress} disabled={isDisabled} style={isDisabled ? styles.disabled : undefined}>
       <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.button}>
-        {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.label}>{label}</Text>}
+        {loading ? <LoadingIndicator color={colors.white} /> : <Text style={styles.label}>{label}</Text>}
       </LinearGradient>
     </Pressable>
   );
