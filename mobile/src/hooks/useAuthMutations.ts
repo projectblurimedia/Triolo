@@ -34,9 +34,17 @@ export function useVerifyLoginOtp() {
 export function useLogout() {
   const clearSession = useAuthStore((state) => state.clearSession);
   const refreshToken = useAuthStore((state) => state.refreshToken);
+  const setLoggingOut = useAuthStore((state) => state.setLoggingOut);
   return useMutation({
     mutationFn: () => authService.logout(refreshToken ?? ''),
-    onSettled: () => clearSession(),
+    onMutate: () => setLoggingOut(true),
+    // Clear the session first so RootNavigator swaps to the Welcome screen underneath
+    // the overlay, then hide the overlay — it fades away to reveal Welcome already in
+    // place, instead of a flash of the old screen before the swap catches up.
+    onSettled: () => {
+      clearSession();
+      setLoggingOut(false);
+    },
   });
 }
 

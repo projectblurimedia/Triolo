@@ -22,9 +22,12 @@ interface AuthState {
   refreshToken: string | null;
   account: AuthAccount | null;
   isHydrated: boolean;
+  /** True for the duration of the logout request — drives a full-screen overlay (LogoutOverlay) rendered at the app root. Not persisted: a stuck-true value should never survive a restart. */
+  isLoggingOut: boolean;
   setSession: (params: { accessToken: string; refreshToken: string; account: AuthAccount }) => void;
   setAccessToken: (accessToken: string) => void;
   clearSession: () => void;
+  setLoggingOut: (value: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -34,6 +37,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       account: null,
       isHydrated: false,
+      isLoggingOut: false,
       setSession: ({ accessToken, refreshToken, account }) => {
         set({ accessToken, refreshToken, account });
         // The account's saved language is authoritative on login/registration —
@@ -42,10 +46,19 @@ export const useAuthStore = create<AuthState>()(
       },
       setAccessToken: (accessToken) => set({ accessToken }),
       clearSession: () => set({ accessToken: null, refreshToken: null, account: null }),
+      setLoggingOut: (isLoggingOut) => set({ isLoggingOut }),
     }),
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      // Excludes isLoggingOut only — a stuck `true` surviving an app kill mid-logout
+      // would otherwise show the full-screen LogoutOverlay forever on next launch.
+      partialize: (state) => ({
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+        account: state.account,
+        isHydrated: state.isHydrated,
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.isHydrated = true;

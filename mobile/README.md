@@ -22,7 +22,7 @@ src/
   screens/        auth/ (LanguageSelect, Welcome, Register, Login, Otp), home/ (Home), services/ (Services),
                   bazaar/ (Bazaar), profile/ (Profile)
   components/     Button, TextField, ScreenContainer, LanguageSwitcher, ThemePickerModal, LogoutConfirmModal,
-                  GradientHeader, ProfileHeader, ProfileMenuModal, HomeHeader, HomeMenuModal
+                  LogoutOverlay, GradientHeader, ProfileHeader, ProfileMenuModal, HomeHeader, HomeMenuModal
   navigation/     RootNavigator (language + theme hydration gate → auth vs. app), AuthNavigator (stack),
                   AppNavigator (bottom tabs)
   services/       apiClient (fetch wrapper, auto access-token refresh on 401), authService
@@ -37,6 +37,8 @@ src/
 ## What's implemented
 
 Full registration/login flow against the backend Auth module: role selection → OTP request → OTP verify → session persisted (AsyncStorage). Access-token refresh on 401 is wired in `apiClient`.
+
+**Welcome screen**: a gradient hero panel (brand icon, app name, tagline) followed by three role-selection cards (Customer/Worker/Business — each a distinct-gradient icon square + title + subtitle + chevron, reusing `HomeMenuModal`'s item-card pattern) and a plain "Already have an account? Log In" text link. Doesn't use the shared `ScreenContainer` (its fixed padding would clip the edge-to-edge hero bleed) — composes its own `SafeAreaView`s instead. **Logout** shows a full-screen `LogoutOverlay` (brand gradient, three dots orbiting the app's `shapes` mark) for the duration of the request, driven by `authStore.isLoggingOut` (set in `useLogout()`'s `onMutate`/`onSettled`, excluded from persistence) and rendered from `App.tsx` above whichever navigator is mounted — replacing what used to be an abrupt, feedback-free stack swap straight to Welcome.
 
 **Post-login app shell**: a 4-tab bottom navigator (Home, Services, Bazaar, Profile) via `@react-navigation/bottom-tabs`, each screen topped with a `GradientHeader` (brand gradient `#0055D3` → `#1D76FA`, see `theme/colors.ts`). ("Bazaar" — the shop-ordering tab was originally named "Shoppify"; renamed to avoid trademark confusion with Shopify, and it translates naturally to Telugu, "బజార్", unlike "Shoppify". "Services" — originally a "Search" tab; the free-text search input moved to Home, and this tab is now for browsing by service category instead.) Services and Bazaar are placeholders until the Worker/Business search and shopping-list modules are built. Home is a dashboard greeting plus a search bar and filter chips (not wired to anything real yet). Tab icons via `@expo/vector-icons` (`FontAwesome6`, solid glyphs — the free tier has no outline counterpart for most of these).
 

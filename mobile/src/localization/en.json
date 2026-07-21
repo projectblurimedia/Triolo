@@ -6,7 +6,8 @@
     "close": "Close",
     "retry": "Retry",
     "loading": "Loading...",
-    "logout": "Log Out"
+    "logout": "Log Out",
+    "loggingOut": "Logging out..."
   },
   "auth": {
     "welcomeTitle": "Find trusted workers and shops near you",
@@ -19,7 +20,12 @@
     "register": "Register",
     "roleUser": "I'm a Customer",
     "roleWorker": "I'm a Worker",
-    "roleBusiness": "I'm a Business"
+    "roleBusiness": "I'm a Business",
+    "roleUserSubtitle": "Find trusted workers and shops nearby",
+    "roleWorkerSubtitle": "Offer your skills and get hired",
+    "roleBusinessSubtitle": "List your shop and reach more customers",
+    "getStarted": "Get Started",
+    "alreadyHaveAccount": "Already have an account?"
   },
   "settings": {
     "language": "Language",

@@ -9,7 +9,9 @@ import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, P
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RootNavigator } from '@/navigation/RootNavigator';
+import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { useThemeColors } from '@/theme';
+import { useAuthStore } from '@/state/authStore';
 
 const queryClient = new QueryClient();
 
@@ -23,6 +25,7 @@ export default function App() {
     Poppins_700Bold,
   });
   const { colors, isDark } = useThemeColors();
+  const isLoggingOut = useAuthStore((state) => state.isLoggingOut);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -50,6 +53,7 @@ export default function App() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <RootNavigator />
+        {isLoggingOut ? <LogoutOverlay /> : null}
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}
         <StatusBar style="light" />
