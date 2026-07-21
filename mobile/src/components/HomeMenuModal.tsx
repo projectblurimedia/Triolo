@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Alert, Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Dimensions, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemePickerModal } from './ThemePickerModal';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -23,10 +24,47 @@ interface HomeMenuModalProps {
 export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const insets = useSafeAreaInsets();
   const themeMode = useThemeStore((state) => state.mode);
   const logout = useLogout();
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+
+  const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  // The native Modal must stay mounted for the full close animation, or the slide-out
+  // gets cut short — but unlike a spring, a fixed-duration timing animation always
+  // finishes in the same short, predictable window, so the Modal (which blocks all
+  // touches, including the header's own menu button, while mounted) frees up input
+  // again quickly and reliably rather than after an open-ended spring settle tail.
+  const [rendered, setRendered] = useState(visible);
+
+  useEffect(() => {
+    if (visible) {
+      setRendered(true);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!rendered) return;
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: visible ? 0 : DRAWER_WIDTH,
+        duration: visible ? 280 : 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: visible ? 1 : 0,
+        duration: visible ? 280 : 200,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (!visible && finished) {
+        setRendered(false);
+      }
+    });
+  }, [visible, rendered]);
 
   // Worker/Business registration for an already-logged-in User account isn't built
   // yet (see .cloud/project-context.md — Worker/Business modules are still pending),
@@ -61,14 +99,19 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
 
   return (
     <>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <Modal visible={rendered} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
         <View style={styles.container}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
-            <View style={[StyleSheet.absoluteFill, styles.backdrop]} />
+            <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity }]} />
           </Pressable>
 
-          <View style={[styles.drawer, { backgroundColor: colors.surface }]}>
-            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+          <Animated.View style={[styles.drawer, { backgroundColor: colors.surface, transform: [{ translateX }] }]}>
+            <LinearGradient
+              colors={headerGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.header, { paddingTop: insets.top + 14 }]}
+            >
               <View style={styles.headerRow}>
                 <View style={styles.headerLeft}>
                   <FontAwesome6 name="shapes" size={28} color={colors.white} solid />
@@ -102,7 +145,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
                     <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
                       {item.title}
                     </Text>
-                    <Text style={[styles.itemSubtitle, { color: colors.textMuted }]} numberOfLines={2}>
+                    <Text style={[styles.itemSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
                       {item.subtitle}
                     </Text>
                   </View>
@@ -142,7 +185,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
                 <Text style={[styles.footerText, { color: colors.textMuted }]}>{t('common.appName')}</Text>
               </View>
             </ScrollView>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -174,8 +217,10 @@ const styles = StyleSheet.create({
       android: { elevation: 20 },
     }),
   },
+  // paddingTop is overridden inline with insets.top + 14 — the same formula
+  // GradientHeader uses — so this header's height always matches the app's own
+  // top header regardless of device/notch, instead of a hardcoded guess.
   header: {
-    paddingTop: Platform.OS === 'ios' ? 64 : 44,
     paddingBottom: 20,
     paddingHorizontal: 20,
   },
@@ -203,6 +248,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     padding: 12,
+    paddingRight: 14,
     marginBottom: 10,
   },
   itemIcon: {
@@ -213,7 +259,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  itemText: { flex: 1, marginRight: 8 },
+  itemText: { flex: 1, marginRight: 10 },
   itemTitle: { ...typography.body, fontFamily: fonts.semiBold },
   itemSubtitle: { ...typography.caption, marginTop: 2 },
   logout: {

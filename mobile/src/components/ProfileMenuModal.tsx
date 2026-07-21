@@ -67,7 +67,7 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
               style={[styles.card, styles.themeRow, { backgroundColor: colors.background, borderColor: colors.border }]}
               onPress={() => setThemePickerVisible(true)}
             >
-              <View style={styles.cardHeaderRow}>
+              <View style={[styles.cardHeaderRow, styles.themeHeaderRow]}>
                 <View style={[styles.cardIcon, { backgroundColor: `${colors.primary}20` }]}>
                   <FontAwesome6 name="palette" size={16} color={colors.primary} solid />
                 </View>
@@ -151,7 +151,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   label: { ...typography.body, fontFamily: fonts.semiBold },
-  themeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  themeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 18 },
+  themeHeaderRow: { flex: 1, marginRight: 10 },
   themeText: { flex: 1 },
   themeValue: { ...typography.caption, marginTop: 2 },
   logout: {
