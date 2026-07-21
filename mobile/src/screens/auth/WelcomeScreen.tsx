@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '@/components/Button';
+import { LanguagePickerModal } from '@/components/LanguagePickerModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
 
@@ -20,10 +21,20 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 export function WelcomeScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const insets = useSafeAreaInsets();
+  const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <Pressable
+          style={[styles.languageButton, { top: insets.top + 14 }]}
+          onPress={() => setLanguagePickerVisible(true)}
+          accessibilityLabel={t('settings.language')}
+          hitSlop={8}
+        >
+          <FontAwesome6 name="language" size={16} color="#FFFFFF" solid />
+        </Pressable>
         <SafeAreaView edges={['top']} style={styles.heroContent}>
           <View style={styles.heroIcon}>
             <FontAwesome6 name="shapes" size={40} color="#FFFFFF" solid />
@@ -44,6 +55,8 @@ export function WelcomeScreen({ navigation }: Props) {
           </Text>
         </Pressable>
       </SafeAreaView>
+
+      <LanguagePickerModal visible={languagePickerVisible} onClose={() => setLanguagePickerVisible(false)} />
     </View>
   );
 }
@@ -51,6 +64,18 @@ export function WelcomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   hero: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
+  languageButton: {
+    position: 'absolute',
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.32)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   heroContent: { alignItems: 'center' },
   heroIcon: {
     width: 88,

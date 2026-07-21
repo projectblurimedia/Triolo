@@ -91,9 +91,15 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
             <Pressable style={styles.backButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
-            <Text style={styles.headerTitle}>{t('businessProfile.title')}</Text>
+            <View style={styles.titleGroup}>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {t('businessProfile.title')}
+              </Text>
+              <Text style={styles.headerSubtitle} numberOfLines={1}>
+                {t('businessProfile.subtitle')}
+              </Text>
+            </View>
           </View>
-          <Text style={styles.headerSubtitle}>{t('businessProfile.subtitle')}</Text>
         </LinearGradient>
 
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -142,12 +148,13 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingBottom: 20, paddingHorizontal: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
-  headerTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF', marginLeft: 12 },
-  headerSubtitle: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', marginTop: 4 },
+  titleGroup: { marginLeft: 14, flex: 1 },
+  headerTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF', lineHeight: 20 },
+  headerSubtitle: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', lineHeight: 14, marginTop: 2 },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.32)',
