@@ -68,9 +68,9 @@ Adds the Worker capability to the authenticated (already self-registered) `user`
 ### POST /workers/me/profile
 Create the caller's worker profile. `multipart/form-data`, not JSON — the only such endpoint in this API so far, since it carries image files.
 - Auth: Bearer access token
-- Body (multipart fields): `skillCategory: "electrician"|"plumber"|"painter"|"carpenter"|"mechanic"|"cleaner"|"mason"|"other"`, `experienceYears: number`, `latitude?: number`, `longitude?: number`, `locationAddress?: string`, plus 0-6 image files under the field name `portfolioPhotos` (JPEG/PNG/WEBP, 5MB each max).
-- 201: `{ success: true, message: "Worker profile created", data: { id, accountId, skillCategory, experienceYears, latitude, longitude, locationAddress, portfolioPhotoUrls, verificationStatus, createdAt, updatedAt } }`
-- 400: validation error, or `CLOUDINARY_NOT_CONFIGURED` if image uploads aren't set up on this server yet
+- Body (multipart fields): `skillCategories: string` — a JSON-stringified array of 1+ of `"electrician"|"plumber"|"painter"|"carpenter"|"mechanic"|"cleaner"|"mason"|"other"` (a worker can have multiple skills), `otherSkillDescription?: string` (required when `skillCategories` includes `"other"`), `experienceYears: number`, `latitude?: number`, `longitude?: number`, `locationAddress?: string`, plus 0-6 image files under the field name `portfolioPhotos` (JPEG/PNG/WEBP, 5MB each max).
+- 201: `{ success: true, message: "Worker profile created", data: { id, accountId, skillCategories, otherSkillDescription, experienceYears, latitude, longitude, locationAddress, portfolioPhotoUrls, verificationStatus, createdAt, updatedAt } }`
+- 400: validation error (including `otherSkillDescription` missing when `"other"` is selected), or `CLOUDINARY_NOT_CONFIGURED` if image uploads aren't set up on this server yet
 - 409: `WORKER_PROFILE_EXISTS` — one worker profile per account
 
 ### GET /workers/me/profile
@@ -85,9 +85,9 @@ Adds the Business capability to the authenticated `user` account — mirrors the
 ### POST /businesses/me/profile
 Create the caller's business profile. `multipart/form-data`.
 - Auth: Bearer access token
-- Body (multipart fields): `shopName: string`, `shopCategory: "grocery"|"restaurant"|"pharmacy"|"electronics"|"clothing"|"hardware"|"salon"|"other"`, `latitude?: number`, `longitude?: number`, `locationAddress?: string`, plus 0-6 image files under the field name `shopPhotos`.
-- 201: `{ success: true, message: "Business profile created", data: { id, accountId, shopName, shopCategory, latitude, longitude, locationAddress, shopPhotoUrls, verificationStatus, createdAt, updatedAt } }`
-- 400 / 409: same shape as the Workers endpoint (`BUSINESS_PROFILE_EXISTS` instead of `WORKER_PROFILE_EXISTS`)
+- Body (multipart fields): `shopName: string`, `shopCategories: string` — a JSON-stringified array of 1+ of `"grocery"|"restaurant"|"pharmacy"|"electronics"|"clothing"|"hardware"|"salon"|"other"` (a shop can belong to multiple categories), `otherCategoryDescription?: string` (required when `shopCategories` includes `"other"`), `latitude?: number`, `longitude?: number`, `locationAddress?: string`, `deliveryAvailable: "true"|"false"`, `deliveryPricePerKm?: number` (required when `deliveryAvailable` is `"true"`), plus 0-6 image files under the field name `shopPhotos`.
+- 201: `{ success: true, message: "Business profile created", data: { id, accountId, shopName, shopCategories, otherCategoryDescription, latitude, longitude, locationAddress, shopPhotoUrls, deliveryAvailable, deliveryPricePerKm, verificationStatus, createdAt, updatedAt } }`
+- 400 / 409: same shape as the Workers endpoint (`BUSINESS_PROFILE_EXISTS` instead of `WORKER_PROFILE_EXISTS`; also validates `otherCategoryDescription`/`deliveryPricePerKm` requirements)
 
 ### GET /businesses/me/profile
 Return the caller's business profile, or `null` if they haven't created one.

@@ -78,7 +78,8 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 |---|---|---|
 | id | uuid PK | serves as the worker's distinct identifier (worker_id) |
 | account_id | uuid FK → accounts.id, UNIQUE | one worker profile per account |
-| skill_category | enum `worker_skill_category` (electrician, plumber, painter, carpenter, mechanic, cleaner, mason, other) | stable code, not translated text — see `docs/localization.md`'s reference-data rule |
+| skill_categories | enum `worker_skill_category`[] | a worker can have multiple skills; GIN-indexed for containment search. Stable codes, not translated text — see `docs/localization.md`'s reference-data rule |
+| other_skill_description | text nullable | free-text description, required (validated at the API layer) when `skill_categories` includes `other` |
 | experience_years | int | |
 | latitude / longitude | double precision nullable | service location, separate from the account's own registration location |
 | location_address | text nullable | |
@@ -92,10 +93,13 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | id | uuid PK | serves as the business's distinct identifier (business_id) |
 | account_id | uuid FK → accounts.id, UNIQUE | one business profile per account |
 | shop_name | text | |
-| shop_category | enum `business_shop_category` (grocery, restaurant, pharmacy, electronics, clothing, hardware, salon, other) | same stable-code pattern as `skill_category` |
+| shop_categories | enum `business_shop_category`[] | a shop can belong to multiple categories; GIN-indexed for containment search. Same stable-code pattern as `skill_categories` |
+| other_category_description | text nullable | free-text description, required (validated at the API layer) when `shop_categories` includes `other` |
 | latitude / longitude | double precision nullable | shop location |
 | location_address | text nullable | |
 | shop_photo_urls | text[] | Cloudinary-hosted URLs, uploaded via `POST /api/v1/businesses/me/profile` (multipart) |
+| delivery_available | boolean | whether the shop offers delivery |
+| delivery_price_per_km | double precision nullable | required (validated at the API layer) when `delivery_available` is true |
 | verification_status | enum `profile_verification_status` | shared enum with `worker_profiles` |
 | created_at / updated_at | timestamptz | |
 
@@ -114,8 +118,8 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 
 - `accounts.mobile_number` — unique index (login lookup).
 - `accounts.email` — indexed.
-- `worker_profiles.skill_category` — search filtering.
-- `business_profiles.shop_category` — search filtering.
+- `worker_profiles.skill_categories` — GIN index, array-containment search filtering.
+- `business_profiles.shop_categories` — GIN index, array-containment search filtering.
 - `bookings.status`, `orders.status` — dashboard/queue queries.
 
 ## Migration Policy
