@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '@/components/Button';
-import { fonts, headerGradient, typography } from '@/theme';
+import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
@@ -19,9 +19,10 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
  */
 export function WelcomeScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  const { colors } = useThemeColors();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <SafeAreaView edges={['top']} style={styles.heroContent}>
           <View style={styles.heroIcon}>
@@ -38,8 +39,8 @@ export function WelcomeScreen({ navigation }: Props) {
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>
         <Pressable onPress={() => navigation.navigate('Login')} hitSlop={8}>
-          <Text style={styles.loginPrompt}>
-            {t('auth.alreadyHaveAccount')} <Text style={styles.loginLink}>{t('auth.login')}</Text>
+          <Text style={[styles.loginPrompt, { color: colors.textMuted }]}>
+            {t('auth.alreadyHaveAccount')} <Text style={[styles.loginLink, { color: colors.primary }]}>{t('auth.login')}</Text>
           </Text>
         </Pressable>
       </SafeAreaView>
@@ -48,7 +49,7 @@ export function WelcomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FCFF' },
+  container: { flex: 1 },
   hero: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
   heroContent: { alignItems: 'center' },
   heroIcon: {
@@ -72,6 +73,6 @@ const styles = StyleSheet.create({
   },
   body: { padding: 24, paddingBottom: 8 },
   footer: { alignItems: 'center', paddingVertical: 16 },
-  loginPrompt: { ...typography.body, color: '#5B6472' },
-  loginLink: { fontFamily: fonts.semiBold, color: '#0055D3' },
+  loginPrompt: { ...typography.body },
+  loginLink: { fontFamily: fonts.semiBold },
 });

@@ -21,14 +21,9 @@
     "verifyOtp": "Verify OTP",
     "login": "Log In",
     "register": "Register",
-    "roleUser": "I'm a Customer",
-    "roleWorker": "I'm a Worker",
-    "roleBusiness": "I'm a Business",
-    "roleUserSubtitle": "Find trusted workers and shops nearby",
-    "roleWorkerSubtitle": "Offer your skills and get hired",
-    "roleBusinessSubtitle": "List your shop and reach more customers",
-    "getStarted": "Get Started",
-    "alreadyHaveAccount": "Already have an account?"
+    "alreadyHaveAccount": "Already have an account?",
+    "accountCreatedTitle": "Account Created!",
+    "accountCreatedMessage": "Want to offer your skills or list your shop? Add a Worker or Business profile anytime from the menu on the Home screen."
   },
   "location": {
     "useCurrent": "Use My Current Location",

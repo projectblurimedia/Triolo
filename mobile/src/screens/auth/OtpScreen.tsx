@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Alert, StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
@@ -29,6 +29,15 @@ export function OtpScreen({ route }: Props) {
       {
         // Successful verification updates the auth store; RootNavigator
         // automatically switches to the app stack once accessToken is set.
+        onSuccess: () => {
+          // Every account is a plain user immediately (see .cloud/project-context.md's
+          // "Account Model") — Worker/Business are opt-in, reachable from Home's menu,
+          // not part of this form. One-time pointer so that's discoverable right away
+          // instead of the user having to go looking for it.
+          if (mode === 'registration') {
+            Alert.alert(t('auth.accountCreatedTitle'), t('auth.accountCreatedMessage'));
+          }
+        },
         onError: (err) => setError(getLocalizedErrorMessage(err, t)),
       },
     );
