@@ -9,14 +9,20 @@ interface ButtonProps {
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
+  gradient?: readonly [string, string, ...string[]];
 }
 
-export function Button({ label, onPress, loading, disabled }: ButtonProps) {
+export function Button({ label, onPress, loading, disabled, gradient }: ButtonProps) {
   const isDisabled = disabled || loading;
 
   return (
     <Pressable onPress={onPress} disabled={isDisabled} style={isDisabled ? styles.disabled : undefined}>
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.button}>
+      <LinearGradient
+        colors={gradient ?? headerGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.button}
+      >
         {loading ? <LoadingIndicator color={colors.white} /> : <Text style={styles.label}>{label}</Text>}
       </LinearGradient>
     </Pressable>

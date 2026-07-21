@@ -2,7 +2,8 @@ import { apiClient } from './apiClient';
 import { PickedImage } from '@/components/ImagePickerField';
 
 export interface CreateWorkerProfileParams {
-  skillCategory: string;
+  skillCategories: string[];
+  otherSkillDescription?: string;
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
@@ -13,7 +14,8 @@ export interface CreateWorkerProfileParams {
 export interface WorkerProfile {
   id: string;
   accountId: string;
-  skillCategory: string;
+  skillCategories: string[];
+  otherSkillDescription: string | null;
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
@@ -27,7 +29,8 @@ export const workersService = {
 
   createProfile: (params: CreateWorkerProfileParams) => {
     const formData = new FormData();
-    formData.append('skillCategory', params.skillCategory);
+    formData.append('skillCategories', JSON.stringify(params.skillCategories));
+    if (params.otherSkillDescription) formData.append('otherSkillDescription', params.otherSkillDescription);
     formData.append('experienceYears', String(params.experienceYears));
     if (params.latitude != null) formData.append('latitude', String(params.latitude));
     if (params.longitude != null) formData.append('longitude', String(params.longitude));

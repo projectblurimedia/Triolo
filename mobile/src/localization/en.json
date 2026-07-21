@@ -43,7 +43,8 @@
   "workerProfile": {
     "title": "Worker Registration",
     "subtitle": "Provide your service details to get discovered by customers nearby",
-    "skillLabel": "Your Skill",
+    "skillLabel": "Your Skills (select all that apply)",
+    "otherSkillLabel": "What's your skill?",
     "skills": {
       "electrician": "Electrician",
       "plumber": "Plumber",
@@ -63,7 +64,8 @@
     "title": "Business Registration",
     "subtitle": "Provide your shop details to get discovered by customers nearby",
     "shopNameLabel": "Shop Name",
-    "categoryLabel": "Shop Category",
+    "categoryLabel": "Shop Categories (select all that apply)",
+    "otherCategoryLabel": "What's your shop category?",
     "categories": {
       "grocery": "Grocery",
       "restaurant": "Restaurant",
@@ -75,6 +77,10 @@
       "other": "Other"
     },
     "photosLabel": "Shop Photos (optional)",
+    "deliveryLabel": "Do you offer delivery?",
+    "deliveryYes": "Yes",
+    "deliveryNo": "No",
+    "deliveryPriceLabel": "Delivery Price per KM (₹)",
     "successTitle": "Business Profile Created",
     "successMessage": "Your shop details are submitted for verification. We'll notify you once approved."
   },

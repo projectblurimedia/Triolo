@@ -38,23 +38,41 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
   const createProfile = useCreateBusinessProfile();
 
   const [shopName, setShopName] = useState('');
-  const [shopCategory, setShopCategory] = useState<string | null>(null);
+  const [shopCategories, setShopCategories] = useState<string[]>([]);
+  const [otherCategoryDescription, setOtherCategoryDescription] = useState('');
   const [location, setLocation] = useState<LocationValue>({ latitude: null, longitude: null, address: '' });
   const [photos, setPhotos] = useState<PickedImage[]>([]);
+  const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
+  const [deliveryPricePerKm, setDeliveryPricePerKm] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const toggleCategory = (key: string) => {
+    setShopCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
+  };
 
   const resetAndClose = () => {
     setShopName('');
-    setShopCategory(null);
+    setShopCategories([]);
+    setOtherCategoryDescription('');
     setLocation({ latitude: null, longitude: null, address: '' });
     setPhotos([]);
+    setDeliveryAvailable(null);
+    setDeliveryPricePerKm('');
     setError(null);
     onClose();
   };
 
   const handleSubmit = () => {
     setError(null);
-    if (!shopName.trim() || !shopCategory || !location.address.trim()) {
+    const includesOther = shopCategories.includes('other');
+    if (
+      !shopName.trim() ||
+      shopCategories.length === 0 ||
+      (includesOther && !otherCategoryDescription.trim()) ||
+      !location.address.trim() ||
+      deliveryAvailable === null ||
+      (deliveryAvailable && !deliveryPricePerKm.trim())
+    ) {
       setError(t('errors.VALIDATION_ERROR'));
       return;
     }
@@ -62,11 +80,14 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
     createProfile.mutate(
       {
         shopName,
-        shopCategory,
+        shopCategories,
+        otherCategoryDescription: includesOther ? otherCategoryDescription.trim() : undefined,
         latitude: location.latitude,
         longitude: location.longitude,
         locationAddress: location.address,
         shopPhotos: photos,
+        deliveryAvailable,
+        deliveryPricePerKm: deliveryAvailable ? Number(deliveryPricePerKm) : undefined,
       },
       {
         onSuccess: () => {
@@ -108,9 +129,9 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
           <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.categoryLabel')}</Text>
           <View style={styles.chipRow}>
             {SHOP_CATEGORIES.map((category) => {
-              const isActive = shopCategory === category.key;
+              const isActive = shopCategories.includes(category.key);
               return (
-                <Pressable key={category.key} onPress={() => setShopCategory(category.key)}>
+                <Pressable key={category.key} onPress={() => toggleCategory(category.key)}>
                   {isActive ? (
                     <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
                       <FontAwesome6 name={category.icon} size={12} color="#FFFFFF" solid />
@@ -131,13 +152,57 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
             })}
           </View>
 
+          {shopCategories.includes('other') ? (
+            <TextField
+              label={t('businessProfile.otherCategoryLabel')}
+              value={otherCategoryDescription}
+              onChangeText={setOtherCategoryDescription}
+              maxLength={100}
+            />
+          ) : null}
+
           <LocationPicker value={location} onChange={setLocation} />
 
           <ImagePickerField label={t('businessProfile.photosLabel')} images={photos} onChange={setPhotos} />
 
+          <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.deliveryLabel')}</Text>
+          <View style={styles.chipRow}>
+            <Pressable onPress={() => setDeliveryAvailable(true)}>
+              {deliveryAvailable === true ? (
+                <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t('businessProfile.deliveryYes')}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
+                  <Text style={[styles.chipLabel, { color: colors.text }]}>{t('businessProfile.deliveryYes')}</Text>
+                </View>
+              )}
+            </Pressable>
+            <Pressable onPress={() => setDeliveryAvailable(false)}>
+              {deliveryAvailable === false ? (
+                <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t('businessProfile.deliveryNo')}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
+                  <Text style={[styles.chipLabel, { color: colors.text }]}>{t('businessProfile.deliveryNo')}</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+
+          {deliveryAvailable ? (
+            <TextField
+              label={t('businessProfile.deliveryPriceLabel')}
+              value={deliveryPricePerKm}
+              onChangeText={setDeliveryPricePerKm}
+              keyboardType="decimal-pad"
+            />
+          ) : null}
+
           {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 
-          <Button label={t('common.submit')} onPress={handleSubmit} loading={createProfile.isPending} />
+          <Button label={t('common.submit')} onPress={handleSubmit} loading={createProfile.isPending} gradient={SHOP_GRADIENT} />
         </ScrollView>
       </View>
     </Modal>

@@ -35,14 +35,20 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
   const insets = useSafeAreaInsets();
   const createProfile = useCreateWorkerProfile();
 
-  const [skillCategory, setSkillCategory] = useState<string | null>(null);
+  const [skillCategories, setSkillCategories] = useState<string[]>([]);
+  const [otherSkillDescription, setOtherSkillDescription] = useState('');
   const [experienceYears, setExperienceYears] = useState('');
   const [location, setLocation] = useState<LocationValue>({ latitude: null, longitude: null, address: '' });
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const toggleSkill = (key: string) => {
+    setSkillCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
+  };
+
   const resetAndClose = () => {
-    setSkillCategory(null);
+    setSkillCategories([]);
+    setOtherSkillDescription('');
     setExperienceYears('');
     setLocation({ latitude: null, longitude: null, address: '' });
     setPhotos([]);
@@ -52,14 +58,21 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
 
   const handleSubmit = () => {
     setError(null);
-    if (!skillCategory || !experienceYears.trim() || !location.address.trim()) {
+    const includesOther = skillCategories.includes('other');
+    if (
+      skillCategories.length === 0 ||
+      (includesOther && !otherSkillDescription.trim()) ||
+      !experienceYears.trim() ||
+      !location.address.trim()
+    ) {
       setError(t('errors.VALIDATION_ERROR'));
       return;
     }
 
     createProfile.mutate(
       {
-        skillCategory,
+        skillCategories,
+        otherSkillDescription: includesOther ? otherSkillDescription.trim() : undefined,
         experienceYears: Number(experienceYears),
         latitude: location.latitude,
         longitude: location.longitude,
@@ -104,9 +117,9 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
           <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.skillLabel')}</Text>
           <View style={styles.chipRow}>
             {SKILL_CATEGORIES.map((skill) => {
-              const isActive = skillCategory === skill.key;
+              const isActive = skillCategories.includes(skill.key);
               return (
-                <Pressable key={skill.key} onPress={() => setSkillCategory(skill.key)}>
+                <Pressable key={skill.key} onPress={() => toggleSkill(skill.key)}>
                   {isActive ? (
                     <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
                       <FontAwesome6 name={skill.icon} size={12} color="#FFFFFF" solid />
@@ -122,6 +135,15 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
               );
             })}
           </View>
+
+          {skillCategories.includes('other') ? (
+            <TextField
+              label={t('workerProfile.otherSkillLabel')}
+              value={otherSkillDescription}
+              onChangeText={setOtherSkillDescription}
+              maxLength={100}
+            />
+          ) : null}
 
           <TextField
             label={t('workerProfile.experienceLabel')}
