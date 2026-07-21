@@ -1,13 +1,13 @@
 import { WorkersService } from './service';
 import { WorkersRepository } from './repository';
 import { WorkerProfile } from './interfaces';
+import * as cloudinaryService from '@/common/services/cloudinaryService';
 
 jest.mock('@/common/services/cloudinaryService', () => ({
   uploadToCloudinary: jest.fn(),
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { uploadToCloudinary } = require('@/common/services/cloudinaryService');
+const uploadToCloudinary = jest.mocked(cloudinaryService.uploadToCloudinary);
 
 type MockRepository = {
   [K in keyof WorkersRepository]: jest.Mock;
