@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Dimensions, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemePickerModal } from './ThemePickerModal';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
+import { WorkerProfileModal } from './WorkerProfileModal';
+import { BusinessProfileModal } from './BusinessProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
@@ -29,6 +31,8 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const logout = useLogout();
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [workerProfileVisible, setWorkerProfileVisible] = useState(false);
+  const [businessProfileVisible, setBusinessProfileVisible] = useState(false);
 
   const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -66,14 +70,6 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
     });
   }, [visible, rendered]);
 
-  // Worker/Business registration for an already-logged-in User account isn't built
-  // yet (see .cloud/project-context.md — Worker/Business modules are still pending),
-  // so these entries surface the intent now and tell the user it's on the way.
-  const handleComingSoon = () => {
-    onClose();
-    Alert.alert(t('homeMenu.comingSoonTitle'), t('homeMenu.comingSoonMessage'));
-  };
-
   const handleLogoutConfirm = () => {
     setLogoutConfirmVisible(false);
     onClose();
@@ -87,6 +83,10 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
       gradient: headerGradient,
       title: t('homeMenu.registerWorkerTitle'),
       subtitle: t('homeMenu.registerWorkerSubtitle'),
+      onPress: () => {
+        onClose();
+        setWorkerProfileVisible(true);
+      },
     },
     {
       key: 'business',
@@ -94,6 +94,10 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
       gradient: [colors.secondary, colors.warning] as const,
       title: t('homeMenu.registerBusinessTitle'),
       subtitle: t('homeMenu.registerBusinessSubtitle'),
+      onPress: () => {
+        onClose();
+        setBusinessProfileVisible(true);
+      },
     },
   ];
 
@@ -136,7 +140,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
                 <Pressable
                   key={item.key}
                   style={[styles.item, { backgroundColor: colors.background, borderColor: colors.border }]}
-                  onPress={handleComingSoon}
+                  onPress={item.onPress}
                 >
                   <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.itemIcon}>
                     <FontAwesome6 name={item.icon} size={18} color={colors.white} solid />
@@ -196,6 +200,8 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
         onConfirm={handleLogoutConfirm}
         onCancel={() => setLogoutConfirmVisible(false)}
       />
+      <WorkerProfileModal visible={workerProfileVisible} onClose={() => setWorkerProfileVisible(false)} />
+      <BusinessProfileModal visible={businessProfileVisible} onClose={() => setBusinessProfileVisible(false)} />
     </>
   );
 }

@@ -65,6 +65,30 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> 
   return (json as ApiEnvelope<T>).data;
 }
 
+/**
+ * Multipart uploads (Worker portfolio / Business shop photos) can't go through
+ * rawRequest — it always JSON.stringifies the body. Content-Type is deliberately never
+ * set here: fetch computes the multipart boundary itself from the FormData instance,
+ * and setting the header manually would drop that boundary and break the upload.
+ */
+async function rawFormRequest<T>(path: string, formData: FormData): Promise<T> {
+  const { accessToken } = useAuthStore.getState();
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { method: 'POST', headers, body: formData });
+  const json = (await response.json()) as ApiEnvelope<T> | ApiErrorBody;
+
+  if (!response.ok || !json.success) {
+    const errorBody = json as ApiErrorBody;
+    throw new ApiError(response.status, errorBody.message ?? 'Request failed', errorBody.error?.code);
+  }
+
+  return (json as ApiEnvelope<T>).data;
+}
+
 async function tryRefreshAccessToken(): Promise<boolean> {
   const { refreshToken, setAccessToken } = useAuthStore.getState();
   if (!refreshToken) return false;
@@ -86,4 +110,5 @@ export const apiClient = {
   get: <T>(path: string, auth = false) => rawRequest<T>(path, { method: 'GET', auth }),
   post: <T>(path: string, body?: unknown, auth = false) => rawRequest<T>(path, { method: 'POST', body, auth }),
   patch: <T>(path: string, body?: unknown, auth = false) => rawRequest<T>(path, { method: 'PATCH', body, auth }),
+  postForm: <T>(path: string, formData: FormData) => rawFormRequest<T>(path, formData),
 };

@@ -12,6 +12,7 @@ export interface AuthAccount {
   id: string;
   fullName: string;
   mobileNumber: string;
+  email: string;
   role: AccountRole;
   status: AccountStatus;
   preferredLanguage: AccountLanguage;

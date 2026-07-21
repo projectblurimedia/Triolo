@@ -6,17 +6,20 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
+import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
+import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 
-// Ratings/posts are placeholder content until the Worker/Business profile modules and
-// ratings/reviews module exist (see .cloud/project-context.md) — shown for worker and
-// business accounts only, since a plain user account has neither.
-const PROFESSIONAL_ROLES = new Set(['worker', 'business_owner', 'business_staff']);
-
+// Ratings/posts are placeholder content until the ratings/reviews module exists (see
+// .cloud/project-context.md) — shown once the account has added the Worker and/or
+// Business capability (see "Account Model"), not based on accounts.role, which is
+// always 'user' for every self-registered account regardless of capabilities added.
 export function ProfileScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const account = useAuthStore((state) => state.account);
-  const isProfessional = account ? PROFESSIONAL_ROLES.has(account.role) : false;
+  const { data: workerProfile } = useMyWorkerProfile();
+  const { data: businessProfile } = useMyBusinessProfile();
+  const isProfessional = Boolean(workerProfile || businessProfile);
   const initial = account?.fullName?.trim().charAt(0).toUpperCase() ?? '?';
 
   return (

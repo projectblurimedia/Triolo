@@ -24,7 +24,19 @@
     "plugins": [
       "expo-localization",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Triolo uses your location to find services and shops near you."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Triolo needs access to your photos to upload portfolio or shop images."
+        }
+      ]
     ]
   }
 }

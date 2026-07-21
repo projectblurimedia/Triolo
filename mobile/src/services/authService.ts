@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import { AccountLanguage, AccountRole, AuthAccount } from '@/state/authStore';
+import { AccountLanguage, AuthAccount } from '@/state/authStore';
 
 interface AuthTokens {
   accessToken: string;
@@ -14,7 +14,10 @@ export const authService = {
   requestRegistrationOtp: (params: {
     fullName: string;
     mobileNumber: string;
-    role: AccountRole;
+    email: string;
+    latitude: number | null;
+    longitude: number | null;
+    locationAddress: string;
     preferredLanguage: AccountLanguage;
   }) => apiClient.post<{ mobileNumber: string }>('/auth/register/request-otp', params),
 

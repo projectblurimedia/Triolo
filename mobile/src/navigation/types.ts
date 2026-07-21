@@ -1,8 +1,8 @@
-import { AccountRole } from '@/state/authStore';
-
 export type AuthStackParamList = {
   Welcome: undefined;
-  Register: { role: AccountRole };
+  // No role param — every self-registered account is a plain `user`; Worker/Business
+  // are optional capabilities added later via Home's menu, not chosen at registration.
+  Register: undefined;
   Login: undefined;
   Otp: { mode: 'registration' | 'login'; mobileNumber: string };
 };

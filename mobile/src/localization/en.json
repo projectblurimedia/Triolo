@@ -4,6 +4,7 @@
     "continue": "Continue",
     "cancel": "Cancel",
     "close": "Close",
+    "submit": "Submit",
     "retry": "Retry",
     "loading": "Loading...",
     "logout": "Log Out",
@@ -11,8 +12,10 @@
   },
   "auth": {
     "welcomeTitle": "Find trusted workers and shops near you",
+    "createAccount": "Create Account",
     "fullNameLabel": "Full Name",
     "mobileNumberLabel": "Mobile Number",
+    "emailLabel": "Email",
     "otpLabel": "Enter OTP",
     "sendOtp": "Send OTP",
     "verifyOtp": "Verify OTP",
@@ -26,6 +29,59 @@
     "roleBusinessSubtitle": "List your shop and reach more customers",
     "getStarted": "Get Started",
     "alreadyHaveAccount": "Already have an account?"
+  },
+  "location": {
+    "useCurrent": "Use My Current Location",
+    "addressLabel": "Location",
+    "addressPlaceholder": "Village/town, district",
+    "gpsDetected": "Detected via GPS",
+    "permissionDeniedTitle": "Location Permission Needed",
+    "permissionDeniedMessage": "Allow location access to auto-detect your location, or enter it manually below.",
+    "detectFailedTitle": "Couldn't Detect Location",
+    "detectFailedMessage": "Something went wrong finding your location. Please enter it manually."
+  },
+  "imagePicker": {
+    "permissionDeniedTitle": "Photo Access Needed",
+    "permissionDeniedMessage": "Allow photo library access to add images.",
+    "hint": "{{count}}/{{max}} photos added"
+  },
+  "workerProfile": {
+    "title": "Become a Worker",
+    "subtitle": "Tell us what you do, so nearby customers can find you",
+    "skillLabel": "Your Skill",
+    "skills": {
+      "electrician": "Electrician",
+      "plumber": "Plumber",
+      "painter": "Painter",
+      "carpenter": "Carpenter",
+      "mechanic": "Mechanic",
+      "cleaner": "Cleaner",
+      "mason": "Mason",
+      "other": "Other"
+    },
+    "experienceLabel": "Years of Experience",
+    "portfolioLabel": "Photos of Your Work (optional)",
+    "successTitle": "Worker Profile Created",
+    "successMessage": "Your details are submitted for verification. We'll notify you once approved."
+  },
+  "businessProfile": {
+    "title": "Become a Business",
+    "subtitle": "Tell us about your shop, so nearby customers can find you",
+    "shopNameLabel": "Shop Name",
+    "categoryLabel": "Shop Category",
+    "categories": {
+      "grocery": "Grocery",
+      "restaurant": "Restaurant",
+      "pharmacy": "Pharmacy",
+      "electronics": "Electronics",
+      "clothing": "Clothing",
+      "hardware": "Hardware",
+      "salon": "Salon",
+      "other": "Other"
+    },
+    "photosLabel": "Shop Photos (optional)",
+    "successTitle": "Business Profile Created",
+    "successMessage": "Your shop details are submitted for verification. We'll notify you once approved."
   },
   "settings": {
     "language": "Language",
@@ -67,9 +123,7 @@
     "registerWorkerSubtitle": "Get booked for jobs nearby",
     "registerBusinessTitle": "Become a Business",
     "registerBusinessSubtitle": "Have a shop? List it now",
-    "settingsSection": "App Settings",
-    "comingSoonTitle": "Coming Soon",
-    "comingSoonMessage": "This will be available soon. Stay tuned!"
+    "settingsSection": "App Settings"
   },
   "services": {
     "comingSoon": "Browsing services by category is coming soon.",
@@ -103,6 +157,9 @@
     "OTP_CONTEXT_MISSING": "Something went wrong with registration. Please start again.",
     "ACCOUNT_NOT_ACTIVE": "This account has been suspended or blocked.",
     "VALIDATION_ERROR": "Please check the details you entered.",
-    "RATE_LIMITED": "Too many attempts. Please wait a bit and try again."
+    "RATE_LIMITED": "Too many attempts. Please wait a bit and try again.",
+    "WORKER_PROFILE_EXISTS": "You already have a worker profile.",
+    "BUSINESS_PROFILE_EXISTS": "You already have a business profile.",
+    "CLOUDINARY_NOT_CONFIGURED": "Image uploads aren't available right now. Please try again later."
   }
 }
