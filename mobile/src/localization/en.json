@@ -4,6 +4,7 @@
     "continue": "Continue",
     "cancel": "Cancel",
     "close": "Close",
+    "done": "Done",
     "submit": "Submit",
     "retry": "Retry",
     "loading": "Loading...",
@@ -165,6 +166,7 @@
     "RATE_LIMITED": "Too many attempts. Please wait a bit and try again.",
     "WORKER_PROFILE_EXISTS": "You already have a worker profile.",
     "BUSINESS_PROFILE_EXISTS": "You already have a business profile.",
-    "CLOUDINARY_NOT_CONFIGURED": "Image uploads aren't available right now. Please try again later."
+    "CLOUDINARY_NOT_CONFIGURED": "Image uploads aren't available right now. Please try again later.",
+    "INTERNAL_SERVER_ERROR": "Something went wrong on our end. Please try again."
   }
 }

@@ -39,7 +39,9 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
 
   const [shopName, setShopName] = useState('');
   const [shopCategories, setShopCategories] = useState<string[]>([]);
-  const [otherCategoryDescription, setOtherCategoryDescription] = useState('');
+  const [otherCategoryEntries, setOtherCategoryEntries] = useState<string[]>([]);
+  const [showOtherInput, setShowOtherInput] = useState(false);
+  const [otherInputValue, setOtherInputValue] = useState('');
   const [location, setLocation] = useState<LocationValue>({ latitude: null, longitude: null, address: '' });
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
@@ -47,13 +49,32 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
   const [error, setError] = useState<string | null>(null);
 
   const toggleCategory = (key: string) => {
+    if (key === 'other') {
+      setShowOtherInput(true);
+      return;
+    }
     setShopCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
+  };
+
+  const commitOtherEntry = () => {
+    const trimmed = otherInputValue.trim();
+    if (trimmed && !otherCategoryEntries.includes(trimmed)) {
+      setOtherCategoryEntries((prev) => [...prev, trimmed]);
+    }
+    setOtherInputValue('');
+    setShowOtherInput(false);
+  };
+
+  const removeOtherEntry = (index: number) => {
+    setOtherCategoryEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
   const resetAndClose = () => {
     setShopName('');
     setShopCategories([]);
-    setOtherCategoryDescription('');
+    setOtherCategoryEntries([]);
+    setShowOtherInput(false);
+    setOtherInputValue('');
     setLocation({ latitude: null, longitude: null, address: '' });
     setPhotos([]);
     setDeliveryAvailable(null);
@@ -64,11 +85,10 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
 
   const handleSubmit = () => {
     setError(null);
-    const includesOther = shopCategories.includes('other');
+    const includesOther = otherCategoryEntries.length > 0;
     if (
       !shopName.trim() ||
-      shopCategories.length === 0 ||
-      (includesOther && !otherCategoryDescription.trim()) ||
+      (shopCategories.length === 0 && !includesOther) ||
       !location.address.trim() ||
       deliveryAvailable === null ||
       (deliveryAvailable && !deliveryPricePerKm.trim())
@@ -80,8 +100,8 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
     createProfile.mutate(
       {
         shopName,
-        shopCategories,
-        otherCategoryDescription: includesOther ? otherCategoryDescription.trim() : undefined,
+        shopCategories: includesOther ? [...shopCategories, 'other'] : shopCategories,
+        otherCategoryDescription: includesOther ? otherCategoryEntries.join(', ') : undefined,
         latitude: location.latitude,
         longitude: location.longitude,
         locationAddress: location.address,
@@ -129,7 +149,8 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
           <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.categoryLabel')}</Text>
           <View style={styles.chipRow}>
             {SHOP_CATEGORIES.map((category) => {
-              const isActive = shopCategories.includes(category.key);
+              const isActive =
+                category.key === 'other' ? otherCategoryEntries.length > 0 : shopCategories.includes(category.key);
               return (
                 <Pressable key={category.key} onPress={() => toggleCategory(category.key)}>
                   {isActive ? (
@@ -150,18 +171,45 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
                 </Pressable>
               );
             })}
+            {otherCategoryEntries.map((entry, index) => (
+              <Pressable key={`other-${entry}-${index}`} onPress={() => removeOtherEntry(index)}>
+                <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]} numberOfLines={1}>
+                    {entry}
+                  </Text>
+                  <FontAwesome6 name="xmark" size={10} color="#FFFFFF" solid />
+                </LinearGradient>
+              </Pressable>
+            ))}
           </View>
 
-          {shopCategories.includes('other') ? (
-            <TextField
-              label={t('businessProfile.otherCategoryLabel')}
-              value={otherCategoryDescription}
-              onChangeText={setOtherCategoryDescription}
-              maxLength={100}
-            />
+          {showOtherInput ? (
+            <View style={styles.otherInputRow}>
+              <View style={styles.otherInputField}>
+                <TextField
+                  label={t('businessProfile.otherCategoryLabel')}
+                  value={otherInputValue}
+                  onChangeText={setOtherInputValue}
+                  maxLength={40}
+                  returnKeyType="done"
+                  onSubmitEditing={commitOtherEntry}
+                  autoFocus
+                />
+              </View>
+              <Pressable
+                style={[styles.otherDoneButton, { opacity: otherInputValue.trim() ? 1 : 0.5 }]}
+                onPress={commitOtherEntry}
+                disabled={!otherInputValue.trim()}
+                accessibilityLabel={t('common.done')}
+              >
+                <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
+                  <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
+                </LinearGradient>
+              </Pressable>
+            </View>
           ) : null}
 
-          <LocationPicker value={location} onChange={setLocation} />
+          <LocationPicker value={location} onChange={setLocation} accentColor={SHOP_GRADIENT[0]} />
 
           <ImagePickerField label={t('businessProfile.photosLabel')} images={photos} onChange={setPhotos} />
 
@@ -239,5 +287,15 @@ const styles = StyleSheet.create({
   },
   chipInactive: { borderWidth: 1 },
   chipLabel: { ...typography.caption, fontFamily: fonts.medium },
+  otherInputRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  otherInputField: { flex: 1 },
+  otherDoneButton: { marginTop: 22 },
+  otherDoneGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   error: { ...typography.caption, marginBottom: 12 },
 });

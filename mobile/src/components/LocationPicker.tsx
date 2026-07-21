@@ -17,6 +17,8 @@ interface LocationPickerProps {
   value: LocationValue;
   onChange: (value: LocationValue) => void;
   error?: string;
+  /** Overrides the "use current location" button's tint — lets a screen with its own brand-distinct gradient (e.g. Business's orange) stay visually consistent instead of the default blue. */
+  accentColor?: string;
 }
 
 /**
@@ -26,10 +28,11 @@ interface LocationPickerProps {
  * the "Planned Next" note in .cloud/project-context.md for the full GPS-coordinates
  * decision this implements.
  */
-export function LocationPicker({ value, onChange, error }: LocationPickerProps) {
+export function LocationPicker({ value, onChange, error, accentColor }: LocationPickerProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const [detecting, setDetecting] = useState(false);
+  const tint = accentColor ?? colors.primary;
 
   const handleDetect = async () => {
     setDetecting(true);
@@ -60,16 +63,16 @@ export function LocationPicker({ value, onChange, error }: LocationPickerProps) 
   return (
     <View style={styles.container}>
       <Pressable
-        style={[styles.detectButton, { borderColor: colors.primary, backgroundColor: `${colors.primary}12` }]}
+        style={[styles.detectButton, { borderColor: tint, backgroundColor: `${tint}12` }]}
         onPress={handleDetect}
         disabled={detecting}
       >
         {detecting ? (
-          <LoadingIndicator size={16} dotSize={3} color={colors.primary} />
+          <LoadingIndicator size={16} dotSize={3} color={tint} />
         ) : (
-          <FontAwesome6 name="location-crosshairs" size={15} color={colors.primary} solid />
+          <FontAwesome6 name="location-crosshairs" size={15} color={tint} solid />
         )}
-        <Text style={[styles.detectText, { color: colors.primary }]}>{t('location.useCurrent')}</Text>
+        <Text style={[styles.detectText, { color: tint }]}>{t('location.useCurrent')}</Text>
       </Pressable>
 
       <TextField

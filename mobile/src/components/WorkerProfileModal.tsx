@@ -36,19 +36,40 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
   const createProfile = useCreateWorkerProfile();
 
   const [skillCategories, setSkillCategories] = useState<string[]>([]);
-  const [otherSkillDescription, setOtherSkillDescription] = useState('');
+  const [otherSkillEntries, setOtherSkillEntries] = useState<string[]>([]);
+  const [showOtherInput, setShowOtherInput] = useState(false);
+  const [otherInputValue, setOtherInputValue] = useState('');
   const [experienceYears, setExperienceYears] = useState('');
   const [location, setLocation] = useState<LocationValue>({ latitude: null, longitude: null, address: '' });
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const toggleSkill = (key: string) => {
+    if (key === 'other') {
+      setShowOtherInput(true);
+      return;
+    }
     setSkillCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
+  };
+
+  const commitOtherEntry = () => {
+    const trimmed = otherInputValue.trim();
+    if (trimmed && !otherSkillEntries.includes(trimmed)) {
+      setOtherSkillEntries((prev) => [...prev, trimmed]);
+    }
+    setOtherInputValue('');
+    setShowOtherInput(false);
+  };
+
+  const removeOtherEntry = (index: number) => {
+    setOtherSkillEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
   const resetAndClose = () => {
     setSkillCategories([]);
-    setOtherSkillDescription('');
+    setOtherSkillEntries([]);
+    setShowOtherInput(false);
+    setOtherInputValue('');
     setExperienceYears('');
     setLocation({ latitude: null, longitude: null, address: '' });
     setPhotos([]);
@@ -58,10 +79,9 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
 
   const handleSubmit = () => {
     setError(null);
-    const includesOther = skillCategories.includes('other');
+    const includesOther = otherSkillEntries.length > 0;
     if (
-      skillCategories.length === 0 ||
-      (includesOther && !otherSkillDescription.trim()) ||
+      (skillCategories.length === 0 && !includesOther) ||
       !experienceYears.trim() ||
       !location.address.trim()
     ) {
@@ -71,8 +91,8 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
 
     createProfile.mutate(
       {
-        skillCategories,
-        otherSkillDescription: includesOther ? otherSkillDescription.trim() : undefined,
+        skillCategories: includesOther ? [...skillCategories, 'other'] : skillCategories,
+        otherSkillDescription: includesOther ? otherSkillEntries.join(', ') : undefined,
         experienceYears: Number(experienceYears),
         latitude: location.latitude,
         longitude: location.longitude,
@@ -117,7 +137,8 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
           <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.skillLabel')}</Text>
           <View style={styles.chipRow}>
             {SKILL_CATEGORIES.map((skill) => {
-              const isActive = skillCategories.includes(skill.key);
+              const isActive =
+                skill.key === 'other' ? otherSkillEntries.length > 0 : skillCategories.includes(skill.key);
               return (
                 <Pressable key={skill.key} onPress={() => toggleSkill(skill.key)}>
                   {isActive ? (
@@ -134,15 +155,42 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
                 </Pressable>
               );
             })}
+            {otherSkillEntries.map((entry, index) => (
+              <Pressable key={`other-${entry}-${index}`} onPress={() => removeOtherEntry(index)}>
+                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]} numberOfLines={1}>
+                    {entry}
+                  </Text>
+                  <FontAwesome6 name="xmark" size={10} color="#FFFFFF" solid />
+                </LinearGradient>
+              </Pressable>
+            ))}
           </View>
 
-          {skillCategories.includes('other') ? (
-            <TextField
-              label={t('workerProfile.otherSkillLabel')}
-              value={otherSkillDescription}
-              onChangeText={setOtherSkillDescription}
-              maxLength={100}
-            />
+          {showOtherInput ? (
+            <View style={styles.otherInputRow}>
+              <View style={styles.otherInputField}>
+                <TextField
+                  label={t('workerProfile.otherSkillLabel')}
+                  value={otherInputValue}
+                  onChangeText={setOtherInputValue}
+                  maxLength={40}
+                  returnKeyType="done"
+                  onSubmitEditing={commitOtherEntry}
+                  autoFocus
+                />
+              </View>
+              <Pressable
+                style={[styles.otherDoneButton, { opacity: otherInputValue.trim() ? 1 : 0.5 }]}
+                onPress={commitOtherEntry}
+                disabled={!otherInputValue.trim()}
+                accessibilityLabel={t('common.done')}
+              >
+                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
+                  <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
+                </LinearGradient>
+              </Pressable>
+            </View>
           ) : null}
 
           <TextField
@@ -196,5 +244,15 @@ const styles = StyleSheet.create({
   },
   chipInactive: { borderWidth: 1 },
   chipLabel: { ...typography.caption, fontFamily: fonts.medium },
+  otherInputRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  otherInputField: { flex: 1 },
+  otherDoneButton: { marginTop: 22 },
+  otherDoneGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   error: { ...typography.caption, marginBottom: 12 },
 });
