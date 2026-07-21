@@ -5,6 +5,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "done": "Done",
+    "addNew": "Add New",
     "submit": "Submit",
     "retry": "Retry",
     "loading": "Loading...",
@@ -167,6 +168,10 @@
     "WORKER_PROFILE_EXISTS": "You already have a worker profile.",
     "BUSINESS_PROFILE_EXISTS": "You already have a business profile.",
     "CLOUDINARY_NOT_CONFIGURED": "Image uploads aren't available right now. Please try again later.",
-    "INTERNAL_SERVER_ERROR": "Something went wrong on our end. Please try again."
+    "INTERNAL_SERVER_ERROR": "Something went wrong on our end. Please try again.",
+    "UNAUTHORIZED": "Your session has expired. Please log in again.",
+    "FORBIDDEN": "You don't have permission to do that.",
+    "NOT_FOUND": "We couldn't find what you're looking for.",
+    "CONFLICT": "This already exists."
   }
 }

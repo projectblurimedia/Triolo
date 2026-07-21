@@ -20,7 +20,6 @@ const SKILL_CATEGORIES = [
   { key: 'mechanic', icon: 'wrench' as const },
   { key: 'cleaner', icon: 'broom' as const },
   { key: 'mason', icon: 'trowel' as const },
-  { key: 'other', icon: 'ellipsis' as const },
 ];
 
 interface WorkerProfileModalProps {
@@ -45,12 +44,12 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
   const [error, setError] = useState<string | null>(null);
 
   const toggleSkill = (key: string) => {
-    if (key === 'other') {
-      setShowOtherInput(true);
-      return;
-    }
     setSkillCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
   };
+
+  const orderedSkills = [...SKILL_CATEGORIES].sort(
+    (a, b) => Number(skillCategories.includes(b.key)) - Number(skillCategories.includes(a.key)),
+  );
 
   const commitOtherEntry = () => {
     const trimmed = otherInputValue.trim();
@@ -136,9 +135,8 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.skillLabel')}</Text>
           <View style={styles.chipRow}>
-            {SKILL_CATEGORIES.map((skill) => {
-              const isActive =
-                skill.key === 'other' ? otherSkillEntries.length > 0 : skillCategories.includes(skill.key);
+            {orderedSkills.map((skill) => {
+              const isActive = skillCategories.includes(skill.key);
               return (
                 <Pressable key={skill.key} onPress={() => toggleSkill(skill.key)}>
                   {isActive ? (
@@ -165,6 +163,12 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
                 </LinearGradient>
               </Pressable>
             ))}
+            <Pressable onPress={() => setShowOtherInput(true)}>
+              <View style={[styles.chip, styles.addNewChip, { borderColor: colors.primary }]}>
+                <FontAwesome6 name="plus" size={12} color={colors.primary} solid />
+                <Text style={[styles.chipLabel, { color: colors.primary }]}>{t('common.addNew')}</Text>
+              </View>
+            </Pressable>
           </View>
 
           {showOtherInput ? (
@@ -243,6 +247,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   chipInactive: { borderWidth: 1 },
+  addNewChip: { borderWidth: 1, borderStyle: 'dashed' },
   chipLabel: { ...typography.caption, fontFamily: fonts.medium },
   otherInputRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   otherInputField: { flex: 1 },

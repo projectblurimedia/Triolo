@@ -22,7 +22,6 @@ const SHOP_CATEGORIES = [
   { key: 'clothing', icon: 'shirt' as const },
   { key: 'hardware', icon: 'screwdriver-wrench' as const },
   { key: 'salon', icon: 'scissors' as const },
-  { key: 'other', icon: 'ellipsis' as const },
 ];
 
 interface BusinessProfileModalProps {
@@ -49,12 +48,12 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
   const [error, setError] = useState<string | null>(null);
 
   const toggleCategory = (key: string) => {
-    if (key === 'other') {
-      setShowOtherInput(true);
-      return;
-    }
     setShopCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
   };
+
+  const orderedCategories = [...SHOP_CATEGORIES].sort(
+    (a, b) => Number(shopCategories.includes(b.key)) - Number(shopCategories.includes(a.key)),
+  );
 
   const commitOtherEntry = () => {
     const trimmed = otherInputValue.trim();
@@ -148,9 +147,8 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
 
           <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.categoryLabel')}</Text>
           <View style={styles.chipRow}>
-            {SHOP_CATEGORIES.map((category) => {
-              const isActive =
-                category.key === 'other' ? otherCategoryEntries.length > 0 : shopCategories.includes(category.key);
+            {orderedCategories.map((category) => {
+              const isActive = shopCategories.includes(category.key);
               return (
                 <Pressable key={category.key} onPress={() => toggleCategory(category.key)}>
                   {isActive ? (
@@ -181,6 +179,12 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
                 </LinearGradient>
               </Pressable>
             ))}
+            <Pressable onPress={() => setShowOtherInput(true)}>
+              <View style={[styles.chip, styles.addNewChip, { borderColor: SHOP_GRADIENT[0] }]}>
+                <FontAwesome6 name="plus" size={12} color={SHOP_GRADIENT[0]} solid />
+                <Text style={[styles.chipLabel, { color: SHOP_GRADIENT[0] }]}>{t('common.addNew')}</Text>
+              </View>
+            </Pressable>
           </View>
 
           {showOtherInput ? (
@@ -286,6 +290,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   chipInactive: { borderWidth: 1 },
+  addNewChip: { borderWidth: 1, borderStyle: 'dashed' },
   chipLabel: { ...typography.caption, fontFamily: fonts.medium },
   otherInputRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   otherInputField: { flex: 1 },

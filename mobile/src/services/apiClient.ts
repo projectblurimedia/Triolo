@@ -71,7 +71,7 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> 
  * set here: fetch computes the multipart boundary itself from the FormData instance,
  * and setting the header manually would drop that boundary and break the upload.
  */
-async function rawFormRequest<T>(path: string, formData: FormData): Promise<T> {
+async function rawFormRequest<T>(path: string, formData: FormData, _retried = false): Promise<T> {
   const { accessToken } = useAuthStore.getState();
   const headers: Record<string, string> = {};
   if (accessToken) {
@@ -83,6 +83,19 @@ async function rawFormRequest<T>(path: string, formData: FormData): Promise<T> {
 
   if (!response.ok || !json.success) {
     const errorBody = json as ApiErrorBody;
+
+    // These forms can take several minutes to fill out (multi-select chips, photos,
+    // location) — the access token frequently expires mid-fill. Mirror rawRequest's
+    // refresh-once-and-retry so a stale token doesn't surface as a raw, unmapped
+    // "Unauthorized" error at the very end of a long form.
+    if (response.status === 401 && !_retried) {
+      const refreshed = await tryRefreshAccessToken();
+      if (refreshed) {
+        return rawFormRequest<T>(path, formData, true);
+      }
+      useAuthStore.getState().clearSession();
+    }
+
     throw new ApiError(response.status, errorBody.message ?? 'Request failed', errorBody.error?.code);
   }
 
