@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ import { Button } from './Button';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useCreateWorkerProfile } from '@/hooks/useWorkerMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
+import { showToast } from '@/state/toastStore';
 
 const SKILL_CATEGORIES = [
   { key: 'electrician', icon: 'bolt' as const },
@@ -53,8 +54,16 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
 
   const commitOtherEntry = () => {
     const trimmed = otherInputValue.trim();
-    if (trimmed && !otherSkillEntries.includes(trimmed)) {
-      setOtherSkillEntries((prev) => [...prev, trimmed]);
+    if (trimmed) {
+      setOtherSkillEntries((prev) => {
+        const existingIndex = prev.findIndex((entry) => entry.toLowerCase() === trimmed.toLowerCase());
+        if (existingIndex !== -1) {
+          // Already added — surface it (bring to front) instead of creating a duplicate chip.
+          const existing = prev[existingIndex];
+          return [existing, ...prev.filter((_, i) => i !== existingIndex)];
+        }
+        return [...prev, trimmed];
+      });
     }
     setOtherInputValue('');
     setShowOtherInput(false);
@@ -101,7 +110,7 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
       {
         onSuccess: () => {
           resetAndClose();
-          Alert.alert(t('workerProfile.successTitle'), t('workerProfile.successMessage'));
+          showToast({ variant: 'success', title: t('workerProfile.successTitle'), message: t('workerProfile.successMessage') });
         },
         onError: (err) => setError(getLocalizedErrorMessage(err, t)),
       },
@@ -164,9 +173,19 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
               </Pressable>
             ))}
             <Pressable onPress={() => setShowOtherInput(true)}>
-              <View style={[styles.chip, styles.addNewChip, { borderColor: colors.primary }]}>
-                <FontAwesome6 name="plus" size={12} color={colors.primary} solid />
-                <Text style={[styles.chipLabel, { color: colors.primary }]}>{t('common.addNew')}</Text>
+              <View
+                style={[
+                  styles.chip,
+                  styles.addNewChip,
+                  { borderColor: colors.primary, backgroundColor: `${colors.primary}16` },
+                ]}
+              >
+                <View style={[styles.addNewBadge, { backgroundColor: colors.primary }]}>
+                  <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
+                </View>
+                <Text style={[styles.chipLabel, { color: colors.primary, fontFamily: fonts.semiBold }]}>
+                  {t('common.addNew')}
+                </Text>
               </View>
             </Pressable>
           </View>
@@ -247,7 +266,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   chipInactive: { borderWidth: 1 },
-  addNewChip: { borderWidth: 1, borderStyle: 'dashed' },
+  addNewChip: { borderWidth: 1.5 },
+  addNewBadge: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   chipLabel: { ...typography.caption, fontFamily: fonts.medium },
   otherInputRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   otherInputField: { flex: 1 },

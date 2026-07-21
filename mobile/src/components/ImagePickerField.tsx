@@ -1,9 +1,10 @@
 import React from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { typography, useThemeColors } from '@/theme';
+import { showToast } from '@/state/toastStore';
 
 export interface PickedImage {
   uri: string;
@@ -31,7 +32,11 @@ export function ImagePickerField({ label, images, onChange, maxImages = 6 }: Ima
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(t('imagePicker.permissionDeniedTitle'), t('imagePicker.permissionDeniedMessage'));
+      showToast({
+        variant: 'error',
+        title: t('imagePicker.permissionDeniedTitle'),
+        message: t('imagePicker.permissionDeniedMessage'),
+      });
       return;
     }
 

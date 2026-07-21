@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ import { Button } from './Button';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useCreateBusinessProfile } from '@/hooks/useBusinessMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
+import { showToast } from '@/state/toastStore';
 
 const SHOP_GRADIENT = ['#F59E0B', '#D97706'] as const;
 
@@ -57,8 +58,16 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
 
   const commitOtherEntry = () => {
     const trimmed = otherInputValue.trim();
-    if (trimmed && !otherCategoryEntries.includes(trimmed)) {
-      setOtherCategoryEntries((prev) => [...prev, trimmed]);
+    if (trimmed) {
+      setOtherCategoryEntries((prev) => {
+        const existingIndex = prev.findIndex((entry) => entry.toLowerCase() === trimmed.toLowerCase());
+        if (existingIndex !== -1) {
+          // Already added — surface it (bring to front) instead of creating a duplicate chip.
+          const existing = prev[existingIndex];
+          return [existing, ...prev.filter((_, i) => i !== existingIndex)];
+        }
+        return [...prev, trimmed];
+      });
     }
     setOtherInputValue('');
     setShowOtherInput(false);
@@ -111,7 +120,7 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
       {
         onSuccess: () => {
           resetAndClose();
-          Alert.alert(t('businessProfile.successTitle'), t('businessProfile.successMessage'));
+          showToast({ variant: 'success', title: t('businessProfile.successTitle'), message: t('businessProfile.successMessage') });
         },
         onError: (err) => setError(getLocalizedErrorMessage(err, t)),
       },
@@ -180,9 +189,19 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
               </Pressable>
             ))}
             <Pressable onPress={() => setShowOtherInput(true)}>
-              <View style={[styles.chip, styles.addNewChip, { borderColor: SHOP_GRADIENT[0] }]}>
-                <FontAwesome6 name="plus" size={12} color={SHOP_GRADIENT[0]} solid />
-                <Text style={[styles.chipLabel, { color: SHOP_GRADIENT[0] }]}>{t('common.addNew')}</Text>
+              <View
+                style={[
+                  styles.chip,
+                  styles.addNewChip,
+                  { borderColor: SHOP_GRADIENT[0], backgroundColor: `${SHOP_GRADIENT[0]}16` },
+                ]}
+              >
+                <View style={[styles.addNewBadge, { backgroundColor: SHOP_GRADIENT[0] }]}>
+                  <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
+                </View>
+                <Text style={[styles.chipLabel, { color: SHOP_GRADIENT[0], fontFamily: fonts.semiBold }]}>
+                  {t('common.addNew')}
+                </Text>
               </View>
             </Pressable>
           </View>
@@ -290,7 +309,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   chipInactive: { borderWidth: 1 },
-  addNewChip: { borderWidth: 1, borderStyle: 'dashed' },
+  addNewChip: { borderWidth: 1.5 },
+  addNewBadge: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   chipLabel: { ...typography.caption, fontFamily: fonts.medium },
   otherInputRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   otherInputField: { flex: 1 },

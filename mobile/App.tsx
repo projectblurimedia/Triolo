@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
+import { ToastHost } from '@/components/ToastHost';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 
@@ -54,6 +55,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <RootNavigator />
         {isLoggingOut ? <LogoutOverlay /> : null}
+        <ToastHost />
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}
         <StatusBar style="light" />

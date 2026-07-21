@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
@@ -9,6 +9,7 @@ import { colors, typography } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
 import { useVerifyLoginOtp, useVerifyRegistrationOtp } from '@/hooks/useAuthMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
+import { showToast } from '@/state/toastStore';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Otp'>;
 
@@ -35,7 +36,7 @@ export function OtpScreen({ route }: Props) {
           // not part of this form. One-time pointer so that's discoverable right away
           // instead of the user having to go looking for it.
           if (mode === 'registration') {
-            Alert.alert(t('auth.accountCreatedTitle'), t('auth.accountCreatedMessage'));
+            showToast({ variant: 'success', title: t('auth.accountCreatedTitle'), message: t('auth.accountCreatedMessage') });
           }
         },
         onError: (err) => setError(getLocalizedErrorMessage(err, t)),

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { TextField } from './TextField';
 import { LoadingIndicator } from './LoadingIndicator';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { showToast } from '@/state/toastStore';
 
 export interface LocationValue {
   latitude: number | null;
@@ -39,7 +40,11 @@ export function LocationPicker({ value, onChange, error, accentColor }: Location
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(t('location.permissionDeniedTitle'), t('location.permissionDeniedMessage'));
+        showToast({
+          variant: 'error',
+          title: t('location.permissionDeniedTitle'),
+          message: t('location.permissionDeniedMessage'),
+        });
         return;
       }
 
@@ -54,7 +59,7 @@ export function LocationPicker({ value, onChange, error, accentColor }: Location
 
       onChange({ latitude: position.coords.latitude, longitude: position.coords.longitude, address });
     } catch {
-      Alert.alert(t('location.detectFailedTitle'), t('location.detectFailedMessage'));
+      showToast({ variant: 'error', title: t('location.detectFailedTitle'), message: t('location.detectFailedMessage') });
     } finally {
       setDetecting(false);
     }
