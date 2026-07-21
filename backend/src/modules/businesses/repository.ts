@@ -60,4 +60,45 @@ export class BusinessesRepository {
     );
     return mapBusinessProfile(result.rows[0]);
   }
+
+  async update(
+    accountId: string,
+    params: {
+      shopName: string;
+      shopCategories: string[];
+      otherCategoryDescription: string | null;
+      latitude: number | null;
+      longitude: number | null;
+      locationAddress: string | null;
+      shopPhotoUrls: string[];
+      deliveryAvailable: boolean;
+      deliveryPricePerKm: number | null;
+      verificationStatus: string;
+    },
+  ): Promise<BusinessProfile> {
+    const result = await this.pool.query(
+      `UPDATE business_profiles
+       SET shop_name = $2, shop_categories = $3, other_category_description = $4, latitude = $5, longitude = $6, location_address = $7, shop_photo_urls = $8, delivery_available = $9, delivery_price_per_km = $10, verification_status = $11, updated_at = now()
+       WHERE account_id = $1
+       RETURNING *`,
+      [
+        accountId,
+        params.shopName,
+        params.shopCategories,
+        params.otherCategoryDescription,
+        params.latitude,
+        params.longitude,
+        params.locationAddress,
+        params.shopPhotoUrls,
+        params.deliveryAvailable,
+        params.deliveryPricePerKm,
+        params.verificationStatus,
+      ],
+    );
+    return mapBusinessProfile(result.rows[0]);
+  }
+
+  async remove(accountId: string): Promise<void> {
+    await this.pool.query('DELETE FROM business_profiles WHERE account_id = $1', [accountId]);
+  }
 }

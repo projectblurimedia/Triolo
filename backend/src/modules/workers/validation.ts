@@ -21,3 +21,21 @@ export const createWorkerProfileSchema = z
     message: 'Please describe your skill',
     path: ['otherSkillDescription'],
   });
+
+export const updateWorkerProfileSchema = z
+  .object({
+    skillCategories: z.preprocess(
+      parseJsonIfString,
+      z.array(z.enum(WORKER_SKILL_CATEGORIES as [string, ...string[]])).min(1, 'Select at least one skill'),
+    ),
+    otherSkillDescription: z.string().trim().max(100).optional(),
+    experienceYears: z.coerce.number().int().min(0).max(60),
+    latitude: z.coerce.number().min(-90).max(90).optional(),
+    longitude: z.coerce.number().min(-180).max(180).optional(),
+    locationAddress: z.string().trim().min(2).max(255).optional(),
+    existingPhotoUrls: z.preprocess(parseJsonIfString, z.array(z.string())).optional(),
+  })
+  .refine((data) => !data.skillCategories.includes('other') || !!data.otherSkillDescription, {
+    message: 'Please describe your skill',
+    path: ['otherSkillDescription'],
+  });

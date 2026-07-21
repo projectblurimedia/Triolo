@@ -6,7 +6,7 @@ import { upload } from '@/common/middleware/upload';
 import { WorkersController } from './controller';
 import { WorkersService } from './service';
 import { WorkersRepository } from './repository';
-import { createWorkerProfileSchema } from './validation';
+import { createWorkerProfileSchema, updateWorkerProfileSchema } from './validation';
 
 const repository = new WorkersRepository(pool);
 const service = new WorkersService(repository);
@@ -24,3 +24,11 @@ workersRouter.post(
   controller.createProfile,
 );
 workersRouter.get('/me/profile', authenticate, controller.getMyProfile);
+workersRouter.patch(
+  '/me/profile',
+  authenticate,
+  upload.array('portfolioPhotos', 6),
+  validateBody(updateWorkerProfileSchema),
+  controller.updateProfile,
+);
+workersRouter.delete('/me/profile', authenticate, controller.deleteProfile);

@@ -6,7 +6,7 @@ import { upload } from '@/common/middleware/upload';
 import { BusinessesController } from './controller';
 import { BusinessesService } from './service';
 import { BusinessesRepository } from './repository';
-import { createBusinessProfileSchema } from './validation';
+import { createBusinessProfileSchema, updateBusinessProfileSchema } from './validation';
 
 const repository = new BusinessesRepository(pool);
 const service = new BusinessesService(repository);
@@ -22,3 +22,11 @@ businessesRouter.post(
   controller.createProfile,
 );
 businessesRouter.get('/me/profile', authenticate, controller.getMyProfile);
+businessesRouter.patch(
+  '/me/profile',
+  authenticate,
+  upload.array('shopPhotos', 6),
+  validateBody(updateBusinessProfileSchema),
+  controller.updateProfile,
+);
+businessesRouter.delete('/me/profile', authenticate, controller.deleteProfile);

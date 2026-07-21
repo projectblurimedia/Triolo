@@ -54,4 +54,41 @@ export class WorkersRepository {
     );
     return mapWorkerProfile(result.rows[0]);
   }
+
+  async update(
+    accountId: string,
+    params: {
+      skillCategories: string[];
+      otherSkillDescription: string | null;
+      experienceYears: number;
+      latitude: number | null;
+      longitude: number | null;
+      locationAddress: string | null;
+      portfolioPhotoUrls: string[];
+      verificationStatus: string;
+    },
+  ): Promise<WorkerProfile> {
+    const result = await this.pool.query(
+      `UPDATE worker_profiles
+       SET skill_categories = $2, other_skill_description = $3, experience_years = $4, latitude = $5, longitude = $6, location_address = $7, portfolio_photo_urls = $8, verification_status = $9, updated_at = now()
+       WHERE account_id = $1
+       RETURNING *`,
+      [
+        accountId,
+        params.skillCategories,
+        params.otherSkillDescription,
+        params.experienceYears,
+        params.latitude,
+        params.longitude,
+        params.locationAddress,
+        params.portfolioPhotoUrls,
+        params.verificationStatus,
+      ],
+    );
+    return mapWorkerProfile(result.rows[0]);
+  }
+
+  async remove(accountId: string): Promise<void> {
+    await this.pool.query('DELETE FROM worker_profiles WHERE account_id = $1', [accountId]);
+  }
 }
