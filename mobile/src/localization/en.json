@@ -22,8 +22,8 @@
     "login": "Log In",
     "register": "Register",
     "alreadyHaveAccount": "Already have an account?",
-    "accountCreatedTitle": "Account Created!",
-    "accountCreatedMessage": "Want to offer your skills or list your shop? Add a Worker or Business profile anytime from the menu on the Home screen."
+    "accountCreatedTitle": "Account Created",
+    "accountCreatedMessage": "Your account has been created successfully. You may register as a Worker or Business at any time from the menu on the Home screen."
   },
   "location": {
     "useCurrent": "Use My Current Location",
@@ -41,8 +41,8 @@
     "hint": "{{count}}/{{max}} photos added"
   },
   "workerProfile": {
-    "title": "Become a Worker",
-    "subtitle": "Tell us what you do, so nearby customers can find you",
+    "title": "Worker Registration",
+    "subtitle": "Provide your service details to get discovered by customers nearby",
     "skillLabel": "Your Skill",
     "skills": {
       "electrician": "Electrician",
@@ -60,8 +60,8 @@
     "successMessage": "Your details are submitted for verification. We'll notify you once approved."
   },
   "businessProfile": {
-    "title": "Become a Business",
-    "subtitle": "Tell us about your shop, so nearby customers can find you",
+    "title": "Business Registration",
+    "subtitle": "Provide your shop details to get discovered by customers nearby",
     "shopNameLabel": "Shop Name",
     "categoryLabel": "Shop Category",
     "categories": {
@@ -114,10 +114,10 @@
     "title": "Triolo",
     "subtitle": "Grow with Triolo",
     "growSection": "Grow With Triolo",
-    "registerWorkerTitle": "Become a Worker",
-    "registerWorkerSubtitle": "Get booked for jobs nearby",
-    "registerBusinessTitle": "Become a Business",
-    "registerBusinessSubtitle": "Have a shop? List it now",
+    "registerWorkerTitle": "Are You a Worker?",
+    "registerWorkerSubtitle": "Register your skills and receive requests nearby",
+    "registerBusinessTitle": "Do You Have a Shop?",
+    "registerBusinessSubtitle": "Register your business and reach more customers",
     "settingsSection": "App Settings"
   },
   "services": {
@@ -140,6 +140,10 @@
   "themePicker": {
     "title": "Choose Theme",
     "subtitle": "Select your preferred app theme"
+  },
+  "languagePicker": {
+    "title": "Choose Language",
+    "subtitle": "Select your preferred language"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",

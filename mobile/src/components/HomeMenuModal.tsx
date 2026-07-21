@@ -5,12 +5,14 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemePickerModal } from './ThemePickerModal';
+import { LanguagePickerModal } from './LanguagePickerModal';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
 import { WorkerProfileModal } from './WorkerProfileModal';
 import { BusinessProfileModal } from './BusinessProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { useLogout } from '@/hooks/useAuthMutations';
+import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
+import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.85;
@@ -28,8 +30,11 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const themeMode = useThemeStore((state) => state.mode);
+  const language = useSettingsStore((state) => state.language);
   const logout = useLogout();
+  const updateLanguage = useUpdateAccountLanguage();
   const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const [workerProfileVisible, setWorkerProfileVisible] = useState(false);
   const [businessProfileVisible, setBusinessProfileVisible] = useState(false);
@@ -162,6 +167,23 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
               </Text>
               <Pressable
                 style={[styles.item, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => setLanguagePickerVisible(true)}
+              >
+                <View style={[styles.itemIcon, { backgroundColor: `${colors.primary}20` }]}>
+                  <FontAwesome6 name="language" size={18} color={colors.primary} solid />
+                </View>
+                <View style={styles.itemText}>
+                  <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
+                    {t('settings.language')}
+                  </Text>
+                  <Text style={[styles.itemSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
+                    {t(languageLabelKey(language))}
+                  </Text>
+                </View>
+                <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
+              </Pressable>
+              <Pressable
+                style={[styles.item, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => setThemePickerVisible(true)}
               >
                 <View style={[styles.itemIcon, { backgroundColor: `${colors.primary}20` }]}>
@@ -194,6 +216,11 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
       </Modal>
 
       <ThemePickerModal visible={themePickerVisible} onClose={() => setThemePickerVisible(false)} />
+      <LanguagePickerModal
+        visible={languagePickerVisible}
+        onClose={() => setLanguagePickerVisible(false)}
+        onChange={(next) => updateLanguage.mutate(next)}
+      />
       <LogoutConfirmModal
         visible={logoutConfirmVisible}
         loading={logout.isPending}

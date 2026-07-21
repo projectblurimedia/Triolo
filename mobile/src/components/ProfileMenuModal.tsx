@@ -3,12 +3,13 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { FontAwesome6 } from '@expo/vector-icons';
-import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemePickerModal } from './ThemePickerModal';
+import { LanguagePickerModal } from './LanguagePickerModal';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
+import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
 
 const CLOSE_BUTTON_SIZE = 36;
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
@@ -23,9 +24,11 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const themeMode = useThemeStore((state) => state.mode);
+  const language = useSettingsStore((state) => state.language);
   const logout = useLogout();
   const updateLanguage = useUpdateAccountLanguage();
   const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
 
   const handleLogoutConfirm = () => {
@@ -52,16 +55,21 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
               </Pressable>
             </View>
 
-            <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <View style={styles.cardHeaderRow}>
+            <Pressable
+              style={[styles.card, styles.themeRow, { backgroundColor: colors.background, borderColor: colors.border }]}
+              onPress={() => setLanguagePickerVisible(true)}
+            >
+              <View style={[styles.cardHeaderRow, styles.themeHeaderRow]}>
                 <View style={[styles.cardIcon, { backgroundColor: `${colors.primary}20` }]}>
                   <FontAwesome6 name="language" size={16} color={colors.primary} solid />
                 </View>
-                <Text style={[styles.label, { color: colors.text }]}>{t('settings.language')}</Text>
+                <View style={styles.themeText}>
+                  <Text style={[styles.label, { color: colors.text }]}>{t('settings.language')}</Text>
+                  <Text style={[styles.themeValue, { color: colors.textMuted }]}>{t(languageLabelKey(language))}</Text>
+                </View>
               </View>
-              {/* Persists locally immediately; also synced to the account so it follows the user to a new device. */}
-              <LanguageSwitcher onChange={(language) => updateLanguage.mutate(language)} />
-            </View>
+              <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
+            </Pressable>
 
             <Pressable
               style={[styles.card, styles.themeRow, { backgroundColor: colors.background, borderColor: colors.border }]}
@@ -90,6 +98,11 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
       </Modal>
 
       <ThemePickerModal visible={themePickerVisible} onClose={() => setThemePickerVisible(false)} />
+      <LanguagePickerModal
+        visible={languagePickerVisible}
+        onClose={() => setLanguagePickerVisible(false)}
+        onChange={(next) => updateLanguage.mutate(next)}
+      />
       <LogoutConfirmModal
         visible={logoutConfirmVisible}
         loading={logout.isPending}

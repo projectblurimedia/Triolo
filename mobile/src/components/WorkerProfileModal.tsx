@@ -86,10 +86,10 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
           style={[styles.header, { paddingTop: insets.top + 14 }]}
         >
           <View style={styles.headerRow}>
-            <Text style={styles.headerTitle}>{t('workerProfile.title')}</Text>
-            <Pressable style={styles.closeButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
-              <FontAwesome6 name="xmark" size={18} color="#FFFFFF" solid />
+            <Pressable style={styles.backButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
+              <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
+            <Text style={styles.headerTitle}>{t('workerProfile.title')}</Text>
           </View>
           <Text style={styles.headerSubtitle}>{t('workerProfile.subtitle')}</Text>
         </LinearGradient>
@@ -141,10 +141,10 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingBottom: 20, paddingHorizontal: 20 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  headerRow: { flexDirection: 'row', alignItems: 'center' },
+  headerTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF', marginLeft: 12 },
   headerSubtitle: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', marginTop: 4 },
-  closeButton: {
+  backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,

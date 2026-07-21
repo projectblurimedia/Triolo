@@ -12,6 +12,11 @@ interface SettingsState {
   confirmLanguage: () => void;
 }
 
+/** Localization key for a language code's display label — shared by every language-picker UI. */
+export function languageLabelKey(language: SupportedLanguage): string {
+  return language === 'te' ? 'settings.telugu' : 'settings.english';
+}
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
