@@ -13,9 +13,13 @@ export interface Account {
   id: string;
   fullName: string;
   mobileNumber: string;
+  email: string;
   role: AccountRole;
   status: AccountStatus;
   preferredLanguage: PreferredLanguage;
+  latitude: number | null;
+  longitude: number | null;
+  locationAddress: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,5 +35,7 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
-/** Roles a person can self-register as. business_staff is invite-only; admin is provisioned separately. */
-export const SELF_REGISTERABLE_ROLES: AccountRole[] = ['user', 'worker', 'business_owner'];
+// Every self-registered account is always 'user' — Worker and Business are optional
+// capabilities added afterward (see modules/workers, modules/businesses), not an
+// exclusive role chosen at registration. business_staff is invite-only; admin is
+// provisioned separately.

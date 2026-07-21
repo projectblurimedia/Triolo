@@ -1,9 +1,12 @@
-import { AccountRole, PreferredLanguage } from './interfaces';
+import { PreferredLanguage } from './interfaces';
 
 export interface RequestRegistrationOtpDto {
   fullName: string;
   mobileNumber: string;
-  role: AccountRole;
+  email: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  locationAddress: string;
   preferredLanguage?: PreferredLanguage;
 }
 

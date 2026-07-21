@@ -2,16 +2,19 @@
 
 PostgreSQL, UTF-8 encoding (Postgres default). All free-text columns (names, addresses, shopping list items, reviews, business names, worker descriptions) accept full Unicode/Telugu input unmodified — never constrained to ASCII. Normalized schema; foreign keys enforce relationships; index columns used in frequent filters (mobile_number, profession, business_category, service_area, status fields). See `docs/localization.md` for the language-related data model (account language preference, future category/notification/announcement translation pattern).
 
+## Account Model
+
+Every self-registered account is a plain `user` — not one of an exclusive set of roles picked at registration. Worker and Business are **additive capabilities**: a `user` account can optionally gain a `worker_profiles` row and/or a `business_profiles` row (via `POST /api/v1/workers/me/profile` / `POST /api/v1/businesses/me/profile`), each with its own generated `id` serving as that capability's distinct identifier (worker_id / business_id). The base account is `active` immediately; each capability profile carries its own `verification_status` (`pending_verification` → `verified`/`rejected`) gating whether it's trustworthy to surface in search/booking, independent of the account itself. `business_staff` (an employee added by a business owner) and `admin` are unrelated to this — assigned differently, never self-registered.
+
 ## Entity Overview
 
 | Entity | Owned by module | Notes |
 |---|---|---|
-| accounts | auth | Shared identity row for every account (User/Worker/Business/Admin) |
+| accounts | auth | Shared identity row for every account — always `role = user` for self-registrations |
 | otp_verifications | auth | Short-lived OTP codes for registration/login |
 | refresh_tokens | auth | JWT refresh token store, revocable |
-| users | users | Extends accounts where role = user |
-| worker_profiles | workers | Extends accounts where role = worker |
-| business_profiles | businesses | Extends accounts where role = business |
+| worker_profiles | workers | Optional Worker capability a `user` account can add |
+| business_profiles | businesses | Optional Business capability a `user` account can add |
 | business_staff | staff | Staff membership + permissions, linked to a business_profile |
 | bookings | booking | Worker booking lifecycle |
 | booking_pins | booking | Single-use arrival PIN per booking |
@@ -31,9 +34,13 @@ PostgreSQL, UTF-8 encoding (Postgres default). All free-text columns (names, add
 | id | uuid PK | |
 | full_name | text | |
 | mobile_number | varchar(15) UNIQUE | indexed |
-| role | enum(user, worker, business_owner, business_staff, admin) | |
-| status | enum(active, pending_verification, suspended, blocked) | default active for `user`, `pending_verification` for worker/business |
+| email | text nullable | indexed; required by the API for new registrations, nullable at the DB level since a migration can't backfill rows that predate it |
+| role | enum(user, worker, business_owner, business_staff, admin) | always `user` for self-registered accounts as of the account-model change above; other values are provisioned separately (not self-registerable) |
+| status | enum(active, pending_verification, suspended, blocked) | `active` immediately on registration — the old worker/business `pending_verification` gate moved to each capability profile's own `verification_status` |
 | preferred_language | enum `app_language` (en, te, ...) | authoritative language for this account; see `docs/localization.md`. Enum so adding a language later is `ALTER TYPE ... ADD VALUE`, no migration of existing rows. |
+| latitude | double precision nullable | GPS coordinate captured at registration (auto-detect or manual); null if the user only entered a manual address with no GPS fix |
+| longitude | double precision nullable | see `latitude` |
+| location_address | text nullable | human-readable address (reverse-geocoded from GPS, or manually typed) — required by the API for new registrations |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 
@@ -45,7 +52,11 @@ PostgreSQL, UTF-8 encoding (Postgres default). All free-text columns (names, add
 | otp_hash | text | hashed, never stored plain |
 | purpose | enum(registration, login) | |
 | full_name | text nullable | registration only |
-| role | account_role nullable | registration only |
+| role | account_role nullable | no longer populated for registration (always `user`) — column kept, unused going forward |
+| email | text nullable | registration only |
+| latitude | double precision nullable | registration only |
+| longitude | double precision nullable | registration only |
+| location_address | text nullable | registration only |
 | preferred_language | app_language nullable | registration only — carries the app's active language at registration time so the account is created with it already set |
 | expires_at | timestamptz | |
 | consumed_at | timestamptz nullable | single-use |
@@ -62,10 +73,34 @@ PostgreSQL, UTF-8 encoding (Postgres default). All free-text columns (names, add
 | revoked_at | timestamptz nullable | |
 | created_at | timestamptz | |
 
+### worker_profiles (Workers module — implemented)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | serves as the worker's distinct identifier (worker_id) |
+| account_id | uuid FK → accounts.id, UNIQUE | one worker profile per account |
+| skill_category | enum `worker_skill_category` (electrician, plumber, painter, carpenter, mechanic, cleaner, mason, other) | stable code, not translated text — see `docs/localization.md`'s reference-data rule |
+| experience_years | int | |
+| latitude / longitude | double precision nullable | service location, separate from the account's own registration location |
+| location_address | text nullable | |
+| portfolio_photo_urls | text[] | Cloudinary-hosted URLs, uploaded via `POST /api/v1/workers/me/profile` (multipart) |
+| verification_status | enum `profile_verification_status` (pending_verification, verified, rejected) | admin review gate for this capability specifically, independent of `accounts.status` |
+| created_at / updated_at | timestamptz | |
+
+### business_profiles (Businesses module — implemented)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | serves as the business's distinct identifier (business_id) |
+| account_id | uuid FK → accounts.id, UNIQUE | one business profile per account |
+| shop_name | text | |
+| shop_category | enum `business_shop_category` (grocery, restaurant, pharmacy, electronics, clothing, hardware, salon, other) | same stable-code pattern as `skill_category` |
+| latitude / longitude | double precision nullable | shop location |
+| location_address | text nullable | |
+| shop_photo_urls | text[] | Cloudinary-hosted URLs, uploaded via `POST /api/v1/businesses/me/profile` (multipart) |
+| verification_status | enum `profile_verification_status` | shared enum with `worker_profiles` |
+| created_at / updated_at | timestamptz | |
+
 ## Planned Tables (subsequent modules — outline only, refine when implemented)
 
-- **worker_profiles**: account_id FK, profession, skills[], experience_years, service_areas[], working_hours, address, id_document_url, profile_photo_url, portfolio_photo_urls[], availability enum(online, busy, offline).
-- **business_profiles**: account_id FK, business_name, category, owner_name, address, village_town, service_area, working_hours, weekly_holiday, delivery_available bool, verification_document_urls[], shop_photo_urls[].
 - **business_staff**: business_profile_id FK, account_id FK, permissions jsonb.
 - **bookings**: user_id FK, worker_id FK, status enum (pipeline per product-specification §2), requested_at, accepted_at, completed_at.
 - **booking_pins**: booking_id FK, pin_hash, single_use, verified_at nullable, attempt_count.
@@ -78,8 +113,9 @@ PostgreSQL, UTF-8 encoding (Postgres default). All free-text columns (names, add
 ## Indexing Notes
 
 - `accounts.mobile_number` — unique index (login lookup).
-- `worker_profiles.profession`, `worker_profiles.service_areas` — search filtering.
-- `business_profiles.category`, `business_profiles.service_area` — search filtering.
+- `accounts.email` — indexed.
+- `worker_profiles.skill_category` — search filtering.
+- `business_profiles.shop_category` — search filtering.
 - `bookings.status`, `orders.status` — dashboard/queue queries.
 
 ## Migration Policy

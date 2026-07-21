@@ -58,6 +58,7 @@ function toPublicAccount(account: {
   id: string;
   fullName: string;
   mobileNumber: string;
+  email: string;
   role: string;
   status: string;
   preferredLanguage: string;
@@ -66,6 +67,7 @@ function toPublicAccount(account: {
     id: account.id,
     fullName: account.fullName,
     mobileNumber: account.mobileNumber,
+    email: account.email,
     role: account.role,
     status: account.status,
     preferredLanguage: account.preferredLanguage,

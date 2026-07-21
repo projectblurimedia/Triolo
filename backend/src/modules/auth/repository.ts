@@ -8,6 +8,10 @@ interface OtpRecord {
   purpose: OtpPurpose;
   fullName: string | null;
   role: AccountRole | null;
+  email: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  locationAddress: string | null;
   preferredLanguage: PreferredLanguage | null;
   expiresAt: Date;
   consumedAt: Date | null;
@@ -28,9 +32,13 @@ function mapAccount(row: QueryResultRow): Account {
     id: row.id,
     fullName: row.full_name,
     mobileNumber: row.mobile_number,
+    email: row.email,
     role: row.role,
     status: row.status,
     preferredLanguage: row.preferred_language,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    locationAddress: row.location_address,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -44,6 +52,10 @@ function mapOtp(row: QueryResultRow): OtpRecord {
     purpose: row.purpose,
     fullName: row.full_name,
     role: row.role,
+    email: row.email,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    locationAddress: row.location_address,
     preferredLanguage: row.preferred_language,
     expiresAt: row.expires_at,
     consumedAt: row.consumed_at,
@@ -78,15 +90,29 @@ export class AuthRepository {
   async createAccount(params: {
     fullName: string;
     mobileNumber: string;
+    email: string;
     role: AccountRole;
     status: AccountStatus;
     preferredLanguage: PreferredLanguage;
+    latitude: number | null;
+    longitude: number | null;
+    locationAddress: string | null;
   }): Promise<Account> {
     const result = await this.pool.query(
-      `INSERT INTO accounts (full_name, mobile_number, role, status, preferred_language)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO accounts (full_name, mobile_number, email, role, status, preferred_language, latitude, longitude, location_address)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [params.fullName, params.mobileNumber, params.role, params.status, params.preferredLanguage],
+      [
+        params.fullName,
+        params.mobileNumber,
+        params.email,
+        params.role,
+        params.status,
+        params.preferredLanguage,
+        params.latitude,
+        params.longitude,
+        params.locationAddress,
+      ],
     );
     return mapAccount(result.rows[0]);
   }
@@ -104,19 +130,25 @@ export class AuthRepository {
     otpHash: string;
     purpose: OtpPurpose;
     fullName?: string;
-    role?: AccountRole;
+    email?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    locationAddress?: string;
     preferredLanguage?: PreferredLanguage;
     expiresAt: Date;
   }): Promise<void> {
     await this.pool.query(
-      `INSERT INTO otp_verifications (mobile_number, otp_hash, purpose, full_name, role, preferred_language, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO otp_verifications (mobile_number, otp_hash, purpose, full_name, email, latitude, longitude, location_address, preferred_language, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         params.mobileNumber,
         params.otpHash,
         params.purpose,
         params.fullName ?? null,
-        params.role ?? null,
+        params.email ?? null,
+        params.latitude ?? null,
+        params.longitude ?? null,
+        params.locationAddress ?? null,
         params.preferredLanguage ?? null,
         params.expiresAt,
       ],

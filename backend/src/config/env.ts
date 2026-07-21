@@ -29,4 +29,14 @@ export const env = {
     expiryMinutes: Number(process.env.OTP_EXPIRY_MINUTES ?? 5),
     maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS ?? 5),
   },
+
+  // Backend-mediated image uploads (Worker portfolio / Business shop photos) — the
+  // API secret never reaches the client. Left optional here (not `required()`) so a
+  // dev environment without Cloudinary configured yet can still boot; uploadToCloudinary
+  // throws a clear error at call time instead if these are unset.
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? '',
+    apiKey: process.env.CLOUDINARY_API_KEY ?? '',
+    apiSecret: process.env.CLOUDINARY_API_SECRET ?? '',
+  },
 };

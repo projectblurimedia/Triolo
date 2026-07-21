@@ -5,6 +5,8 @@ import pinoHttp from 'pino-http';
 import { logger } from '@/common/utils/logger';
 import { errorHandler, notFoundHandler } from '@/common/middleware/errorHandler';
 import { authRouter } from '@/modules/auth/routes';
+import { workersRouter } from '@/modules/workers/routes';
+import { businessesRouter } from '@/modules/businesses/routes';
 
 export function createApp(): Express {
   const app = express();
@@ -33,6 +35,8 @@ export function createApp(): Express {
   });
 
   app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/workers', workersRouter);
+  app.use('/api/v1/businesses', businessesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

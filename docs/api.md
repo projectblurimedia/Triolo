@@ -5,18 +5,19 @@ Conventions: see [[.cloud/api-guidelines.md]]. Base path: `/api/v1`.
 ## Auth Module
 
 ### POST /auth/register/request-otp
-Request OTP for a new account.
+Request OTP for a new account. Every self-registered account is a plain `user` — there is no `role` field; Worker/Business are optional capabilities added later via the Workers/Businesses modules (see below), not chosen at registration.
 - Auth: none
-- Body: `{ fullName: string, mobileNumber: string, role: "user" | "worker" | "business_owner", preferredLanguage?: "en" | "te" }` — `preferredLanguage` defaults to `en` if omitted; the client should always send the app's currently active language (see `docs/localization.md`).
+- Body: `{ fullName: string, mobileNumber: string, email: string, latitude?: number, longitude?: number, locationAddress: string, preferredLanguage?: "en" | "te" }` — `latitude`/`longitude` are omitted when the client only has a manually-typed address (no GPS fix); `locationAddress` is always required. `preferredLanguage` defaults to `en` if omitted; the client should always send the app's currently active language (see `docs/localization.md`).
 - 200: `{ success: true, message: "OTP sent", data: { mobileNumber } }`
+- 400: validation error (missing/invalid email, location, etc.)
 - 409: mobile number already registered
 
 ### POST /auth/register/verify-otp
-Verify OTP and create the account.
+Verify OTP and create the account (always `role: "user"`, `status: "active"` immediately).
 - Auth: none
 - Body: `{ mobileNumber: string, otp: string }`
-- 201: `{ success: true, message: "Account created", data: { accessToken, refreshToken, account: { id, fullName, role, status } } }`
-- 400: invalid/expired/already-consumed OTP
+- 201: `{ success: true, message: "Account created", data: { accessToken, refreshToken, account: { id, fullName, mobileNumber, email, role, status, preferredLanguage } } }`
+- 400: invalid/expired/already-consumed OTP, or `OTP_CONTEXT_MISSING` if registration details are missing
 
 ### POST /auth/login/request-otp
 Request OTP for login.
@@ -49,7 +50,7 @@ Revoke the current refresh token.
 ### GET /auth/me
 Return the authenticated account's basic info.
 - Auth: Bearer access token
-- 200: `{ success: true, data: { id, fullName, mobileNumber, role, status, preferredLanguage } }`
+- 200: `{ success: true, data: { id, fullName, mobileNumber, email, role, status, preferredLanguage } }`
 
 ### PATCH /auth/me/language
 Update the authenticated account's language preference.
@@ -57,6 +58,41 @@ Update the authenticated account's language preference.
 - Body: `{ preferredLanguage: "en" | "te" }`
 - 200: `{ success: true, message: "Language updated", data: { preferredLanguage } }`
 - 400: unsupported language code
+
+---
+
+## Workers Module
+
+Adds the Worker capability to the authenticated (already self-registered) `user` account — see the account-model note in `docs/database.md`.
+
+### POST /workers/me/profile
+Create the caller's worker profile. `multipart/form-data`, not JSON — the only such endpoint in this API so far, since it carries image files.
+- Auth: Bearer access token
+- Body (multipart fields): `skillCategory: "electrician"|"plumber"|"painter"|"carpenter"|"mechanic"|"cleaner"|"mason"|"other"`, `experienceYears: number`, `latitude?: number`, `longitude?: number`, `locationAddress?: string`, plus 0-6 image files under the field name `portfolioPhotos` (JPEG/PNG/WEBP, 5MB each max).
+- 201: `{ success: true, message: "Worker profile created", data: { id, accountId, skillCategory, experienceYears, latitude, longitude, locationAddress, portfolioPhotoUrls, verificationStatus, createdAt, updatedAt } }`
+- 400: validation error, or `CLOUDINARY_NOT_CONFIGURED` if image uploads aren't set up on this server yet
+- 409: `WORKER_PROFILE_EXISTS` — one worker profile per account
+
+### GET /workers/me/profile
+Return the caller's worker profile, or `null` if they haven't created one.
+- Auth: Bearer access token
+- 200: `{ success: true, data: WorkerProfile | null }`
+
+## Businesses Module
+
+Adds the Business capability to the authenticated `user` account — mirrors the Workers module exactly, shop-shaped instead of skill-shaped.
+
+### POST /businesses/me/profile
+Create the caller's business profile. `multipart/form-data`.
+- Auth: Bearer access token
+- Body (multipart fields): `shopName: string`, `shopCategory: "grocery"|"restaurant"|"pharmacy"|"electronics"|"clothing"|"hardware"|"salon"|"other"`, `latitude?: number`, `longitude?: number`, `locationAddress?: string`, plus 0-6 image files under the field name `shopPhotos`.
+- 201: `{ success: true, message: "Business profile created", data: { id, accountId, shopName, shopCategory, latitude, longitude, locationAddress, shopPhotoUrls, verificationStatus, createdAt, updatedAt } }`
+- 400 / 409: same shape as the Workers endpoint (`BUSINESS_PROFILE_EXISTS` instead of `WORKER_PROFILE_EXISTS`)
+
+### GET /businesses/me/profile
+Return the caller's business profile, or `null` if they haven't created one.
+- Auth: Bearer access token
+- 200: `{ success: true, data: BusinessProfile | null }`
 
 ---
 

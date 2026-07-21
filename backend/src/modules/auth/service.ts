@@ -40,7 +40,10 @@ export class AuthService {
       otpHash,
       purpose: 'registration',
       fullName: dto.fullName,
-      role: dto.role,
+      email: dto.email,
+      latitude: dto.latitude ?? null,
+      longitude: dto.longitude ?? null,
+      locationAddress: dto.locationAddress,
       preferredLanguage: dto.preferredLanguage ?? 'en',
       expiresAt: otpExpiryDate(),
     });
@@ -51,7 +54,7 @@ export class AuthService {
   async verifyRegistrationOtp(dto: VerifyRegistrationOtpDto): Promise<{ account: Account; tokens: AuthTokens }> {
     const otpRecord = await this.consumeValidOtp(dto.mobileNumber, dto.otp, 'registration');
 
-    if (!otpRecord.fullName || !otpRecord.role) {
+    if (!otpRecord.fullName || !otpRecord.email || !otpRecord.locationAddress) {
       throw AppError.badRequest('Registration details missing. Please request a new OTP.', 'OTP_CONTEXT_MISSING');
     }
 
@@ -60,13 +63,19 @@ export class AuthService {
       throw AppError.conflict('This mobile number is already registered.', 'MOBILE_ALREADY_REGISTERED');
     }
 
-    const status = otpRecord.role === 'user' ? 'active' : 'pending_verification';
+    // Every self-registered account is a plain 'user', active immediately — Worker and
+    // Business are optional capabilities added afterward (modules/workers,
+    // modules/businesses), not an exclusive role chosen here.
     const account = await this.repository.createAccount({
       fullName: otpRecord.fullName,
       mobileNumber: dto.mobileNumber,
-      role: otpRecord.role,
-      status,
+      email: otpRecord.email,
+      role: 'user',
+      status: 'active',
       preferredLanguage: otpRecord.preferredLanguage ?? 'en',
+      latitude: otpRecord.latitude,
+      longitude: otpRecord.longitude,
+      locationAddress: otpRecord.locationAddress,
     });
 
     const tokens = await this.issueTokens(account);

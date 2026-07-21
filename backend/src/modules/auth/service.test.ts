@@ -29,14 +29,27 @@ function buildAccount(overrides: Partial<Account> = {}): Account {
     id: 'account-1',
     fullName: 'Test Person',
     mobileNumber: '9876543210',
+    email: 'test@example.com',
     role: 'user',
     status: 'active',
     preferredLanguage: 'en',
+    latitude: 17.385,
+    longitude: 78.4867,
+    locationAddress: 'Hyderabad, Telangana',
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
   };
 }
+
+const registrationRequestParams = {
+  fullName: 'A',
+  mobileNumber: '9876543210',
+  email: 'a@example.com',
+  latitude: 17.385,
+  longitude: 78.4867,
+  locationAddress: 'Hyderabad, Telangana',
+};
 
 describe('AuthService.requestRegistrationOtp', () => {
   it('rejects if the mobile number is already registered', async () => {
@@ -44,9 +57,10 @@ describe('AuthService.requestRegistrationOtp', () => {
     repo.findAccountByMobile.mockResolvedValue(buildAccount());
     const service = new AuthService(repo as unknown as AuthRepository);
 
-    await expect(
-      service.requestRegistrationOtp({ fullName: 'A', mobileNumber: '9876543210', role: 'user' }),
-    ).rejects.toMatchObject({ statusCode: 409, code: 'MOBILE_ALREADY_REGISTERED' });
+    await expect(service.requestRegistrationOtp(registrationRequestParams)).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'MOBILE_ALREADY_REGISTERED',
+    });
 
     expect(repo.createOtp).not.toHaveBeenCalled();
   });
@@ -56,14 +70,17 @@ describe('AuthService.requestRegistrationOtp', () => {
     repo.findAccountByMobile.mockResolvedValue(null);
     const service = new AuthService(repo as unknown as AuthRepository);
 
-    await service.requestRegistrationOtp({ fullName: 'A', mobileNumber: '9876543210', role: 'worker' });
+    await service.requestRegistrationOtp(registrationRequestParams);
 
     expect(repo.createOtp).toHaveBeenCalledWith(
       expect.objectContaining({
         mobileNumber: '9876543210',
         purpose: 'registration',
         fullName: 'A',
-        role: 'worker',
+        email: 'a@example.com',
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationAddress: 'Hyderabad, Telangana',
         preferredLanguage: 'en',
       }),
     );
@@ -74,12 +91,7 @@ describe('AuthService.requestRegistrationOtp', () => {
     repo.findAccountByMobile.mockResolvedValue(null);
     const service = new AuthService(repo as unknown as AuthRepository);
 
-    await service.requestRegistrationOtp({
-      fullName: 'A',
-      mobileNumber: '9876543210',
-      role: 'user',
-      preferredLanguage: 'te',
-    });
+    await service.requestRegistrationOtp({ ...registrationRequestParams, preferredLanguage: 'te' });
 
     expect(repo.createOtp).toHaveBeenCalledWith(expect.objectContaining({ preferredLanguage: 'te' }));
   });
@@ -95,7 +107,10 @@ describe('AuthService.verifyRegistrationOtp', () => {
       otpHash,
       purpose: 'registration',
       fullName: 'A',
-      role: 'user',
+      email: 'a@example.com',
+      latitude: 17.385,
+      longitude: 78.4867,
+      locationAddress: 'Hyderabad, Telangana',
       preferredLanguage: 'te',
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
@@ -108,13 +123,19 @@ describe('AuthService.verifyRegistrationOtp', () => {
     const result = await service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' });
 
     expect(repo.createAccount).toHaveBeenCalledWith(
-      expect.objectContaining({ role: 'user', status: 'active', preferredLanguage: 'te' }),
+      expect.objectContaining({
+        role: 'user',
+        status: 'active',
+        email: 'a@example.com',
+        locationAddress: 'Hyderabad, Telangana',
+        preferredLanguage: 'te',
+      }),
     );
     expect(result.tokens.accessToken).toBeDefined();
     expect(result.tokens.refreshToken).toContain('.');
   });
 
-  it('creates a worker account as pending_verification', async () => {
+  it('rejects if registration details (email/location) are missing from the OTP record', async () => {
     const repo = createMockRepository();
     const otpHash = await hashOtp('111111');
     repo.findLatestActiveOtp.mockResolvedValue({
@@ -122,22 +143,24 @@ describe('AuthService.verifyRegistrationOtp', () => {
       mobileNumber: '9876543210',
       otpHash,
       purpose: 'registration',
-      fullName: 'A Worker',
-      role: 'worker',
+      fullName: 'A',
+      email: null,
+      latitude: null,
+      longitude: null,
+      locationAddress: null,
       preferredLanguage: 'en',
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
       attemptCount: 0,
     });
-    repo.findAccountByMobile.mockResolvedValue(null);
-    repo.createAccount.mockResolvedValue(buildAccount({ status: 'pending_verification', role: 'worker' }));
 
     const service = new AuthService(repo as unknown as AuthRepository);
-    await service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' });
 
-    expect(repo.createAccount).toHaveBeenCalledWith(
-      expect.objectContaining({ role: 'worker', status: 'pending_verification' }),
-    );
+    await expect(
+      service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' }),
+    ).rejects.toMatchObject({ statusCode: 400, code: 'OTP_CONTEXT_MISSING' });
+
+    expect(repo.createAccount).not.toHaveBeenCalled();
   });
 
   it('rejects an incorrect OTP and records the attempt', async () => {
@@ -149,7 +172,8 @@ describe('AuthService.verifyRegistrationOtp', () => {
       otpHash,
       purpose: 'registration',
       fullName: 'A',
-      role: 'user',
+      email: 'a@example.com',
+      locationAddress: 'Hyderabad, Telangana',
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
       attemptCount: 0,
@@ -173,7 +197,8 @@ describe('AuthService.verifyRegistrationOtp', () => {
       otpHash: 'irrelevant',
       purpose: 'registration',
       fullName: 'A',
-      role: 'user',
+      email: 'a@example.com',
+      locationAddress: 'Hyderabad, Telangana',
       expiresAt: new Date(Date.now() - 1000),
       consumedAt: null,
       attemptCount: 0,
@@ -194,7 +219,8 @@ describe('AuthService.verifyRegistrationOtp', () => {
       otpHash: 'irrelevant',
       purpose: 'registration',
       fullName: 'A',
-      role: 'user',
+      email: 'a@example.com',
+      locationAddress: 'Hyderabad, Telangana',
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
       attemptCount: 5,
@@ -229,7 +255,8 @@ describe('AuthService.requestLoginOtp / verifyLoginOtp', () => {
       otpHash,
       purpose: 'login',
       fullName: null,
-      role: null,
+      email: null,
+      locationAddress: null,
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
       attemptCount: 0,
@@ -252,7 +279,8 @@ describe('AuthService.requestLoginOtp / verifyLoginOtp', () => {
       otpHash,
       purpose: 'login',
       fullName: null,
-      role: null,
+      email: null,
+      locationAddress: null,
       expiresAt: new Date(Date.now() + 60_000),
       consumedAt: null,
       attemptCount: 0,
