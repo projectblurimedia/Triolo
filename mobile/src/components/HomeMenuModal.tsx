@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { ThemeSwitcher } from './ThemeSwitcher';
-import { Button } from './Button';
+import { ThemePickerModal } from './ThemePickerModal';
+import { LogoutConfirmModal } from './LogoutConfirmModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout } from '@/hooks/useAuthMutations';
+import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.85;
 const ICON_BUTTON_SIZE = 40;
+const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
 interface HomeMenuModalProps {
   visible: boolean;
@@ -21,7 +23,10 @@ interface HomeMenuModalProps {
 export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const themeMode = useThemeStore((state) => state.mode);
   const logout = useLogout();
+  const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
 
   // Worker/Business registration for an already-logged-in User account isn't built
   // yet (see .cloud/project-context.md — Worker/Business modules are still pending),
@@ -31,7 +36,8 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
     Alert.alert(t('homeMenu.comingSoonTitle'), t('homeMenu.comingSoonMessage'));
   };
 
-  const handleLogout = () => {
+  const handleLogoutConfirm = () => {
+    setLogoutConfirmVisible(false);
     onClose();
     logout.mutate();
   };
@@ -54,77 +60,100 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.container}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
-          <View style={[StyleSheet.absoluteFill, styles.backdrop]} />
-        </Pressable>
+    <>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+        <View style={styles.container}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
+            <View style={[StyleSheet.absoluteFill, styles.backdrop]} />
+          </Pressable>
 
-        <View style={[styles.drawer, { backgroundColor: colors.surface }]}>
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-            <View style={styles.headerRow}>
-              <View style={styles.headerLeft}>
-                <FontAwesome6 name="shapes" size={28} color={colors.white} solid />
-                <View style={styles.headerText}>
-                  <Text style={styles.headerTitle} numberOfLines={1}>
-                    {t('homeMenu.title')}
-                  </Text>
-                  <Text style={styles.headerSubtitle} numberOfLines={1}>
-                    {t('homeMenu.subtitle')}
-                  </Text>
+          <View style={[styles.drawer, { backgroundColor: colors.surface }]}>
+            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+              <View style={styles.headerRow}>
+                <View style={styles.headerLeft}>
+                  <FontAwesome6 name="shapes" size={28} color={colors.white} solid />
+                  <View style={styles.headerText}>
+                    <Text style={styles.headerTitle} numberOfLines={1}>
+                      {t('homeMenu.title')}
+                    </Text>
+                    <Text style={styles.headerSubtitle} numberOfLines={1}>
+                      {t('homeMenu.subtitle')}
+                    </Text>
+                  </View>
                 </View>
+                <Pressable style={styles.closeButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
+                  <FontAwesome6 name="xmark" size={18} color={colors.white} solid />
+                </Pressable>
               </View>
-              <Pressable style={styles.closeButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
-                <FontAwesome6 name="xmark" size={18} color={colors.white} solid />
-              </Pressable>
-            </View>
-          </LinearGradient>
+            </LinearGradient>
 
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('homeMenu.growSection')}</Text>
-            {items.map((item) => (
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('homeMenu.growSection')}</Text>
+              {items.map((item) => (
+                <Pressable
+                  key={item.key}
+                  style={[styles.item, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={handleComingSoon}
+                >
+                  <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.itemIcon}>
+                    <FontAwesome6 name={item.icon} size={18} color={colors.white} solid />
+                  </LinearGradient>
+                  <View style={styles.itemText}>
+                    <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.itemSubtitle, { color: colors.textMuted }]} numberOfLines={2}>
+                      {item.subtitle}
+                    </Text>
+                  </View>
+                  <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
+                </Pressable>
+              ))}
+
+              <Text style={[styles.sectionTitle, styles.sectionSpacing, { color: colors.textMuted }]}>
+                {t('homeMenu.settingsSection')}
+              </Text>
               <Pressable
-                key={item.key}
                 style={[styles.item, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={handleComingSoon}
+                onPress={() => setThemePickerVisible(true)}
               >
-                <LinearGradient colors={item.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.itemIcon}>
-                  <FontAwesome6 name={item.icon} size={18} color={colors.white} solid />
-                </LinearGradient>
+                <View style={[styles.itemIcon, { backgroundColor: `${colors.primary}20` }]}>
+                  <FontAwesome6 name="palette" size={18} color={colors.primary} solid />
+                </View>
                 <View style={styles.itemText}>
                   <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
-                    {item.title}
+                    {t('settings.theme')}
                   </Text>
-                  <Text style={[styles.itemSubtitle, { color: colors.textMuted }]} numberOfLines={2}>
-                    {item.subtitle}
+                  <Text style={[styles.itemSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
+                    {t(themeModeLabelKey(themeMode))}
                   </Text>
                 </View>
                 <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
               </Pressable>
-            ))}
 
-            <Text style={[styles.sectionTitle, styles.sectionSpacing, { color: colors.textMuted }]}>
-              {t('homeMenu.settingsSection')}
-            </Text>
-            <View style={[styles.settingsCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <View style={styles.settingsHeaderRow}>
-                <View style={[styles.settingsIcon, { backgroundColor: `${colors.primary}20` }]}>
-                  <FontAwesome6 name="palette" size={16} color={colors.primary} solid />
-                </View>
-                <Text style={[styles.itemTitle, { color: colors.text }]}>{t('settings.theme')}</Text>
+              <Pressable style={styles.logout} onPress={() => setLogoutConfirmVisible(true)}>
+                <LinearGradient colors={LOGOUT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.logoutGradient}>
+                  <FontAwesome6 name="right-from-bracket" size={16} color={colors.white} solid />
+                  <Text style={styles.logoutText}>{t('common.logout')}</Text>
+                </LinearGradient>
+              </Pressable>
+
+              <View style={styles.footer}>
+                <Text style={[styles.footerText, { color: colors.textMuted }]}>{t('common.appName')}</Text>
               </View>
-              <ThemeSwitcher />
-            </View>
-
-            <Button label={t('common.logout')} onPress={handleLogout} loading={logout.isPending} />
-
-            <View style={styles.footer}>
-              <Text style={[styles.footerText, { color: colors.textMuted }]}>{t('common.appName')}</Text>
-            </View>
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+
+      <ThemePickerModal visible={themePickerVisible} onClose={() => setThemePickerVisible(false)} />
+      <LogoutConfirmModal
+        visible={logoutConfirmVisible}
+        loading={logout.isPending}
+        onConfirm={handleLogoutConfirm}
+        onCancel={() => setLogoutConfirmVisible(false)}
+      />
+    </>
   );
 }
 
@@ -187,21 +216,24 @@ const styles = StyleSheet.create({
   itemText: { flex: 1, marginRight: 8 },
   itemTitle: { ...typography.body, fontFamily: fonts.semiBold },
   itemSubtitle: { ...typography.caption, marginTop: 2 },
-  settingsCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
+  logout: {
+    marginTop: 6,
     marginBottom: 20,
-    gap: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowColor: '#ef4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
+      android: { elevation: 4 },
+    }),
   },
-  settingsHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  settingsIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
+  logoutGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
   },
-  footer: { alignItems: 'center', paddingTop: 20 },
+  logoutText: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  footer: { alignItems: 'center', paddingTop: 4 },
   footerText: { ...typography.caption },
 });

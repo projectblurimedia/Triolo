@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { LanguageSwitcher } from './LanguageSwitcher';
-import { ThemeSwitcher } from './ThemeSwitcher';
-import { Button } from './Button';
+import { ThemePickerModal } from './ThemePickerModal';
+import { LogoutConfirmModal } from './LogoutConfirmModal';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
+import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
 
 const CLOSE_BUTTON_SIZE = 36;
+const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
 interface ProfileMenuModalProps {
   visible: boolean;
@@ -19,58 +22,81 @@ interface ProfileMenuModalProps {
 export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const themeMode = useThemeStore((state) => state.mode);
   const logout = useLogout();
   const updateLanguage = useUpdateAccountLanguage();
+  const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+
+  const handleLogoutConfirm = () => {
+    setLogoutConfirmVisible(false);
+    onClose();
+    logout.mutate();
+  };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.handle} />
-          <View style={styles.headerRow}>
-            <Text style={[styles.title, { color: colors.text }]}>{t('profile.menuTitle')}</Text>
+    <>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+        <Pressable style={styles.overlay} onPress={onClose}>
+          <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.handle} />
+            <View style={styles.headerRow}>
+              <Text style={[styles.title, { color: colors.text }]}>{t('profile.menuTitle')}</Text>
+              <Pressable
+                onPress={onClose}
+                hitSlop={8}
+                accessibilityLabel={t('common.cancel')}
+                style={[styles.closeButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+              >
+                <FontAwesome6 name="xmark" size={16} color={colors.textMuted} solid />
+              </Pressable>
+            </View>
+
+            <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <View style={styles.cardHeaderRow}>
+                <View style={[styles.cardIcon, { backgroundColor: `${colors.primary}20` }]}>
+                  <FontAwesome6 name="language" size={16} color={colors.primary} solid />
+                </View>
+                <Text style={[styles.label, { color: colors.text }]}>{t('settings.language')}</Text>
+              </View>
+              {/* Persists locally immediately; also synced to the account so it follows the user to a new device. */}
+              <LanguageSwitcher onChange={(language) => updateLanguage.mutate(language)} />
+            </View>
+
             <Pressable
-              onPress={onClose}
-              hitSlop={8}
-              accessibilityLabel={t('common.cancel')}
-              style={[styles.closeButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+              style={[styles.card, styles.themeRow, { backgroundColor: colors.background, borderColor: colors.border }]}
+              onPress={() => setThemePickerVisible(true)}
             >
-              <FontAwesome6 name="xmark" size={16} color={colors.textMuted} solid />
+              <View style={styles.cardHeaderRow}>
+                <View style={[styles.cardIcon, { backgroundColor: `${colors.primary}20` }]}>
+                  <FontAwesome6 name="palette" size={16} color={colors.primary} solid />
+                </View>
+                <View style={styles.themeText}>
+                  <Text style={[styles.label, { color: colors.text }]}>{t('settings.theme')}</Text>
+                  <Text style={[styles.themeValue, { color: colors.textMuted }]}>{t(themeModeLabelKey(themeMode))}</Text>
+                </View>
+              </View>
+              <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
             </Pressable>
-          </View>
 
-          <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <View style={styles.cardHeaderRow}>
-              <View style={[styles.cardIcon, { backgroundColor: `${colors.primary}20` }]}>
-                <FontAwesome6 name="language" size={16} color={colors.primary} solid />
-              </View>
-              <Text style={[styles.label, { color: colors.text }]}>{t('settings.language')}</Text>
-            </View>
-            {/* Persists locally immediately; also synced to the account so it follows the user to a new device. */}
-            <LanguageSwitcher onChange={(language) => updateLanguage.mutate(language)} />
-          </View>
-
-          <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <View style={styles.cardHeaderRow}>
-              <View style={[styles.cardIcon, { backgroundColor: `${colors.primary}20` }]}>
-                <FontAwesome6 name="palette" size={16} color={colors.primary} solid />
-              </View>
-              <Text style={[styles.label, { color: colors.text }]}>{t('settings.theme')}</Text>
-            </View>
-            <ThemeSwitcher />
-          </View>
-
-          <Button
-            label={t('common.logout')}
-            onPress={() => {
-              onClose();
-              logout.mutate();
-            }}
-            loading={logout.isPending}
-          />
+            <Pressable style={styles.logout} onPress={() => setLogoutConfirmVisible(true)}>
+              <LinearGradient colors={LOGOUT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.logoutGradient}>
+                <FontAwesome6 name="right-from-bracket" size={16} color={colors.white} solid />
+                <Text style={styles.logoutText}>{t('common.logout')}</Text>
+              </LinearGradient>
+            </Pressable>
+          </Pressable>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </Modal>
+
+      <ThemePickerModal visible={themePickerVisible} onClose={() => setThemePickerVisible(false)} />
+      <LogoutConfirmModal
+        visible={logoutConfirmVisible}
+        loading={logout.isPending}
+        onConfirm={handleLogoutConfirm}
+        onCancel={() => setLogoutConfirmVisible(false)}
+      />
+    </>
   );
 }
 
@@ -125,4 +151,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   label: { ...typography.body, fontFamily: fonts.semiBold },
+  themeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  themeText: { flex: 1 },
+  themeValue: { ...typography.caption, marginTop: 2 },
+  logout: {
+    marginTop: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  logoutGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+  },
+  logoutText: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF' },
 });

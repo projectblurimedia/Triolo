@@ -3,6 +3,7 @@
     "appName": "Triolo",
     "continue": "కొనసాగించు",
     "cancel": "రద్దు చేయి",
+    "close": "మూసివేయి",
     "retry": "మళ్ళీ ప్రయత్నించు",
     "loading": "లోడ్ అవుతోంది...",
     "logout": "లాగ్ అవుట్"
@@ -56,9 +57,9 @@
     "title": "Triolo",
     "subtitle": "ట్రయోలోతో వృద్ధి చెందండి",
     "growSection": "మీ కోసం అవకాశాలు",
-    "registerWorkerTitle": "కార్మికుడిగా నమోదు చేసుకోండి",
+    "registerWorkerTitle": "కార్మికుడిగా మారండి",
     "registerWorkerSubtitle": "మీ నైపుణ్యాలను చూపించి, దగ్గర్లో బుకింగ్‌లు పొందండి",
-    "registerBusinessTitle": "వ్యాపారవేత్తగా నమోదు చేసుకోండి",
+    "registerBusinessTitle": "వ్యాపారవేత్తగా మారండి",
     "registerBusinessSubtitle": "మీకు షాప్ ఉందా? లిస్ట్ చేసి ఆర్డర్లు తీసుకోవడం మొదలుపెట్టండి",
     "settingsSection": "యాప్ సెట్టింగ్‌లు",
     "comingSoonTitle": "త్వరలో వస్తుంది",
@@ -77,7 +78,13 @@
     "menuTitle": "సెట్టింగ్‌లు",
     "ratingValue": "4.8",
     "ratingCount": "126 రివ్యూలు",
-    "postsTitle": "ఇటీవలి పని"
+    "postsTitle": "ఇటీవలి పని",
+    "logoutConfirmTitle": "లాగ్ అవుట్ నిర్ధారించండి",
+    "logoutConfirmMessage": "మీరు మీ ఖాతా నుండి లాగ్ అవుట్ కావాలనుకుంటున్నారా?"
+  },
+  "themePicker": {
+    "title": "థీమ్ ఎంచుకోండి",
+    "subtitle": "మీకు నచ్చిన యాప్ థీమ్‌ని ఎంచుకోండి"
   },
   "errors": {
     "generic": "ఏదో పొరపాటు జరిగింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",

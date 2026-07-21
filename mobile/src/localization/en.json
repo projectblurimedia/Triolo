@@ -3,6 +3,7 @@
     "appName": "Triolo",
     "continue": "Continue",
     "cancel": "Cancel",
+    "close": "Close",
     "retry": "Retry",
     "loading": "Loading...",
     "logout": "Log Out"
@@ -56,9 +57,9 @@
     "title": "Triolo",
     "subtitle": "Grow with Triolo",
     "growSection": "Grow With Triolo",
-    "registerWorkerTitle": "Register as a Worker",
+    "registerWorkerTitle": "Become a Worker",
     "registerWorkerSubtitle": "Offer your skills and get booked nearby",
-    "registerBusinessTitle": "Register as a Business",
+    "registerBusinessTitle": "Become a Business",
     "registerBusinessSubtitle": "Have a shop? List it and start taking orders",
     "settingsSection": "App Settings",
     "comingSoonTitle": "Coming Soon",
@@ -77,7 +78,13 @@
     "menuTitle": "Settings",
     "ratingValue": "4.8",
     "ratingCount": "126 reviews",
-    "postsTitle": "Recent Work"
+    "postsTitle": "Recent Work",
+    "logoutConfirmTitle": "Confirm Logout",
+    "logoutConfirmMessage": "Are you sure you want to logout from your account?"
+  },
+  "themePicker": {
+    "title": "Choose Theme",
+    "subtitle": "Select your preferred app theme"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",
