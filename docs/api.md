@@ -78,6 +78,19 @@ Return the caller's worker profile, or `null` if they haven't created one.
 - Auth: Bearer access token
 - 200: `{ success: true, data: WorkerProfile | null }`
 
+### PATCH /workers/me/profile
+Update the caller's existing worker profile. `multipart/form-data`, same field shape as `POST`, plus `existingPhotoUrls: string` (a JSON-stringified array of already-uploaded portfolio photo URLs to keep — anything omitted is dropped). Newly uploaded files under `portfolioPhotos` are appended to the kept URLs, capped at 6 total. Resets `verificationStatus` to `pending_verification` — edited details haven't been reviewed yet.
+- Auth: Bearer access token
+- 200: `{ success: true, message: "Worker profile updated", data: WorkerProfile }`
+- 400: validation error
+- 404: `WORKER_PROFILE_NOT_FOUND` — no profile exists yet to update
+
+### DELETE /workers/me/profile
+Permanently remove the caller's worker profile.
+- Auth: Bearer access token
+- 200: `{ success: true, message: "Worker profile deleted", data: null }`
+- 404: `WORKER_PROFILE_NOT_FOUND`
+
 ## Businesses Module
 
 Adds the Business capability to the authenticated `user` account — mirrors the Workers module exactly, shop-shaped instead of skill-shaped.
@@ -93,6 +106,18 @@ Create the caller's business profile. `multipart/form-data`.
 Return the caller's business profile, or `null` if they haven't created one.
 - Auth: Bearer access token
 - 200: `{ success: true, data: BusinessProfile | null }`
+
+### PATCH /businesses/me/profile
+Update the caller's existing business profile. `multipart/form-data`, same field shape as `POST`, plus `existingPhotoUrls: string` (a JSON-stringified array of already-uploaded shop photo URLs to keep). Newly uploaded files under `shopPhotos` are appended to the kept URLs, capped at 6 total. Resets `verificationStatus` to `pending_verification`.
+- Auth: Bearer access token
+- 200: `{ success: true, message: "Business profile updated", data: BusinessProfile }`
+- 400 / 404: same shape as the Workers endpoint (`BUSINESS_PROFILE_NOT_FOUND` instead of `WORKER_PROFILE_NOT_FOUND`)
+
+### DELETE /businesses/me/profile
+Permanently remove the caller's business profile.
+- Auth: Bearer access token
+- 200: `{ success: true, message: "Business profile deleted", data: null }`
+- 404: `BUSINESS_PROFILE_NOT_FOUND`
 
 ---
 
