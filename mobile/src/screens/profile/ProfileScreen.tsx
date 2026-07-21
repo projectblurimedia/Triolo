@@ -1,9 +1,11 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
+import { WorkerProfileModal } from '@/components/WorkerProfileModal';
+import { BusinessProfileModal } from '@/components/BusinessProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
@@ -21,6 +23,8 @@ export function ProfileScreen() {
   const { data: businessProfile } = useMyBusinessProfile();
   const isProfessional = Boolean(workerProfile || businessProfile);
   const initial = account?.fullName?.trim().charAt(0).toUpperCase() ?? '?';
+  const [editWorkerVisible, setEditWorkerVisible] = useState(false);
+  const [editBusinessVisible, setEditBusinessVisible] = useState(false);
 
   return (
     <ScreenContainer edges={['left', 'right']}>
@@ -37,6 +41,32 @@ export function ProfileScreen() {
             </Text>
           </View>
         </View>
+      ) : null}
+
+      {workerProfile || businessProfile ? (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.manageProfilesTitle')}</Text>
+          {workerProfile ? (
+            <Pressable
+              style={[styles.manageRow, { backgroundColor: colors.surface }]}
+              onPress={() => setEditWorkerVisible(true)}
+            >
+              <FontAwesome6 name="screwdriver-wrench" size={16} color={colors.primary} solid />
+              <Text style={[styles.manageRowText, { color: colors.text }]}>{t('profile.editWorkerProfile')}</Text>
+              <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
+            </Pressable>
+          ) : null}
+          {businessProfile ? (
+            <Pressable
+              style={[styles.manageRow, { backgroundColor: colors.surface }]}
+              onPress={() => setEditBusinessVisible(true)}
+            >
+              <FontAwesome6 name="store" size={16} color={colors.secondary} solid />
+              <Text style={[styles.manageRowText, { color: colors.text }]}>{t('profile.editBusinessProfile')}</Text>
+              <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
+            </Pressable>
+          ) : null}
+        </>
       ) : null}
 
       {isProfessional ? (
@@ -59,6 +89,13 @@ export function ProfileScreen() {
           </View>
         </>
       ) : null}
+
+      <WorkerProfileModal visible={editWorkerVisible} onClose={() => setEditWorkerVisible(false)} profile={workerProfile} />
+      <BusinessProfileModal
+        visible={editBusinessVisible}
+        onClose={() => setEditBusinessVisible(false)}
+        profile={businessProfile}
+      />
     </ScreenContainer>
   );
 }
@@ -99,6 +136,15 @@ const styles = StyleSheet.create({
   ratingValue: { ...typography.subheading, fontFamily: fonts.semiBold },
   ratingCount: { ...typography.caption },
   sectionTitle: { ...typography.body, fontFamily: fonts.medium, marginBottom: 10 },
+  manageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  manageRowText: { ...typography.body, fontFamily: fonts.medium, flex: 1 },
   postsRow: { flexDirection: 'row', gap: 10 },
   postCard: {
     flex: 1,

@@ -7,6 +7,8 @@
     "done": "Done",
     "addNew": "Add New",
     "submit": "Submit",
+    "saveChanges": "Save Changes",
+    "delete": "Delete",
     "retry": "Retry",
     "loading": "Loading...",
     "logout": "Log Out",
@@ -40,11 +42,15 @@
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",
     "permissionDeniedMessage": "Allow photo library access to add images.",
+    "pickFailedTitle": "Couldn't Open Photos",
+    "pickFailedMessage": "Something went wrong opening your photo library. Please try again.",
     "hint": "{{count}}/{{max}} photos added"
   },
   "workerProfile": {
     "title": "Worker Registration",
     "subtitle": "Provide your service details to get discovered by customers nearby",
+    "editTitle": "Edit Worker Profile",
+    "editSubtitle": "Update your service details",
     "skillLabel": "Your Skills (select all that apply)",
     "otherSkillLabel": "What's your skill?",
     "skills": {
@@ -60,11 +66,20 @@
     "experienceLabel": "Years of Experience",
     "portfolioLabel": "Photos of Your Work (optional)",
     "successTitle": "Worker Profile Created",
-    "successMessage": "Your details are submitted for verification. We'll notify you once approved."
+    "successMessage": "Your details are submitted for verification. We'll notify you once approved.",
+    "updateSuccessTitle": "Worker Profile Updated",
+    "updateSuccessMessage": "Your changes are submitted for verification. We'll notify you once approved.",
+    "deleteAction": "Delete Worker Profile",
+    "deleteConfirmTitle": "Delete Worker Profile?",
+    "deleteConfirmMessage": "This removes your worker profile permanently. You can create a new one later if you change your mind.",
+    "deleteSuccessTitle": "Worker Profile Deleted",
+    "deleteSuccessMessage": "Your worker profile has been removed."
   },
   "businessProfile": {
     "title": "Business Registration",
     "subtitle": "Provide your shop details to get discovered by customers nearby",
+    "editTitle": "Edit Business Profile",
+    "editSubtitle": "Update your shop details",
     "shopNameLabel": "Shop Name",
     "categoryLabel": "Shop Categories (select all that apply)",
     "otherCategoryLabel": "What's your shop category?",
@@ -84,7 +99,14 @@
     "deliveryNo": "No",
     "deliveryPriceLabel": "Delivery Price per KM (₹)",
     "successTitle": "Business Profile Created",
-    "successMessage": "Your shop details are submitted for verification. We'll notify you once approved."
+    "successMessage": "Your shop details are submitted for verification. We'll notify you once approved.",
+    "updateSuccessTitle": "Business Profile Updated",
+    "updateSuccessMessage": "Your changes are submitted for verification. We'll notify you once approved.",
+    "deleteAction": "Delete Business Profile",
+    "deleteConfirmTitle": "Delete Business Profile?",
+    "deleteConfirmMessage": "This removes your business profile permanently. You can create a new one later if you change your mind.",
+    "deleteSuccessTitle": "Business Profile Deleted",
+    "deleteSuccessMessage": "Your business profile has been removed."
   },
   "settings": {
     "language": "Language",
@@ -130,11 +152,13 @@
   },
   "services": {
     "comingSoon": "Browsing services by category is coming soon.",
-    "tagline": "Browse workers by category"
+    "tagline": "Browse workers by category",
+    "editWorkerProfile": "Edit Worker Profile"
   },
   "bazaar": {
     "comingSoon": "Shop ordering is coming soon.",
-    "tagline": "Order from your local shops"
+    "tagline": "Order from your local shops",
+    "editBusinessProfile": "Edit Business Profile"
   },
   "profile": {
     "tagline": "Your profile overview",
@@ -142,6 +166,9 @@
     "ratingValue": "4.8",
     "ratingCount": "126 reviews",
     "postsTitle": "Recent Work",
+    "manageProfilesTitle": "Manage Your Profiles",
+    "editWorkerProfile": "Edit Worker Profile",
+    "editBusinessProfile": "Edit Business Profile",
     "logoutConfirmTitle": "Confirm Logout",
     "logoutConfirmMessage": "Are you sure you want to logout from your account?"
   },
@@ -167,6 +194,8 @@
     "RATE_LIMITED": "Too many attempts. Please wait a bit and try again.",
     "WORKER_PROFILE_EXISTS": "You already have a worker profile.",
     "BUSINESS_PROFILE_EXISTS": "You already have a business profile.",
+    "WORKER_PROFILE_NOT_FOUND": "We couldn't find your worker profile.",
+    "BUSINESS_PROFILE_NOT_FOUND": "We couldn't find your business profile.",
     "CLOUDINARY_NOT_CONFIGURED": "Image uploads aren't available right now. Please try again later.",
     "INTERNAL_SERVER_ERROR": "Something went wrong on our end. Please try again.",
     "UNAUTHORIZED": "Your session has expired. Please log in again.",

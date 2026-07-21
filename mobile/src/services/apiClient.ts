@@ -71,14 +71,19 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> 
  * set here: fetch computes the multipart boundary itself from the FormData instance,
  * and setting the header manually would drop that boundary and break the upload.
  */
-async function rawFormRequest<T>(path: string, formData: FormData, _retried = false): Promise<T> {
+async function rawFormRequest<T>(
+  path: string,
+  formData: FormData,
+  method: 'POST' | 'PATCH' = 'POST',
+  _retried = false,
+): Promise<T> {
   const { accessToken } = useAuthStore.getState();
   const headers: Record<string, string> = {};
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { method: 'POST', headers, body: formData });
+  const response = await fetch(`${API_BASE_URL}${path}`, { method, headers, body: formData });
   const json = (await response.json()) as ApiEnvelope<T> | ApiErrorBody;
 
   if (!response.ok || !json.success) {
@@ -91,7 +96,7 @@ async function rawFormRequest<T>(path: string, formData: FormData, _retried = fa
     if (response.status === 401 && !_retried) {
       const refreshed = await tryRefreshAccessToken();
       if (refreshed) {
-        return rawFormRequest<T>(path, formData, true);
+        return rawFormRequest<T>(path, formData, method, true);
       }
       useAuthStore.getState().clearSession();
     }
@@ -123,5 +128,7 @@ export const apiClient = {
   get: <T>(path: string, auth = false) => rawRequest<T>(path, { method: 'GET', auth }),
   post: <T>(path: string, body?: unknown, auth = false) => rawRequest<T>(path, { method: 'POST', body, auth }),
   patch: <T>(path: string, body?: unknown, auth = false) => rawRequest<T>(path, { method: 'PATCH', body, auth }),
-  postForm: <T>(path: string, formData: FormData) => rawFormRequest<T>(path, formData),
+  delete: <T>(path: string, auth = false) => rawRequest<T>(path, { method: 'DELETE', auth }),
+  postForm: <T>(path: string, formData: FormData) => rawFormRequest<T>(path, formData, 'POST'),
+  patchForm: <T>(path: string, formData: FormData) => rawFormRequest<T>(path, formData, 'PATCH'),
 };

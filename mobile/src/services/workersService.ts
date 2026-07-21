@@ -11,6 +11,11 @@ export interface CreateWorkerProfileParams {
   portfolioPhotos: PickedImage[];
 }
 
+export interface UpdateWorkerProfileParams extends CreateWorkerProfileParams {
+  /** Existing (already-uploaded) photo URLs to keep — anything omitted is dropped. */
+  existingPhotoUrls: string[];
+}
+
 export interface WorkerProfile {
   id: string;
   accountId: string;
@@ -43,4 +48,21 @@ export const workersService = {
     });
     return apiClient.postForm('/workers/me/profile', formData);
   },
+
+  updateProfile: (params: UpdateWorkerProfileParams) => {
+    const formData = new FormData();
+    formData.append('skillCategories', JSON.stringify(params.skillCategories));
+    if (params.otherSkillDescription) formData.append('otherSkillDescription', params.otherSkillDescription);
+    formData.append('experienceYears', String(params.experienceYears));
+    if (params.latitude != null) formData.append('latitude', String(params.latitude));
+    if (params.longitude != null) formData.append('longitude', String(params.longitude));
+    formData.append('locationAddress', params.locationAddress);
+    formData.append('existingPhotoUrls', JSON.stringify(params.existingPhotoUrls));
+    params.portfolioPhotos.forEach((image) => {
+      formData.append('portfolioPhotos', { uri: image.uri, name: image.name, type: image.type } as unknown as Blob);
+    });
+    return apiClient.patchForm<WorkerProfile>('/workers/me/profile', formData);
+  },
+
+  deleteProfile: () => apiClient.delete<null>('/workers/me/profile', true),
 };

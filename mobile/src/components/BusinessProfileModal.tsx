@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -8,12 +8,19 @@ import { TextField } from './TextField';
 import { LocationPicker, LocationValue } from './LocationPicker';
 import { ImagePickerField, PickedImage } from './ImagePickerField';
 import { Button } from './Button';
-import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { useCreateBusinessProfile } from '@/hooks/useBusinessMutations';
+import { ConfirmModal } from './ConfirmModal';
+import { fonts, typography, useThemeColors } from '@/theme';
+import {
+  useCreateBusinessProfile,
+  useDeleteBusinessProfile,
+  useUpdateBusinessProfile,
+} from '@/hooks/useBusinessMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
+import { BusinessProfile } from '@/services/businessesService';
 
 const SHOP_GRADIENT = ['#F59E0B', '#D97706'] as const;
+const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
 const SHOP_CATEGORIES = [
   { key: 'grocery', icon: 'basket-shopping' as const },
@@ -28,14 +35,19 @@ const SHOP_CATEGORIES = [
 interface BusinessProfileModalProps {
   visible: boolean;
   onClose: () => void;
+  /** When provided, the modal edits this existing profile instead of creating a new one. */
+  profile?: BusinessProfile | null;
 }
 
-/** Opened from Home's menu ("Become a Business") — adds the Business capability to the current User account. */
-export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalProps) {
+/** Opened from Home's menu ("Become a Business"), the Bazaar header, or Profile — creates or edits the Business capability on the current User account. */
+export function BusinessProfileModal({ visible, onClose, profile }: BusinessProfileModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
+  const isEditMode = !!profile;
   const createProfile = useCreateBusinessProfile();
+  const updateProfile = useUpdateBusinessProfile();
+  const deleteProfile = useDeleteBusinessProfile();
 
   const [shopName, setShopName] = useState('');
   const [shopCategories, setShopCategories] = useState<string[]>([]);
@@ -47,6 +59,24 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
   const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
   const [deliveryPricePerKm, setDeliveryPricePerKm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    if (visible && profile) {
+      setShopName(profile.shopName);
+      setShopCategories(profile.shopCategories.filter((key) => key !== 'other'));
+      setOtherCategoryEntries(
+        profile.otherCategoryDescription ? profile.otherCategoryDescription.split(', ').filter(Boolean) : [],
+      );
+      setLocation({ latitude: profile.latitude, longitude: profile.longitude, address: profile.locationAddress ?? '' });
+      setPhotos(
+        profile.shopPhotoUrls.map((url) => ({ uri: url, name: url.split('/').pop() ?? 'photo.jpg', type: 'image/jpeg' })),
+      );
+      setDeliveryAvailable(profile.deliveryAvailable);
+      setDeliveryPricePerKm(profile.deliveryPricePerKm != null ? String(profile.deliveryPricePerKm) : '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, profile]);
 
   const toggleCategory = (key: string) => {
     setShopCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
@@ -59,15 +89,24 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
   const commitOtherEntry = () => {
     const trimmed = otherInputValue.trim();
     if (trimmed) {
-      setOtherCategoryEntries((prev) => {
-        const existingIndex = prev.findIndex((entry) => entry.toLowerCase() === trimmed.toLowerCase());
-        if (existingIndex !== -1) {
-          // Already added — surface it (bring to front) instead of creating a duplicate chip.
-          const existing = prev[existingIndex];
-          return [existing, ...prev.filter((_, i) => i !== existingIndex)];
-        }
-        return [...prev, trimmed];
-      });
+      // Typing something that matches one of the fixed categories (e.g. "Grocery") should
+      // select that existing chip, not create a redundant custom "other" tag for it.
+      const matchedCategory = SHOP_CATEGORIES.find(
+        (category) => t(`businessProfile.categories.${category.key}`).toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (matchedCategory) {
+        setShopCategories((prev) => (prev.includes(matchedCategory.key) ? prev : [...prev, matchedCategory.key]));
+      } else {
+        setOtherCategoryEntries((prev) => {
+          const existingIndex = prev.findIndex((entry) => entry.toLowerCase() === trimmed.toLowerCase());
+          if (existingIndex !== -1) {
+            // Already added — surface it (bring to front) instead of creating a duplicate chip.
+            const existing = prev[existingIndex];
+            return [existing, ...prev.filter((_, i) => i !== existingIndex)];
+          }
+          return [...prev, trimmed];
+        });
+      }
     }
     setOtherInputValue('');
     setShowOtherInput(false);
@@ -105,26 +144,64 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
       return;
     }
 
-    createProfile.mutate(
-      {
-        shopName,
-        shopCategories: includesOther ? [...shopCategories, 'other'] : shopCategories,
-        otherCategoryDescription: includesOther ? otherCategoryEntries.join(', ') : undefined,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        locationAddress: location.address,
-        shopPhotos: photos,
-        deliveryAvailable,
-        deliveryPricePerKm: deliveryAvailable ? Number(deliveryPricePerKm) : undefined,
-      },
-      {
-        onSuccess: () => {
-          resetAndClose();
-          showToast({ variant: 'success', title: t('businessProfile.successTitle'), message: t('businessProfile.successMessage') });
+    const commonPayload = {
+      shopName,
+      shopCategories: includesOther ? [...shopCategories, 'other'] : shopCategories,
+      otherCategoryDescription: includesOther ? otherCategoryEntries.join(', ') : undefined,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      locationAddress: location.address,
+      deliveryAvailable,
+      deliveryPricePerKm: deliveryAvailable ? Number(deliveryPricePerKm) : undefined,
+    };
+
+    if (isEditMode) {
+      const existingPhotoUrls = photos.filter((image) => image.uri.startsWith('http')).map((image) => image.uri);
+      const newPhotos = photos.filter((image) => !image.uri.startsWith('http'));
+      updateProfile.mutate(
+        { ...commonPayload, existingPhotoUrls, shopPhotos: newPhotos },
+        {
+          onSuccess: () => {
+            resetAndClose();
+            showToast({
+              variant: 'success',
+              title: t('businessProfile.updateSuccessTitle'),
+              message: t('businessProfile.updateSuccessMessage'),
+            });
+          },
+          onError: (err) => setError(getLocalizedErrorMessage(err, t)),
         },
-        onError: (err) => setError(getLocalizedErrorMessage(err, t)),
+      );
+    } else {
+      createProfile.mutate(
+        { ...commonPayload, shopPhotos: photos },
+        {
+          onSuccess: () => {
+            resetAndClose();
+            showToast({ variant: 'success', title: t('businessProfile.successTitle'), message: t('businessProfile.successMessage') });
+          },
+          onError: (err) => setError(getLocalizedErrorMessage(err, t)),
+        },
+      );
+    }
+  };
+
+  const handleDelete = () => {
+    deleteProfile.mutate(undefined, {
+      onSuccess: () => {
+        setShowDeleteConfirm(false);
+        resetAndClose();
+        showToast({
+          variant: 'success',
+          title: t('businessProfile.deleteSuccessTitle'),
+          message: t('businessProfile.deleteSuccessMessage'),
+        });
       },
-    );
+      onError: (err) => {
+        setShowDeleteConfirm(false);
+        showToast({ variant: 'error', title: t('errors.generic'), message: getLocalizedErrorMessage(err, t) });
+      },
+    });
   };
 
   return (
@@ -142,10 +219,10 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
             </Pressable>
             <View style={styles.titleGroup}>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {t('businessProfile.title')}
+                {t(isEditMode ? 'businessProfile.editTitle' : 'businessProfile.title')}
               </Text>
               <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {t('businessProfile.subtitle')}
+                {t(isEditMode ? 'businessProfile.editSubtitle' : 'businessProfile.subtitle')}
               </Text>
             </View>
           </View>
@@ -273,9 +350,33 @@ export function BusinessProfileModal({ visible, onClose }: BusinessProfileModalP
 
           {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 
-          <Button label={t('common.submit')} onPress={handleSubmit} loading={createProfile.isPending} gradient={SHOP_GRADIENT} />
+          <Button
+            label={t(isEditMode ? 'common.saveChanges' : 'common.submit')}
+            onPress={handleSubmit}
+            loading={isEditMode ? updateProfile.isPending : createProfile.isPending}
+            gradient={SHOP_GRADIENT}
+          />
+
+          {isEditMode ? (
+            <Pressable style={styles.deleteButton} onPress={() => setShowDeleteConfirm(true)}>
+              <FontAwesome6 name="trash" size={14} color={colors.error} solid />
+              <Text style={[styles.deleteText, { color: colors.error }]}>{t('businessProfile.deleteAction')}</Text>
+            </Pressable>
+          ) : null}
         </ScrollView>
       </View>
+
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        icon="trash"
+        gradient={DELETE_GRADIENT}
+        title={t('businessProfile.deleteConfirmTitle')}
+        message={t('businessProfile.deleteConfirmMessage')}
+        confirmLabel={t('common.delete')}
+        loading={deleteProfile.isPending}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </Modal>
   );
 }
@@ -323,4 +424,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   error: { ...typography.caption, marginBottom: 12 },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 18,
+    paddingVertical: 10,
+  },
+  deleteText: { ...typography.body, fontFamily: fonts.semiBold },
 });

@@ -30,33 +30,42 @@ export function ImagePickerField({ label, images, onChange, maxImages = 6 }: Ima
     const remaining = maxImages - images.length;
     if (remaining <= 0) return;
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showToast({
-        variant: 'error',
-        title: t('imagePicker.permissionDeniedTitle'),
-        message: t('imagePicker.permissionDeniedMessage'),
-      });
-      return;
-    }
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showToast({
+          variant: 'error',
+          title: t('imagePicker.permissionDeniedTitle'),
+          message: t('imagePicker.permissionDeniedMessage'),
+        });
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-      allowsMultipleSelection: true,
-      selectionLimit: remaining,
-    });
-
-    if (!result.canceled) {
-      const picked: PickedImage[] = result.assets.map((asset, index) => {
-        const extension = asset.uri.split('.').pop() ?? 'jpg';
-        return {
-          uri: asset.uri,
-          name: asset.fileName ?? `photo_${Date.now()}_${index}.${extension}`,
-          type: asset.mimeType ?? `image/${extension}`,
-        };
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.7,
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
       });
-      onChange([...images, ...picked].slice(0, maxImages));
+
+      if (!result.canceled) {
+        const picked: PickedImage[] = result.assets.map((asset, index) => {
+          // Android gallery picks are often content:// URIs with no real file extension —
+          // asset.uri.split('.').pop() on those returns garbage (the whole URI), which
+          // would corrupt the multipart file's type/name. Trust asset.mimeType first;
+          // fall back to a safe, always-valid default rather than guessing from the URI.
+          const type = asset.mimeType ?? 'image/jpeg';
+          const extension = type.split('/').pop() ?? 'jpg';
+          return {
+            uri: asset.uri,
+            name: asset.fileName ?? `photo_${Date.now()}_${index}.${extension}`,
+            type,
+          };
+        });
+        onChange([...images, ...picked].slice(0, maxImages));
+      }
+    } catch {
+      showToast({ variant: 'error', title: t('imagePicker.pickFailedTitle'), message: t('imagePicker.pickFailedMessage') });
     }
   };
 

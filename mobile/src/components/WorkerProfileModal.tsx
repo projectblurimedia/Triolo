@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -8,10 +8,14 @@ import { TextField } from './TextField';
 import { LocationPicker, LocationValue } from './LocationPicker';
 import { ImagePickerField, PickedImage } from './ImagePickerField';
 import { Button } from './Button';
+import { ConfirmModal } from './ConfirmModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { useCreateWorkerProfile } from '@/hooks/useWorkerMutations';
+import { useCreateWorkerProfile, useDeleteWorkerProfile, useUpdateWorkerProfile } from '@/hooks/useWorkerMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
+import { WorkerProfile } from '@/services/workersService';
+
+const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
 const SKILL_CATEGORIES = [
   { key: 'electrician', icon: 'bolt' as const },
@@ -26,14 +30,19 @@ const SKILL_CATEGORIES = [
 interface WorkerProfileModalProps {
   visible: boolean;
   onClose: () => void;
+  /** When provided, the modal edits this existing profile instead of creating a new one. */
+  profile?: WorkerProfile | null;
 }
 
-/** Opened from Home's menu ("Become a Worker") — adds the Worker capability to the current User account. */
-export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps) {
+/** Opened from Home's menu ("Become a Worker"), the Services header, or Profile — creates or edits the Worker capability on the current User account. */
+export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
+  const isEditMode = !!profile;
   const createProfile = useCreateWorkerProfile();
+  const updateProfile = useUpdateWorkerProfile();
+  const deleteProfile = useDeleteWorkerProfile();
 
   const [skillCategories, setSkillCategories] = useState<string[]>([]);
   const [otherSkillEntries, setOtherSkillEntries] = useState<string[]>([]);
@@ -43,6 +52,20 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
   const [location, setLocation] = useState<LocationValue>({ latitude: null, longitude: null, address: '' });
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    if (visible && profile) {
+      setSkillCategories(profile.skillCategories.filter((key) => key !== 'other'));
+      setOtherSkillEntries(profile.otherSkillDescription ? profile.otherSkillDescription.split(', ').filter(Boolean) : []);
+      setExperienceYears(String(profile.experienceYears));
+      setLocation({ latitude: profile.latitude, longitude: profile.longitude, address: profile.locationAddress ?? '' });
+      setPhotos(
+        profile.portfolioPhotoUrls.map((url) => ({ uri: url, name: url.split('/').pop() ?? 'photo.jpg', type: 'image/jpeg' })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, profile]);
 
   const toggleSkill = (key: string) => {
     setSkillCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
@@ -55,15 +78,24 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
   const commitOtherEntry = () => {
     const trimmed = otherInputValue.trim();
     if (trimmed) {
-      setOtherSkillEntries((prev) => {
-        const existingIndex = prev.findIndex((entry) => entry.toLowerCase() === trimmed.toLowerCase());
-        if (existingIndex !== -1) {
-          // Already added — surface it (bring to front) instead of creating a duplicate chip.
-          const existing = prev[existingIndex];
-          return [existing, ...prev.filter((_, i) => i !== existingIndex)];
-        }
-        return [...prev, trimmed];
-      });
+      // Typing something that matches one of the fixed skills (e.g. "Electrician") should
+      // select that existing chip, not create a redundant custom "other" tag for it.
+      const matchedSkill = SKILL_CATEGORIES.find(
+        (skill) => t(`workerProfile.skills.${skill.key}`).toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (matchedSkill) {
+        setSkillCategories((prev) => (prev.includes(matchedSkill.key) ? prev : [...prev, matchedSkill.key]));
+      } else {
+        setOtherSkillEntries((prev) => {
+          const existingIndex = prev.findIndex((entry) => entry.toLowerCase() === trimmed.toLowerCase());
+          if (existingIndex !== -1) {
+            // Already added — surface it (bring to front) instead of creating a duplicate chip.
+            const existing = prev[existingIndex];
+            return [existing, ...prev.filter((_, i) => i !== existingIndex)];
+          }
+          return [...prev, trimmed];
+        });
+      }
     }
     setOtherInputValue('');
     setShowOtherInput(false);
@@ -97,24 +129,62 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
       return;
     }
 
-    createProfile.mutate(
-      {
-        skillCategories: includesOther ? [...skillCategories, 'other'] : skillCategories,
-        otherSkillDescription: includesOther ? otherSkillEntries.join(', ') : undefined,
-        experienceYears: Number(experienceYears),
-        latitude: location.latitude,
-        longitude: location.longitude,
-        locationAddress: location.address,
-        portfolioPhotos: photos,
-      },
-      {
-        onSuccess: () => {
-          resetAndClose();
-          showToast({ variant: 'success', title: t('workerProfile.successTitle'), message: t('workerProfile.successMessage') });
+    const commonPayload = {
+      skillCategories: includesOther ? [...skillCategories, 'other'] : skillCategories,
+      otherSkillDescription: includesOther ? otherSkillEntries.join(', ') : undefined,
+      experienceYears: Number(experienceYears),
+      latitude: location.latitude,
+      longitude: location.longitude,
+      locationAddress: location.address,
+    };
+
+    if (isEditMode) {
+      const existingPhotoUrls = photos.filter((image) => image.uri.startsWith('http')).map((image) => image.uri);
+      const newPhotos = photos.filter((image) => !image.uri.startsWith('http'));
+      updateProfile.mutate(
+        { ...commonPayload, existingPhotoUrls, portfolioPhotos: newPhotos },
+        {
+          onSuccess: () => {
+            resetAndClose();
+            showToast({
+              variant: 'success',
+              title: t('workerProfile.updateSuccessTitle'),
+              message: t('workerProfile.updateSuccessMessage'),
+            });
+          },
+          onError: (err) => setError(getLocalizedErrorMessage(err, t)),
         },
-        onError: (err) => setError(getLocalizedErrorMessage(err, t)),
+      );
+    } else {
+      createProfile.mutate(
+        { ...commonPayload, portfolioPhotos: photos },
+        {
+          onSuccess: () => {
+            resetAndClose();
+            showToast({ variant: 'success', title: t('workerProfile.successTitle'), message: t('workerProfile.successMessage') });
+          },
+          onError: (err) => setError(getLocalizedErrorMessage(err, t)),
+        },
+      );
+    }
+  };
+
+  const handleDelete = () => {
+    deleteProfile.mutate(undefined, {
+      onSuccess: () => {
+        setShowDeleteConfirm(false);
+        resetAndClose();
+        showToast({
+          variant: 'success',
+          title: t('workerProfile.deleteSuccessTitle'),
+          message: t('workerProfile.deleteSuccessMessage'),
+        });
       },
-    );
+      onError: (err) => {
+        setShowDeleteConfirm(false);
+        showToast({ variant: 'error', title: t('errors.generic'), message: getLocalizedErrorMessage(err, t) });
+      },
+    });
   };
 
   return (
@@ -132,10 +202,10 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
             </Pressable>
             <View style={styles.titleGroup}>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {t('workerProfile.title')}
+                {t(isEditMode ? 'workerProfile.editTitle' : 'workerProfile.title')}
               </Text>
               <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {t('workerProfile.subtitle')}
+                {t(isEditMode ? 'workerProfile.editSubtitle' : 'workerProfile.subtitle')}
               </Text>
             </View>
           </View>
@@ -230,9 +300,32 @@ export function WorkerProfileModal({ visible, onClose }: WorkerProfileModalProps
 
           {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 
-          <Button label={t('common.submit')} onPress={handleSubmit} loading={createProfile.isPending} />
+          <Button
+            label={t(isEditMode ? 'common.saveChanges' : 'common.submit')}
+            onPress={handleSubmit}
+            loading={isEditMode ? updateProfile.isPending : createProfile.isPending}
+          />
+
+          {isEditMode ? (
+            <Pressable style={styles.deleteButton} onPress={() => setShowDeleteConfirm(true)}>
+              <FontAwesome6 name="trash" size={14} color={colors.error} solid />
+              <Text style={[styles.deleteText, { color: colors.error }]}>{t('workerProfile.deleteAction')}</Text>
+            </Pressable>
+          ) : null}
         </ScrollView>
       </View>
+
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        icon="trash"
+        gradient={DELETE_GRADIENT}
+        title={t('workerProfile.deleteConfirmTitle')}
+        message={t('workerProfile.deleteConfirmMessage')}
+        confirmLabel={t('common.delete')}
+        loading={deleteProfile.isPending}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </Modal>
   );
 }
@@ -280,4 +373,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   error: { ...typography.caption, marginBottom: 12 },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 18,
+    paddingVertical: 10,
+  },
+  deleteText: { ...typography.body, fontFamily: fonts.semiBold },
 });

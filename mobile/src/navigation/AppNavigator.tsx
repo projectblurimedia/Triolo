@@ -11,6 +11,8 @@ import { BazaarScreen } from '@/screens/bazaar/BazaarScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { GradientHeader } from '@/components/GradientHeader';
 import { HomeHeader } from '@/components/HomeHeader';
+import { ServicesHeader } from '@/components/ServicesHeader';
+import { BazaarHeader } from '@/components/BazaarHeader';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { fonts, headerGradient, useThemeColors } from '@/theme';
 
@@ -119,8 +121,25 @@ export function AppNavigator() {
           header: () => <HomeHeader title={t('common.appName')} subtitle={t('home.tagline')} />,
         }}
       />
-      <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: titles.Services }} />
-      <Tab.Screen name="Bazaar" component={BazaarScreen} options={{ tabBarLabel: titles.Bazaar }} />
+      <Tab.Screen
+        name="Services"
+        component={ServicesScreen}
+        options={{
+          tabBarLabel: titles.Services,
+          // Carries an edit action for an existing Worker profile — needs local modal
+          // state a stateless header render function can't hold, so it's a wrapper
+          // component (ServicesHeader), same pattern as HomeHeader/ProfileHeader.
+          header: () => <ServicesHeader title={titles.Services} subtitle={subtitles.Services} />,
+        }}
+      />
+      <Tab.Screen
+        name="Bazaar"
+        component={BazaarScreen}
+        options={{
+          tabBarLabel: titles.Bazaar,
+          header: () => <BazaarHeader title={titles.Bazaar} subtitle={subtitles.Bazaar} />,
+        }}
+      />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
