@@ -105,6 +105,7 @@ const styles = StyleSheet.create({
   title: {
     ...typography.heading,
     fontFamily: fonts.semiBold,
+    fontSize: typography.heading.fontSize - 2,
     color: colors.white,
     lineHeight: 24,
   },
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: 'rgba(255, 255, 255, 0.82)',
     lineHeight: 14,
-    marginTop: 0,
+    marginTop: 1.5,
   },
   actions: {
     flexDirection: 'row',
