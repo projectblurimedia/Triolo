@@ -58,8 +58,9 @@
     "growSection": "Grow With Triolo",
     "registerWorkerTitle": "Register as a Worker",
     "registerWorkerSubtitle": "Offer your skills and get booked nearby",
-    "registerBusinessTitle": "Have a Shop? Register Your Business",
-    "registerBusinessSubtitle": "List your shop and start taking orders",
+    "registerBusinessTitle": "Register as a Business",
+    "registerBusinessSubtitle": "Have a shop? List it and start taking orders",
+    "settingsSection": "App Settings",
     "comingSoonTitle": "Coming Soon",
     "comingSoonMessage": "This will be available soon. Stay tuned!"
   },

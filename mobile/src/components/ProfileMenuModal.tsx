@@ -8,6 +8,8 @@ import { Button } from './Button';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 
+const CLOSE_BUTTON_SIZE = 36;
+
 interface ProfileMenuModalProps {
   visible: boolean;
   onClose: () => void;
@@ -21,25 +23,40 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
   const updateLanguage = useUpdateAccountLanguage();
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.handle} />
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: colors.text }]}>{t('profile.menuTitle')}</Text>
-            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel={t('common.cancel')}>
-              <FontAwesome6 name="xmark" size={18} color={colors.textMuted} />
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              accessibilityLabel={t('common.cancel')}
+              style={[styles.closeButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            >
+              <FontAwesome6 name="xmark" size={16} color={colors.textMuted} solid />
             </Pressable>
           </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.label, { color: colors.textMuted }]}>{t('settings.language')}</Text>
+          <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderRow}>
+              <View style={[styles.cardIcon, { backgroundColor: `${colors.primary}20` }]}>
+                <FontAwesome6 name="language" size={16} color={colors.primary} solid />
+              </View>
+              <Text style={[styles.label, { color: colors.text }]}>{t('settings.language')}</Text>
+            </View>
             {/* Persists locally immediately; also synced to the account so it follows the user to a new device. */}
             <LanguageSwitcher onChange={(language) => updateLanguage.mutate(language)} />
           </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.label, { color: colors.textMuted }]}>{t('settings.theme')}</Text>
+          <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderRow}>
+              <View style={[styles.cardIcon, { backgroundColor: `${colors.primary}20` }]}>
+                <FontAwesome6 name="palette" size={16} color={colors.primary} solid />
+              </View>
+              <Text style={[styles.label, { color: colors.text }]}>{t('settings.theme')}</Text>
+            </View>
             <ThemeSwitcher />
           </View>
 
@@ -84,6 +101,28 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: { ...typography.subheading, fontFamily: fonts.semiBold },
-  section: { gap: 10, marginBottom: 20 },
-  label: { ...typography.body },
+  closeButton: {
+    width: CLOSE_BUTTON_SIZE,
+    height: CLOSE_BUTTON_SIZE,
+    borderRadius: CLOSE_BUTTON_SIZE / 2,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  card: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+    marginBottom: 16,
+  },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  label: { ...typography.body, fontFamily: fonts.semiBold },
 });

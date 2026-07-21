@@ -1,62 +1,27 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { Alert, Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { ThemeSwitcher } from './ThemeSwitcher';
+import { Button } from './Button';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { useLogout } from '@/hooks/useAuthMutations';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.85;
+const ICON_BUTTON_SIZE = 40;
 
 interface HomeMenuModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
-/** Right-side sliding drawer triggered from Home's header menu icon — entry points for onboarding into Worker/Business. */
+/** Right-side drawer triggered from Home's header menu icon — Worker/Business entry points plus theme/logout. */
 export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  // The native <Modal> must stay mounted for the full closing animation — unmounting
-  // it the instant `visible` flips false (by binding it directly to the prop) cuts the
-  // slide-out short, leaving translateX at whatever mid-animation value it was
-  // interrupted at. The next open then springs in from that stale position instead of
-  // fully off-screen, which is why only the very first open ever looked smooth.
-  const [rendered, setRendered] = useState(visible);
-
-  useEffect(() => {
-    if (visible) {
-      setRendered(true);
-    }
-  }, [visible]);
-
-  useEffect(() => {
-    if (!rendered) return;
-    // Opening uses a spring for a bit of bounce; closing uses a fixed-duration timing
-    // instead — a spring's settle tail is unpredictable (can run well past its visual
-    // "arrival"), and since the native Modal stays mounted (and keeps swallowing all
-    // touches, including the header's own menu button) until this animation reports
-    // `finished`, a slow/uncertain close made reopening immediately after feel broken.
-    // A short, fixed timing means the Modal frees up input again reliably and quickly.
-    const slideAnimation = visible
-      ? Animated.spring(translateX, { toValue: 0, useNativeDriver: true, tension: 60, friction: 12 })
-      : Animated.timing(translateX, { toValue: DRAWER_WIDTH, duration: 200, useNativeDriver: true });
-
-    Animated.parallel([
-      slideAnimation,
-      Animated.timing(backdropOpacity, {
-        toValue: visible ? 1 : 0,
-        duration: visible ? 250 : 200,
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (!visible && finished) {
-        setRendered(false);
-      }
-    });
-  }, [visible, rendered]);
+  const logout = useLogout();
 
   // Worker/Business registration for an already-logged-in User account isn't built
   // yet (see .cloud/project-context.md — Worker/Business modules are still pending),
@@ -64,6 +29,11 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const handleComingSoon = () => {
     onClose();
     Alert.alert(t('homeMenu.comingSoonTitle'), t('homeMenu.comingSoonMessage'));
+  };
+
+  const handleLogout = () => {
+    onClose();
+    logout.mutate();
   };
 
   const items = [
@@ -84,15 +54,13 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   ];
 
   return (
-    <Modal visible={rendered} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.container}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
-          <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity }]} />
+          <View style={[StyleSheet.absoluteFill, styles.backdrop]} />
         </Pressable>
 
-        <Animated.View
-          style={[styles.drawer, { backgroundColor: colors.surface, transform: [{ translateX }] }]}
-        >
+        <View style={[styles.drawer, { backgroundColor: colors.surface }]}>
           <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
             <View style={styles.headerRow}>
               <View style={styles.headerLeft}>
@@ -134,8 +102,27 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
                 <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
               </Pressable>
             ))}
+
+            <Text style={[styles.sectionTitle, styles.sectionSpacing, { color: colors.textMuted }]}>
+              {t('homeMenu.settingsSection')}
+            </Text>
+            <View style={[styles.settingsCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <View style={styles.settingsHeaderRow}>
+                <View style={[styles.settingsIcon, { backgroundColor: `${colors.primary}20` }]}>
+                  <FontAwesome6 name="palette" size={16} color={colors.primary} solid />
+                </View>
+                <Text style={[styles.itemTitle, { color: colors.text }]}>{t('settings.theme')}</Text>
+              </View>
+              <ThemeSwitcher />
+            </View>
+
+            <Button label={t('common.logout')} onPress={handleLogout} loading={logout.isPending} />
+
+            <View style={styles.footer}>
+              <Text style={[styles.footerText, { color: colors.textMuted }]}>{t('common.appName')}</Text>
+            </View>
           </ScrollView>
-        </Animated.View>
+        </View>
       </View>
     </Modal>
   );
@@ -163,21 +150,24 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingHorizontal: 20,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 },
   headerText: { marginLeft: 12, flex: 1 },
-  headerTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  headerSubtitle: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', marginTop: 2 },
+  headerTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF', lineHeight: 20 },
+  headerSubtitle: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', lineHeight: 14, marginTop: 2 },
   closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: ICON_BUTTON_SIZE,
+    height: ICON_BUTTON_SIZE,
+    borderRadius: ICON_BUTTON_SIZE / 2,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.32)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   scrollContent: { padding: 16, paddingBottom: 32 },
   sectionTitle: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 10, marginLeft: 4 },
+  sectionSpacing: { marginTop: 8 },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -197,4 +187,21 @@ const styles = StyleSheet.create({
   itemText: { flex: 1, marginRight: 8 },
   itemTitle: { ...typography.body, fontFamily: fonts.semiBold },
   itemSubtitle: { ...typography.caption, marginTop: 2 },
+  settingsCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 20,
+    gap: 12,
+  },
+  settingsHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  settingsIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footer: { alignItems: 'center', paddingTop: 20 },
+  footerText: { ...typography.caption },
 });
