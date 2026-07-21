@@ -1,11 +1,13 @@
 import { Pool, QueryResultRow } from 'pg';
+import { parsePgArray } from '@/common/utils/pgArray';
 import { WorkerProfile } from './interfaces';
 
 function mapWorkerProfile(row: QueryResultRow): WorkerProfile {
   return {
     id: row.id,
     accountId: row.account_id,
-    skillCategory: row.skill_category,
+    skillCategories: parsePgArray(row.skill_categories) as WorkerProfile['skillCategories'],
+    otherSkillDescription: row.other_skill_description,
     experienceYears: row.experience_years,
     latitude: row.latitude,
     longitude: row.longitude,
@@ -27,7 +29,8 @@ export class WorkersRepository {
 
   async create(params: {
     accountId: string;
-    skillCategory: string;
+    skillCategories: string[];
+    otherSkillDescription: string | null;
     experienceYears: number;
     latitude: number | null;
     longitude: number | null;
@@ -35,12 +38,13 @@ export class WorkersRepository {
     portfolioPhotoUrls: string[];
   }): Promise<WorkerProfile> {
     const result = await this.pool.query(
-      `INSERT INTO worker_profiles (account_id, skill_category, experience_years, latitude, longitude, location_address, portfolio_photo_urls)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO worker_profiles (account_id, skill_categories, other_skill_description, experience_years, latitude, longitude, location_address, portfolio_photo_urls)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         params.accountId,
-        params.skillCategory,
+        params.skillCategories,
+        params.otherSkillDescription,
         params.experienceYears,
         params.latitude,
         params.longitude,

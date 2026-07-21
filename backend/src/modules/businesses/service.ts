@@ -28,11 +28,14 @@ export class BusinessesService {
     return this.repository.create({
       accountId,
       shopName: dto.shopName,
-      shopCategory: dto.shopCategory,
+      shopCategories: dto.shopCategories,
+      otherCategoryDescription: dto.otherCategoryDescription ?? null,
       latitude: dto.latitude ?? null,
       longitude: dto.longitude ?? null,
       locationAddress: dto.locationAddress ?? null,
       shopPhotoUrls,
+      deliveryAvailable: dto.deliveryAvailable,
+      deliveryPricePerKm: dto.deliveryAvailable ? (dto.deliveryPricePerKm ?? null) : null,
     });
   }
 

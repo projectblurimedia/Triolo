@@ -25,11 +25,14 @@ function buildProfile(overrides: Partial<BusinessProfile> = {}): BusinessProfile
     id: 'business-1',
     accountId: 'account-1',
     shopName: 'Test Shop',
-    shopCategory: 'grocery',
+    shopCategories: ['grocery'],
+    otherCategoryDescription: null,
     latitude: 17.385,
     longitude: 78.4867,
     locationAddress: 'Hyderabad, Telangana',
     shopPhotoUrls: [],
+    deliveryAvailable: false,
+    deliveryPricePerKm: null,
     verificationStatus: 'pending_verification',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -48,7 +51,11 @@ describe('BusinessesService.createProfile', () => {
     const service = new BusinessesService(repo as unknown as BusinessesRepository);
 
     await expect(
-      service.createProfile('account-1', { shopName: 'Shop', shopCategory: 'grocery' }, []),
+      service.createProfile(
+        'account-1',
+        { shopName: 'Shop', shopCategories: ['grocery'], deliveryAvailable: false },
+        [],
+      ),
     ).rejects.toMatchObject({ statusCode: 409, code: 'BUSINESS_PROFILE_EXISTS' });
 
     expect(repo.create).not.toHaveBeenCalled();
@@ -65,7 +72,12 @@ describe('BusinessesService.createProfile', () => {
 
     await service.createProfile(
       'account-1',
-      { shopName: 'My Shop', shopCategory: 'restaurant', locationAddress: 'Hyderabad' },
+      {
+        shopName: 'My Shop',
+        shopCategories: ['restaurant'],
+        locationAddress: 'Hyderabad',
+        deliveryAvailable: false,
+      },
       files,
     );
 
@@ -74,7 +86,7 @@ describe('BusinessesService.createProfile', () => {
       expect.objectContaining({
         accountId: 'account-1',
         shopName: 'My Shop',
-        shopCategory: 'restaurant',
+        shopCategories: ['restaurant'],
         locationAddress: 'Hyderabad',
         shopPhotoUrls: ['https://cdn/a.jpg'],
       }),
@@ -87,10 +99,48 @@ describe('BusinessesService.createProfile', () => {
     repo.create.mockResolvedValue(buildProfile({ shopPhotoUrls: [] }));
 
     const service = new BusinessesService(repo as unknown as BusinessesRepository);
-    await service.createProfile('account-1', { shopName: 'Shop', shopCategory: 'other' }, []);
+    await service.createProfile(
+      'account-1',
+      { shopName: 'Shop', shopCategories: ['other'], deliveryAvailable: false },
+      [],
+    );
 
     expect(uploadToCloudinary).not.toHaveBeenCalled();
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ shopPhotoUrls: [] }));
+  });
+
+  it('stores the delivery price when delivery is available', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(null);
+    repo.create.mockResolvedValue(buildProfile({ deliveryAvailable: true, deliveryPricePerKm: 10 }));
+
+    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    await service.createProfile(
+      'account-1',
+      { shopName: 'Shop', shopCategories: ['grocery'], deliveryAvailable: true, deliveryPricePerKm: 10 },
+      [],
+    );
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ deliveryAvailable: true, deliveryPricePerKm: 10 }),
+    );
+  });
+
+  it('ignores a submitted delivery price when delivery is not available', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(null);
+    repo.create.mockResolvedValue(buildProfile({ deliveryAvailable: false, deliveryPricePerKm: null }));
+
+    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    await service.createProfile(
+      'account-1',
+      { shopName: 'Shop', shopCategories: ['grocery'], deliveryAvailable: false, deliveryPricePerKm: 10 },
+      [],
+    );
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ deliveryAvailable: false, deliveryPricePerKm: null }),
+    );
   });
 });
 

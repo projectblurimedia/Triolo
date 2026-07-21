@@ -1,7 +1,8 @@
 import { WorkerSkillCategory } from './interfaces';
 
 export interface CreateWorkerProfileDto {
-  skillCategory: WorkerSkillCategory;
+  skillCategories: WorkerSkillCategory[];
+  otherSkillDescription?: string;
   experienceYears: number;
   latitude?: number | null;
   longitude?: number | null;

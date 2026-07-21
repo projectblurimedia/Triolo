@@ -24,7 +24,8 @@ export type ProfileVerificationStatus = 'pending_verification' | 'verified' | 'r
 export interface WorkerProfile {
   id: string;
   accountId: string;
-  skillCategory: WorkerSkillCategory;
+  skillCategories: WorkerSkillCategory[];
+  otherSkillDescription: string | null;
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;

@@ -25,11 +25,14 @@ export interface BusinessProfile {
   id: string;
   accountId: string;
   shopName: string;
-  shopCategory: BusinessShopCategory;
+  shopCategories: BusinessShopCategory[];
+  otherCategoryDescription: string | null;
   latitude: number | null;
   longitude: number | null;
   locationAddress: string | null;
   shopPhotoUrls: string[];
+  deliveryAvailable: boolean;
+  deliveryPricePerKm: number | null;
   verificationStatus: ProfileVerificationStatus;
   createdAt: Date;
   updatedAt: Date;

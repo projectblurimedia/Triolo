@@ -24,7 +24,8 @@ function buildProfile(overrides: Partial<WorkerProfile> = {}): WorkerProfile {
   return {
     id: 'worker-1',
     accountId: 'account-1',
-    skillCategory: 'electrician',
+    skillCategories: ['electrician'],
+    otherSkillDescription: null,
     experienceYears: 3,
     latitude: 17.385,
     longitude: 78.4867,
@@ -48,7 +49,7 @@ describe('WorkersService.createProfile', () => {
     const service = new WorkersService(repo as unknown as WorkersRepository);
 
     await expect(
-      service.createProfile('account-1', { skillCategory: 'electrician', experienceYears: 3 }, []),
+      service.createProfile('account-1', { skillCategories: ['electrician'], experienceYears: 3 }, []),
     ).rejects.toMatchObject({ statusCode: 409, code: 'WORKER_PROFILE_EXISTS' });
 
     expect(repo.create).not.toHaveBeenCalled();
@@ -67,7 +68,7 @@ describe('WorkersService.createProfile', () => {
 
     await service.createProfile(
       'account-1',
-      { skillCategory: 'plumber', experienceYears: 5, locationAddress: 'Hyderabad' },
+      { skillCategories: ['plumber'], experienceYears: 5, locationAddress: 'Hyderabad' },
       files,
     );
 
@@ -76,7 +77,7 @@ describe('WorkersService.createProfile', () => {
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         accountId: 'account-1',
-        skillCategory: 'plumber',
+        skillCategories: ['plumber'],
         experienceYears: 5,
         locationAddress: 'Hyderabad',
         portfolioPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'],
@@ -90,10 +91,27 @@ describe('WorkersService.createProfile', () => {
     repo.create.mockResolvedValue(buildProfile({ portfolioPhotoUrls: [] }));
 
     const service = new WorkersService(repo as unknown as WorkersRepository);
-    await service.createProfile('account-1', { skillCategory: 'mason', experienceYears: 0 }, []);
+    await service.createProfile('account-1', { skillCategories: ['mason'], experienceYears: 0 }, []);
 
     expect(uploadToCloudinary).not.toHaveBeenCalled();
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ portfolioPhotoUrls: [] }));
+  });
+
+  it('stores the "other" skill description when "other" is among the selected skills', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(null);
+    repo.create.mockResolvedValue(buildProfile({ skillCategories: ['other'], otherSkillDescription: 'Roofing' }));
+
+    const service = new WorkersService(repo as unknown as WorkersRepository);
+    await service.createProfile(
+      'account-1',
+      { skillCategories: ['electrician', 'other'], otherSkillDescription: 'Roofing', experienceYears: 2 },
+      [],
+    );
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ skillCategories: ['electrician', 'other'], otherSkillDescription: 'Roofing' }),
+    );
   });
 });
 

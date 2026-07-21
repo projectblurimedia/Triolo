@@ -27,7 +27,8 @@ export class WorkersService {
 
     return this.repository.create({
       accountId,
-      skillCategory: dto.skillCategory,
+      skillCategories: dto.skillCategories,
+      otherSkillDescription: dto.otherSkillDescription ?? null,
       experienceYears: dto.experienceYears,
       latitude: dto.latitude ?? null,
       longitude: dto.longitude ?? null,
