@@ -197,6 +197,8 @@
     "WORKER_PROFILE_NOT_FOUND": "We couldn't find your worker profile.",
     "BUSINESS_PROFILE_NOT_FOUND": "We couldn't find your business profile.",
     "CLOUDINARY_NOT_CONFIGURED": "Image uploads aren't available right now. Please try again later.",
+    "FILE_UPLOAD_ERROR": "One of your photos couldn't be uploaded. Please try a smaller photo.",
+    "INVALID_FILE_TYPE": "Please choose a JPEG, PNG, or WEBP image.",
     "INTERNAL_SERVER_ERROR": "Something went wrong on our end. Please try again.",
     "UNAUTHORIZED": "Your session has expired. Please log in again.",
     "FORBIDDEN": "You don't have permission to do that.",
