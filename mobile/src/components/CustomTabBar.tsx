@@ -44,9 +44,14 @@ const NOTCH_WIDTH = (ARC_END_X + SHOULDER_WIDTH) * 2;
 // fits every common phone width with 4 tabs (360dp and up) without ever engaging, and only
 // matters as a safety net on unusually narrow screens; see clampNotchCenter below.
 const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_WIDTH / 2 + 2;
-// Bubble's center sits right at the bar's top edge (y=0) — it pokes up by exactly its own
-// radius, noticeably less than an earlier pass that floated it much higher above the bar.
-const BUBBLE_TOP = -BUBBLE_RADIUS;
+// How far the bubble pokes above the bar's flat top edge (y=0) — deliberately less than
+// its own radius (which would center it exactly on the surface) so it reads as sitting
+// lower/more nested in the bar, per repeated feedback that it floated too high. The notch
+// dip is purely a cosmetic cutout in the bar's top silhouette — the solid bar fill
+// continues underneath it — so the bubble's lower portion extending slightly past the
+// notch's own deepest point isn't a visual problem; both areas are the same fill color.
+const BUBBLE_POKE = 14;
+const BUBBLE_TOP = -BUBBLE_POKE;
 
 /**
  * Keeps the *drawn notch* from ever running past the rounded corner or off the bar,
@@ -163,6 +168,8 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
             key={index}
             d={buildNotchPath(SCREEN_WIDTH, totalHeight, centers[index])}
             fill={colors.surface}
+            stroke={colors.border}
+            strokeWidth={1}
             opacity={notchOpacities[index]}
           />
         ))}
@@ -209,7 +216,18 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { position: 'relative' },
+  container: {
+    position: 'relative',
+    // Restores the shadow the original tab bar had (dropped when it was rebuilt as a
+    // custom SVG shape) — without it, the bar reads as barely distinct from the screen
+    // background in dark mode (colors.surface and colors.background are both very dark,
+    // low-contrast blues), which made the notch curve underneath the bubble hard to see
+    // regardless of how correct its geometry was.
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12 },
+      android: { elevation: 16 },
+    }),
+  },
   svg: { position: 'absolute', top: 0, left: 0 },
   row: { flexDirection: 'row', height: BAR_HEIGHT },
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
