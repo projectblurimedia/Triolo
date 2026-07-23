@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GradientHeader } from './GradientHeader';
-import { GridMenuModal, GridMenuItem } from './GridMenuModal';
-import { headerGradient } from '@/theme';
+import { SideDockMenu, SideDockItem } from './SideDockMenu';
+import { colors } from '@/theme';
 import { showToast } from '@/state/toastStore';
 
 interface ServicesHeaderProps {
@@ -10,7 +10,7 @@ interface ServicesHeaderProps {
   subtitle?: string;
 }
 
-const MENU_ITEMS: GridMenuItem[] = [
+const MENU_ITEMS: SideDockItem[] = [
   { key: 'filters', icon: 'filter', label: 'services.menuFilters' },
   { key: 'sort', icon: 'arrow-up-wide-short', label: 'services.menuSort' },
   { key: 'favorites', icon: 'star', label: 'services.menuFavorites' },
@@ -30,11 +30,10 @@ export function ServicesHeader({ title, subtitle }: ServicesHeaderProps) {
         leadingIcon="screwdriver-wrench"
         actions={[{ icon: 'bars', accessibilityLabel: t('services.menu'), onPress: () => setMenuVisible(true) }]}
       />
-      <GridMenuModal
+      <SideDockMenu
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
-        title={t('services.menuTitle')}
-        gradient={headerGradient}
+        accentColor={colors.primary}
         items={MENU_ITEMS.map((item) => ({ ...item, label: t(item.label) }))}
         onSelectItem={(item) => {
           setMenuVisible(false);

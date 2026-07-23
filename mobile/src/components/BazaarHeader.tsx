@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GradientHeader } from './GradientHeader';
-import { GridMenuModal, GridMenuItem } from './GridMenuModal';
+import { SideDockMenu, SideDockItem } from './SideDockMenu';
 import { SHOP_GRADIENT } from './BusinessProfileModal';
 import { showToast } from '@/state/toastStore';
 
@@ -10,7 +10,7 @@ interface BazaarHeaderProps {
   subtitle?: string;
 }
 
-const MENU_ITEMS: GridMenuItem[] = [
+const MENU_ITEMS: SideDockItem[] = [
   { key: 'filters', icon: 'filter', label: 'bazaar.menuFilters' },
   { key: 'sort', icon: 'arrow-up-wide-short', label: 'bazaar.menuSort' },
   { key: 'favorites', icon: 'star', label: 'bazaar.menuFavorites' },
@@ -30,11 +30,10 @@ export function BazaarHeader({ title, subtitle }: BazaarHeaderProps) {
         leadingIcon="store"
         actions={[{ icon: 'bars', accessibilityLabel: t('bazaar.menu'), onPress: () => setMenuVisible(true) }]}
       />
-      <GridMenuModal
+      <SideDockMenu
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
-        title={t('bazaar.menuTitle')}
-        gradient={SHOP_GRADIENT}
+        accentColor={SHOP_GRADIENT}
         items={MENU_ITEMS.map((item) => ({ ...item, label: t(item.label) }))}
         onSelectItem={(item) => {
           setMenuVisible(false);
