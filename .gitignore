@@ -24,6 +24,9 @@ yarn-error.log*
 # Testing / coverage
 coverage/
 
+# Multer disk-storage staging dir (temp upload files, cleaned up after each Cloudinary upload)
+backend/temp/
+
 # OS
 .DS_Store
 Thumbs.db

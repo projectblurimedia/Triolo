@@ -38,6 +38,55 @@ const http = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function base64UrlDecode(input: string): string {
+  const base64 = input.replace(/-/g, '+').replace(/_/g, '/');
+  let output = '';
+  let buffer = 0;
+  let bits = 0;
+  for (const char of base64) {
+    const value = BASE64_CHARS.indexOf(char);
+    if (value === -1) continue;
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      output += String.fromCharCode((buffer >> bits) & 0xff);
+    }
+  }
+  return output;
+}
+
+/**
+ * Access tokens expire in 15 minutes (see backend JWT_ACCESS_EXPIRY) — easily outlived by
+ * the Worker/Business forms (multi-select chips, photos, location). Checking the token's
+ * own exp claim lets requests refresh proactively *before* sending, instead of reactively
+ * retrying after a 401 — which matters most for multipart uploads: re-sending the exact
+ * same FormData instance a second time is not something React Native's networking layer
+ * reliably supports (a file part that already started streaming on the first attempt can
+ * fail silently on a retry), so a request that arrives with an already-expired token could
+ * "fail once, then work on a manual second click" — the second click always builds a fresh
+ * FormData with a (by then) refreshed token. Proactive refresh avoids ever hitting that
+ * path for the common case of the token simply expiring mid-form-fill.
+ */
+function isAccessTokenExpired(token: string, bufferSeconds = 20): boolean {
+  try {
+    const payload = JSON.parse(base64UrlDecode(token.split('.')[1])) as { exp?: number };
+    if (!payload.exp) return false;
+    return payload.exp * 1000 <= Date.now() + bufferSeconds * 1000;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureFreshAccessToken(): Promise<void> {
+  const { accessToken } = useAuthStore.getState();
+  if (accessToken && isAccessTokenExpired(accessToken)) {
+    await tryRefreshAccessToken();
+  }
+}
+
 function toApiError(err: unknown): ApiError {
   if (axios.isAxiosError(err)) {
     const axiosErr = err as AxiosError<ApiErrorBody>;
@@ -58,6 +107,10 @@ async function request<T>(
   auth: boolean,
   _retried = false,
 ): Promise<T> {
+  if (auth && !_retried) {
+    await ensureFreshAccessToken();
+  }
+
   const { accessToken } = useAuthStore.getState();
   const headers: Record<string, string> = {};
   if (auth && accessToken) {
@@ -91,6 +144,10 @@ async function requestForm<T>(
   method: 'post' | 'patch',
   _retried = false,
 ): Promise<T> {
+  if (!_retried) {
+    await ensureFreshAccessToken();
+  }
+
   const { accessToken } = useAuthStore.getState();
   const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
   if (accessToken) {
