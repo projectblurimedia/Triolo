@@ -1,12 +1,18 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { useThemeColors } from '@/theme';
+import { headerGradient, useThemeColors } from '@/theme';
+import { SHOP_GRADIENT } from './BusinessProfileModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BAR_HEIGHT = 64;
+// Matches the rounded top corners the tab bar had before this custom SVG shape replaced
+// the default @react-navigation rendering — dropping this was an oversight, not a
+// deliberate redesign.
+const BAR_RADIUS = 26;
 const BUBBLE_SIZE = 54;
 const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
 // The notch's own "radius" is derived from the bubble's, not an independent magic
@@ -30,16 +36,31 @@ const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> =
   Profile: 'user',
 };
 
-/** A bar shape that's flat everywhere except a smooth dip ("notch") centered at `cx`, sized to cradle the floating bubble. */
+// Bazaar's bubble matches its own established orange identity (SHOP_GRADIENT — same as
+// its header, icon dock, and profile card); every other tab uses the constant brand blue.
+const BUBBLE_GRADIENTS: Record<string, readonly [string, string]> = {
+  Home: headerGradient,
+  Services: headerGradient,
+  Bazaar: SHOP_GRADIENT,
+  Profile: headerGradient,
+};
+
+/**
+ * A bar shape with rounded top corners (matching what the tab bar had before this custom
+ * SVG shape replaced the default @react-navigation rendering) and a smooth dip ("notch")
+ * centered at `cx`, sized to cradle the floating bubble.
+ */
 function buildNotchPath(width: number, totalHeight: number, cx: number): string {
   const leftX = cx - NOTCH_WIDTH / 2;
   const rightX = cx + NOTCH_WIDTH / 2;
   return [
-    `M0,0`,
+    `M0,${BAR_RADIUS}`,
+    `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${BAR_RADIUS},0`,
     `L${leftX},0`,
     `C${leftX + NOTCH_WIDTH * 0.25},0 ${cx - NOTCH_WIDTH * 0.35},${NOTCH_DEPTH} ${cx},${NOTCH_DEPTH}`,
     `C${cx + NOTCH_WIDTH * 0.35},${NOTCH_DEPTH} ${rightX - NOTCH_WIDTH * 0.25},0 ${rightX},0`,
-    `L${width},0`,
+    `L${width - BAR_RADIUS},0`,
+    `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${width},${BAR_RADIUS}`,
     `L${width},${totalHeight}`,
     `L0,${totalHeight}`,
     `Z`,
@@ -101,12 +122,16 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
       </Svg>
 
       <Animated.View
-        style={[
-          styles.bubble,
-          { backgroundColor: colors.primary, transform: [{ translateX: Animated.subtract(bubbleX, BUBBLE_SIZE / 2) }] },
-        ]}
+        style={[styles.bubble, { transform: [{ translateX: Animated.subtract(bubbleX, BUBBLE_SIZE / 2) }] }]}
       >
-        <FontAwesome6 name={ICONS[state.routes[state.index].name]} size={20} color="#FFFFFF" solid />
+        <LinearGradient
+          colors={BUBBLE_GRADIENTS[state.routes[state.index].name] ?? headerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.bubbleFill}
+        >
+          <FontAwesome6 name={ICONS[state.routes[state.index].name]} size={20} color="#FFFFFF" solid />
+        </LinearGradient>
       </Animated.View>
 
       <View style={styles.row}>
@@ -148,11 +173,15 @@ const styles = StyleSheet.create({
     width: BUBBLE_SIZE,
     height: BUBBLE_SIZE,
     borderRadius: BUBBLE_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8 },
       android: { elevation: 8 },
     }),
+  },
+  bubbleFill: {
+    flex: 1,
+    borderRadius: BUBBLE_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
