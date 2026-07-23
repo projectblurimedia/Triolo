@@ -16,7 +16,14 @@ export function BazaarHeader({ title, subtitle }: BazaarHeaderProps) {
   const [editVisible, setEditVisible] = useState(false);
 
   const actions: HeaderAction[] = businessProfile
-    ? [{ icon: 'pen', accessibilityLabel: t('bazaar.editBusinessProfile'), onPress: () => setEditVisible(true) }]
+    ? [
+        {
+          icon: 'store',
+          label: t('bazaar.myBusiness'),
+          accessibilityLabel: t('bazaar.editBusinessProfile'),
+          onPress: () => setEditVisible(true),
+        },
+      ]
     : [];
 
   return (

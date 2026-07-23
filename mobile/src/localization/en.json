@@ -154,12 +154,14 @@
   "services": {
     "comingSoon": "Browsing services by category is coming soon.",
     "tagline": "Browse workers by category",
-    "editWorkerProfile": "Edit Worker Profile"
+    "editWorkerProfile": "Edit Worker Profile",
+    "myService": "My Service"
   },
   "bazaar": {
     "comingSoon": "Shop ordering is coming soon.",
     "tagline": "Order from your local shops",
-    "editBusinessProfile": "Edit Business Profile"
+    "editBusinessProfile": "Edit Business Profile",
+    "myBusiness": "My Business"
   },
   "profile": {
     "tagline": "Your profile overview",

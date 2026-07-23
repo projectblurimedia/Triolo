@@ -9,6 +9,8 @@ import { colors, fonts, headerGradient, typography } from '@/theme';
 export interface HeaderAction {
   icon: keyof typeof FontAwesome6.glyphMap;
   accessibilityLabel: string;
+  /** Optional visible text — renders as a labeled pill (icon + text) instead of a bare icon-only circle. */
+  label?: string;
   onPress?: () => void;
 }
 
@@ -62,17 +64,32 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
 
           {actions && actions.length > 0 ? (
             <View style={styles.actions}>
-              {actions.map((action) => (
-                <Pressable
-                  key={action.accessibilityLabel}
-                  onPress={action.onPress}
-                  accessibilityLabel={action.accessibilityLabel}
-                  hitSlop={8}
-                  style={styles.iconButton}
-                >
-                  <FontAwesome6 name={action.icon} size={17} color={colors.white} solid />
-                </Pressable>
-              ))}
+              {actions.map((action) =>
+                action.label ? (
+                  <Pressable
+                    key={action.accessibilityLabel}
+                    onPress={action.onPress}
+                    accessibilityLabel={action.accessibilityLabel}
+                    hitSlop={8}
+                    style={styles.labeledAction}
+                  >
+                    <FontAwesome6 name={action.icon} size={13} color={colors.white} solid />
+                    <Text style={styles.labeledActionText} numberOfLines={1}>
+                      {action.label}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    key={action.accessibilityLabel}
+                    onPress={action.onPress}
+                    accessibilityLabel={action.accessibilityLabel}
+                    hitSlop={8}
+                    style={styles.iconButton}
+                  >
+                    <FontAwesome6 name={action.icon} size={17} color={colors.white} solid />
+                  </Pressable>
+                ),
+              )}
             </View>
           ) : null}
         </View>
@@ -128,6 +145,22 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.32)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  labeledAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: ICON_BUTTON_SIZE,
+    paddingHorizontal: 12,
+    borderRadius: ICON_BUTTON_SIZE / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.32)',
+  },
+  labeledActionText: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    color: colors.white,
   },
   accent: {
     height: 3,

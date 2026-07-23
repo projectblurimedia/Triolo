@@ -16,7 +16,14 @@ export function ServicesHeader({ title, subtitle }: ServicesHeaderProps) {
   const [editVisible, setEditVisible] = useState(false);
 
   const actions: HeaderAction[] = workerProfile
-    ? [{ icon: 'pen', accessibilityLabel: t('services.editWorkerProfile'), onPress: () => setEditVisible(true) }]
+    ? [
+        {
+          icon: 'screwdriver-wrench',
+          label: t('services.myService'),
+          accessibilityLabel: t('services.editWorkerProfile'),
+          onPress: () => setEditVisible(true),
+        },
+      ]
     : [];
 
   return (
