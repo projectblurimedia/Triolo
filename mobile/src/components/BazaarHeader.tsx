@@ -1,35 +1,46 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GradientHeader, HeaderAction } from './GradientHeader';
-import { BusinessProfileModal } from './BusinessProfileModal';
-import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { GradientHeader } from './GradientHeader';
+import { GridMenuModal, GridMenuItem } from './GridMenuModal';
+import { SHOP_GRADIENT } from './BusinessProfileModal';
+import { showToast } from '@/state/toastStore';
 
 interface BazaarHeaderProps {
   title: string;
   subtitle?: string;
 }
 
-/** Bazaar's header carries an edit action for the account's Business profile, shown only once one exists — creation itself still happens from Home's menu. */
+const MENU_ITEMS: GridMenuItem[] = [
+  { key: 'filters', icon: 'filter', label: 'bazaar.menuFilters' },
+  { key: 'sort', icon: 'arrow-up-wide-short', label: 'bazaar.menuSort' },
+  { key: 'favorites', icon: 'star', label: 'bazaar.menuFavorites' },
+  { key: 'orders', icon: 'bag-shopping', label: 'bazaar.menuOrders' },
+];
+
+/** Bazaar's header carries a plain menu action (matching Home's pattern) — the Business profile's own edit entry point now lives in a card at the top of the screen body instead, since the header pill only appeared once the profile query resolved, which read as a UI glitch. */
 export function BazaarHeader({ title, subtitle }: BazaarHeaderProps) {
   const { t } = useTranslation();
-  const { data: businessProfile } = useMyBusinessProfile();
-  const [editVisible, setEditVisible] = useState(false);
-
-  const actions: HeaderAction[] = businessProfile
-    ? [
-        {
-          icon: 'store',
-          label: t('bazaar.myBusiness'),
-          accessibilityLabel: t('bazaar.editBusinessProfile'),
-          onPress: () => setEditVisible(true),
-        },
-      ]
-    : [];
+  const [menuVisible, setMenuVisible] = useState(false);
 
   return (
     <>
-      <GradientHeader title={title} subtitle={subtitle} leadingIcon="store" actions={actions} />
-      <BusinessProfileModal visible={editVisible} onClose={() => setEditVisible(false)} profile={businessProfile} />
+      <GradientHeader
+        title={title}
+        subtitle={subtitle}
+        leadingIcon="store"
+        actions={[{ icon: 'bars', accessibilityLabel: t('bazaar.menu'), onPress: () => setMenuVisible(true) }]}
+      />
+      <GridMenuModal
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        title={t('bazaar.menuTitle')}
+        gradient={SHOP_GRADIENT}
+        items={MENU_ITEMS.map((item) => ({ ...item, label: t(item.label) }))}
+        onSelectItem={(item) => {
+          setMenuVisible(false);
+          showToast({ variant: 'info', title: item.label, message: t('common.comingSoonMessage') });
+        }}
+      />
     </>
   );
 }

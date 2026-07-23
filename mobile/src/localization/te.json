@@ -13,7 +13,13 @@
     "loading": "లోడ్ అవుతోంది...",
     "logout": "లాగ్ అవుట్",
     "loggingOut": "లాగ్ అవుట్ అవుతోంది...",
-    "errorTitle": "ఏదో తప్పు జరిగింది"
+    "errorTitle": "ఏదో తప్పు జరిగింది",
+    "comingSoonMessage": "ఈ ఫీచర్ త్వరలో వస్తుంది."
+  },
+  "verification": {
+    "pending": "సమీక్షలో ఉంది",
+    "verified": "ధృవీకరించబడింది",
+    "rejected": "తిరస్కరించబడింది"
   },
   "auth": {
     "welcomeTitle": "మీ దగ్గర విశ్వసనీయ కార్మికులు మరియు దుకాణాలను కనుగొనండి",
@@ -155,13 +161,28 @@
     "comingSoon": "కేటగిరీల వారీగా సేవలు చూసే సదుపాయం త్వరలో వస్తుంది.",
     "tagline": "కేటగిరీల వారీగా వర్కర్లను చూడండి",
     "editWorkerProfile": "వర్కర్ ప్రొఫైల్ సవరించండి",
-    "myService": "నా సేవ"
+    "myService": "నా సేవ",
+    "experienceYears": "{{count}} సంవత్సరాల అనుభవం",
+    "menu": "మెనూ",
+    "menuTitle": "త్వరిత చర్యలు",
+    "menuFilters": "ఫిల్టర్లు",
+    "menuSort": "క్రమం",
+    "menuFavorites": "ఇష్టమైనవి",
+    "menuHistory": "చరిత్ర"
   },
   "bazaar": {
     "comingSoon": "షాపింగ్ ఆర్డర్ చేసే సదుపాయం త్వరలో వస్తుంది.",
     "tagline": "మీ దగ్గరి షాప్‌ల నుండి ఆర్డర్ చేయండి",
     "editBusinessProfile": "బిజినెస్ ప్రొఫైల్ సవరించండి",
-    "myBusiness": "నా వ్యాపారం"
+    "myBusiness": "నా వ్యాపారం",
+    "menu": "మెనూ",
+    "menuTitle": "త్వరిత చర్యలు",
+    "menuFilters": "ఫిల్టర్లు",
+    "menuSort": "క్రమం",
+    "menuFavorites": "ఇష్టమైనవి",
+    "menuOrders": "ఆర్డర్లు",
+    "deliveryAvailableYes": "డెలివరీ అందుబాటులో ఉంది",
+    "deliveryAvailableNo": "డెలివరీ లేదు"
   },
   "profile": {
     "tagline": "మీ ప్రొఫైల్ వివరాలు",

@@ -19,7 +19,7 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { BusinessProfile } from '@/services/businessesService';
 
-const SHOP_GRADIENT = ['#F59E0B', '#D97706'] as const;
+export const SHOP_GRADIENT = ['#F59E0B', '#D97706'] as const;
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
 const SHOP_CATEGORIES = [
