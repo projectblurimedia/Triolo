@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GradientHeader } from './GradientHeader';
 import { SideDockMenu, SideDockItem } from './SideDockMenu';
-import { colors } from '@/theme';
+import { headerGradient } from '@/theme';
 import { showToast } from '@/state/toastStore';
 
 interface ServicesHeaderProps {
@@ -33,7 +33,7 @@ export function ServicesHeader({ title, subtitle }: ServicesHeaderProps) {
       <SideDockMenu
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
-        accentColor={colors.primary}
+        gradient={headerGradient}
         items={MENU_ITEMS.map((item) => ({ ...item, label: t(item.label) }))}
         onSelectItem={(item) => {
           setMenuVisible(false);

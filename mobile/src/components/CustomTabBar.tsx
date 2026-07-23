@@ -7,14 +7,19 @@ import { useThemeColors } from '@/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BAR_HEIGHT = 64;
-const NOTCH_WIDTH = 78;
-const NOTCH_DEPTH = 26;
 const BUBBLE_SIZE = 54;
-// Pulls the bubble up so its bottom edge (BUBBLE_TOP + BUBBLE_SIZE) sits a clear ~8px
-// above the notch's floor (NOTCH_DEPTH) — previously the bubble's bottom edge landed
-// almost exactly on the notch floor, so the bubble's own background visually fused with
-// the bar surface instead of floating above it with a visible gap.
-const BUBBLE_TOP = -36;
+const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
+// The notch's own "radius" is derived from the bubble's, not an independent magic
+// number — so the socket the bubble sits in is actually proportioned to match it,
+// instead of two unrelated shapes that happen to overlap. GAP_RING is the visible ring
+// of bar surface left between the bubble's edge and the notch's edge.
+const GAP_RING = 6;
+const NOTCH_RADIUS = BUBBLE_RADIUS + GAP_RING;
+const NOTCH_WIDTH = NOTCH_RADIUS * 2.2;
+const NOTCH_DEPTH = NOTCH_RADIUS;
+// Bubble's center sits right at the bar's top edge (y=0) — it pokes up by exactly its own
+// radius, noticeably less than an earlier pass that floated it much higher above the bar.
+const BUBBLE_TOP = -BUBBLE_RADIUS;
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 

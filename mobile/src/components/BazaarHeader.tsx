@@ -34,7 +34,7 @@ export function BazaarHeader({ title, subtitle }: BazaarHeaderProps) {
       <SideDockMenu
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
-        accentColor={SHOP_GRADIENT}
+        gradient={SHOP_GRADIENT}
         items={MENU_ITEMS.map((item) => ({ ...item, label: t(item.label) }))}
         onSelectItem={(item) => {
           setMenuVisible(false);
