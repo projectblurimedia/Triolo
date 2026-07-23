@@ -20,6 +20,13 @@ const MULTER_ERROR_MESSAGES: Partial<Record<string, string>> = {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction): void {
   if (err instanceof AppError) {
+    // Every handled error is logged, not just unexpected ones — 400/401/404s are
+    // "expected" from the client's perspective but were previously invisible server-side,
+    // which made diagnosing a repeated client-reported failure pure guesswork.
+    logger.warn(
+      { code: err.code, statusCode: err.statusCode, path: req.originalUrl, details: err.details },
+      `Handled error: ${err.message}`,
+    );
     res.status(err.statusCode).json({
       success: false,
       message: err.message,
@@ -32,6 +39,10 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
   // limit — without this, a too-large photo surfaced as a generic 500 "something went
   // wrong" instead of the specific, actionable reason.
   if (err instanceof multer.MulterError) {
+    logger.warn(
+      { multerCode: err.code, field: err.field, path: req.originalUrl },
+      `Multer upload error: ${err.message}`,
+    );
     res.status(400).json({
       success: false,
       message: MULTER_ERROR_MESSAGES[err.code] ?? 'There was a problem with the uploaded file.',
@@ -40,7 +51,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
     return;
   }
 
-  logger.error({ err }, 'Unhandled error');
+  logger.error({ err, path: req.originalUrl }, 'Unhandled error');
   res.status(500).json({
     success: false,
     message: 'Something went wrong. Please try again.',

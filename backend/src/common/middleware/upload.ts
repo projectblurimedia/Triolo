@@ -1,8 +1,9 @@
 import multer, { FileFilterCallback } from 'multer';
 import fs from 'fs';
 import path from 'path';
-import { Request } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { AppError } from '@/common/errors/AppError';
+import { logger } from '@/common/utils/logger';
 
 const TEMP_DIR = path.resolve(process.cwd(), 'temp/uploads');
 const ALLOWED_EXTENSIONS = /\.(jpe?g|png|webp)$/i;
@@ -39,3 +40,23 @@ export const upload = multer({
   fileFilter,
   limits: { fileSize: 8 * 1024 * 1024 },
 });
+
+/**
+ * Logs exactly what multer received (count/size/mimetype per file) right after it parses
+ * the request, before validation runs — so a client-reported upload failure is
+ * diagnosable from the server log alone instead of guessed at from the client side.
+ */
+export function logUploadedFiles(req: Request, _res: Response, next: NextFunction): void {
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  if (files.length > 0) {
+    logger.info(
+      {
+        path: req.originalUrl,
+        count: files.length,
+        files: files.map((f) => ({ originalname: f.originalname, mimetype: f.mimetype, sizeBytes: f.size })),
+      },
+      `Received ${files.length} file(s)`,
+    );
+  }
+  next();
+}

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
 import { validateBody } from '@/common/middleware/validate';
-import { upload } from '@/common/middleware/upload';
+import { logUploadedFiles, upload } from '@/common/middleware/upload';
 import { BusinessesController } from './controller';
 import { BusinessesService } from './service';
 import { BusinessesRepository } from './repository';
@@ -18,6 +18,7 @@ businessesRouter.post(
   '/me/profile',
   authenticate,
   upload.array('shopPhotos', 6),
+  logUploadedFiles,
   validateBody(createBusinessProfileSchema),
   controller.createProfile,
 );
@@ -26,6 +27,7 @@ businessesRouter.patch(
   '/me/profile',
   authenticate,
   upload.array('shopPhotos', 6),
+  logUploadedFiles,
   validateBody(updateBusinessProfileSchema),
   controller.updateProfile,
 );

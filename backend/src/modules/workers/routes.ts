@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
 import { validateBody } from '@/common/middleware/validate';
-import { upload } from '@/common/middleware/upload';
+import { logUploadedFiles, upload } from '@/common/middleware/upload';
 import { WorkersController } from './controller';
 import { WorkersService } from './service';
 import { WorkersRepository } from './repository';
@@ -20,6 +20,7 @@ workersRouter.post(
   '/me/profile',
   authenticate,
   upload.array('portfolioPhotos', 6),
+  logUploadedFiles,
   validateBody(createWorkerProfileSchema),
   controller.createProfile,
 );
@@ -28,6 +29,7 @@ workersRouter.patch(
   '/me/profile',
   authenticate,
   upload.array('portfolioPhotos', 6),
+  logUploadedFiles,
   validateBody(updateWorkerProfileSchema),
   controller.updateProfile,
 );
