@@ -1,3 +1,4 @@
+import axios, { AxiosError, Method } from 'axios';
 import { API_BASE_URL } from '@/constants/config';
 import { useAuthStore } from '@/state/authStore';
 
@@ -24,87 +25,95 @@ export class ApiError extends Error {
   }
 }
 
-interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  body?: unknown;
-  auth?: boolean;
-  /** internal: prevents infinite refresh loops */
-  _retried?: boolean;
-}
-
-async function rawRequest<T>(path: string, options: RequestOptions): Promise<T> {
-  const { accessToken } = useAuthStore.getState();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (options.auth && accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-  }
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
-
-  const json = (await response.json()) as ApiEnvelope<T> | ApiErrorBody;
-
-  if (!response.ok || !json.success) {
-    const errorBody = json as ApiErrorBody;
-
-    // Access token expired mid-session: refresh once, then retry the original call.
-    if (response.status === 401 && options.auth && !options._retried) {
-      const refreshed = await tryRefreshAccessToken();
-      if (refreshed) {
-        return rawRequest<T>(path, { ...options, _retried: true });
-      }
-      useAuthStore.getState().clearSession();
-    }
-
-    throw new ApiError(response.status, errorBody.message ?? 'Request failed', errorBody.error?.code);
-  }
-
-  return (json as ApiEnvelope<T>).data;
-}
-
 /**
- * Multipart uploads (Worker portfolio / Business shop photos) can't go through
- * rawRequest — it always JSON.stringifies the body. Content-Type is deliberately never
- * set here: fetch computes the multipart boundary itself from the FormData instance,
- * and setting the header manually would drop that boundary and break the upload.
+ * axios, not React Native's built-in fetch — matches the networking approach already
+ * proven reliable in a sibling project's photo-upload flow (CampuSphere's CreateStudent),
+ * after fetch's multipart handling proved flaky for Worker/Business photo uploads in this
+ * Expo/RN version. A generous timeout guards a slow/unstable connection (multiple photos
+ * over local Wi-Fi to a dev machine) from ever surfacing as a silent, unexplained failure.
  */
-async function rawFormRequest<T>(
+const http = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 45000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+function toApiError(err: unknown): ApiError {
+  if (axios.isAxiosError(err)) {
+    const axiosErr = err as AxiosError<ApiErrorBody>;
+    if (axiosErr.response) {
+      const body = axiosErr.response.data;
+      return new ApiError(axiosErr.response.status, body?.message ?? 'Request failed', body?.error?.code);
+    }
+    // Request never got a response at all — timeout, connection refused, DNS failure.
+    return new ApiError(0, axiosErr.message || 'Network request failed');
+  }
+  return new ApiError(0, err instanceof Error ? err.message : 'Request failed');
+}
+
+async function request<T>(
   path: string,
-  formData: FormData,
-  method: 'POST' | 'PATCH' = 'POST',
+  method: Method,
+  body: unknown,
+  auth: boolean,
   _retried = false,
 ): Promise<T> {
   const { accessToken } = useAuthStore.getState();
   const headers: Record<string, string> = {};
+  if (auth && accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  try {
+    const response = await http.request<ApiEnvelope<T>>({ url: path, method, data: body, headers });
+    return response.data.data;
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 401 && auth && !_retried) {
+      const refreshed = await tryRefreshAccessToken();
+      if (refreshed) {
+        return request<T>(path, method, body, auth, true);
+      }
+      useAuthStore.getState().clearSession();
+    }
+    throw toApiError(err);
+  }
+}
+
+/**
+ * Multipart uploads (Worker portfolio / Business shop photos). Content-Type is explicitly
+ * `multipart/form-data` with no boundary — React Native's networking layer fills in the
+ * boundary itself when it sees this exact header value paired with a FormData body (the
+ * same pattern CampuSphere's axios-based upload already relies on).
+ */
+async function requestForm<T>(
+  path: string,
+  formData: FormData,
+  method: 'post' | 'patch',
+  _retried = false,
+): Promise<T> {
+  const { accessToken } = useAuthStore.getState();
+  const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { method, headers, body: formData });
-  const json = (await response.json()) as ApiEnvelope<T> | ApiErrorBody;
-
-  if (!response.ok || !json.success) {
-    const errorBody = json as ApiErrorBody;
-
+  try {
+    const response = await http.request<ApiEnvelope<T>>({ url: path, method, data: formData, headers });
+    return response.data.data;
+  } catch (err) {
     // These forms can take several minutes to fill out (multi-select chips, photos,
-    // location) — the access token frequently expires mid-fill. Mirror rawRequest's
-    // refresh-once-and-retry so a stale token doesn't surface as a raw, unmapped
-    // "Unauthorized" error at the very end of a long form.
-    if (response.status === 401 && !_retried) {
+    // location) — the access token frequently expires mid-fill. Refresh once and retry
+    // so a stale token doesn't surface as a raw, unmapped "Unauthorized" error at the
+    // very end of a long form.
+    if (axios.isAxiosError(err) && err.response?.status === 401 && !_retried) {
       const refreshed = await tryRefreshAccessToken();
       if (refreshed) {
-        return rawFormRequest<T>(path, formData, method, true);
+        return requestForm<T>(path, formData, method, true);
       }
       useAuthStore.getState().clearSession();
     }
-
-    throw new ApiError(response.status, errorBody.message ?? 'Request failed', errorBody.error?.code);
+    throw toApiError(err);
   }
-
-  return (json as ApiEnvelope<T>).data;
 }
 
 // Refresh tokens rotate on use (single-use — the backend revokes the old one and issues a
@@ -133,12 +142,13 @@ async function performRefresh(): Promise<boolean> {
   if (!refreshToken) return false;
 
   try {
-    const data = await rawRequest<{ accessToken: string; refreshToken: string }>('/auth/refresh', {
-      method: 'POST',
-      body: { refreshToken },
+    const response = await http.request<ApiEnvelope<{ accessToken: string; refreshToken: string }>>({
+      url: '/auth/refresh',
+      method: 'post',
+      data: { refreshToken },
     });
-    setAccessToken(data.accessToken);
-    useAuthStore.setState({ refreshToken: data.refreshToken });
+    setAccessToken(response.data.data.accessToken);
+    useAuthStore.setState({ refreshToken: response.data.data.refreshToken });
     return true;
   } catch {
     return false;
@@ -146,10 +156,10 @@ async function performRefresh(): Promise<boolean> {
 }
 
 export const apiClient = {
-  get: <T>(path: string, auth = false) => rawRequest<T>(path, { method: 'GET', auth }),
-  post: <T>(path: string, body?: unknown, auth = false) => rawRequest<T>(path, { method: 'POST', body, auth }),
-  patch: <T>(path: string, body?: unknown, auth = false) => rawRequest<T>(path, { method: 'PATCH', body, auth }),
-  delete: <T>(path: string, auth = false) => rawRequest<T>(path, { method: 'DELETE', auth }),
-  postForm: <T>(path: string, formData: FormData) => rawFormRequest<T>(path, formData, 'POST'),
-  patchForm: <T>(path: string, formData: FormData) => rawFormRequest<T>(path, formData, 'PATCH'),
+  get: <T>(path: string, auth = false) => request<T>(path, 'get', undefined, auth),
+  post: <T>(path: string, body?: unknown, auth = false) => request<T>(path, 'post', body, auth),
+  patch: <T>(path: string, body?: unknown, auth = false) => request<T>(path, 'patch', body, auth),
+  delete: <T>(path: string, auth = false) => request<T>(path, 'delete', undefined, auth),
+  postForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'post'),
+  patchForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'patch'),
 };
