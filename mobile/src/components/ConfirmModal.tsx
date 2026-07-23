@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { LoadingIndicator } from './LoadingIndicator';
 
 interface ConfirmModalProps {
   visible: boolean;
@@ -56,7 +57,7 @@ export function ConfirmModal({
             </Pressable>
             <Pressable style={styles.confirmButton} onPress={onConfirm} disabled={loading}>
               <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.confirmGradient}>
-                <Text style={styles.confirmText}>{confirmLabel}</Text>
+                {loading ? <LoadingIndicator size={18} dotSize={3.5} /> : <Text style={styles.confirmText}>{confirmLabel}</Text>}
               </LinearGradient>
             </Pressable>
           </View>
