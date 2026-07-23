@@ -8,7 +8,13 @@ import { useThemeColors } from '@/theme';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BAR_HEIGHT = 64;
 const NOTCH_WIDTH = 78;
+const NOTCH_DEPTH = 26;
 const BUBBLE_SIZE = 54;
+// Pulls the bubble up so its bottom edge (BUBBLE_TOP + BUBBLE_SIZE) sits a clear ~8px
+// above the notch's floor (NOTCH_DEPTH) — previously the bubble's bottom edge landed
+// almost exactly on the notch floor, so the bubble's own background visually fused with
+// the bar surface instead of floating above it with a visible gap.
+const BUBBLE_TOP = -36;
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -20,15 +26,14 @@ const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> =
 };
 
 /** A bar shape that's flat everywhere except a smooth dip ("notch") centered at `cx`, sized to cradle the floating bubble. */
-function buildNotchPath(width: number, barHeight: number, totalHeight: number, cx: number): string {
-  const notchDepth = barHeight * 0.55;
+function buildNotchPath(width: number, totalHeight: number, cx: number): string {
   const leftX = cx - NOTCH_WIDTH / 2;
   const rightX = cx + NOTCH_WIDTH / 2;
   return [
     `M0,0`,
     `L${leftX},0`,
-    `C${leftX + NOTCH_WIDTH * 0.25},0 ${cx - NOTCH_WIDTH * 0.35},${notchDepth} ${cx},${notchDepth}`,
-    `C${cx + NOTCH_WIDTH * 0.35},${notchDepth} ${rightX - NOTCH_WIDTH * 0.25},0 ${rightX},0`,
+    `C${leftX + NOTCH_WIDTH * 0.25},0 ${cx - NOTCH_WIDTH * 0.35},${NOTCH_DEPTH} ${cx},${NOTCH_DEPTH}`,
+    `C${cx + NOTCH_WIDTH * 0.35},${NOTCH_DEPTH} ${rightX - NOTCH_WIDTH * 0.25},0 ${rightX},0`,
     `L${width},0`,
     `L${width},${totalHeight}`,
     `L0,${totalHeight}`,
@@ -83,7 +88,7 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
         {state.routes.map((_, index) => (
           <AnimatedPath
             key={index}
-            d={buildNotchPath(SCREEN_WIDTH, BAR_HEIGHT, totalHeight, centers[index])}
+            d={buildNotchPath(SCREEN_WIDTH, totalHeight, centers[index])}
             fill={colors.surface}
             opacity={notchOpacities[index]}
           />
@@ -133,7 +138,7 @@ const styles = StyleSheet.create({
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   bubble: {
     position: 'absolute',
-    top: -18,
+    top: BUBBLE_TOP,
     left: 0,
     width: BUBBLE_SIZE,
     height: BUBBLE_SIZE,

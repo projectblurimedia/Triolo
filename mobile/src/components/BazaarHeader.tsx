@@ -28,6 +28,7 @@ export function BazaarHeader({ title, subtitle }: BazaarHeaderProps) {
         title={title}
         subtitle={subtitle}
         leadingIcon="store"
+        gradient={SHOP_GRADIENT}
         actions={[{ icon: 'bars', accessibilityLabel: t('bazaar.menu'), onPress: () => setMenuVisible(true) }]}
       />
       <SideDockMenu

@@ -24,16 +24,18 @@ interface GradientHeaderProps {
   leadingIcon?: keyof typeof FontAwesome6.glyphMap;
   /** Right-side icon buttons — e.g. Home's notifications/messages/menu. */
   actions?: HeaderAction[];
+  /** Overrides the brand-blue gradient — e.g. Bazaar's own orange, matching its Business identity everywhere else (SHOP_GRADIENT). */
+  gradient?: readonly [string, string];
 }
 
 /** Brand header used on every top-level screen — see docs/localization.md for why title is passed pre-translated. */
-export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions }: GradientHeaderProps) {
+export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions, gradient = headerGradient }: GradientHeaderProps) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const hasLeading = Boolean(showBack || leadingIcon);
 
   return (
-    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
+    <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
       <View style={[styles.content, { paddingTop: insets.top + 14 }]}>
         <View style={styles.row}>
           {showBack ? (
