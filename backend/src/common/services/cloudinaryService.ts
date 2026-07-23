@@ -2,6 +2,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
 import { env } from '@/config/env';
 import { AppError } from '@/common/errors/AppError';
+import { logger } from '@/common/utils/logger';
 
 let configured = false;
 
@@ -41,6 +42,46 @@ export async function uploadToCloudinary(filePath: string, folder: string): Prom
   } finally {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
+    }
+  }
+}
+
+/**
+ * Cloudinary secure URLs embed the public_id in their path:
+ * https://res.cloudinary.com/{cloud}/image/upload/v{version}/{public_id}.{ext}
+ * Only the URL (not the public_id) is persisted per photo, so this is how removed/replaced
+ * photos and deleted profiles find what to clean up in Cloudinary.
+ */
+export function extractPublicIdFromUrl(url: string): string | null {
+  const match = url.match(/\/upload\/v\d+\/(.+)\.[a-zA-Z0-9]+$/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Best-effort cleanup — a photo no longer being kept (dropped during an edit) or a whole
+ * profile being deleted shouldn't leave orphaned assets in Cloudinary storage forever.
+ * Failures are logged, not thrown: a Cloudinary hiccup must never block the user's actual
+ * profile update/delete from succeeding.
+ */
+export async function deletePhotosFromCloudinary(urls: string[]): Promise<void> {
+  if (urls.length === 0) {
+    return;
+  }
+  try {
+    ensureConfigured();
+  } catch (err) {
+    logger.warn({ err }, 'Skipping Cloudinary cleanup — not configured');
+    return;
+  }
+  for (const url of urls) {
+    const publicId = extractPublicIdFromUrl(url);
+    if (!publicId) {
+      continue;
+    }
+    try {
+      await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+    } catch (err) {
+      logger.warn({ err, publicId }, 'Failed to delete Cloudinary asset');
     }
   }
 }

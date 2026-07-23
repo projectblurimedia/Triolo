@@ -5,9 +5,11 @@ import * as cloudinaryService from '@/common/services/cloudinaryService';
 
 jest.mock('@/common/services/cloudinaryService', () => ({
   uploadToCloudinary: jest.fn(),
+  deletePhotosFromCloudinary: jest.fn(),
 }));
 
 const uploadToCloudinary = jest.mocked(cloudinaryService.uploadToCloudinary);
+const deletePhotosFromCloudinary = jest.mocked(cloudinaryService.deletePhotosFromCloudinary);
 
 type MockRepository = {
   [K in keyof BusinessesRepository]: jest.Mock;
@@ -223,6 +225,28 @@ describe('BusinessesService.updateProfile', () => {
       expect.objectContaining({ shopPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/new.jpg'] }),
     );
   });
+
+  it('deletes dropped photos from Cloudinary when they are no longer kept', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(
+      buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }),
+    );
+    repo.update.mockResolvedValue(buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg'] }));
+
+    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    await service.updateProfile(
+      'account-1',
+      {
+        shopName: 'Shop',
+        shopCategories: ['grocery'],
+        deliveryAvailable: false,
+        existingPhotoUrls: ['https://cdn/a.jpg'],
+      },
+      [],
+    );
+
+    expect(deletePhotosFromCloudinary).toHaveBeenCalledWith(['https://cdn/b.jpg']);
+  });
 });
 
 describe('BusinessesService.deleteProfile', () => {
@@ -249,5 +273,16 @@ describe('BusinessesService.deleteProfile', () => {
 
     await service.deleteProfile('account-1');
     expect(repo.remove).toHaveBeenCalledWith('account-1');
+  });
+
+  it('deletes all shop photos from Cloudinary when the profile is deleted', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(
+      buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }),
+    );
+    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+
+    await service.deleteProfile('account-1');
+    expect(deletePhotosFromCloudinary).toHaveBeenCalledWith(['https://cdn/a.jpg', 'https://cdn/b.jpg']);
   });
 });

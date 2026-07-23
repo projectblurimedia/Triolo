@@ -1,5 +1,5 @@
 import { AppError } from '@/common/errors/AppError';
-import { uploadToCloudinary } from '@/common/services/cloudinaryService';
+import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { WorkersRepository } from './repository';
 import { CreateWorkerProfileDto, UpdateWorkerProfileDto } from './dto';
 import { WorkerProfile } from './interfaces';
@@ -60,6 +60,9 @@ export class WorkersService {
     const keptPhotoUrls = dto.existingPhotoUrls ?? existing.portfolioPhotoUrls;
     const portfolioPhotoUrls = [...keptPhotoUrls, ...newPhotoUrls].slice(0, 6);
 
+    const droppedPhotoUrls = existing.portfolioPhotoUrls.filter((url) => !keptPhotoUrls.includes(url));
+    await deletePhotosFromCloudinary(droppedPhotoUrls);
+
     return this.repository.update(accountId, {
       skillCategories: dto.skillCategories,
       otherSkillDescription: dto.otherSkillDescription ?? null,
@@ -79,6 +82,7 @@ export class WorkersService {
     if (!existing) {
       throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
     }
+    await deletePhotosFromCloudinary(existing.portfolioPhotoUrls);
     await this.repository.remove(accountId);
   }
 }

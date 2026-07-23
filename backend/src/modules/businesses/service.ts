@@ -1,5 +1,5 @@
 import { AppError } from '@/common/errors/AppError';
-import { uploadToCloudinary } from '@/common/services/cloudinaryService';
+import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { BusinessesRepository } from './repository';
 import { CreateBusinessProfileDto, UpdateBusinessProfileDto } from './dto';
 import { BusinessProfile } from './interfaces';
@@ -62,6 +62,9 @@ export class BusinessesService {
     const keptPhotoUrls = dto.existingPhotoUrls ?? existing.shopPhotoUrls;
     const shopPhotoUrls = [...keptPhotoUrls, ...newPhotoUrls].slice(0, 6);
 
+    const droppedPhotoUrls = existing.shopPhotoUrls.filter((url) => !keptPhotoUrls.includes(url));
+    await deletePhotosFromCloudinary(droppedPhotoUrls);
+
     return this.repository.update(accountId, {
       shopName: dto.shopName,
       shopCategories: dto.shopCategories,
@@ -83,6 +86,7 @@ export class BusinessesService {
     if (!existing) {
       throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
     }
+    await deletePhotosFromCloudinary(existing.shopPhotoUrls);
     await this.repository.remove(accountId);
   }
 }
