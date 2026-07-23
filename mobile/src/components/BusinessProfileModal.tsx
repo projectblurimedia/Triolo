@@ -130,6 +130,12 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
     onClose();
   };
 
+  const handleMutationError = (err: unknown) => {
+    const message = getLocalizedErrorMessage(err, t);
+    setError(message);
+    showToast({ variant: 'error', title: t('common.errorTitle'), message });
+  };
+
   const handleSubmit = () => {
     setError(null);
     const includesOther = otherCategoryEntries.length > 0;
@@ -169,7 +175,7 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
               message: t('businessProfile.updateSuccessMessage'),
             });
           },
-          onError: (err) => setError(getLocalizedErrorMessage(err, t)),
+          onError: handleMutationError,
         },
       );
     } else {
@@ -180,7 +186,7 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
             resetAndClose();
             showToast({ variant: 'success', title: t('businessProfile.successTitle'), message: t('businessProfile.successMessage') });
           },
-          onError: (err) => setError(getLocalizedErrorMessage(err, t)),
+          onError: handleMutationError,
         },
       );
     }
@@ -199,7 +205,7 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
       },
       onError: (err) => {
         setShowDeleteConfirm(false);
-        showToast({ variant: 'error', title: t('errors.generic'), message: getLocalizedErrorMessage(err, t) });
+        showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(err, t) });
       },
     });
   };

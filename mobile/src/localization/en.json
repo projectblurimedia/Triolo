@@ -12,7 +12,8 @@
     "retry": "Retry",
     "loading": "Loading...",
     "logout": "Log Out",
-    "loggingOut": "Logging out..."
+    "loggingOut": "Logging out...",
+    "errorTitle": "Something Went Wrong"
   },
   "auth": {
     "welcomeTitle": "Find trusted workers and shops near you",

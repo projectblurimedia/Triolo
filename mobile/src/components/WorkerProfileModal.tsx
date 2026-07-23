@@ -117,6 +117,12 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
     onClose();
   };
 
+  const handleMutationError = (err: unknown) => {
+    const message = getLocalizedErrorMessage(err, t);
+    setError(message);
+    showToast({ variant: 'error', title: t('common.errorTitle'), message });
+  };
+
   const handleSubmit = () => {
     setError(null);
     const includesOther = otherSkillEntries.length > 0;
@@ -152,7 +158,7 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
               message: t('workerProfile.updateSuccessMessage'),
             });
           },
-          onError: (err) => setError(getLocalizedErrorMessage(err, t)),
+          onError: handleMutationError,
         },
       );
     } else {
@@ -163,7 +169,7 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
             resetAndClose();
             showToast({ variant: 'success', title: t('workerProfile.successTitle'), message: t('workerProfile.successMessage') });
           },
-          onError: (err) => setError(getLocalizedErrorMessage(err, t)),
+          onError: handleMutationError,
         },
       );
     }
@@ -182,7 +188,7 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
       },
       onError: (err) => {
         setShowDeleteConfirm(false);
-        showToast({ variant: 'error', title: t('errors.generic'), message: getLocalizedErrorMessage(err, t) });
+        showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(err, t) });
       },
     });
   };

@@ -107,7 +107,28 @@ async function rawFormRequest<T>(
   return (json as ApiEnvelope<T>).data;
 }
 
-async function tryRefreshAccessToken(): Promise<boolean> {
+// Refresh tokens rotate on use (single-use — the backend revokes the old one and issues a
+// new pair on every /auth/refresh call). Screens like Profile/Services/Bazaar all fire
+// several authenticated queries in parallel (worker profile, business profile, account
+// info), so if the access token expires, multiple requests can hit 401 within the same
+// instant. Without this dedup, each one would independently call /auth/refresh with the
+// SAME still-valid-looking refresh token — only the first to reach the server wins (its
+// call rotates the token), and every other concurrent refresh attempt gets its own 401
+// (using an already-revoked token), which used to clearSession() and silently log the
+// user out mid-flow. Sharing one in-flight promise means only one network call happens;
+// every concurrent 401 waits on it and then retries with the token IT obtained.
+let refreshPromise: Promise<boolean> | null = null;
+
+function tryRefreshAccessToken(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = performRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+async function performRefresh(): Promise<boolean> {
   const { refreshToken, setAccessToken } = useAuthStore.getState();
   if (!refreshToken) return false;
 
