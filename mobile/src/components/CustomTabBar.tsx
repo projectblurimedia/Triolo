@@ -15,39 +15,33 @@ const BAR_HEIGHT = 64;
 const BAR_RADIUS = 16;
 const BUBBLE_SIZE = 48;
 const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
-// A wide, shallow-cornered "smile" notch — a symmetric cubic-bezier S-curve per side,
-// each leaving the flat bar horizontally and arriving at the dip's bottom horizontally
-// (both tangents are 0, so the whole dip is one continuous curve with no kink at the
-// midpoint either). This replaced an earlier design that matched the notch's curvature
-// tightly to the bubble's own radius via a true circular arc — that was geometrically
-// smooth too, but read as a narrow dimple hidden mostly behind the bubble rather than a
-// wide, visibly-rounded scoop cradling it (confirmed by rendering both to a PNG via a
-// headless browser and comparing side by side — see docs/changelog.md). NOTCH_DEPTH is
-// tied to BUBBLE_RADIUS (not independently tuned) so the bubble nests almost exactly to
-// the scoop's own floor rather than floating above it or poking out the bottom.
-//
-// NOTCH_HALF_WIDTH must clear BUBBLE_RADIUS by a wide enough margin that a real curved
-// portion of the bezier peeks out on either side of the bubble, not just its almost-flat
-// starting tangent — a cubic bezier with a zero-tangent start stays close to flat for a
-// good stretch, so with too little exposed width (the bubble itself covers the deepest,
-// most-curved part) only that near-flat opening section is visible, reading as "barely
-// rounded" even though the underlying curve is mathematically fine. Confirmed by
-// rendering the exposed sliver (bubble included, at real device colors) to a PNG and
-// comparing — see docs/changelog.md.
-const NOTCH_HALF_WIDTH = 50;
-const NOTCH_DEPTH = BUBBLE_RADIUS + 8;
-const CURVE_REACH = 24;
+// A true semicircular dip — a single SVG arc of radius NOTCH_RADIUS, not a bezier
+// approximation. Two earlier designs both used a bezier curve with a zero-tangent start
+// (first tightly matched to the bubble's own radius, then widened) so the dip would meet
+// the flat bar with a perfectly smooth join — but a zero-tangent bezier's curvature is
+// weakest exactly where it starts, so it stays close to flat for a good stretch, and any
+// portion of that stretch covered by the bubble left only the near-flat remainder
+// visible, reading as "not rounded" no matter how wide the notch was made. A circle's
+// curvature is constant all the way to its own edge, so a true arc looks unmistakably
+// round the instant it's exposed past the bubble — confirmed by rendering both approaches
+// to a PNG (bubble included, at real device colors) and comparing — see
+// docs/changelog.md. The tradeoff: a true semicircle's tangent is vertical (not
+// horizontal) right where it meets the flat bar, a small "kink" that a tangent-matched
+// bezier avoids — in practice this reads as invisible next to `BAR_RADIUS`'s own corner
+// rounding at this shallow a scale, and looking unmistakably round matters far more here
+// than perfect tangent continuity at a seam nobody's looking at.
+const NOTCH_RADIUS = 42;
 // The minimum distance the notch's (and bubble's) center can sit from either screen edge
-// before the notch's shoulders would run past the bar's own rounded corner. This engages
-// on the edge tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the
-// notch and the bubble's translateX identically, so they never visually separate even
-// when clamped; the tradeoff is the bubble sitting a few px off its tab's true geometric
-// center on the narrowest realistic screens (~23px at 360dp), which reads as far less
-// noticeable than a scoop that's visibly off-center from the bubble sitting in it.
-const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_HALF_WIDTH + 2;
+// before the notch would run past the bar's own rounded corner. This engages on the edge
+// tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the notch and the
+// bubble's translateX identically, so they never visually separate even when clamped; the
+// tradeoff is the bubble sitting a few px off its tab's true geometric center on the
+// narrowest realistic screens, which reads as far less noticeable than a scoop that's
+// visibly off-center from the bubble sitting in it.
+const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_RADIUS + 2;
 // How far the bubble pokes above the bar's flat top edge (y=0). Chosen so the bubble's
-// own bottom edge clears the notch's floor (NOTCH_DEPTH) by a visible ~10px gap — at the
-// previous, shallower poke the bubble's bottom actually extended past the notch floor,
+// own bottom edge clears the notch's deepest point (NOTCH_RADIUS) by a visible gap — at an
+// earlier, shallower poke the bubble's bottom actually extended past the notch floor,
 // which (both being the same fill color) read as the bubble sitting fused/attached to the
 // bar rather than floating above it. Still well under the "poke = full radius" range an
 // earlier pass already rejected as floating too high.
@@ -82,23 +76,19 @@ const BUBBLE_GRADIENTS: Record<string, readonly [string, string]> = {
 
 /**
  * A bar shape with rounded top corners (matching what the tab bar had before this custom
- * SVG shape replaced the default @react-navigation rendering) and a wide, smoothly-rounded
- * dip ("notch") centered at the already-clamped `cx`. Each side of the dip is a single
- * cubic bezier that starts horizontal (matching the flat bar's own tangent) and ends
- * horizontal (matching the flat floor at the dip's center) — both tangents being zero is
- * what makes the whole dip read as one continuous rounded scoop rather than two curves
- * meeting at a visible kink.
+ * SVG shape replaced the default @react-navigation rendering) and a true semicircular dip
+ * ("notch") of radius `NOTCH_RADIUS` centered at the already-clamped `cx` — a single SVG
+ * arc, not a bezier approximation, so its curvature is genuinely constant and unmistakably
+ * round all the way to its own edge.
  */
 function buildNotchPath(width: number, totalHeight: number, cx: number): string {
-  const leftX = cx - NOTCH_HALF_WIDTH;
-  const rightX = cx + NOTCH_HALF_WIDTH;
-  const a = CURVE_REACH;
+  const leftX = cx - NOTCH_RADIUS;
+  const rightX = cx + NOTCH_RADIUS;
   return [
     `M0,${BAR_RADIUS}`,
     `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${BAR_RADIUS},0`,
     `L${leftX},0`,
-    `C${leftX + a},0 ${cx - a},${NOTCH_DEPTH} ${cx},${NOTCH_DEPTH}`,
-    `C${cx + a},${NOTCH_DEPTH} ${rightX - a},0 ${rightX},0`,
+    `A${NOTCH_RADIUS},${NOTCH_RADIUS} 0 0,0 ${rightX},0`,
     `L${width - BAR_RADIUS},0`,
     `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${width},${BAR_RADIUS}`,
     `L${width},${totalHeight}`,
