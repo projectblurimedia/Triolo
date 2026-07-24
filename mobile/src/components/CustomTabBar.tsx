@@ -25,16 +25,25 @@ const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
 // headless browser and comparing side by side — see docs/changelog.md). NOTCH_DEPTH is
 // tied to BUBBLE_RADIUS (not independently tuned) so the bubble nests almost exactly to
 // the scoop's own floor rather than floating above it or poking out the bottom.
-const NOTCH_HALF_WIDTH = 40;
+//
+// NOTCH_HALF_WIDTH must clear BUBBLE_RADIUS by a wide enough margin that a real curved
+// portion of the bezier peeks out on either side of the bubble, not just its almost-flat
+// starting tangent — a cubic bezier with a zero-tangent start stays close to flat for a
+// good stretch, so with too little exposed width (the bubble itself covers the deepest,
+// most-curved part) only that near-flat opening section is visible, reading as "barely
+// rounded" even though the underlying curve is mathematically fine. Confirmed by
+// rendering the exposed sliver (bubble included, at real device colors) to a PNG and
+// comparing — see docs/changelog.md.
+const NOTCH_HALF_WIDTH = 50;
 const NOTCH_DEPTH = BUBBLE_RADIUS + 8;
-const CURVE_REACH = 22;
+const CURVE_REACH = 24;
 // The minimum distance the notch's (and bubble's) center can sit from either screen edge
 // before the notch's shoulders would run past the bar's own rounded corner. This engages
 // on the edge tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the
 // notch and the bubble's translateX identically, so they never visually separate even
 // when clamped; the tradeoff is the bubble sitting a few px off its tab's true geometric
-// center on the narrowest realistic screens (~13px at 360dp), which reads as invisible
-// next to a scoop that's visibly off-center from the bubble sitting in it.
+// center on the narrowest realistic screens (~23px at 360dp), which reads as far less
+// noticeable than a scoop that's visibly off-center from the bubble sitting in it.
 const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_HALF_WIDTH + 2;
 // How far the bubble pokes above the bar's flat top edge (y=0). Chosen so the bubble's
 // own bottom edge clears the notch's floor (NOTCH_DEPTH) by a visible ~10px gap — at the
