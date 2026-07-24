@@ -13,7 +13,7 @@ const BAR_HEIGHT = 64;
 // the default @react-navigation rendering — dropping this was an oversight, not a
 // deliberate redesign.
 const BAR_RADIUS = 16;
-const BUBBLE_SIZE = 48;
+const BUBBLE_SIZE = 54;
 const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
 // A true semicircular dip — a single SVG arc of radius NOTCH_RADIUS, not a bezier
 // approximation. Two earlier designs both used a bezier curve with a zero-tangent start
@@ -40,12 +40,11 @@ const NOTCH_RADIUS = 42;
 // visibly off-center from the bubble sitting in it.
 const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_RADIUS + 2;
 // How far the bubble pokes above the bar's flat top edge (y=0). Chosen so the bubble's
-// own bottom edge clears the notch's deepest point (NOTCH_RADIUS) by a visible gap — at an
-// earlier, shallower poke the bubble's bottom actually extended past the notch floor,
-// which (both being the same fill color) read as the bubble sitting fused/attached to the
-// bar rather than floating above it. Still well under the "poke = full radius" range an
-// earlier pass already rejected as floating too high.
-const BUBBLE_POKE = 26;
+// own bottom edge clears the notch's deepest point (NOTCH_RADIUS) by a small, deliberate
+// ~5px gap — enough that the bubble still visibly floats rather than fusing with the bar
+// (both share the same fill color, so with no gap at all they'd read as touching), but
+// tight enough not to look like it's hovering unnaturally far above the bar.
+const BUBBLE_POKE = 17;
 const BUBBLE_TOP = -BUBBLE_POKE;
 
 /**
@@ -166,7 +165,7 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
           end={{ x: 1, y: 1 }}
           style={styles.bubbleFill}
         >
-          <FontAwesome6 name={ICONS[state.routes[state.index].name]} size={20} color="#FFFFFF" solid />
+          <FontAwesome6 name={ICONS[state.routes[state.index].name]} size={23} color="#FFFFFF" solid />
         </LinearGradient>
       </Animated.View>
 
