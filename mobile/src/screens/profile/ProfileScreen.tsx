@@ -1,27 +1,31 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FontAwesome6 } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
+import { WorkerProfileCard } from '@/components/WorkerProfileCard';
+import { BusinessProfileCard } from '@/components/BusinessProfileCard';
 import { WorkerProfileModal } from '@/components/WorkerProfileModal';
 import { BusinessProfileModal } from '@/components/BusinessProfileModal';
+import { ProfileStatsRow } from '@/components/ProfileStatsRow';
+import { SHOP_GRADIENT } from '@/components/BusinessProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 
-// Ratings/posts are placeholder content until the ratings/reviews module exists (see
-// .cloud/project-context.md) — shown once the account has added the Worker and/or
-// Business capability (see "Account Model"), not based on accounts.role, which is
-// always 'user' for every self-registered account regardless of capabilities added.
+// Rating/completed-work counts are placeholder content until the ratings/reviews and
+// booking/order modules exist (see .cloud/project-context.md) — shown once the account has
+// added the Worker and/or Business capability (see "Account Model"), not based on
+// accounts.role, which is always 'user' for every self-registered account regardless of
+// capabilities added. Each capability gets its own stats row + profile card, since a
+// rating/completed-work count is per-capability, not per-account.
 export function ProfileScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const account = useAuthStore((state) => state.account);
   const { data: workerProfile } = useMyWorkerProfile();
   const { data: businessProfile } = useMyBusinessProfile();
-  const isProfessional = Boolean(workerProfile || businessProfile);
   const initial = account?.fullName?.trim().charAt(0).toUpperCase() ?? '?';
   const [editWorkerVisible, setEditWorkerVisible] = useState(false);
   const [editBusinessVisible, setEditBusinessVisible] = useState(false);
@@ -43,50 +47,37 @@ export function ProfileScreen() {
         </View>
       ) : null}
 
-      {workerProfile || businessProfile ? (
+      {workerProfile ? (
         <>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.manageProfilesTitle')}</Text>
-          {workerProfile ? (
-            <Pressable
-              style={[styles.manageRow, { backgroundColor: colors.surface }]}
-              onPress={() => setEditWorkerVisible(true)}
-            >
-              <FontAwesome6 name="screwdriver-wrench" size={16} color={colors.primary} solid />
-              <Text style={[styles.manageRowText, { color: colors.text }]}>{t('profile.editWorkerProfile')}</Text>
-              <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
-            </Pressable>
-          ) : null}
-          {businessProfile ? (
-            <Pressable
-              style={[styles.manageRow, { backgroundColor: colors.surface }]}
-              onPress={() => setEditBusinessVisible(true)}
-            >
-              <FontAwesome6 name="store" size={16} color={colors.secondary} solid />
-              <Text style={[styles.manageRowText, { color: colors.text }]}>{t('profile.editBusinessProfile')}</Text>
-              <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
-            </Pressable>
-          ) : null}
+          <ProfileStatsRow
+            stats={[
+              { icon: 'star', value: t('profile.ratingValue'), label: t('profile.ratingCount'), tint: colors.primary },
+              {
+                icon: 'briefcase',
+                value: t('profile.servicesDoneValue'),
+                label: t('profile.servicesDoneLabel'),
+                tint: colors.primary,
+              },
+            ]}
+          />
+          <WorkerProfileCard profile={workerProfile} onEdit={() => setEditWorkerVisible(true)} />
         </>
       ) : null}
 
-      {isProfessional ? (
+      {businessProfile ? (
         <>
-          <View style={[styles.ratingCard, { backgroundColor: colors.surface }]}>
-            <FontAwesome6 name="star" size={22} color={colors.secondary} solid />
-            <View style={styles.ratingInfo}>
-              <Text style={[styles.ratingValue, { color: colors.text }]}>{t('profile.ratingValue')}</Text>
-              <Text style={[styles.ratingCount, { color: colors.textMuted }]}>{t('profile.ratingCount')}</Text>
-            </View>
-          </View>
-
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.postsTitle')}</Text>
-          <View style={styles.postsRow}>
-            {[0, 1, 2].map((i) => (
-              <View key={i} style={[styles.postCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <FontAwesome6 name="image" size={20} color={colors.textMuted} solid />
-              </View>
-            ))}
-          </View>
+          <ProfileStatsRow
+            stats={[
+              { icon: 'star', value: t('profile.ratingValue'), label: t('profile.ratingCount'), tint: SHOP_GRADIENT[0] },
+              {
+                icon: 'bag-shopping',
+                value: t('profile.ordersDoneValue'),
+                label: t('profile.ordersDoneLabel'),
+                tint: SHOP_GRADIENT[0],
+              },
+            ]}
+          />
+          <BusinessProfileCard profile={businessProfile} onEdit={() => setEditBusinessVisible(true)} />
         </>
       ) : null}
 
@@ -110,9 +101,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -120,38 +111,9 @@ const styles = StyleSheet.create({
     ...typography.heading,
     fontFamily: fonts.semiBold,
     color: '#FFFFFF',
+    fontSize: typography.heading.fontSize + 4,
   },
   cardInfo: { marginLeft: 14, flex: 1 },
   name: { ...typography.subheading, fontFamily: fonts.semiBold },
   meta: { ...typography.body, marginTop: 2 },
-  ratingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  ratingInfo: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  ratingValue: { ...typography.subheading, fontFamily: fonts.semiBold },
-  ratingCount: { ...typography.caption },
-  sectionTitle: { ...typography.body, fontFamily: fonts.medium, marginBottom: 10 },
-  manageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-  },
-  manageRowText: { ...typography.body, fontFamily: fonts.medium, flex: 1 },
-  postsRow: { flexDirection: 'row', gap: 10 },
-  postCard: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 });
