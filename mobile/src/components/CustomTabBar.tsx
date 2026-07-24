@@ -11,53 +11,40 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BAR_HEIGHT = 64;
 // Matches the rounded top corners the tab bar had before this custom SVG shape replaced
 // the default @react-navigation rendering — dropping this was an oversight, not a
-// deliberate redesign. Kept modest (not the original 30) so the edge tabs' notches have
-// more room to breathe before the safety clamp below ever needs to engage.
+// deliberate redesign.
 const BAR_RADIUS = 16;
 const BUBBLE_SIZE = 48;
 const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
-// The notch's own "radius" is derived from the bubble's, not an independent magic
-// number — so the socket the bubble sits in is actually proportioned to match it,
-// instead of two unrelated shapes that happen to overlap. GAP_RING is the visible ring
-// of bar surface left between the bubble's edge and the notch's edge.
-const GAP_RING = 5;
-const NOTCH_RADIUS = BUBBLE_RADIUS + GAP_RING;
-// The dip's central span is a genuine circular arc of NOTCH_RADIUS (not a bezier
-// approximation) — ARC_HALF_ANGLE is how much of that circle (measured from its bottom
-// point) is drawn as the true arc before handing off to a short shoulder curve back to
-// the flat bar. A flat line can never blend smoothly into a full semicircle (their
-// tangents don't match at the flat-line height), so *some* transition curve is
-// unavoidable — keeping it short means most of the visible dip really is the bubble's
-// own radius, not an approximation of it.
-const ARC_HALF_ANGLE = (42 * Math.PI) / 180;
-const ARC_END_X = NOTCH_RADIUS * Math.sin(ARC_HALF_ANGLE);
-const ARC_END_Y = NOTCH_RADIUS * Math.cos(ARC_HALF_ANGLE);
-// How far each cubic shoulder's control points sit from their nearest endpoint. Chosen
-// (with the arc-tangent-aligned control point below) so the shoulder curve's slope
-// matches the arc's own slope exactly at their junction — verified numerically, not
-// eyeballed (both sides compute to the same tangent slope where they meet the arc).
-const SHOULDER_CONTROL_DISTANCE = 10;
-const SHOULDER_WIDTH = 9;
-const NOTCH_WIDTH = (ARC_END_X + SHOULDER_WIDTH) * 2;
-// The minimum distance the notch's own center can sit from either screen edge before its
-// shoulders would run past the rounded corner (or off the bar entirely) — this comfortably
-// fits every common phone width with 4 tabs (360dp and up) without ever engaging, and only
-// matters as a safety net on unusually narrow screens; see clampNotchCenter below.
-const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_WIDTH / 2 + 2;
-// How far the bubble pokes above the bar's flat top edge (y=0) — deliberately less than
-// its own radius (which would center it exactly on the surface) so it reads as sitting
-// lower/more nested in the bar, per repeated feedback that it floated too high. The notch
-// dip is purely a cosmetic cutout in the bar's top silhouette — the solid bar fill
-// continues underneath it — so the bubble's lower portion extending slightly past the
-// notch's own deepest point isn't a visual problem; both areas are the same fill color.
+// A wide, shallow-cornered "smile" notch — a symmetric cubic-bezier S-curve per side,
+// each leaving the flat bar horizontally and arriving at the dip's bottom horizontally
+// (both tangents are 0, so the whole dip is one continuous curve with no kink at the
+// midpoint either). This replaced an earlier design that matched the notch's curvature
+// tightly to the bubble's own radius via a true circular arc — that was geometrically
+// smooth too, but read as a narrow dimple hidden mostly behind the bubble rather than a
+// wide, visibly-rounded scoop cradling it (confirmed by rendering both to a PNG via a
+// headless browser and comparing side by side — see docs/changelog.md). NOTCH_DEPTH is
+// tied to BUBBLE_RADIUS (not independently tuned) so the bubble nests almost exactly to
+// the scoop's own floor rather than floating above it or poking out the bottom.
+const NOTCH_HALF_WIDTH = 40;
+const NOTCH_DEPTH = BUBBLE_RADIUS + 8;
+const CURVE_REACH = 22;
+// The minimum distance the notch's (and bubble's) center can sit from either screen edge
+// before the notch's shoulders would run past the bar's own rounded corner. This engages
+// on the edge tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the
+// notch and the bubble's translateX identically, so they never visually separate even
+// when clamped; the tradeoff is the bubble sitting a few px off its tab's true geometric
+// center on the narrowest realistic screens (~13px at 360dp), which reads as invisible
+// next to a scoop that's visibly off-center from the bubble sitting in it.
+const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_HALF_WIDTH + 2;
+// How far the bubble pokes above the bar's flat top edge (y=0) — less than its own radius
+// so it reads as nested in the bar rather than floating above it, per repeated feedback
+// that it floated too high.
 const BUBBLE_POKE = 14;
 const BUBBLE_TOP = -BUBBLE_POKE;
 
 /**
- * Keeps the *drawn notch* from ever running past the rounded corner or off the bar,
- * regardless of screen width — the bubble itself still tracks the tab's true center via
- * its own `translateX`, so this only matters (and only shifts the notch a few px) on
- * screens narrower than every common phone width tested against.
+ * Keeps the notch center (and, identically, the bubble's) from ever running past the
+ * bar's rounded corner, regardless of screen width.
  */
 function clampNotchCenter(cx: number, width: number): number {
   return Math.min(Math.max(cx, MIN_NOTCH_MARGIN), width - MIN_NOTCH_MARGIN);
@@ -83,34 +70,23 @@ const BUBBLE_GRADIENTS: Record<string, readonly [string, string]> = {
 
 /**
  * A bar shape with rounded top corners (matching what the tab bar had before this custom
- * SVG shape replaced the default @react-navigation rendering) and a dip ("notch") centered
- * at `cx` whose central span is a true circular arc of `NOTCH_RADIUS` — so the socket the
- * bubble sits in genuinely shares its curvature, not just its overall depth/width. Each
- * shoulder connecting the flat bar to that arc is a cubic bezier whose control points are
- * tangent-matched at both ends (horizontal at the flat-line end, aligned with the arc's
- * own tangent direction at the arc end) — a flat line can never blend smoothly into a full
- * semicircle on its own (their tangents don't match at the flat-line height), so this
- * shoulder is the mathematically necessary transition, not an approximation of the dip
- * itself. `rawCx` is passed through `clampNotchCenter` before use, so an edge tab (Home/
- * Profile) on an unusually narrow screen can't push the notch's shoulders past the
- * rounded corner or off the bar entirely.
+ * SVG shape replaced the default @react-navigation rendering) and a wide, smoothly-rounded
+ * dip ("notch") centered at the already-clamped `cx`. Each side of the dip is a single
+ * cubic bezier that starts horizontal (matching the flat bar's own tangent) and ends
+ * horizontal (matching the flat floor at the dip's center) — both tangents being zero is
+ * what makes the whole dip read as one continuous rounded scoop rather than two curves
+ * meeting at a visible kink.
  */
-function buildNotchPath(width: number, totalHeight: number, rawCx: number): string {
-  const cx = clampNotchCenter(rawCx, width);
-  const leftX = cx - NOTCH_WIDTH / 2;
-  const rightX = cx + NOTCH_WIDTH / 2;
-  const arcStartX = cx - ARC_END_X;
-  const arcEndX = cx + ARC_END_X;
-  const d = SHOULDER_CONTROL_DISTANCE;
-  const tCos = d * Math.cos(ARC_HALF_ANGLE);
-  const tSin = d * Math.sin(ARC_HALF_ANGLE);
+function buildNotchPath(width: number, totalHeight: number, cx: number): string {
+  const leftX = cx - NOTCH_HALF_WIDTH;
+  const rightX = cx + NOTCH_HALF_WIDTH;
+  const a = CURVE_REACH;
   return [
     `M0,${BAR_RADIUS}`,
     `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${BAR_RADIUS},0`,
     `L${leftX},0`,
-    `C${leftX + d},0 ${arcStartX - tCos},${ARC_END_Y - tSin} ${arcStartX},${ARC_END_Y}`,
-    `A${NOTCH_RADIUS},${NOTCH_RADIUS} 0 0,1 ${arcEndX},${ARC_END_Y}`,
-    `C${arcEndX + tCos},${ARC_END_Y - tSin} ${rightX - d},0 ${rightX},0`,
+    `C${leftX + a},0 ${cx - a},${NOTCH_DEPTH} ${cx},${NOTCH_DEPTH}`,
+    `C${cx + a},${NOTCH_DEPTH} ${rightX - a},0 ${rightX},0`,
     `L${width - BAR_RADIUS},0`,
     `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${width},${BAR_RADIUS}`,
     `L${width},${totalHeight}`,
@@ -131,7 +107,11 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   const { colors } = useThemeColors();
   const tabCount = state.routes.length;
   const tabWidth = SCREEN_WIDTH / tabCount;
-  const centers = state.routes.map((_, index) => tabWidth * index + tabWidth / 2);
+  // Clamped up front so the notch and the bubble (which shares this same array for its
+  // translateX target) are always visually locked together — see clampNotchCenter's doc.
+  const centers = state.routes.map((_, index) =>
+    clampNotchCenter(tabWidth * index + tabWidth / 2, SCREEN_WIDTH),
+  );
   const totalHeight = BAR_HEIGHT + insets.bottom;
 
   const bubbleX = useRef(new Animated.Value(centers[state.index])).current;
