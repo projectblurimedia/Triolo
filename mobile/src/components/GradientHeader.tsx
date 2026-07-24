@@ -48,7 +48,7 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
               <FontAwesome6 name="chevron-left" size={18} color={colors.white} solid />
             </Pressable>
           ) : leadingIcon ? (
-            <View style={styles.iconButton}>
+            <View style={styles.leadingIconButton}>
               <FontAwesome6 name={leadingIcon} size={22} color={colors.white} solid />
             </View>
           ) : null}
@@ -103,6 +103,10 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
 }
 
 const ICON_BUTTON_SIZE = 40;
+// The leading (decorative) icon's own circle — deliberately a bit bigger than the shared
+// ICON_BUTTON_SIZE used by the back button and right-side actions, since only the leading
+// icon's background was asked to grow, not every icon button in the header.
+const LEADING_ICON_BUTTON_SIZE = 46;
 
 const styles = StyleSheet.create({
   container: {
@@ -142,6 +146,16 @@ const styles = StyleSheet.create({
     width: ICON_BUTTON_SIZE,
     height: ICON_BUTTON_SIZE,
     borderRadius: ICON_BUTTON_SIZE / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.32)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leadingIconButton: {
+    width: LEADING_ICON_BUTTON_SIZE,
+    height: LEADING_ICON_BUTTON_SIZE,
+    borderRadius: LEADING_ICON_BUTTON_SIZE / 2,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.32)',

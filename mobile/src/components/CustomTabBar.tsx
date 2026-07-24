@@ -13,7 +13,7 @@ const BAR_HEIGHT = 64;
 // the default @react-navigation rendering — dropping this was an oversight, not a
 // deliberate redesign.
 const BAR_RADIUS = 16;
-const BUBBLE_SIZE = 54;
+const BUBBLE_SIZE = 52;
 const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
 // A true semicircular dip — a single SVG arc of radius NOTCH_RADIUS, not a bezier
 // approximation. Two earlier designs both used a bezier curve with a zero-tangent start
@@ -30,7 +30,7 @@ const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
 // bezier avoids — in practice this reads as invisible next to `BAR_RADIUS`'s own corner
 // rounding at this shallow a scale, and looking unmistakably round matters far more here
 // than perfect tangent continuity at a seam nobody's looking at.
-const NOTCH_RADIUS = 35;
+const NOTCH_RADIUS = 34;
 // The minimum distance the notch's (and bubble's) center can sit from either screen edge
 // before the notch would run past the bar's own rounded corner. This engages on the edge
 // tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the notch and the
@@ -40,14 +40,14 @@ const NOTCH_RADIUS = 35;
 // visibly off-center from the bubble sitting in it.
 const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_RADIUS + 2;
 // How far the bubble pokes above the bar's flat top edge (y=0). Chosen — together with
-// NOTCH_RADIUS — so the gap between the bubble and the notch is the *same* ~5px on every
+// NOTCH_RADIUS — so the gap between the bubble and the notch is the *same* ~8px on every
 // side, not just at the bottom: the notch and bubble are concentric-ish circles, so the
 // horizontal gap (NOTCH_RADIUS - BUBBLE_RADIUS) and the vertical/bottom gap
 // (NOTCH_RADIUS - (BUBBLE_SIZE - BUBBLE_POKE)) both need to land on the same value for
 // the ring around the bubble to read as uniform — a bigger NOTCH_RADIUS with a shallower
 // poke (an earlier pass) gave a much wider left/right gap than the bottom gap, which broke
 // the illusion of the bubble sitting in a matching round socket.
-const BUBBLE_POKE = 27;
+const BUBBLE_POKE = 26;
 const BUBBLE_TOP = -BUBBLE_POKE;
 
 /**
@@ -168,7 +168,7 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
           end={{ x: 1, y: 1 }}
           style={styles.bubbleFill}
         >
-          <FontAwesome6 name={ICONS[state.routes[state.index].name]} size={23} color="#FFFFFF" solid />
+          <FontAwesome6 name={ICONS[state.routes[state.index].name]} size={22} color="#FFFFFF" solid />
         </LinearGradient>
       </Animated.View>
 
