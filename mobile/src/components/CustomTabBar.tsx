@@ -30,7 +30,7 @@ const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
 // bezier avoids — in practice this reads as invisible next to `BAR_RADIUS`'s own corner
 // rounding at this shallow a scale, and looking unmistakably round matters far more here
 // than perfect tangent continuity at a seam nobody's looking at.
-const NOTCH_RADIUS = 42;
+const NOTCH_RADIUS = 35;
 // The minimum distance the notch's (and bubble's) center can sit from either screen edge
 // before the notch would run past the bar's own rounded corner. This engages on the edge
 // tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the notch and the
@@ -39,12 +39,15 @@ const NOTCH_RADIUS = 42;
 // narrowest realistic screens, which reads as far less noticeable than a scoop that's
 // visibly off-center from the bubble sitting in it.
 const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_RADIUS + 2;
-// How far the bubble pokes above the bar's flat top edge (y=0). Chosen so the bubble's
-// own bottom edge clears the notch's deepest point (NOTCH_RADIUS) by a small, deliberate
-// ~5px gap — enough that the bubble still visibly floats rather than fusing with the bar
-// (both share the same fill color, so with no gap at all they'd read as touching), but
-// tight enough not to look like it's hovering unnaturally far above the bar.
-const BUBBLE_POKE = 17;
+// How far the bubble pokes above the bar's flat top edge (y=0). Chosen — together with
+// NOTCH_RADIUS — so the gap between the bubble and the notch is the *same* ~5px on every
+// side, not just at the bottom: the notch and bubble are concentric-ish circles, so the
+// horizontal gap (NOTCH_RADIUS - BUBBLE_RADIUS) and the vertical/bottom gap
+// (NOTCH_RADIUS - (BUBBLE_SIZE - BUBBLE_POKE)) both need to land on the same value for
+// the ring around the bubble to read as uniform — a bigger NOTCH_RADIUS with a shallower
+// poke (an earlier pass) gave a much wider left/right gap than the bottom gap, which broke
+// the illusion of the bubble sitting in a matching round socket.
+const BUBBLE_POKE = 27;
 const BUBBLE_TOP = -BUBBLE_POKE;
 
 /**
