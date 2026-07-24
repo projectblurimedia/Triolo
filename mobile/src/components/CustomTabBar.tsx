@@ -36,10 +36,13 @@ const CURVE_REACH = 22;
 // center on the narrowest realistic screens (~13px at 360dp), which reads as invisible
 // next to a scoop that's visibly off-center from the bubble sitting in it.
 const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_HALF_WIDTH + 2;
-// How far the bubble pokes above the bar's flat top edge (y=0) — less than its own radius
-// so it reads as nested in the bar rather than floating above it, per repeated feedback
-// that it floated too high.
-const BUBBLE_POKE = 14;
+// How far the bubble pokes above the bar's flat top edge (y=0). Chosen so the bubble's
+// own bottom edge clears the notch's floor (NOTCH_DEPTH) by a visible ~10px gap — at the
+// previous, shallower poke the bubble's bottom actually extended past the notch floor,
+// which (both being the same fill color) read as the bubble sitting fused/attached to the
+// bar rather than floating above it. Still well under the "poke = full radius" range an
+// earlier pass already rejected as floating too high.
+const BUBBLE_POKE = 26;
 const BUBBLE_TOP = -BUBBLE_POKE;
 
 /**
