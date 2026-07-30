@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -9,53 +8,25 @@ import { SHOP_GRADIENT } from './BusinessProfileModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BAR_HEIGHT = 64;
-// Matches the rounded top corners the tab bar had before this custom SVG shape replaced
-// the default @react-navigation rendering — dropping this was an oversight, not a
-// deliberate redesign.
 const BAR_RADIUS = 16;
 const BUBBLE_SIZE = 54;
 const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
-// A raised "hill" bump (the bar's top edge rising up, not a dip cutting into it) with the
-// active bubble nested at its peak, merged rather than floating with a gap — modeled on a
-// reference design the user shared. Built as a wide cubic-bezier bump (each side leaving
-// the flat bar horizontally and arriving at the peak horizontally) rather than a true
-// circular arc: a true semicircular bump narrows to a single point exactly at its peak, and
-// since the bubble sits right at that peak, the mismatch between the bubble's constant
-// curvature and the hill's rapidly-narrowing one created a visible "ear"-shaped notch where
-// they met (confirmed by rendering both to a PNG and comparing). A bezier bump stays
-// meaningfully wide near its own peak, avoiding that mismatch.
-const HILL_HALF_WIDTH = 46;
-const HILL_PEAK = 36;
-const HILL_CURVE_REACH = 18;
-// The whole tab bar container is made taller by this amount (rather than letting the Svg
-// or bubble poke above the container via a negative `top`) so every element — the hill,
-// the bubble, and the flat icon row — sits within the container's own declared bounds with
-// no negative-offset positioning anywhere. `row` is pushed down by this same amount so its
-// icons align with the hill's flat portions, not the container's very top.
-const HILL_SPACE = HILL_PEAK;
-// The minimum distance the hill's (and bubble's) center can sit from either screen edge
-// before the hill would run past the bar's own rounded corner. This engages on the edge
-// tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the hill and the
-// bubble's translateX identically, so they never visually separate even when clamped.
-const MIN_HILL_MARGIN = BAR_RADIUS + HILL_HALF_WIDTH + 2;
-// How far above the bar's flat top edge the bubble's own *center* sits — chosen so a good
-// portion of the bubble overlaps down into the hill (merged, no visible gap) while enough
-// of it still pokes up above the peak to read clearly as its own circle. Expressed relative
-// to the container's own top (which is HILL_SPACE above the bar's flat surface), not to the
-// flat surface directly, since the container itself — not a negatively-offset child — is
-// what now extends up to make room for the hill.
-const BUBBLE_CENTER_OFFSET = 20;
-const BUBBLE_TOP = HILL_SPACE - BUBBLE_CENTER_OFFSET - BUBBLE_RADIUS;
-
-/**
- * Keeps the hill center (and, identically, the bubble's) from ever running past the bar's
- * rounded corner, regardless of screen width.
- */
-function clampBumpCenter(cx: number, width: number): number {
-  return Math.min(Math.max(cx, MIN_HILL_MARGIN), width - MIN_HILL_MARGIN);
-}
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+// How far the bubble's top edge sits above the bar's own flat top edge (y=0). The bar
+// itself is a plain flat rounded-rectangle — it never changes shape per selected tab — so
+// the bubble simply overlaps directly on top of it (overlapIntoBar = BUBBLE_SIZE - POKE,
+// currently 26px) instead of sitting in a cutout or a separately-shaped bump. This
+// replaced two earlier designs (a concave notch cut into the bar, then a raised bezier
+// "hill" bump requiring the bar's own SVG path to animate per tab) that both rendered
+// visually disconnected from the flat icon row on a real device — confirmed the served
+// bundle did contain the intended code both times, ruling out a stale-bundle explanation,
+// which pointed at the per-tab animated bar *shape* (and, for the hill version, the taller
+// container) as the actual source of the bug rather than anything geometry-specific. A
+// plain flat bar + an overlapping circle needs neither: the bar's own box never changes
+// size or shape, and the bubble's "poke above via negative top" positioning is the same
+// mechanism already proven to render correctly throughout every earlier version of this
+// component (only the bar's own per-tab-animated shape was ever the problem).
+const BUBBLE_POKE = 28;
+const BUBBLE_TOP = -BUBBLE_POKE;
 
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
   Home: 'house',
@@ -74,56 +45,24 @@ const BUBBLE_GRADIENTS: Record<string, readonly [string, string]> = {
 };
 
 /**
- * A bar shape with rounded top corners and a raised bezier "hill" centered at the
- * already-clamped `cx`, rising *above* the bar's own flat top edge instead of cutting into
- * it. `containerHeight` is the full height of this component (bar + `HILL_SPACE`), so every
- * coordinate here is expressed directly in the container's own coordinate space — no
- * separate offset/shift needed, since the container itself is already tall enough.
- */
-function buildHillPath(width: number, containerHeight: number, cx: number): string {
-  const flatY = HILL_SPACE;
-  const peakY = 0;
-  const leftX = cx - HILL_HALF_WIDTH;
-  const rightX = cx + HILL_HALF_WIDTH;
-  const a = HILL_CURVE_REACH;
-  return [
-    `M0,${flatY + BAR_RADIUS}`,
-    `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${BAR_RADIUS},${flatY}`,
-    `L${leftX},${flatY}`,
-    `C${leftX + a},${flatY} ${cx - a},${peakY} ${cx},${peakY}`,
-    `C${cx + a},${peakY} ${rightX - a},${flatY} ${rightX},${flatY}`,
-    `L${width - BAR_RADIUS},${flatY}`,
-    `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${width},${flatY + BAR_RADIUS}`,
-    `L${width},${containerHeight}`,
-    `L0,${containerHeight}`,
-    `Z`,
-  ].join(' ');
-}
-
-/**
- * Custom bottom tab bar: a circular "bubble" holding the active tab's icon sits nested at
- * the peak of a raised hill bump that slides to whichever tab is selected — merged into the
- * bar, not floating above it with a gap. React Native's Animated can't smoothly interpolate
- * between two arbitrary SVG path strings, so each tab's hill path is precomputed once
- * (there are only 4, fixed by tab count) and cross-faded via opacity; the bubble's own
- * `translateX` is a plain numeric Animated.Value, which *can* animate continuously.
+ * Custom bottom tab bar: a plain flat bar (rounded top corners only, fixed shape — never
+ * animated per tab) with a circular "bubble" holding the active tab's icon sliding
+ * horizontally along it, overlapping directly on top rather than sitting in any per-tab
+ * cutout or bump. This is deliberately simpler than earlier versions of this component
+ * (a concave notch, then a raised bezier hill, both requiring the bar's own SVG shape to
+ * animate per selected tab) after both repeatedly rendered visually disconnected from the
+ * icon row on a real device despite mathematically-verified-correct geometry — see
+ * docs/changelog.md. The bubble's own `translateX` is a plain numeric `Animated.Value`,
+ * the same mechanism already proven to render correctly across every earlier iteration.
  */
 export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   const { colors } = useThemeColors();
   const tabCount = state.routes.length;
   const tabWidth = SCREEN_WIDTH / tabCount;
-  // Clamped up front so the hill and the bubble (which shares this same array for its
-  // translateX target) are always visually locked together — see clampBumpCenter's doc.
-  const centers = state.routes.map((_, index) =>
-    clampBumpCenter(tabWidth * index + tabWidth / 2, SCREEN_WIDTH),
-  );
+  const centers = state.routes.map((_, index) => tabWidth * index + tabWidth / 2);
   const totalHeight = BAR_HEIGHT + insets.bottom;
-  const containerHeight = totalHeight + HILL_SPACE;
 
   const bubbleX = useRef(new Animated.Value(centers[state.index])).current;
-  const hillOpacities = useRef(
-    state.routes.map((_, index) => new Animated.Value(index === state.index ? 1 : 0)),
-  ).current;
 
   useEffect(() => {
     Animated.timing(bubbleX, {
@@ -132,34 +71,17 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-
-    // SVG path/opacity props aren't guaranteed to be on the native-driver whitelist —
-    // useNativeDriver: false here avoids a runtime warning, and a low-frequency
-    // tab-switch fade has no meaningful perf cost running on the JS thread.
-    hillOpacities.forEach((anim, index) => {
-      Animated.timing(anim, {
-        toValue: index === state.index ? 1 : 0,
-        duration: 220,
-        useNativeDriver: false,
-      }).start();
-    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.index]);
 
   return (
-    <View style={[styles.container, { height: containerHeight }]}>
-      <Svg width={SCREEN_WIDTH} height={containerHeight} style={styles.svg}>
-        {state.routes.map((_, index) => (
-          <AnimatedPath
-            key={index}
-            d={buildHillPath(SCREEN_WIDTH, containerHeight, centers[index])}
-            fill={colors.surface}
-            stroke={colors.border}
-            strokeWidth={1}
-            opacity={hillOpacities[index]}
-          />
-        ))}
-      </Svg>
+    <View style={[styles.container, { height: totalHeight }]}>
+      <View
+        style={[
+          styles.bar,
+          { height: totalHeight, backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      />
 
       <Animated.View
         style={[styles.bubble, { transform: [{ translateX: Animated.subtract(bubbleX, BUBBLE_SIZE / 2) }] }]}
@@ -211,10 +133,17 @@ const styles = StyleSheet.create({
       android: { elevation: 16 },
     }),
   },
-  svg: { position: 'absolute', top: 0, left: 0 },
-  // marginTop pushes the icon row down past HILL_SPACE, so it aligns with the hill's own
-  // flat portions (the bar's visual top surface) rather than the container's very top.
-  row: { flexDirection: 'row', height: BAR_HEIGHT, marginTop: HILL_SPACE },
+  bar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: BAR_RADIUS,
+    borderTopRightRadius: BAR_RADIUS,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+  },
+  row: { flexDirection: 'row', height: BAR_HEIGHT },
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   bubble: {
     position: 'absolute',
