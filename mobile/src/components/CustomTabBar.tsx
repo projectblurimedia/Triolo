@@ -27,22 +27,25 @@ const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
 const HILL_HALF_WIDTH = 46;
 const HILL_PEAK = 36;
 const HILL_CURVE_REACH = 18;
-// react-native-svg clips drawing to its own width/height — since the hill's peak needs to
-// render *above* the bar's own top edge (y=0), the <Svg> itself is made taller by this
-// amount and shifted up to compensate, rather than relying on CSS overflow (unreliable
-// across platforms for this library). All path y-coordinates are offset by this same
-// amount so nothing in the path is ever negative.
-const SVG_TOP_OVERFLOW = HILL_PEAK;
+// The whole tab bar container is made taller by this amount (rather than letting the Svg
+// or bubble poke above the container via a negative `top`) so every element — the hill,
+// the bubble, and the flat icon row — sits within the container's own declared bounds with
+// no negative-offset positioning anywhere. `row` is pushed down by this same amount so its
+// icons align with the hill's flat portions, not the container's very top.
+const HILL_SPACE = HILL_PEAK;
 // The minimum distance the hill's (and bubble's) center can sit from either screen edge
 // before the hill would run past the bar's own rounded corner. This engages on the edge
 // tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the hill and the
 // bubble's translateX identically, so they never visually separate even when clamped.
 const MIN_HILL_MARGIN = BAR_RADIUS + HILL_HALF_WIDTH + 2;
-// How far above the bar's flat top edge (y=0) the bubble's own *center* sits — chosen so a
-// good portion of the bubble overlaps down into the hill (merged, no visible gap) while
-// enough of it still pokes up above the peak to read clearly as its own circle.
+// How far above the bar's flat top edge the bubble's own *center* sits — chosen so a good
+// portion of the bubble overlaps down into the hill (merged, no visible gap) while enough
+// of it still pokes up above the peak to read clearly as its own circle. Expressed relative
+// to the container's own top (which is HILL_SPACE above the bar's flat surface), not to the
+// flat surface directly, since the container itself — not a negatively-offset child — is
+// what now extends up to make room for the hill.
 const BUBBLE_CENTER_OFFSET = 20;
-const BUBBLE_TOP = -BUBBLE_CENTER_OFFSET - BUBBLE_RADIUS;
+const BUBBLE_TOP = HILL_SPACE - BUBBLE_CENTER_OFFSET - BUBBLE_RADIUS;
 
 /**
  * Keeps the hill center (and, identically, the bubble's) from ever running past the bar's
@@ -72,14 +75,14 @@ const BUBBLE_GRADIENTS: Record<string, readonly [string, string]> = {
 
 /**
  * A bar shape with rounded top corners and a raised bezier "hill" centered at the
- * already-clamped `cx`, rising *above* the flat top edge instead of cutting into it. All
- * y-coordinates are offset by `SVG_TOP_OVERFLOW` since the containing `<Svg>` is taller
- * than the visual bar and shifted up by that same amount — see its declaration above.
+ * already-clamped `cx`, rising *above* the bar's own flat top edge instead of cutting into
+ * it. `containerHeight` is the full height of this component (bar + `HILL_SPACE`), so every
+ * coordinate here is expressed directly in the container's own coordinate space — no
+ * separate offset/shift needed, since the container itself is already tall enough.
  */
-function buildHillPath(width: number, totalHeight: number, cx: number): string {
-  const flatY = SVG_TOP_OVERFLOW;
+function buildHillPath(width: number, containerHeight: number, cx: number): string {
+  const flatY = HILL_SPACE;
   const peakY = 0;
-  const bottomY = totalHeight + SVG_TOP_OVERFLOW;
   const leftX = cx - HILL_HALF_WIDTH;
   const rightX = cx + HILL_HALF_WIDTH;
   const a = HILL_CURVE_REACH;
@@ -91,8 +94,8 @@ function buildHillPath(width: number, totalHeight: number, cx: number): string {
     `C${cx + a},${peakY} ${rightX - a},${flatY} ${rightX},${flatY}`,
     `L${width - BAR_RADIUS},${flatY}`,
     `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${width},${flatY + BAR_RADIUS}`,
-    `L${width},${bottomY}`,
-    `L0,${bottomY}`,
+    `L${width},${containerHeight}`,
+    `L0,${containerHeight}`,
     `Z`,
   ].join(' ');
 }
@@ -115,6 +118,7 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
     clampBumpCenter(tabWidth * index + tabWidth / 2, SCREEN_WIDTH),
   );
   const totalHeight = BAR_HEIGHT + insets.bottom;
+  const containerHeight = totalHeight + HILL_SPACE;
 
   const bubbleX = useRef(new Animated.Value(centers[state.index])).current;
   const hillOpacities = useRef(
@@ -143,16 +147,12 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   }, [state.index]);
 
   return (
-    <View style={[styles.container, { height: totalHeight }]}>
-      <Svg
-        width={SCREEN_WIDTH}
-        height={totalHeight + SVG_TOP_OVERFLOW}
-        style={[styles.svg, { top: -SVG_TOP_OVERFLOW }]}
-      >
+    <View style={[styles.container, { height: containerHeight }]}>
+      <Svg width={SCREEN_WIDTH} height={containerHeight} style={styles.svg}>
         {state.routes.map((_, index) => (
           <AnimatedPath
             key={index}
-            d={buildHillPath(SCREEN_WIDTH, totalHeight, centers[index])}
+            d={buildHillPath(SCREEN_WIDTH, containerHeight, centers[index])}
             fill={colors.surface}
             stroke={colors.border}
             strokeWidth={1}
@@ -211,8 +211,10 @@ const styles = StyleSheet.create({
       android: { elevation: 16 },
     }),
   },
-  svg: { position: 'absolute', left: 0 },
-  row: { flexDirection: 'row', height: BAR_HEIGHT },
+  svg: { position: 'absolute', top: 0, left: 0 },
+  // marginTop pushes the icon row down past HILL_SPACE, so it aligns with the hill's own
+  // flat portions (the bar's visual top surface) rather than the container's very top.
+  row: { flexDirection: 'row', height: BAR_HEIGHT, marginTop: HILL_SPACE },
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   bubble: {
     position: 'absolute',
