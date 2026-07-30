@@ -9,26 +9,15 @@ import { SHOP_GRADIENT } from './BusinessProfileModal';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BAR_HEIGHT = 64;
 const BAR_RADIUS = 16;
-// The raised "hill" is a big plain circle — the same fill/border color as the bar itself —
-// mostly hidden behind the bar's own flat body, with only the small cap that pokes above
-// the bar's top edge actually visible. No SVG, no per-tab path shape, no taller container:
-// two earlier designs animated the *bar's own shape* per selected tab (a concave notch,
-// then a bezier hill bump) and both rendered visually disconnected from the flat icon row
-// on a real device despite mathematically-verified geometry and a confirmed-current bundle
-// each time. This version never changes the bar's own shape at all — the hill circle and
-// the bubble both just slide horizontally via `translateX`, the one mechanism already
-// proven reliable throughout every earlier version of this component.
-const HILL_SIZE = 120;
-const HILL_RADIUS = HILL_SIZE / 2;
-const HILL_POKE = 34;
-const HILL_TOP = -HILL_POKE;
-const BUBBLE_SIZE = 54;
-const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
-// How far the bubble's top edge sits above the bar's own flat top edge (y=0) — chosen so
-// it nests near the hill's own peak (34px above the line), overlapping down into both the
-// hill and the bar for a merged look rather than floating separately above either.
-const BUBBLE_POKE = 28;
-const BUBBLE_TOP = -BUBBLE_POKE;
+// The selected tab's colored circle sits entirely within the bar's own row height (never
+// poking above the bar) — three earlier designs each had some element (a notch, a bezier
+// hill, a same-color hidden circle) rising above the bar's flat top edge, and every one of
+// them rendered visually disconnected/floating on a real device despite verified-correct
+// geometry and confirmed-current bundles. Keeping every element fully inside the row's own
+// bounds removes any possibility of that class of bug — the icon and its circle are just
+// ordinary flex-row content now, not an absolutely-positioned overlay reaching outside it.
+const PILL_SIZE = 48;
+const PILL_RADIUS = PILL_SIZE / 2;
 
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
   Home: 'house',
@@ -37,9 +26,9 @@ const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> =
   Profile: 'user',
 };
 
-// Bazaar's bubble matches its own established orange identity (SHOP_GRADIENT — same as
-// its header, icon dock, and profile card); every other tab uses the constant brand blue.
-const BUBBLE_GRADIENTS: Record<string, readonly [string, string]> = {
+// Bazaar's pill matches its own established orange identity (SHOP_GRADIENT — same as its
+// header, icon dock, and profile card); every other tab uses the constant brand blue.
+const PILL_GRADIENTS: Record<string, readonly [string, string]> = {
   Home: headerGradient,
   Services: headerGradient,
   Bazaar: SHOP_GRADIENT,
@@ -47,17 +36,14 @@ const BUBBLE_GRADIENTS: Record<string, readonly [string, string]> = {
 };
 
 /**
- * Custom bottom tab bar: a plain flat bar (rounded top corners only, fixed shape — never
- * animated per tab) with a raised "hill" — a big circle, same color as the bar, mostly
- * hidden behind it — and a circular "bubble" holding the active tab's icon nested at the
- * hill's peak, both sliding horizontally to whichever tab is selected. This is deliberately
- * simpler than earlier versions of this component (a concave notch, then a bezier hill
- * bump, both requiring the bar's *own shape* to animate per selected tab via an SVG path)
- * after both repeatedly rendered visually disconnected from the icon row on a real device
- * despite mathematically-verified-correct geometry — see docs/changelog.md. The bar's
- * shape here never changes; only the hill circle and bubble slide, via the same plain
- * numeric `Animated.Value` + `translateX` mechanism already proven reliable throughout
- * every earlier iteration of this component.
+ * Custom bottom tab bar: a plain flat bar (rounded top corners, fixed shape) with every
+ * icon sitting in one ordinary row at the same height — the selected tab gets a sliding
+ * colored circle directly behind its icon, sized to fit entirely within the row's own
+ * bounds. This is deliberately conservative after three earlier designs (a concave notch,
+ * a bezier hill bump, a same-color hidden circle) each had some element poking above the
+ * bar's own flat top edge and each rendered visually disconnected from the row on a real
+ * device — see docs/changelog.md. Nothing here is positioned outside the row's own box, so
+ * that entire class of bug can't recur.
  */
 export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   const { colors } = useThemeColors();
@@ -66,10 +52,10 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   const centers = state.routes.map((_, index) => tabWidth * index + tabWidth / 2);
   const totalHeight = BAR_HEIGHT + insets.bottom;
 
-  const bubbleX = useRef(new Animated.Value(centers[state.index])).current;
+  const pillX = useRef(new Animated.Value(centers[state.index])).current;
 
   useEffect(() => {
-    Animated.timing(bubbleX, {
+    Animated.timing(pillX, {
       toValue: centers[state.index],
       duration: 320,
       easing: Easing.out(Easing.cubic),
@@ -79,36 +65,21 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   }, [state.index]);
 
   return (
-    <View style={[styles.container, { height: totalHeight }]}>
+    <View
+      style={[
+        styles.container,
+        { height: totalHeight, backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
       <Animated.View
-        style={[
-          styles.hill,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-            transform: [{ translateX: Animated.subtract(bubbleX, HILL_RADIUS) }],
-          },
-        ]}
-      />
-
-      <View
-        style={[
-          styles.bar,
-          { height: totalHeight, backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      />
-
-      <Animated.View
-        style={[styles.bubble, { transform: [{ translateX: Animated.subtract(bubbleX, BUBBLE_SIZE / 2) }] }]}
+        style={[styles.pill, { transform: [{ translateX: Animated.subtract(pillX, PILL_RADIUS) }] }]}
       >
         <LinearGradient
-          colors={BUBBLE_GRADIENTS[state.routes[state.index].name] ?? headerGradient}
+          colors={PILL_GRADIENTS[state.routes[state.index].name] ?? headerGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.bubbleFill}
-        >
-          <FontAwesome6 name={ICONS[state.routes[state.index].name]} size={22} color="#FFFFFF" solid />
-        </LinearGradient>
+          style={styles.pillFill}
+        />
       </Animated.View>
 
       <View style={styles.row}>
@@ -129,7 +100,12 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
               accessibilityLabel={route.name}
               android_ripple={{ color: 'transparent' }}
             >
-              {!isFocused ? <FontAwesome6 name={ICONS[route.name]} size={20} color={colors.textMuted} solid /> : null}
+              <FontAwesome6
+                name={ICONS[route.name]}
+                size={20}
+                color={isFocused ? '#FFFFFF' : colors.textMuted}
+                solid
+              />
             </Pressable>
           );
         })}
@@ -141,6 +117,10 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
+    borderTopLeftRadius: BAR_RADIUS,
+    borderTopRightRadius: BAR_RADIUS,
+    borderWidth: 1,
+    borderBottomWidth: 0,
     // Bar shadow so it reads as a visually distinct raised surface in dark mode, where
     // colors.surface and colors.background are both very dark, low-contrast blues.
     ...Platform.select({
@@ -148,43 +128,18 @@ const styles = StyleSheet.create({
       android: { elevation: 16 },
     }),
   },
-  hill: {
-    position: 'absolute',
-    top: HILL_TOP,
-    left: 0,
-    width: HILL_SIZE,
-    height: HILL_SIZE,
-    borderRadius: HILL_RADIUS,
-    borderWidth: 1,
-  },
-  bar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: BAR_RADIUS,
-    borderTopRightRadius: BAR_RADIUS,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-  },
   row: { flexDirection: 'row', height: BAR_HEIGHT },
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  bubble: {
+  pill: {
     position: 'absolute',
-    top: BUBBLE_TOP,
+    top: (BAR_HEIGHT - PILL_SIZE) / 2,
     left: 0,
-    width: BUBBLE_SIZE,
-    height: BUBBLE_SIZE,
-    borderRadius: BUBBLE_SIZE / 2,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8 },
-      android: { elevation: 8 },
-    }),
+    width: PILL_SIZE,
+    height: PILL_SIZE,
+    borderRadius: PILL_RADIUS,
   },
-  bubbleFill: {
+  pillFill: {
     flex: 1,
-    borderRadius: BUBBLE_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: PILL_RADIUS,
   },
 });
