@@ -37,14 +37,17 @@ export default function App() {
   // The root window background (what shows through the edge-to-edge system nav bar
   // area on Android, since that area isn't part of the React view tree at all) has to
   // be set via this native API — plain component/StyleSheet backgroundColor never
-  // reaches it. Nav bar button style is synced too so the icons stay visible against
-  // either theme, independent of the device's own OS-level light/dark setting.
+  // reaches it. Synced to colors.surface (not colors.background) specifically so the
+  // system back/home/recents bar matches CustomTabBar's own background — the tab bar
+  // sits directly above that system area, so a mismatched color read as a visible seam
+  // right where they meet. Nav bar button style is synced too so the icons stay visible
+  // against either theme, independent of the device's own OS-level light/dark setting.
   useEffect(() => {
-    SystemUI.setBackgroundColorAsync(colors.background);
+    SystemUI.setBackgroundColorAsync(colors.surface);
     if (Platform.OS === 'android') {
       NavigationBar.setStyle(isDark ? 'light' : 'dark');
     }
-  }, [colors.background, isDark]);
+  }, [colors.surface, isDark]);
 
   if (!fontsLoaded && !fontError) {
     return null;
