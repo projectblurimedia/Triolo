@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -8,16 +9,56 @@ import { SHOP_GRADIENT } from './BusinessProfileModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BAR_HEIGHT = 64;
+// Matches the rounded top corners the tab bar had before this custom SVG shape replaced
+// the default @react-navigation rendering — dropping this was an oversight, not a
+// deliberate redesign.
 const BAR_RADIUS = 16;
-// The selected tab's colored circle sits entirely within the bar's own row height (never
-// poking above the bar) — three earlier designs each had some element (a notch, a bezier
-// hill, a same-color hidden circle) rising above the bar's flat top edge, and every one of
-// them rendered visually disconnected/floating on a real device despite verified-correct
-// geometry and confirmed-current bundles. Keeping every element fully inside the row's own
-// bounds removes any possibility of that class of bug — the icon and its circle are just
-// ordinary flex-row content now, not an absolutely-positioned overlay reaching outside it.
-const PILL_SIZE = 48;
-const PILL_RADIUS = PILL_SIZE / 2;
+const BUBBLE_SIZE = 52;
+const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
+// A true semicircular dip — a single SVG arc of radius NOTCH_RADIUS, not a bezier
+// approximation. Two earlier designs both used a bezier curve with a zero-tangent start
+// (first tightly matched to the bubble's own radius, then widened) so the dip would meet
+// the flat bar with a perfectly smooth join — but a zero-tangent bezier's curvature is
+// weakest exactly where it starts, so it stays close to flat for a good stretch, and any
+// portion of that stretch covered by the bubble left only the near-flat remainder
+// visible, reading as "not rounded" no matter how wide the notch was made. A circle's
+// curvature is constant all the way to its own edge, so a true arc looks unmistakably
+// round the instant it's exposed past the bubble — confirmed by rendering both approaches
+// to a PNG (bubble included, at real device colors) and comparing — see
+// docs/changelog.md. The tradeoff: a true semicircle's tangent is vertical (not
+// horizontal) right where it meets the flat bar, a small "kink" that a tangent-matched
+// bezier avoids — in practice this reads as invisible next to `BAR_RADIUS`'s own corner
+// rounding at this shallow a scale, and looking unmistakably round matters far more here
+// than perfect tangent continuity at a seam nobody's looking at.
+const NOTCH_RADIUS = 34;
+// The minimum distance the notch's (and bubble's) center can sit from either screen edge
+// before the notch would run past the bar's own rounded corner. This engages on the edge
+// tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the notch and the
+// bubble's translateX identically, so they never visually separate even when clamped; the
+// tradeoff is the bubble sitting a few px off its tab's true geometric center on the
+// narrowest realistic screens, which reads as far less noticeable than a scoop that's
+// visibly off-center from the bubble sitting in it.
+const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_RADIUS + 2;
+// How far the bubble pokes above the bar's flat top edge (y=0). Chosen — together with
+// NOTCH_RADIUS — so the gap between the bubble and the notch is the *same* ~8px on every
+// side, not just at the bottom: the notch and bubble are concentric-ish circles, so the
+// horizontal gap (NOTCH_RADIUS - BUBBLE_RADIUS) and the vertical/bottom gap
+// (NOTCH_RADIUS - (BUBBLE_SIZE - BUBBLE_POKE)) both need to land on the same value for
+// the ring around the bubble to read as uniform — a bigger NOTCH_RADIUS with a shallower
+// poke (an earlier pass) gave a much wider left/right gap than the bottom gap, which broke
+// the illusion of the bubble sitting in a matching round socket.
+const BUBBLE_POKE = 26;
+const BUBBLE_TOP = -BUBBLE_POKE;
+
+/**
+ * Keeps the notch center (and, identically, the bubble's) from ever running past the
+ * bar's rounded corner, regardless of screen width.
+ */
+function clampNotchCenter(cx: number, width: number): number {
+  return Math.min(Math.max(cx, MIN_NOTCH_MARGIN), width - MIN_NOTCH_MARGIN);
+}
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
   Home: 'house',
@@ -26,9 +67,9 @@ const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> =
   Profile: 'user',
 };
 
-// Bazaar's pill matches its own established orange identity (SHOP_GRADIENT — same as its
-// header, icon dock, and profile card); every other tab uses the constant brand blue.
-const PILL_GRADIENTS: Record<string, readonly [string, string]> = {
+// Bazaar's bubble matches its own established orange identity (SHOP_GRADIENT — same as
+// its header, icon dock, and profile card); every other tab uses the constant brand blue.
+const BUBBLE_GRADIENTS: Record<string, readonly [string, string]> = {
   Home: headerGradient,
   Services: headerGradient,
   Bazaar: SHOP_GRADIENT,
@@ -36,50 +77,99 @@ const PILL_GRADIENTS: Record<string, readonly [string, string]> = {
 };
 
 /**
- * Custom bottom tab bar: a plain flat bar (rounded top corners, fixed shape) with every
- * icon sitting in one ordinary row at the same height — the selected tab gets a sliding
- * colored circle directly behind its icon, sized to fit entirely within the row's own
- * bounds. This is deliberately conservative after three earlier designs (a concave notch,
- * a bezier hill bump, a same-color hidden circle) each had some element poking above the
- * bar's own flat top edge and each rendered visually disconnected from the row on a real
- * device — see docs/changelog.md. Nothing here is positioned outside the row's own box, so
- * that entire class of bug can't recur.
+ * A bar shape with rounded top corners (matching what the tab bar had before this custom
+ * SVG shape replaced the default @react-navigation rendering) and a true semicircular dip
+ * ("notch") of radius `NOTCH_RADIUS` centered at the already-clamped `cx` — a single SVG
+ * arc, not a bezier approximation, so its curvature is genuinely constant and unmistakably
+ * round all the way to its own edge.
+ */
+function buildNotchPath(width: number, totalHeight: number, cx: number): string {
+  const leftX = cx - NOTCH_RADIUS;
+  const rightX = cx + NOTCH_RADIUS;
+  return [
+    `M0,${BAR_RADIUS}`,
+    `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${BAR_RADIUS},0`,
+    `L${leftX},0`,
+    `A${NOTCH_RADIUS},${NOTCH_RADIUS} 0 0,0 ${rightX},0`,
+    `L${width - BAR_RADIUS},0`,
+    `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${width},${BAR_RADIUS}`,
+    `L${width},${totalHeight}`,
+    `L0,${totalHeight}`,
+    `Z`,
+  ].join(' ');
+}
+
+/**
+ * Custom bottom tab bar: a floating circular "bubble" holding the active tab's icon sits
+ * in a smooth SVG notch that slides to whichever tab is selected, instead of a flat bar
+ * with a plain icon+label per tab. React Native's Animated can't smoothly interpolate
+ * between two arbitrary SVG path strings, so each tab's notch path is precomputed once
+ * (there are only 4, fixed by tab count) and cross-faded via opacity; the bubble's own
+ * `translateX` is a plain numeric Animated.Value, which *can* animate continuously.
  */
 export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   const { colors } = useThemeColors();
   const tabCount = state.routes.length;
   const tabWidth = SCREEN_WIDTH / tabCount;
-  const centers = state.routes.map((_, index) => tabWidth * index + tabWidth / 2);
+  // Clamped up front so the notch and the bubble (which shares this same array for its
+  // translateX target) are always visually locked together — see clampNotchCenter's doc.
+  const centers = state.routes.map((_, index) =>
+    clampNotchCenter(tabWidth * index + tabWidth / 2, SCREEN_WIDTH),
+  );
   const totalHeight = BAR_HEIGHT + insets.bottom;
 
-  const pillX = useRef(new Animated.Value(centers[state.index])).current;
+  const bubbleX = useRef(new Animated.Value(centers[state.index])).current;
+  const notchOpacities = useRef(
+    state.routes.map((_, index) => new Animated.Value(index === state.index ? 1 : 0)),
+  ).current;
 
   useEffect(() => {
-    Animated.timing(pillX, {
+    Animated.timing(bubbleX, {
       toValue: centers[state.index],
       duration: 320,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
+
+    // SVG path/opacity props aren't guaranteed to be on the native-driver whitelist —
+    // useNativeDriver: false here avoids a runtime warning, and a low-frequency
+    // tab-switch fade has no meaningful perf cost running on the JS thread.
+    notchOpacities.forEach((anim, index) => {
+      Animated.timing(anim, {
+        toValue: index === state.index ? 1 : 0,
+        duration: 220,
+        useNativeDriver: false,
+      }).start();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.index]);
 
   return (
-    <View
-      style={[
-        styles.container,
-        { height: totalHeight, backgroundColor: colors.surface, borderColor: colors.border },
-      ]}
-    >
+    <View style={[styles.container, { height: totalHeight }]}>
+      <Svg width={SCREEN_WIDTH} height={totalHeight} style={styles.svg}>
+        {state.routes.map((_, index) => (
+          <AnimatedPath
+            key={index}
+            d={buildNotchPath(SCREEN_WIDTH, totalHeight, centers[index])}
+            fill={colors.surface}
+            stroke={colors.border}
+            strokeWidth={1}
+            opacity={notchOpacities[index]}
+          />
+        ))}
+      </Svg>
+
       <Animated.View
-        style={[styles.pill, { transform: [{ translateX: Animated.subtract(pillX, PILL_RADIUS) }] }]}
+        style={[styles.bubble, { transform: [{ translateX: Animated.subtract(bubbleX, BUBBLE_SIZE / 2) }] }]}
       >
         <LinearGradient
-          colors={PILL_GRADIENTS[state.routes[state.index].name] ?? headerGradient}
+          colors={BUBBLE_GRADIENTS[state.routes[state.index].name] ?? headerGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.pillFill}
-        />
+          style={styles.bubbleFill}
+        >
+          <FontAwesome6 name={ICONS[state.routes[state.index].name]} size={22} color="#FFFFFF" solid />
+        </LinearGradient>
       </Animated.View>
 
       <View style={styles.row}>
@@ -100,12 +190,7 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
               accessibilityLabel={route.name}
               android_ripple={{ color: 'transparent' }}
             >
-              <FontAwesome6
-                name={ICONS[route.name]}
-                size={20}
-                color={isFocused ? '#FFFFFF' : colors.textMuted}
-                solid
-              />
+              {!isFocused ? <FontAwesome6 name={ICONS[route.name]} size={20} color={colors.textMuted} solid /> : null}
             </Pressable>
           );
         })}
@@ -117,29 +202,35 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    borderTopLeftRadius: BAR_RADIUS,
-    borderTopRightRadius: BAR_RADIUS,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    // Bar shadow so it reads as a visually distinct raised surface in dark mode, where
-    // colors.surface and colors.background are both very dark, low-contrast blues.
+    // Restores the shadow the original tab bar had (dropped when it was rebuilt as a
+    // custom SVG shape) — without it, the bar reads as barely distinct from the screen
+    // background in dark mode (colors.surface and colors.background are both very dark,
+    // low-contrast blues), which made the notch curve underneath the bubble hard to see
+    // regardless of how correct its geometry was.
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12 },
       android: { elevation: 16 },
     }),
   },
+  svg: { position: 'absolute', top: 0, left: 0 },
   row: { flexDirection: 'row', height: BAR_HEIGHT },
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  pill: {
+  bubble: {
     position: 'absolute',
-    top: (BAR_HEIGHT - PILL_SIZE) / 2,
+    top: BUBBLE_TOP,
     left: 0,
-    width: PILL_SIZE,
-    height: PILL_SIZE,
-    borderRadius: PILL_RADIUS,
+    width: BUBBLE_SIZE,
+    height: BUBBLE_SIZE,
+    borderRadius: BUBBLE_SIZE / 2,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8 },
+      android: { elevation: 8 },
+    }),
   },
-  pillFill: {
+  bubbleFill: {
     flex: 1,
-    borderRadius: PILL_RADIUS,
+    borderRadius: BUBBLE_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
