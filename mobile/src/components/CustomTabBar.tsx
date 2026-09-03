@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Dimensions, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Dimensions, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { headerGradient, useThemeColors } from '@/theme';
+import { fonts, headerGradient, useThemeColors } from '@/theme';
 import { SHOP_GRADIENT } from './BusinessProfileModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -17,12 +18,32 @@ const BAR_MARGIN_BOTTOM = 16;
 const BAR_RADIUS = BAR_HEIGHT / 2;
 const BAR_WIDTH = SCREEN_WIDTH - BAR_MARGIN_HORIZONTAL * 2;
 
-// The selected tab's capsule background, sized to sit comfortably inside the bar's own
-// height with margin above/below — a rounded-rect pill (not a full circle), matching the
-// App Store reference more than Instagram's plain dot indicator.
-const PILL_WIDTH = 56;
-const PILL_HEIGHT = 44;
-const PILL_RADIUS = PILL_HEIGHT / 2;
+// The selected tab expands into an icon+label capsule (sliding, spring-bounced into place)
+// instead of a plain icon-only circle — a deliberately more premium, "alive" interaction
+// than a static indicator, matching current top-tier app tab bars (Arc, Threads, various
+// 2024+ fintech/wellness apps) rather than a plain dot/circle highlight. One fixed width
+// comfortably fits the longest tab label ("Services") — every tab's capsule uses the same
+// width rather than resizing per label, avoiding a jarring per-tab width animation. Sized
+// (and the icon/gap/padding/font tuned down to fit) specifically so that even the
+// longest-label tab, clamped to the narrowest supported edge position (see below), never
+// overlaps the next tab's icon — verified by rendering the exact worst-case geometry
+// (narrowest screen × longest label × edge tab) to a PNG before picking these numbers; an
+// earlier, more spacious 116px version overlapped the neighboring tab's icon at common
+// phone widths once actually checked.
+const CAPSULE_WIDTH = 92;
+const CAPSULE_HEIGHT = 42;
+const CAPSULE_RADIUS = CAPSULE_HEIGHT / 2;
+// The capsule is wider than a single tab's own flex slot at realistic phone widths (4 tabs
+// leaves each slot ~90-107px), so the edge tabs (Home/Profile) need their capsule's center
+// clamped inward — otherwise, at narrow widths, the capsule runs past the bar's own rounded
+// corner and gets clipped by `glassClip`'s overflow:hidden. Same clamping pattern this
+// component's earlier notch/hill designs relied on: only the capsule's own drawn position
+// shifts — the underlying tab's tap target still spans its full, unclamped flex slot.
+const MIN_CAPSULE_MARGIN = CAPSULE_WIDTH / 2 + BAR_RADIUS + 4;
+
+function clampCapsuleCenter(cx: number, width: number): number {
+  return Math.min(Math.max(cx, MIN_CAPSULE_MARGIN), width - MIN_CAPSULE_MARGIN);
+}
 
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
   Home: 'house',
@@ -31,9 +52,9 @@ const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> =
   Profile: 'user',
 };
 
-// Bazaar's pill matches its own established orange identity (SHOP_GRADIENT — same as its
-// header, icon dock, and profile card); every other tab uses the constant brand blue.
-const PILL_GRADIENTS: Record<string, readonly [string, string]> = {
+// Bazaar's capsule matches its own established orange identity (SHOP_GRADIENT — same as
+// its header, icon dock, and profile card); every other tab uses the constant brand blue.
+const CAPSULE_GRADIENTS: Record<string, readonly [string, string]> = {
   Home: headerGradient,
   Services: headerGradient,
   Bazaar: SHOP_GRADIENT,
@@ -50,32 +71,60 @@ interface CustomTabBarProps extends BottomTabBarProps {
 }
 
 /**
- * Custom bottom tab bar: an iOS-style floating glass pill (blurred, translucent,
- * margin on every side) instead of a full-width flat bar — modeled directly on a
- * reference (Instagram/App Store tab bars) the user shared, replacing every previous
- * design of this component (a concave notch, a raised hill, a same-color hidden circle,
- * an in-row pill) outright rather than iterating on any of them. The selected tab gets a
- * sliding colored capsule behind its icon, the same proven `translateX`-on-a-plain-
- * `Animated.Value` mechanism every earlier version of this component has used
- * successfully.
+ * Custom bottom tab bar: an iOS-style floating glass pill (blurred, translucent, margin on
+ * every side) with the selected tab expanding into an icon+label capsule that slides and
+ * spring-bounces into place, instead of a static icon-only indicator — a deliberate step up
+ * in polish after "outdated" feedback on the plain-circle version, on top of the same glass
+ * foundation (blur, shine, floating overlay) that was already working. Replaces every
+ * previous design of this component (a concave notch, a raised hill, a same-color hidden
+ * circle, an in-row pill, a plain glass capsule) outright rather than iterating on any of
+ * them. The capsule's horizontal slide still uses the same proven `translateX`-on-a-plain-
+ * `Animated.Value` mechanism every earlier version of this component has used successfully;
+ * only the entrance bounce (`Animated.spring`) and the icon+label content are new.
  */
 export function CustomTabBar({ state, navigation, insets, blurTarget }: CustomTabBarProps) {
+  const { t } = useTranslation();
   const { colors, isDark } = useThemeColors();
   const tabCount = state.routes.length;
   const tabWidth = BAR_WIDTH / tabCount;
-  const centers = state.routes.map((_, index) => tabWidth * index + tabWidth / 2);
+  // Clamped for the capsule's own sliding target — the underlying tab row below still uses
+  // true, unclamped centers via normal flex layout, so tap targets are unaffected.
+  const centers = state.routes.map((_, index) =>
+    clampCapsuleCenter(tabWidth * index + tabWidth / 2, BAR_WIDTH),
+  );
 
-  const pillX = useRef(new Animated.Value(centers[state.index])).current;
+  const capsuleX = useRef(new Animated.Value(centers[state.index])).current;
+  const capsuleScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.timing(pillX, {
+    Animated.timing(capsuleX, {
       toValue: centers[state.index],
       duration: 320,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
+
+    // A quick squash-then-spring-back on every tab change — this "bounce" is what makes
+    // the capsule feel alive/premium rather than just sliding, without touching the
+    // horizontal slide's own timing (which stays a smooth, predictable `timing`).
+    capsuleScale.setValue(0.82);
+    Animated.spring(capsuleScale, {
+      toValue: 1,
+      friction: 6,
+      tension: 140,
+      useNativeDriver: true,
+    }).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.index]);
+
+  const labels: Record<string, string> = {
+    Home: t('tabs.home'),
+    Services: t('tabs.services'),
+    Bazaar: t('tabs.bazaar'),
+    Profile: t('tabs.profile'),
+  };
+  const activeRouteName = state.routes[state.index].name;
+  const activeGradient = CAPSULE_GRADIENTS[activeRouteName] ?? headerGradient;
 
   return (
     <View style={[styles.wrapper, { paddingBottom: insets.bottom + BAR_MARGIN_BOTTOM }]}>
@@ -117,14 +166,31 @@ export function CustomTabBar({ state, navigation, insets, blurTarget }: CustomTa
           />
 
           <Animated.View
-            style={[styles.pill, { transform: [{ translateX: Animated.subtract(pillX, PILL_WIDTH / 2) }] }]}
+            style={[
+              styles.capsule,
+              // iOS-only colored glow, tinted to the active tab's own gradient — Android's
+              // elevation shadow is always a plain dark tone regardless of shadowColor, so
+              // this is a deliberate iOS-specific enhancement, not a cross-platform bug.
+              Platform.OS === 'ios' ? { shadowColor: activeGradient[0] } : null,
+              {
+                transform: [
+                  { translateX: Animated.subtract(capsuleX, CAPSULE_WIDTH / 2) },
+                  { scale: capsuleScale },
+                ],
+              },
+            ]}
           >
             <LinearGradient
-              colors={PILL_GRADIENTS[state.routes[state.index].name] ?? headerGradient}
+              colors={activeGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.pillFill}
-            />
+              style={styles.capsuleFill}
+            >
+              <FontAwesome6 name={ICONS[activeRouteName]} size={16} color="#FFFFFF" solid />
+              <Text style={styles.capsuleLabel} numberOfLines={1}>
+                {labels[activeRouteName]}
+              </Text>
+            </LinearGradient>
           </Animated.View>
 
           <View style={styles.row}>
@@ -145,12 +211,11 @@ export function CustomTabBar({ state, navigation, insets, blurTarget }: CustomTa
                   accessibilityLabel={route.name}
                   android_ripple={{ color: 'transparent' }}
                 >
-                  <FontAwesome6
-                    name={ICONS[route.name]}
-                    size={20}
-                    color={isFocused ? '#FFFFFF' : colors.textMuted}
-                    solid
-                  />
+                  {/* The active tab's icon renders inside the capsule above instead —
+                      this slot stays empty for it so nothing double-renders underneath. */}
+                  {!isFocused ? (
+                    <FontAwesome6 name={ICONS[route.name]} size={20} color={colors.textMuted} solid />
+                  ) : null}
                 </Pressable>
               );
             })}
@@ -202,16 +267,30 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', height: BAR_HEIGHT },
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  pill: {
+  capsule: {
     position: 'absolute',
-    top: (BAR_HEIGHT - PILL_HEIGHT) / 2,
+    top: (BAR_HEIGHT - CAPSULE_HEIGHT) / 2,
     left: 0,
-    width: PILL_WIDTH,
-    height: PILL_HEIGHT,
-    borderRadius: PILL_RADIUS,
+    width: CAPSULE_WIDTH,
+    height: CAPSULE_HEIGHT,
+    borderRadius: CAPSULE_RADIUS,
+    ...Platform.select({
+      ios: { shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 10 },
+      android: { elevation: 8 },
+    }),
   },
-  pillFill: {
+  capsuleFill: {
     flex: 1,
-    borderRadius: PILL_RADIUS,
+    borderRadius: CAPSULE_RADIUS,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+  },
+  capsuleLabel: {
+    color: '#FFFFFF',
+    fontFamily: fonts.semiBold,
+    fontSize: 11.5,
   },
 });
