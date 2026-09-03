@@ -12,7 +12,7 @@ const BAR_HEIGHT = 64;
 // The bar floats above the bottom edge with margin on every side (iOS-style glass tab bar
 // — Instagram/App Store), instead of spanning full-width and sitting flush with the
 // bottom — a deliberate full redesign, not a tweak of the previous notch-and-bubble bar.
-const BAR_MARGIN_HORIZONTAL = 24;
+const BAR_MARGIN_HORIZONTAL = 16;
 const BAR_MARGIN_BOTTOM = 16;
 const BAR_RADIUS = BAR_HEIGHT / 2;
 const BAR_WIDTH = SCREEN_WIDTH - BAR_MARGIN_HORIZONTAL * 2;
@@ -82,21 +82,38 @@ export function CustomTabBar({ state, navigation, insets, blurTarget }: CustomTa
       <View style={styles.shadowWrap}>
         <View style={styles.glassClip}>
           <BlurView
-            intensity={80}
+            intensity={90}
             tint={isDark ? 'dark' : 'light'}
-            blurMethod="dimezisBlurViewSdk31Plus"
+            // 'dimezisBlurView' (not the SDK31Plus-only variant) actually blurs on every
+            // Android version, not just 31+ — the SDK31Plus variant silently falls back to
+            // a flat tinted view with no blur at all below that, which is why the glass
+            // effect wasn't reading as real glass on older/mid-range Android devices (this
+            // app's primary market). A per-frame blur cost on a bar that only re-renders on
+            // tab change is cheap enough to accept the documented perf tradeoff for.
+            blurMethod="dimezisBlurView"
             blurTarget={blurTarget}
             style={StyleSheet.absoluteFill}
           />
-          {/* A translucent brand-surface tint over the raw blur — keeps icon contrast and
-              brand consistency predictable regardless of what colors are blurring behind
-              it, matching the subtly-tinted (not perfectly clear) look of the reference. */}
+          {/* A light brand-surface tint over the raw blur — just enough to keep icon
+              contrast and brand consistency predictable regardless of what's blurring
+              behind it, without smothering the blur itself into a flat painted panel. */}
           <View
             pointerEvents="none"
             style={[
               StyleSheet.absoluteFill,
-              { backgroundColor: colors.surface, opacity: isDark ? 0.45 : 0.55 },
+              { backgroundColor: colors.surface, opacity: isDark ? 0.22 : 0.3 },
             ]}
+          />
+          {/* The "shine": a soft white highlight catching the top of the glass, fading out
+              by the vertical middle — this is what reads as a glossy, lit surface rather
+              than a flat frosted panel, matching the reference's iOS glass look. */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(255,255,255,0.38)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0)']}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
           />
 
           <Animated.View
@@ -167,7 +184,7 @@ const styles = StyleSheet.create({
     // wrapping View's overflow:hidden is the documented workaround.
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.32)',
   },
   row: { flexDirection: 'row', height: BAR_HEIGHT },
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
