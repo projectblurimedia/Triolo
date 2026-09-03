@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -9,56 +9,20 @@ import { SHOP_GRADIENT } from './BusinessProfileModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BAR_HEIGHT = 64;
-// Matches the rounded top corners the tab bar had before this custom SVG shape replaced
-// the default @react-navigation rendering — dropping this was an oversight, not a
-// deliberate redesign.
-const BAR_RADIUS = 16;
-const BUBBLE_SIZE = 52;
-const BUBBLE_RADIUS = BUBBLE_SIZE / 2;
-// A true semicircular dip — a single SVG arc of radius NOTCH_RADIUS, not a bezier
-// approximation. Two earlier designs both used a bezier curve with a zero-tangent start
-// (first tightly matched to the bubble's own radius, then widened) so the dip would meet
-// the flat bar with a perfectly smooth join — but a zero-tangent bezier's curvature is
-// weakest exactly where it starts, so it stays close to flat for a good stretch, and any
-// portion of that stretch covered by the bubble left only the near-flat remainder
-// visible, reading as "not rounded" no matter how wide the notch was made. A circle's
-// curvature is constant all the way to its own edge, so a true arc looks unmistakably
-// round the instant it's exposed past the bubble — confirmed by rendering both approaches
-// to a PNG (bubble included, at real device colors) and comparing — see
-// docs/changelog.md. The tradeoff: a true semicircle's tangent is vertical (not
-// horizontal) right where it meets the flat bar, a small "kink" that a tangent-matched
-// bezier avoids — in practice this reads as invisible next to `BAR_RADIUS`'s own corner
-// rounding at this shallow a scale, and looking unmistakably round matters far more here
-// than perfect tangent continuity at a seam nobody's looking at.
-const NOTCH_RADIUS = 34;
-// The minimum distance the notch's (and bubble's) center can sit from either screen edge
-// before the notch would run past the bar's own rounded corner. This engages on the edge
-// tabs (Home/Profile) at narrow widths — clampCenter is applied to BOTH the notch and the
-// bubble's translateX identically, so they never visually separate even when clamped; the
-// tradeoff is the bubble sitting a few px off its tab's true geometric center on the
-// narrowest realistic screens, which reads as far less noticeable than a scoop that's
-// visibly off-center from the bubble sitting in it.
-const MIN_NOTCH_MARGIN = BAR_RADIUS + NOTCH_RADIUS + 2;
-// How far the bubble pokes above the bar's flat top edge (y=0). Chosen — together with
-// NOTCH_RADIUS — so the gap between the bubble and the notch is the *same* ~8px on every
-// side, not just at the bottom: the notch and bubble are concentric-ish circles, so the
-// horizontal gap (NOTCH_RADIUS - BUBBLE_RADIUS) and the vertical/bottom gap
-// (NOTCH_RADIUS - (BUBBLE_SIZE - BUBBLE_POKE)) both need to land on the same value for
-// the ring around the bubble to read as uniform — a bigger NOTCH_RADIUS with a shallower
-// poke (an earlier pass) gave a much wider left/right gap than the bottom gap, which broke
-// the illusion of the bubble sitting in a matching round socket.
-const BUBBLE_POKE = 26;
-const BUBBLE_TOP = -BUBBLE_POKE;
+// The bar floats above the bottom edge with margin on every side (iOS-style glass tab bar
+// — Instagram/App Store), instead of spanning full-width and sitting flush with the
+// bottom — a deliberate full redesign, not a tweak of the previous notch-and-bubble bar.
+const BAR_MARGIN_HORIZONTAL = 24;
+const BAR_MARGIN_BOTTOM = 16;
+const BAR_RADIUS = BAR_HEIGHT / 2;
+const BAR_WIDTH = SCREEN_WIDTH - BAR_MARGIN_HORIZONTAL * 2;
 
-/**
- * Keeps the notch center (and, identically, the bubble's) from ever running past the
- * bar's rounded corner, regardless of screen width.
- */
-function clampNotchCenter(cx: number, width: number): number {
-  return Math.min(Math.max(cx, MIN_NOTCH_MARGIN), width - MIN_NOTCH_MARGIN);
-}
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+// The selected tab's capsule background, sized to sit comfortably inside the bar's own
+// height with margin above/below — a rounded-rect pill (not a full circle), matching the
+// App Store reference more than Instagram's plain dot indicator.
+const PILL_WIDTH = 56;
+const PILL_HEIGHT = 44;
+const PILL_RADIUS = PILL_HEIGHT / 2;
 
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
   Home: 'house',
@@ -67,170 +31,156 @@ const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> =
   Profile: 'user',
 };
 
-// Bazaar's bubble matches its own established orange identity (SHOP_GRADIENT — same as
-// its header, icon dock, and profile card); every other tab uses the constant brand blue.
-const BUBBLE_GRADIENTS: Record<string, readonly [string, string]> = {
+// Bazaar's pill matches its own established orange identity (SHOP_GRADIENT — same as its
+// header, icon dock, and profile card); every other tab uses the constant brand blue.
+const PILL_GRADIENTS: Record<string, readonly [string, string]> = {
   Home: headerGradient,
   Services: headerGradient,
   Bazaar: SHOP_GRADIENT,
   Profile: headerGradient,
 };
 
-/**
- * A bar shape with rounded top corners (matching what the tab bar had before this custom
- * SVG shape replaced the default @react-navigation rendering) and a true semicircular dip
- * ("notch") of radius `NOTCH_RADIUS` centered at the already-clamped `cx` — a single SVG
- * arc, not a bezier approximation, so its curvature is genuinely constant and unmistakably
- * round all the way to its own edge.
- */
-function buildNotchPath(width: number, totalHeight: number, cx: number): string {
-  const leftX = cx - NOTCH_RADIUS;
-  const rightX = cx + NOTCH_RADIUS;
-  return [
-    `M0,${BAR_RADIUS}`,
-    `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${BAR_RADIUS},0`,
-    `L${leftX},0`,
-    `A${NOTCH_RADIUS},${NOTCH_RADIUS} 0 0,0 ${rightX},0`,
-    `L${width - BAR_RADIUS},0`,
-    `A${BAR_RADIUS},${BAR_RADIUS} 0 0,1 ${width},${BAR_RADIUS}`,
-    `L${width},${totalHeight}`,
-    `L0,${totalHeight}`,
-    `Z`,
-  ].join(' ');
+interface CustomTabBarProps extends BottomTabBarProps {
+  /**
+   * Ref to the `BlurTargetView` (in `AppNavigator`) wrapping the screen content this bar's
+   * glass effect blurs — required for `BlurView`'s Android blur method to have something
+   * to sample. iOS doesn't need it (it blurs whatever's directly behind natively).
+   */
+  blurTarget?: React.RefObject<View | null>;
 }
 
 /**
- * Custom bottom tab bar: a floating circular "bubble" holding the active tab's icon sits
- * in a smooth SVG notch that slides to whichever tab is selected, instead of a flat bar
- * with a plain icon+label per tab. React Native's Animated can't smoothly interpolate
- * between two arbitrary SVG path strings, so each tab's notch path is precomputed once
- * (there are only 4, fixed by tab count) and cross-faded via opacity; the bubble's own
- * `translateX` is a plain numeric Animated.Value, which *can* animate continuously.
+ * Custom bottom tab bar: an iOS-style floating glass pill (blurred, translucent,
+ * margin on every side) instead of a full-width flat bar — modeled directly on a
+ * reference (Instagram/App Store tab bars) the user shared, replacing every previous
+ * design of this component (a concave notch, a raised hill, a same-color hidden circle,
+ * an in-row pill) outright rather than iterating on any of them. The selected tab gets a
+ * sliding colored capsule behind its icon, the same proven `translateX`-on-a-plain-
+ * `Animated.Value` mechanism every earlier version of this component has used
+ * successfully.
  */
-export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
-  const { colors } = useThemeColors();
+export function CustomTabBar({ state, navigation, insets, blurTarget }: CustomTabBarProps) {
+  const { colors, isDark } = useThemeColors();
   const tabCount = state.routes.length;
-  const tabWidth = SCREEN_WIDTH / tabCount;
-  // Clamped up front so the notch and the bubble (which shares this same array for its
-  // translateX target) are always visually locked together — see clampNotchCenter's doc.
-  const centers = state.routes.map((_, index) =>
-    clampNotchCenter(tabWidth * index + tabWidth / 2, SCREEN_WIDTH),
-  );
-  const totalHeight = BAR_HEIGHT + insets.bottom;
+  const tabWidth = BAR_WIDTH / tabCount;
+  const centers = state.routes.map((_, index) => tabWidth * index + tabWidth / 2);
 
-  const bubbleX = useRef(new Animated.Value(centers[state.index])).current;
-  const notchOpacities = useRef(
-    state.routes.map((_, index) => new Animated.Value(index === state.index ? 1 : 0)),
-  ).current;
+  const pillX = useRef(new Animated.Value(centers[state.index])).current;
 
   useEffect(() => {
-    Animated.timing(bubbleX, {
+    Animated.timing(pillX, {
       toValue: centers[state.index],
       duration: 320,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-
-    // SVG path/opacity props aren't guaranteed to be on the native-driver whitelist —
-    // useNativeDriver: false here avoids a runtime warning, and a low-frequency
-    // tab-switch fade has no meaningful perf cost running on the JS thread.
-    notchOpacities.forEach((anim, index) => {
-      Animated.timing(anim, {
-        toValue: index === state.index ? 1 : 0,
-        duration: 220,
-        useNativeDriver: false,
-      }).start();
-    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.index]);
 
   return (
-    <View style={[styles.container, { height: totalHeight }]}>
-      <Svg width={SCREEN_WIDTH} height={totalHeight} style={styles.svg}>
-        {state.routes.map((_, index) => (
-          <AnimatedPath
-            key={index}
-            d={buildNotchPath(SCREEN_WIDTH, totalHeight, centers[index])}
-            fill={colors.surface}
-            stroke={colors.border}
-            strokeWidth={1}
-            opacity={notchOpacities[index]}
+    <View style={[styles.wrapper, { paddingBottom: insets.bottom + BAR_MARGIN_BOTTOM }]}>
+      <View style={styles.shadowWrap}>
+        <View style={styles.glassClip}>
+          <BlurView
+            intensity={80}
+            tint={isDark ? 'dark' : 'light'}
+            blurMethod="dimezisBlurViewSdk31Plus"
+            blurTarget={blurTarget}
+            style={StyleSheet.absoluteFill}
           />
-        ))}
-      </Svg>
+          {/* A translucent brand-surface tint over the raw blur — keeps icon contrast and
+              brand consistency predictable regardless of what colors are blurring behind
+              it, matching the subtly-tinted (not perfectly clear) look of the reference. */}
+          <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: colors.surface, opacity: isDark ? 0.45 : 0.55 },
+            ]}
+          />
 
-      <Animated.View
-        style={[styles.bubble, { transform: [{ translateX: Animated.subtract(bubbleX, BUBBLE_SIZE / 2) }] }]}
-      >
-        <LinearGradient
-          colors={BUBBLE_GRADIENTS[state.routes[state.index].name] ?? headerGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.bubbleFill}
-        >
-          <FontAwesome6 name={ICONS[state.routes[state.index].name]} size={22} color="#FFFFFF" solid />
-        </LinearGradient>
-      </Animated.View>
+          <Animated.View
+            style={[styles.pill, { transform: [{ translateX: Animated.subtract(pillX, PILL_WIDTH / 2) }] }]}
+          >
+            <LinearGradient
+              colors={PILL_GRADIENTS[state.routes[state.index].name] ?? headerGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.pillFill}
+            />
+          </Animated.View>
 
-      <View style={styles.row}>
-        {state.routes.map((route, index) => {
-          const isFocused = state.index === index;
-          const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
+          <View style={styles.row}>
+            {state.routes.map((route, index) => {
+              const isFocused = state.index === index;
+              const onPress = () => {
+                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              };
 
-          return (
-            <Pressable
-              key={route.key}
-              style={styles.tabButton}
-              onPress={onPress}
-              accessibilityLabel={route.name}
-              android_ripple={{ color: 'transparent' }}
-            >
-              {!isFocused ? <FontAwesome6 name={ICONS[route.name]} size={20} color={colors.textMuted} solid /> : null}
-            </Pressable>
-          );
-        })}
+              return (
+                <Pressable
+                  key={route.key}
+                  style={styles.tabButton}
+                  onPress={onPress}
+                  accessibilityLabel={route.name}
+                  android_ripple={{ color: 'transparent' }}
+                >
+                  <FontAwesome6
+                    name={ICONS[route.name]}
+                    size={20}
+                    color={isFocused ? '#FFFFFF' : colors.textMuted}
+                    solid
+                  />
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'relative',
-    // Restores the shadow the original tab bar had (dropped when it was rebuilt as a
-    // custom SVG shape) — without it, the bar reads as barely distinct from the screen
-    // background in dark mode (colors.surface and colors.background are both very dark,
-    // low-contrast blues), which made the notch curve underneath the bubble hard to see
-    // regardless of how correct its geometry was.
+  wrapper: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  shadowWrap: {
+    width: BAR_WIDTH,
+    height: BAR_HEIGHT,
+    borderRadius: BAR_RADIUS,
+    // Soft floating shadow — the bar reads as elevated above the screen content, not
+    // flush against it, matching the reference's floating pill.
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12 },
-      android: { elevation: 16 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16 },
+      android: { elevation: 12 },
     }),
   },
-  svg: { position: 'absolute', top: 0, left: 0 },
+  glassClip: {
+    flex: 1,
+    borderRadius: BAR_RADIUS,
+    // BlurView's own borderRadius isn't reliably applied on Android — clipping via a
+    // wrapping View's overflow:hidden is the documented workaround.
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
   row: { flexDirection: 'row', height: BAR_HEIGHT },
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  bubble: {
+  pill: {
     position: 'absolute',
-    top: BUBBLE_TOP,
+    top: (BAR_HEIGHT - PILL_HEIGHT) / 2,
     left: 0,
-    width: BUBBLE_SIZE,
-    height: BUBBLE_SIZE,
-    borderRadius: BUBBLE_SIZE / 2,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8 },
-      android: { elevation: 8 },
-    }),
+    width: PILL_WIDTH,
+    height: PILL_HEIGHT,
+    borderRadius: PILL_RADIUS,
   },
-  bubbleFill: {
+  pillFill: {
     flex: 1,
-    borderRadius: BUBBLE_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: PILL_RADIUS,
   },
 });
