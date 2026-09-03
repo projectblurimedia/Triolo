@@ -162,8 +162,22 @@ export function CustomTabBar({ state, navigation, insets, blurTarget }: CustomTa
 }
 
 const styles = StyleSheet.create({
+  // Absolutely positioned so this component contributes ~0 intrinsic height to
+  // BottomTabView's own flex column layout (an absolutely-positioned child doesn't affect
+  // its parent's content size in React Native, same as CSS) — @react-navigation/bottom-tabs
+  // otherwise treats a custom tabBar as a normal flex sibling next to the screens container
+  // (both under a flex-column parent), shrinking the screens area to leave room for it.
+  // For a floating glass bar to actually show real scrolling content behind/around it (the
+  // whole point of the effect), screens need to render their full height, with this bar
+  // overlaying the bottom of that full-height content instead of sitting in its own
+  // reserved strip — otherwise what's "around" the pill is just the screen's own
+  // background ending abruptly, not real content, which is what read as an ugly flat panel
+  // instead of glass.
   wrapper: {
-    width: '100%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignItems: 'center',
   },
   shadowWrap: {
