@@ -20,9 +20,11 @@ Docker for the backend (and PostgreSQL locally via `docker-compose`). `docker/` 
 GitHub Actions (`.github/workflows/`), one workflow per app since they have independent dependency trees:
 
 - `backend-ci.yml`: on push/PR touching `backend/**` — install, lint, typecheck, unit test, build.
-- `mobile-ci.yml`: on push/PR touching `mobile/**` — install, typecheck, `expo export --platform web` as a bundle sanity check.
+- `user-app-ci.yml`: on push/PR touching `user-app/**` — install, typecheck, `expo export --platform web` as a bundle sanity check.
+- `partner-app-ci.yml`: same shape as `user-app-ci.yml`, scoped to `partner-app/**`.
+- `registration-web-ci.yml` / `admin-web-ci.yml`: install, typecheck, `vite build` as the bundle sanity check — scoped to `registration-web/**` and `admin-web/**` respectively (two separate sites, not one — see `.cloud/architecture.md`).
 
-Both currently run against `main`. Integration/API tests will be added to `backend-ci.yml` (with a Postgres service container) once those tests exist — see `docs/testing.md`. Staging/production deploy steps are not yet wired up; add them here when the deploy target (Section "Hosting (MVP)") is decided.
+All five currently run against `main`. Integration/API tests will be added to `backend-ci.yml` (with a Postgres service container) once those tests exist — see `docs/testing.md`. Staging/production deploy steps are not yet wired up; add them here when the deploy target (Section "Hosting (MVP)") is decided.
 
 ## Environment Variables
 

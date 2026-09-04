@@ -44,8 +44,10 @@ Thumbs.db
 *.p12
 *.key
 *.mobileprovision
-mobile/ios/
-mobile/android/app/build/
+user-app/ios/
+user-app/android/app/build/
+partner-app/ios/
+partner-app/android/app/build/
 
 # Docker
 docker/*.env

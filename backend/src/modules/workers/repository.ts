@@ -1,6 +1,6 @@
 import { Pool, QueryResultRow } from 'pg';
 import { parsePgArray } from '@/common/utils/pgArray';
-import { WorkerProfile } from './interfaces';
+import { AdminListFilter, AdminListResult, WorkerProfile, WorkerProfileWithAccount } from './interfaces';
 
 function mapWorkerProfile(row: QueryResultRow): WorkerProfile {
   return {
@@ -16,6 +16,15 @@ function mapWorkerProfile(row: QueryResultRow): WorkerProfile {
     verificationStatus: row.verification_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapWorkerProfileWithAccount(row: QueryResultRow): WorkerProfileWithAccount {
+  return {
+    ...mapWorkerProfile(row),
+    accountFullName: row.account_full_name,
+    accountMobileNumber: row.account_mobile_number,
+    accountEmail: row.account_email,
   };
 }
 
@@ -90,5 +99,56 @@ export class WorkersRepository {
 
   async remove(accountId: string): Promise<void> {
     await this.pool.query('DELETE FROM worker_profiles WHERE account_id = $1', [accountId]);
+  }
+
+  // --- Admin-facing (see modules/admin) — reads joined against `accounts` for review
+  // context. This is a same-module query against a FK-related table, not a reach into
+  // another module's repository; the module-boundary rule is about *services* calling
+  // each other, which `admin` does (see AdminService) — it never queries this table itself.
+
+  async findAll(filter: AdminListFilter): Promise<AdminListResult<WorkerProfileWithAccount>> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (filter.status) {
+      params.push(filter.status);
+      conditions.push(`w.verification_status = $${params.length}`);
+    }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countResult = await this.pool.query(`SELECT COUNT(*) FROM worker_profiles w ${whereClause}`, params);
+    const total = Number(countResult.rows[0].count);
+
+    const offset = (filter.page - 1) * filter.limit;
+    params.push(filter.limit, offset);
+    const rows = await this.pool.query(
+      `SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
+       FROM worker_profiles w
+       JOIN accounts a ON a.id = w.account_id
+       ${whereClause}
+       ORDER BY w.created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
+
+    return { items: rows.rows.map(mapWorkerProfileWithAccount), total, page: filter.page, limit: filter.limit };
+  }
+
+  async findById(id: string): Promise<WorkerProfileWithAccount | null> {
+    const result = await this.pool.query(
+      `SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
+       FROM worker_profiles w
+       JOIN accounts a ON a.id = w.account_id
+       WHERE w.id = $1`,
+      [id],
+    );
+    return result.rows[0] ? mapWorkerProfileWithAccount(result.rows[0]) : null;
+  }
+
+  async updateVerificationStatus(id: string, status: string): Promise<WorkerProfile | null> {
+    const result = await this.pool.query(
+      `UPDATE worker_profiles SET verification_status = $2, updated_at = now() WHERE id = $1 RETURNING *`,
+      [id, status],
+    );
+    return result.rows[0] ? mapWorkerProfile(result.rows[0]) : null;
   }
 }

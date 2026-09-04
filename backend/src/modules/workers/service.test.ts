@@ -21,6 +21,9 @@ function createMockRepository(): MockRepository {
     create: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
+    findAll: jest.fn(),
+    findById: jest.fn(),
+    updateVerificationStatus: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -260,5 +263,65 @@ describe('WorkersService.deleteProfile', () => {
 
     await service.deleteProfile('account-1');
     expect(deletePhotosFromCloudinary).toHaveBeenCalledWith(['https://cdn/a.jpg', 'https://cdn/b.jpg']);
+  });
+});
+
+describe('WorkersService admin-facing methods', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('adminListProfiles passes the filter straight through to the repository', async () => {
+    const repo = createMockRepository();
+    const result = { items: [], total: 0, page: 1, limit: 20 };
+    repo.findAll.mockResolvedValue(result);
+    const service = new WorkersService(repo as unknown as WorkersRepository);
+
+    await expect(service.adminListProfiles({ status: 'pending_verification', page: 1, limit: 20 })).resolves.toBe(
+      result,
+    );
+    expect(repo.findAll).toHaveBeenCalledWith({ status: 'pending_verification', page: 1, limit: 20 });
+  });
+
+  it('adminGetProfile throws 404 when no profile exists for that id', async () => {
+    const repo = createMockRepository();
+    repo.findById.mockResolvedValue(null);
+    const service = new WorkersService(repo as unknown as WorkersRepository);
+
+    await expect(service.adminGetProfile('missing-id')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'WORKER_PROFILE_NOT_FOUND',
+    });
+  });
+
+  it('adminGetProfile returns the profile when found', async () => {
+    const repo = createMockRepository();
+    const withAccount = { ...buildProfile(), accountFullName: 'Asha', accountMobileNumber: '9999999999', accountEmail: 'asha@example.com' };
+    repo.findById.mockResolvedValue(withAccount);
+    const service = new WorkersService(repo as unknown as WorkersRepository);
+
+    await expect(service.adminGetProfile('worker-1')).resolves.toBe(withAccount);
+  });
+
+  it('adminSetVerificationStatus throws 404 when no profile exists for that id', async () => {
+    const repo = createMockRepository();
+    repo.updateVerificationStatus.mockResolvedValue(null);
+    const service = new WorkersService(repo as unknown as WorkersRepository);
+
+    await expect(service.adminSetVerificationStatus('missing-id', 'verified')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'WORKER_PROFILE_NOT_FOUND',
+    });
+  });
+
+  it('adminSetVerificationStatus updates and returns the profile', async () => {
+    const repo = createMockRepository();
+    repo.updateVerificationStatus.mockResolvedValue(buildProfile({ verificationStatus: 'verified' }));
+    const service = new WorkersService(repo as unknown as WorkersRepository);
+
+    await expect(service.adminSetVerificationStatus('worker-1', 'verified')).resolves.toMatchObject({
+      verificationStatus: 'verified',
+    });
+    expect(repo.updateVerificationStatus).toHaveBeenCalledWith('worker-1', 'verified');
   });
 });

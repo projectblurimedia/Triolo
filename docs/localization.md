@@ -28,7 +28,7 @@ Flow:
 
 - APIs are language-independent. The backend never decides what language to respond in for API payloads — it stores and returns UTF-8 text as given.
 - The one exception is **push notification content** and **admin announcements**, which are explicitly per-recipient-language by design (see below) — this is a delivery-content concern, not an API-response-language concern.
-- Validation/error messages returned by the API (`message` field) are for logs/debugging and API consumers in general — **the mobile app must not display `error.message` directly to users**. It must map `error.code` to a localized string client-side. See `mobile/src/localization/errorMessages.ts`.
+- Validation/error messages returned by the API (`message` field) are for logs/debugging and API consumers in general — **the mobile app must not display `error.message` directly to users**. It must map `error.code` to a localized string client-side. See `user-app/src/localization/errorMessages.ts`.
 - All text columns are UTF-8 (Postgres default `UTF8` encoding) and must never be constrained to ASCII/English-only patterns. Regex validation (e.g. mobile number format) may restrict character sets where the underlying data is genuinely numeric/structured, but free-text fields (names, addresses, shopping list items, reviews, business names, worker descriptions) accept any Unicode input unmodified.
 
 ## Category / Reference Data Pattern (for future modules)
@@ -56,11 +56,11 @@ An announcement can carry content in one language, the other, or both. Data shap
 
 ## Plural Rules (Intl.PluralRules)
 
-Some JS engines used by React Native (older Hermes/JSC builds) don't ship `Intl.PluralRules`, which i18next needs to pick the correct plural form per language — Telugu has its own plural rules, distinct from English's. `mobile/src/localization/i18n.ts` detects a missing `Intl.PluralRules` and loads the `@formatjs/intl-pluralrules` polyfill plus `en`/`te` locale data before initializing i18next, so plural-based keys resolve correctly regardless of engine. Add the corresponding locale-data import here for any new language that ends up using plural-form keys.
+Some JS engines used by React Native (older Hermes/JSC builds) don't ship `Intl.PluralRules`, which i18next needs to pick the correct plural form per language — Telugu has its own plural rules, distinct from English's. `user-app/src/localization/i18n.ts` detects a missing `Intl.PluralRules` and loads the `@formatjs/intl-pluralrules` polyfill plus `en`/`te` locale data before initializing i18next, so plural-based keys resolve correctly regardless of engine. Add the corresponding locale-data import here for any new language that ends up using plural-form keys.
 
 ## Adding a New Language Later
 
-1. Add the language code to `SUPPORTED_LANGUAGES` in `mobile/src/localization/i18n.ts`.
+1. Add the language code to `SUPPORTED_LANGUAGES` in `user-app/src/localization/i18n.ts`.
 2. Add a new resource file (`hi.json`, `ta.json`, etc.) with the same key structure as `en.json`.
 3. Add the language option to the language picker UI (`LanguageSwitcher` component).
 4. If category/notification/announcement translation tables exist by then, add rows for the new language code — no schema change, no business-logic change.

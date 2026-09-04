@@ -1,0 +1,38 @@
+name: Registration Web CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'registration-web/**'
+      - '.github/workflows/registration-web-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'registration-web/**'
+      - '.github/workflows/registration-web-ci.yml'
+
+defaults:
+  run:
+    working-directory: registration-web
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: registration-web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build

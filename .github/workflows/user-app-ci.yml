@@ -1,0 +1,38 @@
+name: User App CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'user-app/**'
+      - '.github/workflows/user-app-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'user-app/**'
+      - '.github/workflows/user-app-ci.yml'
+
+defaults:
+  run:
+    working-directory: user-app
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: user-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Web bundle sanity check
+        run: npx expo export --platform web

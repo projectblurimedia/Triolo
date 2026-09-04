@@ -2,7 +2,13 @@ import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { BusinessesRepository } from './repository';
 import { CreateBusinessProfileDto, UpdateBusinessProfileDto } from './dto';
-import { BusinessProfile } from './interfaces';
+import {
+  AdminListFilter,
+  AdminListResult,
+  BusinessProfile,
+  BusinessProfileWithAccount,
+  ProfileVerificationStatus,
+} from './interfaces';
 
 const SHOP_PHOTO_FOLDER = 'triolo/businesses/shop-photos';
 
@@ -88,5 +94,28 @@ export class BusinessesService {
     }
     await deletePhotosFromCloudinary(existing.shopPhotoUrls);
     await this.repository.remove(accountId);
+  }
+
+  // --- Admin-facing (called only from modules/admin's service — see WorkersService's own
+  // equivalent section for why that's the module-boundary-respecting way to reach this data).
+
+  async adminListProfiles(filter: AdminListFilter): Promise<AdminListResult<BusinessProfileWithAccount>> {
+    return this.repository.findAll(filter);
+  }
+
+  async adminGetProfile(id: string): Promise<BusinessProfileWithAccount> {
+    const profile = await this.repository.findById(id);
+    if (!profile) {
+      throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
+    }
+    return profile;
+  }
+
+  async adminSetVerificationStatus(id: string, status: ProfileVerificationStatus): Promise<BusinessProfile> {
+    const updated = await this.repository.updateVerificationStatus(id, status);
+    if (!updated) {
+      throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
+    }
+    return updated;
   }
 }

@@ -1,0 +1,281 @@
+:root {
+  --color-primary: #0055d3;
+  --color-primary-light: #1d76fa;
+  --color-secondary: #f59e0b;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-error: #dc2626;
+  --color-white: #ffffff;
+  --color-background: #f9fcff;
+  --color-surface: #f2f8ff;
+  --color-text: #0c0f14;
+  --color-text-muted: #5b6472;
+  --color-border: #d8dadd;
+  --header-gradient: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  --shop-gradient: linear-gradient(135deg, var(--color-secondary), var(--color-warning));
+  --logout-gradient: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Poppins', system-ui, sans-serif;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Website-only header — no subtitle, back button (when present) sits beside the title
+   rather than above it, and the whole thing is deliberately short (mobile-app headers are
+   unaffected by this — see .cloud/architecture.md). */
+.header {
+  background: var(--header-gradient);
+  color: var(--color-white);
+  padding: 14px 20px;
+}
+
+.header--shop {
+  background: var(--shop-gradient);
+}
+
+.header__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-white);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.header__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.body {
+  flex: 1;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--color-text);
+  background: var(--color-white);
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: -1px;
+}
+
+.error-text {
+  font-size: 12px;
+  color: var(--color-error);
+  margin: -8px 0 12px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-white);
+  background: var(--header-gradient);
+  cursor: pointer;
+}
+
+.button--shop {
+  background: var(--shop-gradient);
+}
+
+.button--logout {
+  background: var(--logout-gradient);
+}
+
+.button--secondary {
+  background: var(--color-white);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 18px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.chip--active {
+  background: var(--header-gradient);
+  color: var(--color-white);
+  border-color: transparent;
+}
+
+.chip--active.chip--shop {
+  background: var(--shop-gradient);
+}
+
+.card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.card--clickable {
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  color: inherit;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.badge--pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: var(--color-warning);
+}
+
+.badge--verified {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--color-success);
+}
+
+.badge--rejected {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--color-error);
+}
+
+.loading-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  color: var(--color-text-muted);
+}
+
+.photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.photo-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tab--active {
+  background: var(--header-gradient);
+  color: var(--color-white);
+  border-color: transparent;
+}

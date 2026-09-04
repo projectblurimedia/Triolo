@@ -1,6 +1,6 @@
 import { Pool, QueryResultRow } from 'pg';
 import { parsePgArray } from '@/common/utils/pgArray';
-import { BusinessProfile } from './interfaces';
+import { AdminListFilter, AdminListResult, BusinessProfile, BusinessProfileWithAccount } from './interfaces';
 
 function mapBusinessProfile(row: QueryResultRow): BusinessProfile {
   return {
@@ -18,6 +18,15 @@ function mapBusinessProfile(row: QueryResultRow): BusinessProfile {
     verificationStatus: row.verification_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapBusinessProfileWithAccount(row: QueryResultRow): BusinessProfileWithAccount {
+  return {
+    ...mapBusinessProfile(row),
+    accountFullName: row.account_full_name,
+    accountMobileNumber: row.account_mobile_number,
+    accountEmail: row.account_email,
   };
 }
 
@@ -100,5 +109,54 @@ export class BusinessesRepository {
 
   async remove(accountId: string): Promise<void> {
     await this.pool.query('DELETE FROM business_profiles WHERE account_id = $1', [accountId]);
+  }
+
+  // --- Admin-facing (see modules/admin) — same rationale as WorkersRepository's own
+  // equivalent section: a same-module join against `accounts`, not a cross-module reach.
+
+  async findAll(filter: AdminListFilter): Promise<AdminListResult<BusinessProfileWithAccount>> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (filter.status) {
+      params.push(filter.status);
+      conditions.push(`b.verification_status = $${params.length}`);
+    }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countResult = await this.pool.query(`SELECT COUNT(*) FROM business_profiles b ${whereClause}`, params);
+    const total = Number(countResult.rows[0].count);
+
+    const offset = (filter.page - 1) * filter.limit;
+    params.push(filter.limit, offset);
+    const rows = await this.pool.query(
+      `SELECT b.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
+       FROM business_profiles b
+       JOIN accounts a ON a.id = b.account_id
+       ${whereClause}
+       ORDER BY b.created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
+
+    return { items: rows.rows.map(mapBusinessProfileWithAccount), total, page: filter.page, limit: filter.limit };
+  }
+
+  async findById(id: string): Promise<BusinessProfileWithAccount | null> {
+    const result = await this.pool.query(
+      `SELECT b.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
+       FROM business_profiles b
+       JOIN accounts a ON a.id = b.account_id
+       WHERE b.id = $1`,
+      [id],
+    );
+    return result.rows[0] ? mapBusinessProfileWithAccount(result.rows[0]) : null;
+  }
+
+  async updateVerificationStatus(id: string, status: string): Promise<BusinessProfile | null> {
+    const result = await this.pool.query(
+      `UPDATE business_profiles SET verification_status = $2, updated_at = now() WHERE id = $1 RETURNING *`,
+      [id, status],
+    );
+    return result.rows[0] ? mapBusinessProfile(result.rows[0]) : null;
   }
 }

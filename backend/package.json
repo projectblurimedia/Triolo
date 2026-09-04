@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "migrate": "tsx scripts/migrate.ts"
+    "migrate": "tsx scripts/migrate.ts",
+    "seed:admin": "tsx scripts/seedAdmin.ts"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

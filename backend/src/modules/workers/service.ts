@@ -2,7 +2,7 @@ import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { WorkersRepository } from './repository';
 import { CreateWorkerProfileDto, UpdateWorkerProfileDto } from './dto';
-import { WorkerProfile } from './interfaces';
+import { AdminListFilter, AdminListResult, ProfileVerificationStatus, WorkerProfile, WorkerProfileWithAccount } from './interfaces';
 
 const PORTFOLIO_FOLDER = 'triolo/workers/portfolio';
 
@@ -84,5 +84,28 @@ export class WorkersService {
     }
     await deletePhotosFromCloudinary(existing.portfolioPhotoUrls);
     await this.repository.remove(accountId);
+  }
+
+  // --- Admin-facing (called only from modules/admin's service — see its own doc comment
+  // for why that's the module-boundary-respecting way to reach this data).
+
+  async adminListProfiles(filter: AdminListFilter): Promise<AdminListResult<WorkerProfileWithAccount>> {
+    return this.repository.findAll(filter);
+  }
+
+  async adminGetProfile(id: string): Promise<WorkerProfileWithAccount> {
+    const profile = await this.repository.findById(id);
+    if (!profile) {
+      throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
+    }
+    return profile;
+  }
+
+  async adminSetVerificationStatus(id: string, status: ProfileVerificationStatus): Promise<WorkerProfile> {
+    const updated = await this.repository.updateVerificationStatus(id, status);
+    if (!updated) {
+      throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
+    }
+    return updated;
   }
 }

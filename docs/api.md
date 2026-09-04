@@ -119,8 +119,35 @@ Permanently remove the caller's business profile.
 - 200: `{ success: true, message: "Business profile deleted", data: null }`
 - 404: `BUSINESS_PROFILE_NOT_FOUND`
 
+## Admin Module
+
+Every route requires `authorize('admin')` in addition to `authenticate` — a valid access token for a non-`admin` account gets `403 FORBIDDEN`, not just a hidden UI. `admin` accounts are provisioned via `backend/scripts/seedAdmin.ts` (`npm run seed:admin -- <mobileNumber> <fullName> [email]`), never self-registered — the admin then logs in through the same `/auth/login/*` endpoints above. This module has no data of its own — it lists/reviews the `worker_profiles`/`business_profiles` rows the Workers/Businesses modules already own, via those modules' own service layer (see `.cloud/architecture.md`'s Backend Module Boundaries).
+
+### GET /admin/workers
+List worker profiles for review, each joined with its account's `fullName`/`mobileNumber`/`email`.
+- Auth: Bearer access token, `admin` role
+- Query: `status?: "pending_verification" | "verified" | "rejected"` (omit for all statuses), `page?: number` (default 1), `limit?: number` (default 20, max 100)
+- 200: `{ success: true, data: { items: WorkerProfile[] & { accountFullName, accountMobileNumber, accountEmail }[], total, page, limit } }`
+
+### GET /admin/workers/:id
+Return one worker profile (by its own `id`, not `accountId`) with account contact info.
+- Auth: Bearer access token, `admin` role
+- 200: `{ success: true, data: WorkerProfile & { accountFullName, accountMobileNumber, accountEmail } }`
+- 404: `WORKER_PROFILE_NOT_FOUND`
+
+### PATCH /admin/workers/:id/verification
+Approve or reject a worker profile.
+- Auth: Bearer access token, `admin` role
+- Body: `{ status: "verified" | "rejected" }`
+- 200: `{ success: true, message: "Verification status updated", data: WorkerProfile }`
+- 400: invalid status value
+- 404: `WORKER_PROFILE_NOT_FOUND`
+
+### GET /admin/businesses, GET /admin/businesses/:id, PATCH /admin/businesses/:id/verification
+Same shape as the three Worker endpoints above, `BusinessProfile`-flavored (`BUSINESS_PROFILE_NOT_FOUND` instead of `WORKER_PROFILE_NOT_FOUND`).
+
 ---
 
 **Localization note**: `message` fields and validation error text on any endpoint are for logs/debugging, not for display — the client resolves `error.code` to a localized string itself. See `docs/localization.md`.
 
-Further modules (Users, Workers, Businesses, Booking, Orders, Notifications, Admin) documented here as they're implemented — never left to drift from the actual routes.
+Further modules (Users, Booking, Orders, Notifications) documented here as they're implemented — never left to drift from the actual routes. Admin currently covers only listing/verifying Worker/Business profiles; the rest of its planned scope (user/worker/business management, complaints, warnings, suspension, announcements, audit logs — see `.cloud/project-context.md`) is still pending.
