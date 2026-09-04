@@ -81,9 +81,11 @@ export class BusinessesService {
       shopPhotoUrls,
       deliveryAvailable: dto.deliveryAvailable,
       deliveryPricePerKm: dto.deliveryAvailable ? (dto.deliveryPricePerKm ?? null) : null,
-      // Edited details haven't been reviewed yet — an already-verified shop changing
-      // its details shouldn't stay "verified" for the new, unreviewed details.
-      verificationStatus: 'pending_verification',
+      // Edits keep whatever verification status the profile already had — a confirmed
+      // reversal of an earlier "any edit resets to pending_verification" design. Admin still
+      // sees when a verified profile was last edited via `updatedAt` (set by the repository's
+      // `updated_at = now()`), surfaced as plain information, not a re-review gate.
+      verificationStatus: existing.verificationStatus,
     });
   }
 

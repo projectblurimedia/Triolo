@@ -2,9 +2,14 @@
   "common": {
     "appName": "Triolo Partner",
     "cancel": "Cancel",
+    "close": "Close",
     "done": "Done",
     "addNew": "Add New",
     "submit": "Submit",
+    "saveChanges": "Save Changes",
+    "edit": "Edit",
+    "delete": "Delete",
+    "menu": "Menu",
     "logout": "Log Out",
     "loggingOut": "Logging out...",
     "errorTitle": "Something Went Wrong"
@@ -44,6 +49,45 @@
   "myInfo": {
     "title": "My Info"
   },
+  "settingsMenu": {
+    "title": "Settings"
+  },
+  "themePicker": {
+    "title": "Choose Theme",
+    "subtitle": "Select your preferred app theme"
+  },
+  "languagePicker": {
+    "title": "Choose Language",
+    "subtitle": "Select your preferred language"
+  },
+  "mainTabs": {
+    "Home": {
+      "title": "Home",
+      "subtitle": "Your Triolo Partner dashboard",
+      "greeting": "Hi, {{name}}",
+      "comingSoon": "Job and order requests will show up here once this is ready."
+    },
+    "Bookings": {
+      "title": "Bookings",
+      "subtitle": "Your job and order requests",
+      "comingSoon": "Job and order requests will show up here once this is ready."
+    },
+    "Earnings": {
+      "title": "Earnings",
+      "subtitle": "Track your payments and payouts",
+      "comingSoon": "Your earnings dashboard is coming soon."
+    },
+    "Profile": {
+      "title": "Profile",
+      "subtitle": "Your account and capabilities",
+      "capabilitiesLabel": "Your Capabilities",
+      "workerTitle": "Worker Profile",
+      "workerQuickFact": "{{count}} years of experience",
+      "businessTitle": "Business Profile",
+      "addWorker": "Register as a Worker",
+      "addBusiness": "Add your Shop"
+    }
+  },
   "location": {
     "useCurrent": "Use My Current Location",
     "addressLabel": "Location",
@@ -79,7 +123,16 @@
     "experienceLabel": "Years of Experience",
     "portfolioLabel": "Photos of Your Work (optional)",
     "successTitle": "Worker Profile Created",
-    "successMessage": "Your details are submitted for verification. We'll notify you once approved."
+    "successMessage": "Your details are submitted for verification. We'll notify you once approved.",
+    "editTitle": "Edit Worker Profile",
+    "editSubtitle": "Update your service details",
+    "updateSuccessTitle": "Worker Profile Updated",
+    "updateSuccessMessage": "Your changes are submitted for verification. We'll notify you once approved.",
+    "deleteAction": "Delete Worker Profile",
+    "deleteConfirmTitle": "Delete Worker Profile?",
+    "deleteConfirmMessage": "This removes your worker profile permanently. You can create a new one later if you change your mind.",
+    "deleteSuccessTitle": "Worker Profile Deleted",
+    "deleteSuccessMessage": "Your worker profile has been removed."
   },
   "businessProfile": {
     "title": "Business Registration",
@@ -103,11 +156,25 @@
     "deliveryNo": "No",
     "deliveryPriceLabel": "Delivery Price per KM (₹)",
     "successTitle": "Business Profile Created",
-    "successMessage": "Your shop details are submitted for verification. We'll notify you once approved."
+    "successMessage": "Your shop details are submitted for verification. We'll notify you once approved.",
+    "editTitle": "Edit Business Profile",
+    "editSubtitle": "Update your shop details",
+    "updateSuccessTitle": "Business Profile Updated",
+    "updateSuccessMessage": "Your changes are submitted for verification. We'll notify you once approved.",
+    "deleteAction": "Delete Business Profile",
+    "deleteConfirmTitle": "Delete Business Profile?",
+    "deleteConfirmMessage": "This removes your business profile permanently. You can create a new one later if you change your mind.",
+    "deleteSuccessTitle": "Business Profile Deleted",
+    "deleteSuccessMessage": "Your business profile has been removed."
   },
   "settings": {
+    "language": "Language",
     "english": "English",
-    "telugu": "Telugu"
+    "telugu": "Telugu",
+    "theme": "Theme",
+    "themeSystem": "System Default",
+    "themeLight": "Light",
+    "themeDark": "Dark"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",

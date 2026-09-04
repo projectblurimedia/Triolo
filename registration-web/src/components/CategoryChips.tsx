@@ -11,11 +11,10 @@ interface CategoryChipsProps {
   onChange: (next: string[]) => void;
   otherEntries: string[];
   onOtherEntriesChange: (next: string[]) => void;
-  shop?: boolean;
 }
 
 /** Same multi-select chip + "+ Add New" custom-tag pattern as the mobile apps' WorkerProfileModal/BusinessProfileModal. */
-export function CategoryChips({ options, selected, onChange, otherEntries, onOtherEntriesChange, shop }: CategoryChipsProps) {
+export function CategoryChips({ options, selected, onChange, otherEntries, onOtherEntriesChange }: CategoryChipsProps) {
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherValue, setOtherValue] = useState('');
 
@@ -56,7 +55,7 @@ export function CategoryChips({ options, selected, onChange, otherEntries, onOth
           <button
             key={option.key}
             type="button"
-            className={`chip ${selected.includes(option.key) ? `chip--active ${shop ? 'chip--shop' : ''}` : ''}`}
+            className={`chip ${selected.includes(option.key) ? 'chip--active' : ''}`}
             onClick={() => toggle(option.key)}
           >
             {option.label}
@@ -66,7 +65,7 @@ export function CategoryChips({ options, selected, onChange, otherEntries, onOth
           <button
             key={`${entry}-${index}`}
             type="button"
-            className={`chip chip--active ${shop ? 'chip--shop' : ''}`}
+            className="chip chip--active"
             onClick={() => removeOther(index)}
           >
             {entry} ✕
@@ -84,7 +83,15 @@ export function CategoryChips({ options, selected, onChange, otherEntries, onOth
             <input
               value={otherValue}
               onChange={(e) => setOtherValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && commitOther()}
+              onKeyDown={(e) => {
+                // This chip picker now lives inside the page's own <form> (for its
+                // Enter-to-submit behavior) — without preventDefault, Enter here would
+                // both commit this tag *and* submit that outer form prematurely.
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitOther();
+                }
+              }}
               autoFocus
             />
           </div>

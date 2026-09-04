@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -9,13 +9,14 @@ import { TextField } from '@/components/TextField';
 import { LocationPicker, LocationValue } from '@/components/LocationPicker';
 import { ImagePickerField, PickedImage } from '@/components/ImagePickerField';
 import { Button } from '@/components/Button';
-import { fonts, typography, useThemeColors } from '@/theme';
-import { useCreateBusinessProfile } from '@/hooks/useBusinessMutations';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { useCreateBusinessProfile, useDeleteBusinessProfile, useUpdateBusinessProfile } from '@/hooks/useBusinessMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { MainStackParamList } from '@/navigation/types';
 
-export const SHOP_GRADIENT = ['#F59E0B', '#D97706'] as const;
+const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
 type Props = NativeStackScreenProps<MainStackParamList, 'BusinessRegistration'>;
 
@@ -32,13 +33,20 @@ const SHOP_CATEGORIES = [
 /**
  * Adapted from user-app's BusinessProfileModal — same fields, same multi-select chip +
  * "+ Add New" pattern, same delivery Yes/No chip pair, same shared LocationPicker/
- * ImagePickerField, submitting to the same `POST /businesses/me/profile`. Create-only for
- * this app's first pass (see WorkerRegistrationScreen's doc comment for the same rationale).
+ * ImagePickerField, submitting to the same `POST /businesses/me/profile`.
+ *
+ * Also doubles as the edit form (mirrors WorkerRegistrationScreen's own edit-mode addition —
+ * see its doc comment for the full rationale): an optional `route.params.profile` switches
+ * into edit mode, prefilled via `useEffect`, `PATCH` instead of `POST`, plus a Delete action.
  */
-export function BusinessRegistrationScreen({ navigation }: Props) {
+export function BusinessRegistrationScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const profile = route.params?.profile;
+  const isEditMode = !!profile;
   const createProfile = useCreateBusinessProfile();
+  const updateProfile = useUpdateBusinessProfile();
+  const deleteProfile = useDeleteBusinessProfile();
 
   const [shopName, setShopName] = useState('');
   const [shopCategories, setShopCategories] = useState<string[]>([]);
@@ -50,6 +58,20 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
   const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
   const [deliveryPricePerKm, setDeliveryPricePerKm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setShopName(profile.shopName);
+      setShopCategories(profile.shopCategories.filter((key) => key !== 'other'));
+      setOtherCategoryEntries(profile.otherCategoryDescription ? profile.otherCategoryDescription.split(', ').filter(Boolean) : []);
+      setLocation({ latitude: profile.latitude, longitude: profile.longitude, address: profile.locationAddress ?? '' });
+      setPhotos(profile.shopPhotoUrls.map((url) => ({ uri: url, name: url.split('/').pop() ?? 'photo.jpg', type: 'image/jpeg' })));
+      setDeliveryAvailable(profile.deliveryAvailable);
+      setDeliveryPricePerKm(profile.deliveryPricePerKm != null ? String(profile.deliveryPricePerKm) : '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
 
   const toggleCategory = (key: string) => {
     setShopCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
@@ -86,6 +108,12 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
     setOtherCategoryEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleMutationError = (err: unknown) => {
+    const message = getLocalizedErrorMessage(err, t);
+    setError(message);
+    showToast({ variant: 'error', title: t('common.errorTitle'), message });
+  };
+
   const handleSubmit = () => {
     setError(null);
     const includesOther = otherCategoryEntries.length > 0;
@@ -100,36 +128,72 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
       return;
     }
 
-    createProfile.mutate(
-      {
-        shopName,
-        shopCategories: includesOther ? [...shopCategories, 'other'] : shopCategories,
-        otherCategoryDescription: includesOther ? otherCategoryEntries.join(', ') : undefined,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        locationAddress: location.address,
-        deliveryAvailable,
-        deliveryPricePerKm: deliveryAvailable ? Number(deliveryPricePerKm) : undefined,
-        shopPhotos: photos,
-      },
-      {
-        onSuccess: () => {
-          showToast({ variant: 'success', title: t('businessProfile.successTitle'), message: t('businessProfile.successMessage') });
-          navigation.replace('MyInfo', { capability: 'business' });
+    const commonPayload = {
+      shopName,
+      shopCategories: includesOther ? [...shopCategories, 'other'] : shopCategories,
+      otherCategoryDescription: includesOther ? otherCategoryEntries.join(', ') : undefined,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      locationAddress: location.address,
+      deliveryAvailable,
+      deliveryPricePerKm: deliveryAvailable ? Number(deliveryPricePerKm) : undefined,
+    };
+
+    if (isEditMode) {
+      const existingPhotoUrls = photos.filter((image) => image.uri.startsWith('http')).map((image) => image.uri);
+      const newPhotos = photos.filter((image) => !image.uri.startsWith('http'));
+      updateProfile.mutate(
+        { ...commonPayload, existingPhotoUrls, shopPhotos: newPhotos },
+        {
+          onSuccess: () => {
+            showToast({
+              variant: 'success',
+              title: t('businessProfile.updateSuccessTitle'),
+              message: t('businessProfile.updateSuccessMessage'),
+            });
+            navigation.replace('MyInfo', { capability: 'business' });
+          },
+          onError: handleMutationError,
         },
-        onError: (err) => {
-          const message = getLocalizedErrorMessage(err, t);
-          setError(message);
-          showToast({ variant: 'error', title: t('common.errorTitle'), message });
+      );
+    } else {
+      createProfile.mutate(
+        { ...commonPayload, shopPhotos: photos },
+        {
+          onSuccess: () => {
+            showToast({ variant: 'success', title: t('businessProfile.successTitle'), message: t('businessProfile.successMessage') });
+            navigation.replace('MyInfo', { capability: 'business' });
+          },
+          onError: handleMutationError,
         },
+      );
+    }
+  };
+
+  const handleDelete = () => {
+    deleteProfile.mutate(undefined, {
+      onSuccess: () => {
+        setShowDeleteConfirm(false);
+        showToast({
+          variant: 'success',
+          title: t('businessProfile.deleteSuccessTitle'),
+          message: t('businessProfile.deleteSuccessMessage'),
+        });
+        navigation.popToTop();
       },
-    );
+      onError: (err) => {
+        setShowDeleteConfirm(false);
+        showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(err, t) });
+      },
+    });
   };
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('businessProfile.subtitle')}</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+          {t(isEditMode ? 'businessProfile.editSubtitle' : 'businessProfile.subtitle')}
+        </Text>
 
         <TextField label={t('businessProfile.shopNameLabel')} value={shopName} onChangeText={setShopName} />
 
@@ -140,7 +204,7 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
             return (
               <Pressable key={category.key} onPress={() => toggleCategory(category.key)}>
                 {isActive ? (
-                  <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                  <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
                     <FontAwesome6 name={category.icon} size={12} color="#FFFFFF" solid />
                     <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t(`businessProfile.categories.${category.key}`)}</Text>
                   </LinearGradient>
@@ -155,7 +219,7 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
           })}
           {otherCategoryEntries.map((entry, index) => (
             <Pressable key={`other-${entry}-${index}`} onPress={() => removeOtherEntry(index)}>
-              <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
                 <Text style={[styles.chipLabel, { color: '#FFFFFF' }]} numberOfLines={1}>
                   {entry}
                 </Text>
@@ -164,11 +228,11 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
             </Pressable>
           ))}
           <Pressable onPress={() => setShowOtherInput(true)}>
-            <View style={[styles.chip, styles.addNewChip, { borderColor: SHOP_GRADIENT[0], backgroundColor: `${SHOP_GRADIENT[0]}16` }]}>
-              <View style={[styles.addNewBadge, { backgroundColor: SHOP_GRADIENT[0] }]}>
+            <View style={[styles.chip, styles.addNewChip, { borderColor: headerGradient[0], backgroundColor: `${headerGradient[0]}16` }]}>
+              <View style={[styles.addNewBadge, { backgroundColor: headerGradient[0] }]}>
                 <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
               </View>
-              <Text style={[styles.chipLabel, { color: SHOP_GRADIENT[0], fontFamily: fonts.semiBold }]}>{t('common.addNew')}</Text>
+              <Text style={[styles.chipLabel, { color: headerGradient[0], fontFamily: fonts.semiBold }]}>{t('common.addNew')}</Text>
             </View>
           </Pressable>
         </View>
@@ -192,14 +256,14 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
               disabled={!otherInputValue.trim()}
               accessibilityLabel={t('common.done')}
             >
-              <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
+              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
                 <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
               </LinearGradient>
             </Pressable>
           </View>
         ) : null}
 
-        <LocationPicker value={location} onChange={setLocation} accentColor={SHOP_GRADIENT[0]} />
+        <LocationPicker value={location} onChange={setLocation} />
 
         <ImagePickerField label={t('businessProfile.photosLabel')} images={photos} onChange={setPhotos} />
 
@@ -207,7 +271,7 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
         <View style={styles.chipRow}>
           <Pressable onPress={() => setDeliveryAvailable(true)}>
             {deliveryAvailable === true ? (
-              <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
                 <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t('businessProfile.deliveryYes')}</Text>
               </LinearGradient>
             ) : (
@@ -218,7 +282,7 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
           </Pressable>
           <Pressable onPress={() => setDeliveryAvailable(false)}>
             {deliveryAvailable === false ? (
-              <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
                 <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t('businessProfile.deliveryNo')}</Text>
               </LinearGradient>
             ) : (
@@ -240,8 +304,31 @@ export function BusinessRegistrationScreen({ navigation }: Props) {
 
         {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 
-        <Button label={t('common.submit')} onPress={handleSubmit} loading={createProfile.isPending} gradient={SHOP_GRADIENT} />
+        <Button
+          label={t(isEditMode ? 'common.saveChanges' : 'common.submit')}
+          onPress={handleSubmit}
+          loading={isEditMode ? updateProfile.isPending : createProfile.isPending}
+        />
+
+        {isEditMode ? (
+          <Pressable style={styles.deleteButton} onPress={() => setShowDeleteConfirm(true)}>
+            <FontAwesome6 name="trash" size={14} color={colors.error} solid />
+            <Text style={[styles.deleteText, { color: colors.error }]}>{t('businessProfile.deleteAction')}</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
+
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        icon="trash"
+        gradient={DELETE_GRADIENT}
+        title={t('businessProfile.deleteConfirmTitle')}
+        message={t('businessProfile.deleteConfirmMessage')}
+        confirmLabel={t('common.delete')}
+        loading={deleteProfile.isPending}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </ScreenContainer>
   );
 }
@@ -261,4 +348,6 @@ const styles = StyleSheet.create({
   otherDoneButton: { marginTop: 22 },
   otherDoneGradient: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   error: { ...typography.caption, marginBottom: 12 },
+  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18, paddingVertical: 10 },
+  deleteText: { ...typography.body, fontFamily: fonts.semiBold },
 });

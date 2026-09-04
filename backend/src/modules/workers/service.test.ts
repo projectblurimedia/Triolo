@@ -157,7 +157,7 @@ describe('WorkersService.updateProfile', () => {
     expect(repo.update).not.toHaveBeenCalled();
   });
 
-  it('resets verification status to pending and keeps existing photos when none are removed', async () => {
+  it('keeps the existing verification status and keeps existing photos when none are removed', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(
       buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg'], verificationStatus: 'verified' }),
@@ -173,7 +173,7 @@ describe('WorkersService.updateProfile', () => {
         skillCategories: ['plumber'],
         experienceYears: 4,
         portfolioPhotoUrls: ['https://cdn/a.jpg'],
-        verificationStatus: 'pending_verification',
+        verificationStatus: 'verified',
       }),
     );
   });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -9,11 +9,14 @@ import { TextField } from '@/components/TextField';
 import { LocationPicker, LocationValue } from '@/components/LocationPicker';
 import { ImagePickerField, PickedImage } from '@/components/ImagePickerField';
 import { Button } from '@/components/Button';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { useCreateWorkerProfile } from '@/hooks/useWorkerMutations';
+import { useCreateWorkerProfile, useDeleteWorkerProfile, useUpdateWorkerProfile } from '@/hooks/useWorkerMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { MainStackParamList } from '@/navigation/types';
+
+const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
 type Props = NativeStackScreenProps<MainStackParamList, 'WorkerRegistration'>;
 
@@ -30,14 +33,23 @@ const SKILL_CATEGORIES = [
 /**
  * Adapted from user-app's WorkerProfileModal — same fields, same multi-select chip +
  * "+ Add New" pattern, same shared LocationPicker/ImagePickerField, submitting to the same
- * `POST /workers/me/profile`. Create-only for this app's first pass (no edit/delete yet —
- * see the plan's "Deferred" note); a plain screen here, not a `Modal`, since navigation
- * itself provides the "come from somewhere, go back" framing a Modal gave the original.
+ * `POST /workers/me/profile`. A plain screen here, not a `Modal`, since navigation itself
+ * provides the "come from somewhere, go back" framing a Modal gave the original.
+ *
+ * Also doubles as the edit form — an optional `route.params.profile` (passed by MyInfoScreen's
+ * edit action, or ChooseCapabilityScreen in principle) switches into edit mode (`isEditMode`):
+ * prefilled via a `useEffect` keyed on the profile, `PATCH` instead of `POST`, plus a Delete
+ * action gated behind the existing generic `ConfirmModal`. Mirrors WorkerProfileModal's own
+ * edit-mode branch field-for-field.
  */
-export function WorkerRegistrationScreen({ navigation }: Props) {
+export function WorkerRegistrationScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const profile = route.params?.profile;
+  const isEditMode = !!profile;
   const createProfile = useCreateWorkerProfile();
+  const updateProfile = useUpdateWorkerProfile();
+  const deleteProfile = useDeleteWorkerProfile();
 
   const [skillCategories, setSkillCategories] = useState<string[]>([]);
   const [otherSkillEntries, setOtherSkillEntries] = useState<string[]>([]);
@@ -47,6 +59,20 @@ export function WorkerRegistrationScreen({ navigation }: Props) {
   const [location, setLocation] = useState<LocationValue>({ latitude: null, longitude: null, address: '' });
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setSkillCategories(profile.skillCategories.filter((key) => key !== 'other'));
+      setOtherSkillEntries(profile.otherSkillDescription ? profile.otherSkillDescription.split(', ').filter(Boolean) : []);
+      setExperienceYears(String(profile.experienceYears));
+      setLocation({ latitude: profile.latitude, longitude: profile.longitude, address: profile.locationAddress ?? '' });
+      setPhotos(
+        profile.portfolioPhotoUrls.map((url) => ({ uri: url, name: url.split('/').pop() ?? 'photo.jpg', type: 'image/jpeg' })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
 
   const toggleSkill = (key: string) => {
     setSkillCategories((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
@@ -83,6 +109,12 @@ export function WorkerRegistrationScreen({ navigation }: Props) {
     setOtherSkillEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleMutationError = (err: unknown) => {
+    const message = getLocalizedErrorMessage(err, t);
+    setError(message);
+    showToast({ variant: 'error', title: t('common.errorTitle'), message });
+  };
+
   const handleSubmit = () => {
     setError(null);
     const includesOther = otherSkillEntries.length > 0;
@@ -91,34 +123,70 @@ export function WorkerRegistrationScreen({ navigation }: Props) {
       return;
     }
 
-    createProfile.mutate(
-      {
-        skillCategories: includesOther ? [...skillCategories, 'other'] : skillCategories,
-        otherSkillDescription: includesOther ? otherSkillEntries.join(', ') : undefined,
-        experienceYears: Number(experienceYears),
-        latitude: location.latitude,
-        longitude: location.longitude,
-        locationAddress: location.address,
-        portfolioPhotos: photos,
-      },
-      {
-        onSuccess: () => {
-          showToast({ variant: 'success', title: t('workerProfile.successTitle'), message: t('workerProfile.successMessage') });
-          navigation.replace('MyInfo', { capability: 'worker' });
+    const commonPayload = {
+      skillCategories: includesOther ? [...skillCategories, 'other'] : skillCategories,
+      otherSkillDescription: includesOther ? otherSkillEntries.join(', ') : undefined,
+      experienceYears: Number(experienceYears),
+      latitude: location.latitude,
+      longitude: location.longitude,
+      locationAddress: location.address,
+    };
+
+    if (isEditMode) {
+      const existingPhotoUrls = photos.filter((image) => image.uri.startsWith('http')).map((image) => image.uri);
+      const newPhotos = photos.filter((image) => !image.uri.startsWith('http'));
+      updateProfile.mutate(
+        { ...commonPayload, existingPhotoUrls, portfolioPhotos: newPhotos },
+        {
+          onSuccess: () => {
+            showToast({
+              variant: 'success',
+              title: t('workerProfile.updateSuccessTitle'),
+              message: t('workerProfile.updateSuccessMessage'),
+            });
+            navigation.replace('MyInfo', { capability: 'worker' });
+          },
+          onError: handleMutationError,
         },
-        onError: (err) => {
-          const message = getLocalizedErrorMessage(err, t);
-          setError(message);
-          showToast({ variant: 'error', title: t('common.errorTitle'), message });
+      );
+    } else {
+      createProfile.mutate(
+        { ...commonPayload, portfolioPhotos: photos },
+        {
+          onSuccess: () => {
+            showToast({ variant: 'success', title: t('workerProfile.successTitle'), message: t('workerProfile.successMessage') });
+            navigation.replace('MyInfo', { capability: 'worker' });
+          },
+          onError: handleMutationError,
         },
+      );
+    }
+  };
+
+  const handleDelete = () => {
+    deleteProfile.mutate(undefined, {
+      onSuccess: () => {
+        setShowDeleteConfirm(false);
+        showToast({
+          variant: 'success',
+          title: t('workerProfile.deleteSuccessTitle'),
+          message: t('workerProfile.deleteSuccessMessage'),
+        });
+        navigation.popToTop();
       },
-    );
+      onError: (err) => {
+        setShowDeleteConfirm(false);
+        showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(err, t) });
+      },
+    });
   };
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('workerProfile.subtitle')}</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+          {t(isEditMode ? 'workerProfile.editSubtitle' : 'workerProfile.subtitle')}
+        </Text>
 
         <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.skillLabel')}</Text>
         <View style={styles.chipRow}>
@@ -200,8 +268,31 @@ export function WorkerRegistrationScreen({ navigation }: Props) {
 
         {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 
-        <Button label={t('common.submit')} onPress={handleSubmit} loading={createProfile.isPending} />
+        <Button
+          label={t(isEditMode ? 'common.saveChanges' : 'common.submit')}
+          onPress={handleSubmit}
+          loading={isEditMode ? updateProfile.isPending : createProfile.isPending}
+        />
+
+        {isEditMode ? (
+          <Pressable style={styles.deleteButton} onPress={() => setShowDeleteConfirm(true)}>
+            <FontAwesome6 name="trash" size={14} color={colors.error} solid />
+            <Text style={[styles.deleteText, { color: colors.error }]}>{t('workerProfile.deleteAction')}</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
+
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        icon="trash"
+        gradient={DELETE_GRADIENT}
+        title={t('workerProfile.deleteConfirmTitle')}
+        message={t('workerProfile.deleteConfirmMessage')}
+        confirmLabel={t('common.delete')}
+        loading={deleteProfile.isPending}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </ScreenContainer>
   );
 }
@@ -221,4 +312,6 @@ const styles = StyleSheet.create({
   otherDoneButton: { marginTop: 22 },
   otherDoneGradient: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   error: { ...typography.caption, marginBottom: 12 },
+  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18, paddingVertical: 10 },
+  deleteText: { ...typography.body, fontFamily: fonts.semiBold },
 });

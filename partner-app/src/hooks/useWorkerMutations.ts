@@ -3,8 +3,8 @@ import { workersService, CreateWorkerProfileParams, UpdateWorkerProfileParams } 
 
 export const WORKER_PROFILE_QUERY_KEY = ['workers', 'me', 'profile'];
 
-export function useMyWorkerProfile() {
-  return useQuery({ queryKey: WORKER_PROFILE_QUERY_KEY, queryFn: workersService.getMyProfile });
+export function useMyWorkerProfile(enabled = true) {
+  return useQuery({ queryKey: WORKER_PROFILE_QUERY_KEY, queryFn: workersService.getMyProfile, enabled });
 }
 
 export function useCreateWorkerProfile() {

@@ -66,27 +66,37 @@ export function AdminLoginPage() {
       <PageHeader title="Triolo Admin" />
       <div className="body">
         {step === 'phone' ? (
-          <div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitPhone();
+            }}
+          >
             <div className="field">
               <label>Admin Mobile Number</label>
-              <input value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} maxLength={10} inputMode="numeric" />
+              <input value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} maxLength={10} inputMode="numeric" autoFocus />
             </div>
             {error ? <p className="error-text">{error}</p> : null}
-            <button className="button" onClick={submitPhone} disabled={loading}>
+            <button type="submit" className="button" disabled={loading}>
               {loading ? <LoadingSpinner /> : 'Send OTP'}
             </button>
-          </div>
+          </form>
         ) : (
-          <div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitOtp();
+            }}
+          >
             <div className="field">
               <label>Enter OTP</label>
-              <input value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} inputMode="numeric" />
+              <input value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} inputMode="numeric" autoFocus />
             </div>
             {error ? <p className="error-text">{error}</p> : null}
-            <button className="button" onClick={submitOtp} disabled={loading}>
+            <button type="submit" className="button" disabled={loading}>
               {loading ? <LoadingSpinner /> : 'Verify & Log In'}
             </button>
-          </div>
+          </form>
         )}
       </div>
     </div>

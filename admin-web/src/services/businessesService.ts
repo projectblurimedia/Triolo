@@ -13,6 +13,8 @@ export interface BusinessProfile {
   deliveryAvailable: boolean;
   deliveryPricePerKm: number | null;
   verificationStatus: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BusinessProfileWithAccount extends BusinessProfile {

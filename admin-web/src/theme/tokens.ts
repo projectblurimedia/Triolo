@@ -15,5 +15,4 @@ export const colors = {
 } as const;
 
 export const headerGradient = `linear-gradient(135deg, ${colors.primary}, ${colors.primaryLight})`;
-export const shopGradient = `linear-gradient(135deg, ${colors.secondary}, ${colors.warning})`;
 export const logoutGradient = 'linear-gradient(135deg, #ef4444, #dc2626)';

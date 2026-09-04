@@ -79,7 +79,7 @@ Return the caller's worker profile, or `null` if they haven't created one.
 - 200: `{ success: true, data: WorkerProfile | null }`
 
 ### PATCH /workers/me/profile
-Update the caller's existing worker profile. `multipart/form-data`, same field shape as `POST`, plus `existingPhotoUrls: string` (a JSON-stringified array of already-uploaded portfolio photo URLs to keep — anything omitted is dropped). Newly uploaded files under `portfolioPhotos` are appended to the kept URLs, capped at 6 total. Resets `verificationStatus` to `pending_verification` — edited details haven't been reviewed yet.
+Update the caller's existing worker profile. `multipart/form-data`, same field shape as `POST`, plus `existingPhotoUrls: string` (a JSON-stringified array of already-uploaded portfolio photo URLs to keep — anything omitted is dropped). Newly uploaded files under `portfolioPhotos` are appended to the kept URLs, capped at 6 total. Keeps the profile's existing `verificationStatus` as-is (no longer resets to `pending_verification` — a reversed decision; admin still sees when a profile was edited via its `updatedAt` timestamp, surfaced as information only).
 - Auth: Bearer access token
 - 200: `{ success: true, message: "Worker profile updated", data: WorkerProfile }`
 - 400: validation error
@@ -108,7 +108,7 @@ Return the caller's business profile, or `null` if they haven't created one.
 - 200: `{ success: true, data: BusinessProfile | null }`
 
 ### PATCH /businesses/me/profile
-Update the caller's existing business profile. `multipart/form-data`, same field shape as `POST`, plus `existingPhotoUrls: string` (a JSON-stringified array of already-uploaded shop photo URLs to keep). Newly uploaded files under `shopPhotos` are appended to the kept URLs, capped at 6 total. Resets `verificationStatus` to `pending_verification`.
+Update the caller's existing business profile. `multipart/form-data`, same field shape as `POST`, plus `existingPhotoUrls: string` (a JSON-stringified array of already-uploaded shop photo URLs to keep). Newly uploaded files under `shopPhotos` are appended to the kept URLs, capped at 6 total. Keeps the profile's existing `verificationStatus` as-is (see the Workers `PATCH` endpoint above for the same note).
 - Auth: Bearer access token
 - 200: `{ success: true, message: "Business profile updated", data: BusinessProfile }`
 - 400 / 404: same shape as the Workers endpoint (`BUSINESS_PROFILE_NOT_FOUND` instead of `WORKER_PROFILE_NOT_FOUND`)

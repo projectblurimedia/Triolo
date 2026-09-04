@@ -12,7 +12,6 @@
   --color-text-muted: #5b6472;
   --color-border: #d8dadd;
   --header-gradient: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
-  --shop-gradient: linear-gradient(135deg, var(--color-secondary), var(--color-warning));
   --logout-gradient: linear-gradient(135deg, #ef4444, #dc2626);
 }
 
@@ -58,25 +57,35 @@ a {
   padding: 14px 20px;
 }
 
-.header--shop {
-  background: var(--shop-gradient);
-}
-
 .header__row {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.header__back {
+/* Same treatment as the mobile apps' GradientHeader iconButton — a circular translucent
+   button, not a bare icon. header__logo is a touch bigger, matching how the mobile header's
+   own leadingIconButton is deliberately bigger than its back/action buttons. */
+.header__iconButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.32);
   color: var(--color-white);
   text-decoration: none;
   flex-shrink: 0;
+  font-size: 15px;
+}
+
+.header__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  font-size: 17px;
 }
 
 .header__title {
@@ -143,10 +152,6 @@ a {
   cursor: pointer;
 }
 
-.button--shop {
-  background: var(--shop-gradient);
-}
-
 .button--logout {
   background: var(--logout-gradient);
 }
@@ -187,10 +192,6 @@ a {
   background: var(--header-gradient);
   color: var(--color-white);
   border-color: transparent;
-}
-
-.chip--active.chip--shop {
-  background: var(--shop-gradient);
 }
 
 .card {

@@ -178,7 +178,7 @@ describe('BusinessesService.updateProfile', () => {
     expect(repo.update).not.toHaveBeenCalled();
   });
 
-  it('resets verification status to pending and keeps existing photos when none are removed', async () => {
+  it('keeps the existing verification status and keeps existing photos when none are removed', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(
       buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg'], verificationStatus: 'verified' }),
@@ -198,7 +198,7 @@ describe('BusinessesService.updateProfile', () => {
         shopName: 'New Name',
         shopCategories: ['restaurant'],
         shopPhotoUrls: ['https://cdn/a.jpg'],
-        verificationStatus: 'pending_verification',
+        verificationStatus: 'verified',
       }),
     );
   });

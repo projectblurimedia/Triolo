@@ -71,9 +71,11 @@ export class WorkersService {
       longitude: dto.longitude ?? null,
       locationAddress: dto.locationAddress ?? null,
       portfolioPhotoUrls,
-      // Edited details haven't been reviewed yet — an already-verified worker changing
-      // their skills/location shouldn't stay "verified" for the new, unreviewed details.
-      verificationStatus: 'pending_verification',
+      // Edits keep whatever verification status the profile already had — a confirmed
+      // reversal of an earlier "any edit resets to pending_verification" design. Admin still
+      // sees when a verified profile was last edited via `updatedAt` (set by the repository's
+      // `updated_at = now()`), surfaced as plain information, not a re-review gate.
+      verificationStatus: existing.verificationStatus,
     });
   }
 

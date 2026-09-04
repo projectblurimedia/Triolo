@@ -15,7 +15,6 @@ import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { MainStackParamList } from '@/navigation/types';
 
-const SHOP_GRADIENT = ['#F59E0B', '#D97706'] as const;
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
 type Props = NativeStackScreenProps<MainStackParamList, 'ChooseCapability'>;
@@ -55,7 +54,7 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
     {
       key: 'business' as const,
       icon: 'store' as const,
-      gradient: SHOP_GRADIENT,
+      gradient: headerGradient,
       registeredTitle: t('chooseCapability.businessRegisteredTitle'),
       unregisteredTitle: t('chooseCapability.businessUnregisteredTitle'),
       unregisteredSubtitle: t('chooseCapability.businessUnregisteredSubtitle'),
@@ -72,6 +71,7 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
       <GradientHeader
         title={t('common.appName')}
         subtitle={t('chooseCapability.tagline')}
+        leadingIcon="shapes"
         actions={[{ icon: 'right-from-bracket', accessibilityLabel: t('common.logout'), onPress: () => setShowLogoutConfirm(true) }]}
       />
 

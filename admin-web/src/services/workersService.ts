@@ -11,6 +11,8 @@ export interface WorkerProfile {
   locationAddress: string | null;
   portfolioPhotoUrls: string[];
   verificationStatus: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface WorkerProfileWithAccount extends WorkerProfile {

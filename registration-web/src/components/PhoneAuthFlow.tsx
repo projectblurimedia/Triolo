@@ -9,7 +9,6 @@ type Step = 'phone' | 'details' | 'otp';
 
 interface PhoneAuthFlowProps {
   onAuthenticated: () => void;
-  shop?: boolean;
 }
 
 /**
@@ -18,7 +17,7 @@ interface PhoneAuthFlowProps {
  * short details step before requesting a registration OTP instead, so one flow covers both
  * "I already have a Triolo account" and "I'm brand new" without asking the person to choose.
  */
-export function PhoneAuthFlow({ onAuthenticated, shop }: PhoneAuthFlowProps) {
+export function PhoneAuthFlow({ onAuthenticated }: PhoneAuthFlowProps) {
   const setSession = useAuthStore((s) => s.setSession);
   const [step, setStep] = useState<Step>('phone');
   const [mobileNumber, setMobileNumber] = useState('');
@@ -98,58 +97,75 @@ export function PhoneAuthFlow({ onAuthenticated, shop }: PhoneAuthFlowProps) {
     }
   };
 
-  const buttonClass = `button ${shop ? 'button--shop' : ''}`;
+  const buttonClass = 'button';
 
+  // A real <form onSubmit>, not a bare onClick — this is what makes pressing Enter in any
+  // field submit the step, the same as clicking the button, without a per-input onKeyDown.
   if (step === 'phone') {
     return (
-      <div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submitPhone();
+        }}
+      >
         <div className="field">
           <label>Mobile Number</label>
-          <input value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} maxLength={10} inputMode="numeric" />
+          <input value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} maxLength={10} inputMode="numeric" autoFocus />
         </div>
         {error ? <p className="error-text">{error}</p> : null}
-        <button className={buttonClass} onClick={submitPhone} disabled={loading}>
+        <button type="submit" className={buttonClass} disabled={loading}>
           {loading ? <LoadingSpinner /> : 'Continue'}
         </button>
-      </div>
+      </form>
     );
   }
 
   if (step === 'details') {
     return (
-      <div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submitDetails();
+        }}
+      >
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: -8, marginBottom: 16 }}>
           We don't have an account for {mobileNumber} yet — a few quick details to set one up.
         </p>
         <div className="field">
           <label>Full Name</label>
-          <input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <input value={fullName} onChange={(e) => setFullName(e.target.value)} autoFocus />
         </div>
         <div className="field">
           <label>Email</label>
           <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
         </div>
         {error ? <p className="error-text">{error}</p> : null}
-        <button className={buttonClass} onClick={submitDetails} disabled={loading}>
+        <button type="submit" className={buttonClass} disabled={loading}>
           {loading ? <LoadingSpinner /> : 'Send OTP'}
         </button>
-      </div>
+      </form>
     );
   }
 
   return (
-    <div>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submitOtp();
+      }}
+    >
       <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: -8, marginBottom: 16 }}>
         Enter the OTP sent to {mobileNumber}.
       </p>
       <div className="field">
         <label>Enter OTP</label>
-        <input value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} inputMode="numeric" />
+        <input value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} inputMode="numeric" autoFocus />
       </div>
       {error ? <p className="error-text">{error}</p> : null}
-      <button className={buttonClass} onClick={submitOtp} disabled={loading}>
+      <button type="submit" className={buttonClass} disabled={loading}>
         {loading ? <LoadingSpinner /> : 'Verify OTP'}
       </button>
-    </div>
+    </form>
   );
 }

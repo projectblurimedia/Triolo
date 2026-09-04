@@ -86,9 +86,9 @@ export function RegisterBusinessPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Business Registration" backTo="/" shop />
+      <PageHeader title="Business Registration" backTo="/" />
       <div className="body">
-        {stage === 'auth' ? <PhoneAuthFlow onAuthenticated={handleAuthenticated} shop /> : null}
+        {stage === 'auth' ? <PhoneAuthFlow onAuthenticated={handleAuthenticated} /> : null}
 
         {stage === 'checking' ? (
           <div className="loading-wrap">
@@ -107,7 +107,12 @@ export function RegisterBusinessPage() {
         ) : null}
 
         {stage === 'form' ? (
-          <div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit();
+            }}
+          >
             <div className="field">
               <label>Shop Name</label>
               <input value={shopName} onChange={(e) => setShopName(e.target.value)} />
@@ -121,7 +126,6 @@ export function RegisterBusinessPage() {
               onChange={setShopCategories}
               otherEntries={otherEntries}
               onOtherEntriesChange={setOtherEntries}
-              shop
             />
             <LocationField value={location} onChange={setLocation} />
             <PhotoUpload label="Shop Photos (optional)" files={photos} onChange={setPhotos} />
@@ -132,14 +136,14 @@ export function RegisterBusinessPage() {
             <div className="chip-row">
               <button
                 type="button"
-                className={`chip ${deliveryAvailable === true ? 'chip--active chip--shop' : ''}`}
+                className={`chip ${deliveryAvailable === true ? 'chip--active' : ''}`}
                 onClick={() => setDeliveryAvailable(true)}
               >
                 Yes
               </button>
               <button
                 type="button"
-                className={`chip ${deliveryAvailable === false ? 'chip--active chip--shop' : ''}`}
+                className={`chip ${deliveryAvailable === false ? 'chip--active' : ''}`}
                 onClick={() => setDeliveryAvailable(false)}
               >
                 No
@@ -153,10 +157,10 @@ export function RegisterBusinessPage() {
             ) : null}
 
             {error ? <p className="error-text">{error}</p> : null}
-            <button className="button button--shop" onClick={handleSubmit} disabled={submitting}>
+            <button type="submit" className="button" disabled={submitting}>
               {submitting ? <LoadingSpinner /> : 'Submit'}
             </button>
-          </div>
+          </form>
         ) : null}
 
         {stage === 'success' ? (

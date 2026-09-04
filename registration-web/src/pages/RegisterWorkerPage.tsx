@@ -97,7 +97,12 @@ export function RegisterWorkerPage() {
         ) : null}
 
         {stage === 'form' ? (
-          <div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit();
+            }}
+          >
             <label style={{ display: 'block', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
               Your Skills (select all that apply)
             </label>
@@ -115,10 +120,10 @@ export function RegisterWorkerPage() {
             <LocationField value={location} onChange={setLocation} />
             <PhotoUpload label="Photos of Your Work (optional)" files={photos} onChange={setPhotos} />
             {error ? <p className="error-text">{error}</p> : null}
-            <button className="button" onClick={handleSubmit} disabled={submitting}>
+            <button type="submit" className="button" disabled={submitting}>
               {submitting ? <LoadingSpinner /> : 'Submit'}
             </button>
-          </div>
+          </form>
         ) : null}
 
         {stage === 'success' ? (

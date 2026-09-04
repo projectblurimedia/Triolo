@@ -7,8 +7,8 @@ import {
 
 export const BUSINESS_PROFILE_QUERY_KEY = ['businesses', 'me', 'profile'];
 
-export function useMyBusinessProfile() {
-  return useQuery({ queryKey: BUSINESS_PROFILE_QUERY_KEY, queryFn: businessesService.getMyProfile });
+export function useMyBusinessProfile(enabled = true) {
+  return useQuery({ queryKey: BUSINESS_PROFILE_QUERY_KEY, queryFn: businessesService.getMyProfile, enabled });
 }
 
 export function useCreateBusinessProfile() {

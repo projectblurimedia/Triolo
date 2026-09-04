@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 export function LandingPage() {
   return (
     <div className="page">
-      <PageHeader title="Triolo" />
+      <PageHeader title="Triolo Partner" />
       <div className="body">
         <Link to="/worker" className="card card--clickable">
           <strong>Are You a Worker?</strong>

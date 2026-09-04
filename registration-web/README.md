@@ -6,12 +6,13 @@ React + Vite + TypeScript — the public Worker/Shop registration site. Does exa
 
 ```bash
 npm install
-npm run dev         # Vite dev server, http://localhost:5173
+npm run dev         # Vite dev server — bound to the LAN interface (server.host in vite.config.ts),
+                    # so it's reachable from another device on the same Wi-Fi, not just this machine
 npm run build        # typecheck + production build
 npm run typecheck
 ```
 
-Expects the backend running locally at `http://localhost:4000` (see `src/services/apiClient.ts`).
+`npm run dev` prints both a `Local` and a `Network` URL — use the `Network` one (`http://<your-LAN-IP>:5173`) to open the site from a phone/another device. Expects the backend reachable at the same LAN IP the mobile apps use (`src/services/apiClient.ts` — keep it in sync with `user-app`/`partner-app`'s `constants/config.ts` if that IP changes).
 
 ## Structure
 

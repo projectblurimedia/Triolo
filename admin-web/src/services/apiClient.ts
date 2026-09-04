@@ -1,12 +1,16 @@
 import { useAuthStore } from '@/state/authStore';
 
 /**
- * Points at the local backend during development — unlike the mobile apps'
- * `constants/config.ts` (which needs a LAN IP since a phone isn't the dev machine), a
- * browser on the same machine as the backend can just use `localhost`. Override for
- * staging/production once those API URLs exist (see docs/deployment.md).
+ * Points at the local backend during development, via the same LAN IP the mobile apps use
+ * (`user-app`/`partner-app`'s `constants/config.ts`) rather than `localhost` — this site is
+ * itself served from that LAN IP (see `vite.config.ts`'s `server.host`) so it can be opened
+ * from another device on the network, and `localhost` from that device would mean itself,
+ * not the dev machine. Update alongside the mobile apps' `API_BASE_URL` if that IP changes
+ * (find it with `ipconfig` on the dev machine — phone and PC must be on the same Wi-Fi
+ * network). Override for staging/production once those API URLs exist (see
+ * docs/deployment.md).
  */
-const API_BASE_URL = 'http://localhost:4000/api/v1';
+const API_BASE_URL = 'http://192.168.1.14:4000/api/v1';
 
 export interface ApiEnvelope<T> {
   success: boolean;
@@ -35,7 +39,18 @@ export class ApiError extends Error {
  * Simpler than the mobile apps' apiClient — a browser's `fetch`+`FormData` is safe to
  * resend on retry (unlike React Native's), so there's no need for the mobile apps'
  * proactive-JWT-decode refresh dance (see .cloud/architecture.md's "Frontend Structure
- * (web/)"). A plain reactive refresh-once-on-401 is enough here.
+ * (web/)"). A plain reactive refresh-once is enough here.
+ *
+ * Also retries on 403, not just 401 — `authenticate` decodes `role` straight from the
+ * access token's own payload (baked in at whichever login minted it), never re-checking the
+ * database per-request. An account promoted to `admin` *after* its current token was issued
+ * (the realistic path — `backend/scripts/seedAdmin.ts` only runs before someone's first
+ * login) keeps hitting `authorize('admin')`'s 403 with every call until it gets a token
+ * minted fresh. `POST /auth/refresh` *does* re-read the account from the database and signs
+ * the new pair from that (see `AuthService.refreshAccessToken`), so a single silent refresh
+ * — the same single-flight `tryRefreshAccessToken()` 401 already uses — fixes this without
+ * forcing a disruptive full re-login. If the retry still 403s, the account genuinely isn't
+ * `admin` and the error is left to surface normally.
  */
 async function request<T>(path: string, init: RequestInit, auth: boolean, retried = false): Promise<T> {
   const { accessToken } = useAuthStore.getState();
@@ -46,12 +61,14 @@ async function request<T>(path: string, init: RequestInit, auth: boolean, retrie
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
 
-  if (response.status === 401 && auth && !retried) {
+  if ((response.status === 401 || response.status === 403) && auth && !retried) {
     const refreshed = await tryRefreshAccessToken();
     if (refreshed) {
       return request<T>(path, init, auth, true);
     }
-    useAuthStore.getState().clearSession();
+    if (response.status === 401) {
+      useAuthStore.getState().clearSession();
+    }
   }
 
   const body = (await response.json().catch(() => null)) as ApiEnvelope<T> | ApiErrorBody | null;

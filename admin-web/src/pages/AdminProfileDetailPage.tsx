@@ -6,6 +6,8 @@ import { WorkerProfileWithAccount } from '@/services/workersService';
 import { BusinessProfileWithAccount } from '@/services/businessesService';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { getErrorMessage } from '@/services/errorMessages';
+import { formatDate } from '@/utils/formatDate';
 
 type Capability = 'worker' | 'business';
 type Profile = WorkerProfileWithAccount | BusinessProfileWithAccount;
@@ -20,21 +22,29 @@ function ProfileDetail({ capability }: { capability: Capability }) {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [deciding, setDeciding] = useState(false);
 
   useEffect(() => {
     if (!id) return;
+    setError(null);
     const fetcher = capability === 'worker' ? adminService.getWorker(id) : adminService.getBusiness(id);
-    fetcher.then(setProfile).finally(() => setLoading(false));
+    fetcher
+      .then(setProfile)
+      .catch((err) => setError(getErrorMessage(err)))
+      .finally(() => setLoading(false));
   }, [id, capability]);
 
   const decide = async (status: VerificationDecision) => {
     if (!id) return;
     setDeciding(true);
+    setError(null);
     try {
       const updated =
         capability === 'worker' ? await adminService.setWorkerVerification(id, status) : await adminService.setBusinessVerification(id, status);
       setProfile((prev) => (prev ? { ...prev, verificationStatus: updated.verificationStatus } : prev));
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setDeciding(false);
     }
@@ -50,12 +60,17 @@ function ProfileDetail({ capability }: { capability: Capability }) {
     );
   }
 
+  // Only the *initial* load failing (no profile at all) earns the full-page error state —
+  // a later failure from decide() (Approve/Reject) still has a valid profile to show, so
+  // that error renders inline in the body instead (see below), not by replacing the page.
   if (!profile) {
     return (
       <div className="page">
-        <PageHeader title="Not found" backTo="/" />
+        <PageHeader title={error ? 'Something Went Wrong' : 'Not Found'} backTo="/" />
         <div className="body">
-          <p>Not found.</p>
+          <p className={error ? 'error-text' : undefined} style={error ? { marginTop: 0 } : undefined}>
+            {error ?? 'Not found.'}
+          </p>
         </div>
       </div>
     );
@@ -74,12 +89,22 @@ function ProfileDetail({ capability }: { capability: Capability }) {
 
   return (
     <div className="page">
-      <PageHeader title={title} backTo="/" shop={capability === 'business'} />
+      <PageHeader title={title} backTo="/" />
       <div className="body">
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: -8, marginBottom: 16 }}>
           {profile.accountFullName} · {profile.accountMobileNumber} · {profile.accountEmail}
         </p>
         <VerificationBadge status={profile.verificationStatus} />
+
+        {/* Plain informational timestamps, not a re-review gate — editing a profile no
+            longer resets it to pending (see .cloud/project-context.md), so this is purely
+            "here's when it was last touched" context for the admin, not an action item. Only
+            shows "Last updated" when it actually differs from "Registered" (i.e. the profile
+            has been edited at least once since it was first submitted). */}
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10 }}>
+          Registered {formatDate(profile.createdAt)}
+          {profile.updatedAt !== profile.createdAt ? ` · Last updated ${formatDate(profile.updatedAt)}` : ''}
+        </p>
 
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 20, marginBottom: 8 }}>
           {capability === 'worker' ? 'Skills' : 'Categories'}
@@ -119,6 +144,12 @@ function ProfileDetail({ capability }: { capability: Capability }) {
               ))}
             </div>
           </>
+        ) : null}
+
+        {error ? (
+          <p className="error-text" style={{ marginTop: 20 }}>
+            {error}
+          </p>
         ) : null}
 
         {profile.verificationStatus === 'pending_verification' ? (

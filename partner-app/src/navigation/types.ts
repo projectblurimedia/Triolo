@@ -1,3 +1,6 @@
+import { WorkerProfile } from '@/services/workersService';
+import { BusinessProfile } from '@/services/businessesService';
+
 export type AuthStackParamList = {
   Welcome: undefined;
   Register: undefined;
@@ -9,7 +12,27 @@ export type CapabilityType = 'worker' | 'business';
 
 export type MainStackParamList = {
   ChooseCapability: undefined;
-  WorkerRegistration: undefined;
-  BusinessRegistration: undefined;
+  MainTabs: undefined;
+  // `profile` present switches the screen into edit mode (prefilled, PATCH instead of POST,
+  // plus a delete action) — omitted (or undefined) for create. Passed as the already-fetched
+  // profile object rather than just an id, since every entry point already has it in hand.
+  WorkerRegistration: { profile?: WorkerProfile } | undefined;
+  BusinessRegistration: { profile?: BusinessProfile } | undefined;
   MyInfo: { capability: CapabilityType };
+};
+
+/**
+ * The verified-partner tab shell — nested inside MainStackParamList's `MainTabs` screen, so
+ * its screens can still reach sibling stack routes (WorkerRegistration/BusinessRegistration/
+ * MyInfo) via the composite navigation prop. Bookings and Earnings are the two concretely
+ * planned near-term features for a Worker/Business partner (see .cloud/project-context.md's
+ * roadmap — the booking/order-flow pipeline and the post-MVP worker earnings dashboard), so
+ * they replace a generic unexplained "Search" tab that didn't map to anything a partner
+ * actually does in this product.
+ */
+export type MainTabParamList = {
+  Home: undefined;
+  Bookings: undefined;
+  Earnings: undefined;
+  Profile: undefined;
 };

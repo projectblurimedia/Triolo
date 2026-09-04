@@ -1,12 +1,16 @@
 import { useAuthStore } from '@/state/authStore';
 
 /**
- * Points at the local backend during development — unlike the mobile apps'
- * `constants/config.ts` (which needs a LAN IP since a phone isn't the dev machine), a
- * browser on the same machine as the backend can just use `localhost`. Override for
- * staging/production once those API URLs exist (see docs/deployment.md).
+ * Points at the local backend during development, via the same LAN IP the mobile apps use
+ * (`user-app`/`partner-app`'s `constants/config.ts`) rather than `localhost` — this site is
+ * itself served from that LAN IP (see `vite.config.ts`'s `server.host`) so it can be opened
+ * from another device on the network, and `localhost` from that device would mean itself,
+ * not the dev machine. Update alongside the mobile apps' `API_BASE_URL` if that IP changes
+ * (find it with `ipconfig` on the dev machine — phone and PC must be on the same Wi-Fi
+ * network). Override for staging/production once those API URLs exist (see
+ * docs/deployment.md).
  */
-const API_BASE_URL = 'http://localhost:4000/api/v1';
+const API_BASE_URL = 'http://192.168.1.14:4000/api/v1';
 
 export interface ApiEnvelope<T> {
   success: boolean;

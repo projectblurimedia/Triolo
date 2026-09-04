@@ -9,4 +9,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Bind to the LAN interface (not just localhost) so the site is reachable from another
+  // device on the same network (e.g. testing on a phone browser) — matches the mobile
+  // apps' own LAN-IP convention (see src/services/apiClient.ts).
+  server: {
+    host: true,
+  },
 });
