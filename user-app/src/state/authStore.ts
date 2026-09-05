@@ -29,6 +29,7 @@ interface AuthState {
   setAccessToken: (accessToken: string) => void;
   clearSession: () => void;
   setLoggingOut: (value: boolean) => void;
+  setHydrated: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -48,6 +49,7 @@ export const useAuthStore = create<AuthState>()(
       setAccessToken: (accessToken) => set({ accessToken }),
       clearSession: () => set({ accessToken: null, refreshToken: null, account: null }),
       setLoggingOut: (isLoggingOut) => set({ isLoggingOut }),
+      setHydrated: () => set({ isHydrated: true }),
     }),
     {
       name: 'auth-storage',
@@ -60,10 +62,16 @@ export const useAuthStore = create<AuthState>()(
         account: state.account,
         isHydrated: state.isHydrated,
       }),
+      // Must call the store's own setHydrated() action (which goes through `set()`) rather
+      // than mutating `state.isHydrated` directly on the object zustand hands back here —
+      // a direct mutation bypasses `set()` entirely, so subscribers (e.g. RootNavigator's
+      // `useAuthStore((s) => s.isHydrated)`) aren't reliably/immediately notified, and the
+      // new value isn't flushed to storage until some unrelated later `set()` call happens
+      // to persist it. Real, if usually-masked, source of intermittent startup glitches —
+      // always mutate store state through an action, never through this callback's `state`
+      // object. (Same fix applied to partner-app's identical copy of this store.)
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.isHydrated = true;
-        }
+        state?.setHydrated();
       },
     },
   ),

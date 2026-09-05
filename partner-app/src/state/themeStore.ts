@@ -9,6 +9,7 @@ interface ThemeState {
   mode: ThemeMode;
   isHydrated: boolean;
   setMode: (mode: ThemeMode) => void;
+  setHydrated: () => void;
 }
 
 /** Localization key for a theme mode's display label — shared by every theme-picker UI. */
@@ -29,14 +30,15 @@ export const useThemeStore = create<ThemeState>()(
       mode: 'system',
       isHydrated: false,
       setMode: (mode) => set({ mode }),
+      setHydrated: () => set({ isHydrated: true }),
     }),
     {
       name: 'theme-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      // See authStore.ts's identical fix for why this must go through the setHydrated()
+      // action (i.e. `set()`) rather than mutating `state.isHydrated` directly here.
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.isHydrated = true;
-        }
+        state?.setHydrated();
       },
     },
   ),

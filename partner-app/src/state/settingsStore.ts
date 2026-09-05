@@ -10,6 +10,7 @@ interface SettingsState {
   isHydrated: boolean;
   setLanguage: (language: SupportedLanguage) => void;
   confirmLanguage: () => void;
+  setHydrated: () => void;
 }
 
 /** Localization key for a language code's display label — shared by every language-picker UI. */
@@ -28,16 +29,20 @@ export const useSettingsStore = create<SettingsState>()(
         set({ language });
       },
       confirmLanguage: () => set({ hasSelectedLanguage: true }),
+      setHydrated: () => set({ isHydrated: true }),
     }),
     {
       name: 'settings-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      // isHydrated must be set via the store's own setHydrated() action (set()), not by
+      // mutating `state` directly here — see authStore.ts's identical fix for why a direct
+      // mutation bypasses `set()` and can leave subscribers un-notified.
       onRehydrateStorage: () => (state) => {
         if (state) {
           // Rehydrated language preference should also drive the active i18n instance,
           // since i18n itself isn't part of persisted state.
           i18n.changeLanguage(state.language);
-          state.isHydrated = true;
+          state.setHydrated();
         }
       },
     },

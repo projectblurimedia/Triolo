@@ -39,7 +39,7 @@ const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> =
 };
 
 // Every tab uses the same constant brand blue in the tab bar itself. Bazaar's header and
-// SideDockMenu also now use this blue (per follow-up feedback) — only BusinessProfileCard
+// BazaarMenuDrawer also use this blue (per follow-up feedback) — only BusinessProfileCard
 // and BusinessProfileModal still carry the orange "Business capability" identity, which is
 // a separate concept from "the Bazaar tab's own chrome."
 const ACTIVE_GRADIENTS: Record<string, readonly [string, string]> = {

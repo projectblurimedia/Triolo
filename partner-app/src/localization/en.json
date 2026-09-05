@@ -12,7 +12,8 @@
     "menu": "Menu",
     "logout": "Log Out",
     "loggingOut": "Logging out...",
-    "errorTitle": "Something Went Wrong"
+    "errorTitle": "Something Went Wrong",
+    "retry": "Retry"
   },
   "verification": {
     "pending": "Pending Review",

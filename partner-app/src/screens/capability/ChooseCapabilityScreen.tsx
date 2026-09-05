@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +36,15 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
   const workerProfile = useMyWorkerProfile();
   const businessProfile = useMyBusinessProfile();
   const isLoading = workerProfile.isLoading || businessProfile.isLoading;
+  // Verification happens in admin-web, outside this app entirely — pull-to-refresh lets
+  // someone re-check right after an admin approves them, instead of having to fully close
+  // and relaunch the app for MainNavigator to notice (see that file's own doc comment for
+  // why a relaunch was previously the only way this updated).
+  const isRefreshing = (workerProfile.isRefetching || businessProfile.isRefetching) && !isLoading;
+  const handleRefresh = () => {
+    workerProfile.refetch();
+    businessProfile.refetch();
+  };
 
   const cards = [
     {
@@ -80,7 +89,12 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
           <LoadingIndicator color={colors.primary} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView
+          contentContainerStyle={styles.body}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+          }
+        >
           {account ? (
             <Text style={[styles.greeting, { color: colors.text }]}>{t('chooseCapability.greeting', { name: account.fullName })}</Text>
           ) : null}

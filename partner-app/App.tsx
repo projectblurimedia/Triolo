@@ -1,13 +1,13 @@
 import '@/localization/i18n';
 import React, { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { ToastHost } from '@/components/ToastHost';
@@ -17,6 +17,21 @@ import { useAuthStore } from '@/state/authStore';
 const queryClient = new QueryClient();
 
 SplashScreen.preventAutoHideAsync();
+
+// React Query has no built-in idea of React Native's app foreground/background state (its
+// default `refetchOnWindowFocus` relies on a browser `focus` event that doesn't exist here)
+// — without this, a query like useMyWorkerProfile()/useMyBusinessProfile() only ever
+// refetches on mount, so a capability getting verified in admin-web while this app is open
+// (or merely backgrounded) never surfaces until the app is fully killed and relaunched.
+// Wiring AppState into `focusManager` makes "app came back to the foreground" count as a
+// focus event, so any query still mounted (e.g. ChooseCapabilityScreen/MainNavigator's
+// profile queries) auto-refetches on foreground per React Query's own default behavior —
+// no per-query opt-in needed.
+function onAppStateChange(status: AppStateStatus) {
+  if (Platform.OS !== 'web') {
+    focusManager.setFocused(status === 'active');
+  }
+}
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -33,6 +48,11 @@ export default function App() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', onAppStateChange);
+    return () => subscription.remove();
+  }, []);
 
   // The root window background (what shows through the edge-to-edge system nav bar
   // area on Android, since that area isn't part of the React view tree at all) has to

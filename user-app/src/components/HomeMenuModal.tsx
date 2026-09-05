@@ -7,8 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemePickerModal } from './ThemePickerModal';
 import { LanguagePickerModal } from './LanguagePickerModal';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
-import { WorkerProfileModal } from './WorkerProfileModal';
-import { BusinessProfileModal } from './BusinessProfileModal';
+import { NearbySearchModal, NearbySearchMode } from './NearbySearchModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
@@ -24,7 +23,7 @@ interface HomeMenuModalProps {
   onClose: () => void;
 }
 
-/** Right-side drawer triggered from Home's header menu icon — Worker/Business entry points plus theme/logout. */
+/** Right-side drawer triggered from Home's header menu icon — nearby-worker/shop discovery plus theme/logout. */
 export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
@@ -36,8 +35,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
-  const [workerProfileVisible, setWorkerProfileVisible] = useState(false);
-  const [businessProfileVisible, setBusinessProfileVisible] = useState(false);
+  const [nearbySearchMode, setNearbySearchMode] = useState<NearbySearchMode | null>(null);
 
   const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -83,25 +81,25 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
 
   const items = [
     {
-      key: 'worker',
+      key: 'nearbyWorkers',
       icon: 'screwdriver-wrench' as const,
       gradient: headerGradient,
-      title: t('homeMenu.registerWorkerTitle'),
-      subtitle: t('homeMenu.registerWorkerSubtitle'),
+      title: t('homeMenu.nearbyWorkersTitle'),
+      subtitle: t('homeMenu.nearbyWorkersSubtitle'),
       onPress: () => {
         onClose();
-        setWorkerProfileVisible(true);
+        setNearbySearchMode('worker');
       },
     },
     {
-      key: 'business',
+      key: 'nearbyShops',
       icon: 'store' as const,
       gradient: [colors.secondary, colors.warning] as const,
-      title: t('homeMenu.registerBusinessTitle'),
-      subtitle: t('homeMenu.registerBusinessSubtitle'),
+      title: t('homeMenu.nearbyShopsTitle'),
+      subtitle: t('homeMenu.nearbyShopsSubtitle'),
       onPress: () => {
         onClose();
-        setBusinessProfileVisible(true);
+        setNearbySearchMode('business');
       },
     },
   ];
@@ -140,7 +138,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
             </LinearGradient>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
-              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('homeMenu.growSection')}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('homeMenu.exploreSection')}</Text>
               {items.map((item) => (
                 <Pressable
                   key={item.key}
@@ -227,8 +225,11 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
         onConfirm={handleLogoutConfirm}
         onCancel={() => setLogoutConfirmVisible(false)}
       />
-      <WorkerProfileModal visible={workerProfileVisible} onClose={() => setWorkerProfileVisible(false)} />
-      <BusinessProfileModal visible={businessProfileVisible} onClose={() => setBusinessProfileVisible(false)} />
+      <NearbySearchModal
+        visible={nearbySearchMode !== null}
+        mode={nearbySearchMode ?? 'worker'}
+        onClose={() => setNearbySearchMode(null)}
+      />
     </>
   );
 }
