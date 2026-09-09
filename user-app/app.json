@@ -31,7 +31,18 @@
     "plugins": [
       "expo-localization",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#001B57",
+          "dark": {
+            "backgroundColor": "#001B57"
+          }
+        }
+      ],
       [
         "expo-location",
         {
@@ -50,6 +61,15 @@
         "projectId": "dcec88c3-6d98-4b27-a064-f9ea883a4cdd"
       }
     },
-    "owner": "projectblurimedia"
+    "owner": "projectblurimedia",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/dcec88c3-6d98-4b27-a064-f9ea883a4cdd",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_ERROR_RECOVERY"
+    }
   }
 }

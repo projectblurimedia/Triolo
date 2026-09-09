@@ -14,7 +14,11 @@
     "logout": "Log Out",
     "loggingOut": "Logging out...",
     "errorTitle": "Something Went Wrong",
-    "comingSoonMessage": "This feature is coming soon."
+    "comingSoonMessage": "This feature is coming soon.",
+    "updatingAppTitle": "Update in Progress",
+    "updatingAppMessage": "Please don't close the app while updating...",
+    "updateCompleteTitle": "Update Complete!",
+    "updateCompleteMessage": "Restarting the app with the latest version..."
   },
   "verification": {
     "pending": "Pending Review",

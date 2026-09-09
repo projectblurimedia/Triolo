@@ -14,7 +14,11 @@
     "logout": "లాగ్ అవుట్",
     "loggingOut": "లాగ్ అవుట్ అవుతోంది...",
     "errorTitle": "ఏదో తప్పు జరిగింది",
-    "comingSoonMessage": "ఈ ఫీచర్ త్వరలో వస్తుంది."
+    "comingSoonMessage": "ఈ ఫీచర్ త్వరలో వస్తుంది.",
+    "updatingAppTitle": "అప్‌డేట్ జరుగుతోంది",
+    "updatingAppMessage": "అప్‌డేట్ అవుతున్నప్పుడు యాప్‌ని మూసివేయవద్దు...",
+    "updateCompleteTitle": "అప్‌డేట్ పూర్తయింది!",
+    "updateCompleteMessage": "తాజా వెర్షన్‌తో యాప్ మళ్లీ ప్రారంభమవుతోంది..."
   },
   "verification": {
     "pending": "సమీక్షలో ఉంది",
