@@ -18,6 +18,11 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Local EAS build signing credentials (self-signed Android keystore + its passwords) —
+# never committed, generated once and kept only on this machine.
+credentials/
+credentials.json
+
 # Metro
 .metro-health-check*
 
