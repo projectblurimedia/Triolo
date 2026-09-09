@@ -7,9 +7,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.projectblurimedia.triolo"
     },
     "android": {
+      "package": "com.projectblurimedia.triolo",
       "adaptiveIcon": {
         "backgroundColor": "#001B57",
         "foregroundImage": "./assets/android-icon-foreground.png",
