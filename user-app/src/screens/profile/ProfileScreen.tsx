@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -34,6 +35,7 @@ const CARD_SHADOW = Platform.select({
 export function ProfileScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const insets = useSafeAreaInsets();
   const account = useAuthStore((state) => state.account);
   const { data: workerProfile } = useMyWorkerProfile();
   const { data: businessProfile } = useMyBusinessProfile();
@@ -41,10 +43,16 @@ export function ProfileScreen() {
   const [editWorkerVisible, setEditWorkerVisible] = useState(false);
   const [editBusinessVisible, setEditBusinessVisible] = useState(false);
   const hasNoCapability = !workerProfile && !businessProfile;
+  // CustomTabBar floats via `position: 'absolute'` (see its own doc comment), so it
+  // contributes ~0 height to layout and never reserves scroll space on its own — every
+  // scrollable tab screen has to clear it manually. Its own footprint is
+  // `Math.max(insets.bottom, 18) + 66` (bottom margin + bar height); a flat 32 wasn't
+  // enough once both capability sections render, so the last card sat under the bar.
+  const tabBarClearance = Math.max(insets.bottom, 18) + 66 + 24;
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         {account ? (
           <LinearGradient
             colors={headerGradient}
@@ -137,7 +145,6 @@ export function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollContent: { paddingBottom: 32 },
   hero: {
     borderRadius: 20,
     padding: 20,
