@@ -12,6 +12,15 @@ import { adminRouter } from '@/modules/admin/routes';
 export function createApp(): Express {
   const app = express();
 
+  // Behind a reverse proxy (Vercel's edge network) in every deployed environment — without
+  // this, Express ignores the `X-Forwarded-For` header entirely, and express-rate-limit
+  // (see routes using rateLimiter.ts) falls back to keying every request off the proxy's
+  // own IP instead of the real client, logging a warning and making per-IP rate limits
+  // meaningless (everyone behind the proxy shares one bucket). `1` trusts exactly one hop
+  // (Vercel's own edge), not an attacker-supplied chain further back. Harmless locally —
+  // there's no proxy in front there, so the header is simply absent.
+  app.set('trust proxy', 1);
+
   app.use(helmet());
   app.use(cors());
   app.use(express.json());
