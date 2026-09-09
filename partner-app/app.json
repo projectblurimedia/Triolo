@@ -7,16 +7,23 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.projectblurimedia.triolopartner"
     },
     "android": {
+      "package": "com.projectblurimedia.triolopartner",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#031F64",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -24,7 +31,18 @@
     "plugins": [
       "expo-localization",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#031F64",
+          "dark": {
+            "backgroundColor": "#031F64"
+          }
+        }
+      ],
       [
         "expo-location",
         {
@@ -37,6 +55,21 @@
           "photosPermission": "Triolo Partner needs access to your photos to upload portfolio or shop images."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "694506a1-a8f3-44aa-9a0a-9a672f110fd0"
+      }
+    },
+    "owner": "projectblurimedia",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/694506a1-a8f3-44aa-9a0a-9a672f110fd0",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_ERROR_RECOVERY"
+    }
   }
 }

@@ -54,3 +54,9 @@ docker/*.env
 
 # Vercel (project link — environment-specific, not shared via git)
 .vercel/
+
+# Local EAS build signing credentials (self-signed Android keystore + its passwords, per
+# app — user-app/credentials/, partner-app/credentials/, etc.) — never committed,
+# generated once per app and kept only on this machine.
+credentials/
+credentials.json
