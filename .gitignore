@@ -51,3 +51,6 @@ partner-app/android/app/build/
 
 # Docker
 docker/*.env
+
+# Vercel (project link — environment-specific, not shared via git)
+.vercel/

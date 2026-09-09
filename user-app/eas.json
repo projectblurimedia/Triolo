@@ -17,14 +17,14 @@
         "credentialsSource": "local"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://triolo-backend.onrender.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://triolo-backend.vercel.app/api/v1"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://triolo-backend.onrender.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://triolo-backend.vercel.app/api/v1"
       }
     }
   },
