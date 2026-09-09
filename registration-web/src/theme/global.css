@@ -25,6 +25,18 @@ body,
   height: 100%;
 }
 
+/* Scroll stays fully functional — only the visual scrollbar is hidden (a taller form, e.g.
+   the Worker/Business registration pages, scrolls at the document level since nothing here
+   sets its own overflow container). */
+html {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+
+html::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Chromium Edge */
+}
+
 body {
   margin: 0;
   font-family: 'Poppins', system-ui, sans-serif;
@@ -114,7 +126,8 @@ a {
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -124,8 +137,15 @@ a {
   background: var(--color-white);
 }
 
+.field select:disabled {
+  color: var(--color-text-muted);
+  background: var(--color-border);
+  opacity: 0.6;
+}
+
 .field input:focus,
-.field textarea:focus {
+.field textarea:focus,
+.field select:focus {
   outline: 2px solid var(--color-primary-light);
   outline-offset: -1px;
 }
@@ -136,15 +156,22 @@ a {
   margin: -8px 0 12px;
 }
 
+/* A fixed height (rather than padding sized to content) so a button is exactly the same
+   height whether it's showing its label text or a LoadingSpinner — the two have slightly
+   different natural heights, which otherwise made adjacent buttons (e.g. PhoneVerification's
+   Confirm OTP/Change Number pair) visibly mismatch whenever one was loading and the other
+   wasn't. 48px matches the prior padding:14px + ~20px text line height almost exactly, so
+   normal buttons look unchanged. */
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   width: 100%;
+  height: 48px;
   border: none;
   border-radius: 10px;
-  padding: 14px;
+  padding: 0 20px;
   font-size: 15px;
   font-weight: 600;
   color: var(--color-white);

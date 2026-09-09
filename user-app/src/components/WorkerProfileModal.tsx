@@ -5,7 +5,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TextField } from './TextField';
-import { LocationPicker, LocationValue } from './LocationPicker';
+import { AddressPicker, AddressValue, EMPTY_ADDRESS } from './AddressPicker';
 import { ImagePickerField, PickedImage } from './ImagePickerField';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
@@ -49,7 +49,7 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherInputValue, setOtherInputValue] = useState('');
   const [experienceYears, setExperienceYears] = useState('');
-  const [location, setLocation] = useState<LocationValue>({ latitude: null, longitude: null, address: '' });
+  const [address, setAddress] = useState<AddressValue>(EMPTY_ADDRESS);
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -59,7 +59,15 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
       setSkillCategories(profile.skillCategories.filter((key) => key !== 'other'));
       setOtherSkillEntries(profile.otherSkillDescription ? profile.otherSkillDescription.split(', ').filter(Boolean) : []);
       setExperienceYears(String(profile.experienceYears));
-      setLocation({ latitude: profile.latitude, longitude: profile.longitude, address: profile.locationAddress ?? '' });
+      setAddress({
+        latitude: profile.latitude,
+        longitude: profile.longitude,
+        area: profile.area ?? '',
+        city: profile.city,
+        district: profile.district,
+        state: profile.state,
+        pincode: profile.pincode,
+      });
       setPhotos(
         profile.portfolioPhotoUrls.map((url) => ({ uri: url, name: url.split('/').pop() ?? 'photo.jpg', type: 'image/jpeg' })),
       );
@@ -111,7 +119,7 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
     setShowOtherInput(false);
     setOtherInputValue('');
     setExperienceYears('');
-    setLocation({ latitude: null, longitude: null, address: '' });
+    setAddress(EMPTY_ADDRESS);
     setPhotos([]);
     setError(null);
     onClose();
@@ -129,7 +137,10 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
     if (
       (skillCategories.length === 0 && !includesOther) ||
       !experienceYears.trim() ||
-      !location.address.trim()
+      !address.city.trim() ||
+      !address.district.trim() ||
+      !address.state.trim() ||
+      !/^[0-9]{6}$/.test(address.pincode)
     ) {
       setError(t('errors.VALIDATION_ERROR'));
       return;
@@ -139,9 +150,13 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
       skillCategories: includesOther ? [...skillCategories, 'other'] : skillCategories,
       otherSkillDescription: includesOther ? otherSkillEntries.join(', ') : undefined,
       experienceYears: Number(experienceYears),
-      latitude: location.latitude,
-      longitude: location.longitude,
-      locationAddress: location.address,
+      latitude: address.latitude,
+      longitude: address.longitude,
+      area: address.area.trim() || undefined,
+      city: address.city.trim(),
+      district: address.district.trim(),
+      state: address.state.trim(),
+      pincode: address.pincode,
     };
 
     if (isEditMode) {
@@ -267,29 +282,32 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
           </View>
 
           {showOtherInput ? (
-            <View style={styles.otherInputRow}>
-              <View style={styles.otherInputField}>
-                <TextField
-                  label={t('workerProfile.otherSkillLabel')}
-                  value={otherInputValue}
-                  onChangeText={setOtherInputValue}
-                  maxLength={40}
-                  returnKeyType="done"
-                  onSubmitEditing={commitOtherEntry}
-                  autoFocus
-                />
+            <>
+              <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.otherSkillLabel')}</Text>
+              <View style={styles.otherInputRow}>
+                <View style={styles.otherInputField}>
+                  <TextField
+                    containerStyle={styles.noMargin}
+                    value={otherInputValue}
+                    onChangeText={setOtherInputValue}
+                    maxLength={40}
+                    returnKeyType="done"
+                    onSubmitEditing={commitOtherEntry}
+                    autoFocus
+                  />
+                </View>
+                <Pressable
+                  style={{ opacity: otherInputValue.trim() ? 1 : 0.5 }}
+                  onPress={commitOtherEntry}
+                  disabled={!otherInputValue.trim()}
+                  accessibilityLabel={t('common.done')}
+                >
+                  <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
+                    <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
+                  </LinearGradient>
+                </Pressable>
               </View>
-              <Pressable
-                style={[styles.otherDoneButton, { opacity: otherInputValue.trim() ? 1 : 0.5 }]}
-                onPress={commitOtherEntry}
-                disabled={!otherInputValue.trim()}
-                accessibilityLabel={t('common.done')}
-              >
-                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
-                  <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
-                </LinearGradient>
-              </Pressable>
-            </View>
+            </>
           ) : null}
 
           <TextField
@@ -300,7 +318,7 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
             maxLength={2}
           />
 
-          <LocationPicker value={location} onChange={setLocation} />
+          <AddressPicker value={address} onChange={setAddress} />
 
           <ImagePickerField label={t('workerProfile.portfolioLabel')} images={photos} onChange={setPhotos} />
 
@@ -368,9 +386,9 @@ const styles = StyleSheet.create({
   addNewChip: { borderWidth: 1.5 },
   addNewBadge: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   chipLabel: { ...typography.caption, fontFamily: fonts.medium },
-  otherInputRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  otherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   otherInputField: { flex: 1 },
-  otherDoneButton: { marginTop: 22 },
+  noMargin: { marginBottom: 0 },
   otherDoneGradient: {
     width: 44,
     height: 44,

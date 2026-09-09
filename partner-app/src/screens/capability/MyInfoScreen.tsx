@@ -12,6 +12,7 @@ import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { MainStackParamList } from '@/navigation/types';
+import { formatAddress } from '@/utils/formatAddress';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'MyInfo'>;
 type MyInfoNavigation = Props['navigation'];
@@ -74,7 +75,7 @@ function WorkerInfo({ navigation }: { navigation: MyInfoNavigation }) {
             <Divider colors={colors} />
             <InfoRow icon="briefcase" label={t('workerProfile.experienceLabel')} value={String(profile.experienceYears)} colors={colors} />
             <Divider colors={colors} />
-            <InfoRow icon="location-dot" label={t('location.addressLabel')} value={profile.locationAddress ?? '-'} colors={colors} />
+            <InfoRow icon="location-dot" label={t('location.addressLabel')} value={formatAddress(profile)} colors={colors} />
           </DetailCard>
 
           {profile.portfolioPhotoUrls.length > 0 ? (
@@ -138,7 +139,7 @@ function BusinessInfo({ navigation }: { navigation: MyInfoNavigation }) {
               colors={colors}
             />
             <Divider colors={colors} />
-            <InfoRow icon="location-dot" label={t('location.addressLabel')} value={profile.locationAddress ?? '-'} colors={colors} />
+            <InfoRow icon="location-dot" label={t('location.addressLabel')} value={formatAddress(profile)} colors={colors} />
           </DetailCard>
 
           {profile.shopPhotoUrls.length > 0 ? (

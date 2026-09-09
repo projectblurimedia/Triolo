@@ -11,16 +11,18 @@ const otp = z.string().trim().regex(/^\d{6}$/, 'OTP must be 6 digits');
 // Full name is free-text Unicode (Telugu names must work) — length-bounded only, no character-set restriction.
 const preferredLanguage = z.enum(SUPPORTED_LANGUAGES as [string, ...string[]]);
 
-// Coordinates are optional (manual address entry with no GPS fix yields none), but the
-// address itself is always required — see LocationPicker on mobile.
+// Coordinates and the address itself are all optional — email and location aren't
+// collected by every client's registration screen (partner-app asks for just name/mobile;
+// a Worker/Business profile captures a far more detailed structured address later anyway,
+// see the workers/businesses modules' own validation). user-app still asks for both.
 const latitude = z.number().min(-90).max(90).nullable().optional();
 const longitude = z.number().min(-180).max(180).nullable().optional();
-const locationAddress = z.string().trim().min(2, 'Enter a location').max(255);
+const locationAddress = z.string().trim().min(2, 'Enter a location').max(255).optional();
 
 export const requestRegistrationOtpSchema = z.object({
   fullName: z.string().trim().min(2, 'Full name is too short').max(100),
   mobileNumber,
-  email: z.string().trim().email('Enter a valid email address').max(255),
+  email: z.string().trim().email('Enter a valid email address').max(255).optional(),
   latitude,
   longitude,
   locationAddress,

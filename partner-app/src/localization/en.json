@@ -22,18 +22,19 @@
   },
   "auth": {
     "welcomeTitle": "Register as a Worker or add your Shop to reach customers near you",
-    "createAccount": "Create Account",
     "fullNameLabel": "Full Name",
     "mobileNumberLabel": "Mobile Number",
-    "emailLabel": "Email",
     "otpLabel": "Enter OTP",
     "sendOtp": "Send OTP",
     "verifyOtp": "Verify OTP",
     "login": "Log In",
-    "register": "Register",
     "alreadyHaveAccount": "Already have an account?",
-    "accountCreatedTitle": "Account Created",
-    "accountCreatedMessage": "Your account has been created successfully. Register as a Worker or add your Shop next."
+    "verifyMobileNumber": "Verify Mobile Number",
+    "verify": "Verify",
+    "otpSentLabel": "Enter OTP sent to {{mobileNumber}}",
+    "confirmOtp": "Confirm OTP",
+    "changeNumber": "Change Number",
+    "verifyToSubmitHint": "Verify your mobile number above to enable Submit."
   },
   "chooseCapability": {
     "tagline": "Register as a Worker or add your Shop",
@@ -97,7 +98,22 @@
     "permissionDeniedTitle": "Location Permission Needed",
     "permissionDeniedMessage": "Allow location access to auto-detect your location, or enter it manually below.",
     "detectFailedTitle": "Couldn't Detect Location",
-    "detectFailedMessage": "Something went wrong finding your location. Please enter it manually."
+    "detectFailedMessage": "Something went wrong finding your location. Please enter it manually.",
+    "areaLabel": "Area / Landmark (optional)",
+    "areaPlaceholder": "Street, locality or nearby landmark",
+    "cityLabel": "City",
+    "districtLabel": "District",
+    "stateLabel": "State",
+    "pincodeLabel": "Pincode",
+    "selectStatePlaceholder": "Select State",
+    "selectDistrictPlaceholder": "Select District",
+    "selectStateFirst": "Select a State first",
+    "searchStatePlaceholder": "Search states",
+    "searchDistrictPlaceholder": "Search districts",
+    "noStatesFound": "No states found",
+    "noDistrictsFound": "No districts found",
+    "selectDistrictManually": "We detected your state, but couldn't match your district automatically — please select it below.",
+    "selectStateAndDistrictManually": "We couldn't match your state and district automatically — please select them below."
   },
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",

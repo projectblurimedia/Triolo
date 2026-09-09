@@ -8,7 +8,11 @@ export interface WorkerProfile {
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
-  locationAddress: string | null;
+  area: string | null;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
   portfolioPhotoUrls: string[];
   verificationStatus: string;
   createdAt: string;
@@ -27,7 +31,11 @@ export interface CreateWorkerProfileParams {
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
-  locationAddress: string;
+  area?: string;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
   portfolioPhotos: File[];
 }
 
@@ -41,7 +49,11 @@ export const workersService = {
     formData.append('experienceYears', String(params.experienceYears));
     if (params.latitude != null) formData.append('latitude', String(params.latitude));
     if (params.longitude != null) formData.append('longitude', String(params.longitude));
-    formData.append('locationAddress', params.locationAddress);
+    if (params.area) formData.append('area', params.area);
+    formData.append('city', params.city);
+    formData.append('district', params.district);
+    formData.append('state', params.state);
+    formData.append('pincode', params.pincode);
     params.portfolioPhotos.forEach((file) => formData.append('portfolioPhotos', file));
     return apiClient.postForm('/workers/me/profile', formData);
   },

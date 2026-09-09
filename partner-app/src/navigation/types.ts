@@ -3,9 +3,13 @@ import { BusinessProfile } from '@/services/businessesService';
 
 export type AuthStackParamList = {
   Welcome: undefined;
-  Register: undefined;
+  // Capability-specific, not a generic "Register" screen — each combines Full Name/Mobile
+  // Number (with inline OTP verification) and that capability's own fields into one form.
+  // See RegisterWorkerScreen's own doc comment for the full rationale.
+  RegisterWorker: undefined;
+  RegisterBusiness: undefined;
   Login: undefined;
-  Otp: { mode: 'registration' | 'login'; mobileNumber: string };
+  Otp: { mode: 'login'; mobileNumber: string };
 };
 
 export type CapabilityType = 'worker' | 'business';

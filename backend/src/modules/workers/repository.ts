@@ -11,7 +11,11 @@ function mapWorkerProfile(row: QueryResultRow): WorkerProfile {
     experienceYears: row.experience_years,
     latitude: row.latitude,
     longitude: row.longitude,
-    locationAddress: row.location_address,
+    area: row.area,
+    city: row.city,
+    district: row.district,
+    state: row.state,
+    pincode: row.pincode,
     portfolioPhotoUrls: row.portfolio_photo_urls ?? [],
     verificationStatus: row.verification_status,
     createdAt: row.created_at,
@@ -43,12 +47,16 @@ export class WorkersRepository {
     experienceYears: number;
     latitude: number | null;
     longitude: number | null;
-    locationAddress: string | null;
+    area: string | null;
+    city: string;
+    district: string;
+    state: string;
+    pincode: string;
     portfolioPhotoUrls: string[];
   }): Promise<WorkerProfile> {
     const result = await this.pool.query(
-      `INSERT INTO worker_profiles (account_id, skill_categories, other_skill_description, experience_years, latitude, longitude, location_address, portfolio_photo_urls)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO worker_profiles (account_id, skill_categories, other_skill_description, experience_years, latitude, longitude, area, city, district, state, pincode, portfolio_photo_urls)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         params.accountId,
@@ -57,7 +65,11 @@ export class WorkersRepository {
         params.experienceYears,
         params.latitude,
         params.longitude,
-        params.locationAddress,
+        params.area,
+        params.city,
+        params.district,
+        params.state,
+        params.pincode,
         params.portfolioPhotoUrls,
       ],
     );
@@ -72,14 +84,18 @@ export class WorkersRepository {
       experienceYears: number;
       latitude: number | null;
       longitude: number | null;
-      locationAddress: string | null;
+      area: string | null;
+      city: string;
+      district: string;
+      state: string;
+      pincode: string;
       portfolioPhotoUrls: string[];
       verificationStatus: string;
     },
   ): Promise<WorkerProfile> {
     const result = await this.pool.query(
       `UPDATE worker_profiles
-       SET skill_categories = $2, other_skill_description = $3, experience_years = $4, latitude = $5, longitude = $6, location_address = $7, portfolio_photo_urls = $8, verification_status = $9, updated_at = now()
+       SET skill_categories = $2, other_skill_description = $3, experience_years = $4, latitude = $5, longitude = $6, area = $7, city = $8, district = $9, state = $10, pincode = $11, portfolio_photo_urls = $12, verification_status = $13, updated_at = now()
        WHERE account_id = $1
        RETURNING *`,
       [
@@ -89,7 +105,11 @@ export class WorkersRepository {
         params.experienceYears,
         params.latitude,
         params.longitude,
-        params.locationAddress,
+        params.area,
+        params.city,
+        params.district,
+        params.state,
+        params.pincode,
         params.portfolioPhotoUrls,
         params.verificationStatus,
       ],

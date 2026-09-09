@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { VerificationBadge } from './VerificationBadge';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { WorkerProfile } from '@/services/workersService';
+import { formatAddress } from '@/utils/formatAddress';
 
 interface WorkerProfileCardProps {
   profile: WorkerProfile;
@@ -68,11 +69,11 @@ export function WorkerProfileCard({ profile, onEdit }: WorkerProfileCardProps) {
           {t('services.experienceYears', { count: profile.experienceYears })}
         </Text>
       </View>
-      {profile.locationAddress ? (
+      {profile.city ? (
         <View style={styles.metaRow}>
           <FontAwesome6 name="location-dot" size={12} color={colors.textMuted} solid />
           <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
-            {profile.locationAddress}
+            {formatAddress(profile)}
           </Text>
         </View>
       ) : null}

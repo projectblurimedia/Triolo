@@ -29,7 +29,11 @@ export interface WorkerProfile {
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
-  locationAddress: string | null;
+  area: string | null;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
   portfolioPhotoUrls: string[];
   verificationStatus: ProfileVerificationStatus;
   createdAt: Date;

@@ -2,27 +2,11 @@ import { useMutation } from '@tanstack/react-query';
 import { authService } from '@/services/authService';
 import { useAuthStore, AccountLanguage } from '@/state/authStore';
 
-export function useRequestRegistrationOtp() {
-  return useMutation({
-    mutationFn: (params: {
-      fullName: string;
-      mobileNumber: string;
-      email: string;
-      latitude: number | null;
-      longitude: number | null;
-      locationAddress: string;
-      preferredLanguage: AccountLanguage;
-    }) => authService.requestRegistrationOtp(params),
-  });
-}
-
-export function useVerifyRegistrationOtp() {
-  const setSession = useAuthStore((state) => state.setSession);
-  return useMutation({
-    mutationFn: (params: { mobileNumber: string; otp: string }) => authService.verifyRegistrationOtp(params),
-    onSuccess: (data) => setSession(data),
-  });
-}
+// No useRequestRegistrationOtp/useVerifyRegistrationOtp here — registration's OTP flow is
+// now inline inside components/PhoneVerification.tsx, which calls authService's
+// requestRegistrationOtp/verifyRegistrationOtp directly rather than through a react-query
+// mutation hook (it needs to branch to the login endpoints first and only fall back to
+// these on ACCOUNT_NOT_FOUND, which doesn't map cleanly onto a single mutation).
 
 export function useRequestLoginOtp() {
   return useMutation({

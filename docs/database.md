@@ -82,7 +82,9 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | other_skill_description | text nullable | free-text description, required (validated at the API layer) when `skill_categories` includes `other` |
 | experience_years | int | |
 | latitude / longitude | double precision nullable | service location, separate from the account's own registration location |
-| location_address | text nullable | |
+| area | text nullable | street/locality/landmark — the only optional part of the structured address |
+| city / district / state | text | required — replaced a single free-text `location_address` column (migration 0008), which wasn't precise enough to filter/search on |
+| pincode | text, `CHECK (pincode ~ '^[0-9]{6}$')` | required, 6-digit Indian postal code — indexed (`idx_worker_profiles_pincode`, plus `idx_worker_profiles_city`) for future area-based search |
 | portfolio_photo_urls | text[] | Cloudinary-hosted URLs, uploaded via `POST /api/v1/workers/me/profile` (multipart) |
 | verification_status | enum `profile_verification_status` (pending_verification, verified, rejected) | admin review gate for this capability specifically, independent of `accounts.status` |
 | created_at / updated_at | timestamptz | |
@@ -96,7 +98,9 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | shop_categories | enum `business_shop_category`[] | a shop can belong to multiple categories; GIN-indexed for containment search. Same stable-code pattern as `skill_categories` |
 | other_category_description | text nullable | free-text description, required (validated at the API layer) when `shop_categories` includes `other` |
 | latitude / longitude | double precision nullable | shop location |
-| location_address | text nullable | |
+| area | text nullable | street/locality/landmark — the only optional part of the structured address |
+| city / district / state | text | required — replaced a single free-text `location_address` column (migration 0008), which wasn't precise enough to filter/search on |
+| pincode | text, `CHECK (pincode ~ '^[0-9]{6}$')` | required, 6-digit Indian postal code — indexed (`idx_business_profiles_pincode`, plus `idx_business_profiles_city`) for future area-based search |
 | shop_photo_urls | text[] | Cloudinary-hosted URLs, uploaded via `POST /api/v1/businesses/me/profile` (multipart) |
 | delivery_available | boolean | whether the shop offers delivery |
 | delivery_price_per_km | double precision nullable | required (validated at the API layer) when `delivery_available` is true |

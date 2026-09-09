@@ -7,7 +7,11 @@ export interface CreateWorkerProfileParams {
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
-  locationAddress: string;
+  area?: string;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
   portfolioPhotos: PickedImage[];
 }
 
@@ -24,7 +28,11 @@ export interface WorkerProfile {
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
-  locationAddress: string | null;
+  area: string | null;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
   portfolioPhotoUrls: string[];
   verificationStatus: string;
 }
@@ -39,7 +47,11 @@ export const workersService = {
     formData.append('experienceYears', String(params.experienceYears));
     if (params.latitude != null) formData.append('latitude', String(params.latitude));
     if (params.longitude != null) formData.append('longitude', String(params.longitude));
-    formData.append('locationAddress', params.locationAddress);
+    if (params.area) formData.append('area', params.area);
+    formData.append('city', params.city);
+    formData.append('district', params.district);
+    formData.append('state', params.state);
+    formData.append('pincode', params.pincode);
     params.portfolioPhotos.forEach((image) => {
       // React Native's fetch/FormData accepts this {uri,name,type} file-object shape —
       // not a real Blob, but that's what the runtime expects (matches the pattern
@@ -56,7 +68,11 @@ export const workersService = {
     formData.append('experienceYears', String(params.experienceYears));
     if (params.latitude != null) formData.append('latitude', String(params.latitude));
     if (params.longitude != null) formData.append('longitude', String(params.longitude));
-    formData.append('locationAddress', params.locationAddress);
+    if (params.area) formData.append('area', params.area);
+    formData.append('city', params.city);
+    formData.append('district', params.district);
+    formData.append('state', params.state);
+    formData.append('pincode', params.pincode);
     formData.append('existingPhotoUrls', JSON.stringify(params.existingPhotoUrls));
     params.portfolioPhotos.forEach((image) => {
       formData.append('portfolioPhotos', { uri: image.uri, name: image.name, type: image.type } as unknown as Blob);

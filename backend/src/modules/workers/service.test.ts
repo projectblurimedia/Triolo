@@ -36,7 +36,11 @@ function buildProfile(overrides: Partial<WorkerProfile> = {}): WorkerProfile {
     experienceYears: 3,
     latitude: 17.385,
     longitude: 78.4867,
-    locationAddress: 'Hyderabad, Telangana',
+    area: 'Ameerpet',
+    city: 'Hyderabad',
+    district: 'Hyderabad',
+    state: 'Telangana',
+    pincode: '500016',
     portfolioPhotoUrls: [],
     verificationStatus: 'pending_verification',
     createdAt: new Date(),
@@ -56,7 +60,11 @@ describe('WorkersService.createProfile', () => {
     const service = new WorkersService(repo as unknown as WorkersRepository);
 
     await expect(
-      service.createProfile('account-1', { skillCategories: ['electrician'], experienceYears: 3 }, []),
+      service.createProfile(
+        'account-1',
+        { skillCategories: ['electrician'], experienceYears: 3, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+        [],
+      ),
     ).rejects.toMatchObject({ statusCode: 409, code: 'WORKER_PROFILE_EXISTS' });
 
     expect(repo.create).not.toHaveBeenCalled();
@@ -75,7 +83,14 @@ describe('WorkersService.createProfile', () => {
 
     await service.createProfile(
       'account-1',
-      { skillCategories: ['plumber'], experienceYears: 5, locationAddress: 'Hyderabad' },
+      {
+        skillCategories: ['plumber'],
+        experienceYears: 5,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+      },
       files,
     );
 
@@ -86,7 +101,10 @@ describe('WorkersService.createProfile', () => {
         accountId: 'account-1',
         skillCategories: ['plumber'],
         experienceYears: 5,
-        locationAddress: 'Hyderabad',
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
         portfolioPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'],
       }),
     );
@@ -98,7 +116,11 @@ describe('WorkersService.createProfile', () => {
     repo.create.mockResolvedValue(buildProfile({ portfolioPhotoUrls: [] }));
 
     const service = new WorkersService(repo as unknown as WorkersRepository);
-    await service.createProfile('account-1', { skillCategories: ['mason'], experienceYears: 0 }, []);
+    await service.createProfile(
+      'account-1',
+      { skillCategories: ['mason'], experienceYears: 0, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+      [],
+    );
 
     expect(uploadToCloudinary).not.toHaveBeenCalled();
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ portfolioPhotoUrls: [] }));
@@ -112,7 +134,15 @@ describe('WorkersService.createProfile', () => {
     const service = new WorkersService(repo as unknown as WorkersRepository);
     await service.createProfile(
       'account-1',
-      { skillCategories: ['electrician', 'other'], otherSkillDescription: 'Roofing', experienceYears: 2 },
+      {
+        skillCategories: ['electrician', 'other'],
+        otherSkillDescription: 'Roofing',
+        experienceYears: 2,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+      },
       [],
     );
 
@@ -151,7 +181,11 @@ describe('WorkersService.updateProfile', () => {
     const service = new WorkersService(repo as unknown as WorkersRepository);
 
     await expect(
-      service.updateProfile('account-1', { skillCategories: ['plumber'], experienceYears: 4 }, []),
+      service.updateProfile(
+        'account-1',
+        { skillCategories: ['plumber'], experienceYears: 4, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+        [],
+      ),
     ).rejects.toMatchObject({ statusCode: 404, code: 'WORKER_PROFILE_NOT_FOUND' });
 
     expect(repo.update).not.toHaveBeenCalled();
@@ -165,7 +199,11 @@ describe('WorkersService.updateProfile', () => {
     repo.update.mockResolvedValue(buildProfile({ skillCategories: ['plumber'], experienceYears: 4 }));
 
     const service = new WorkersService(repo as unknown as WorkersRepository);
-    await service.updateProfile('account-1', { skillCategories: ['plumber'], experienceYears: 4 }, []);
+    await service.updateProfile(
+      'account-1',
+      { skillCategories: ['plumber'], experienceYears: 4, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+      [],
+    );
 
     expect(repo.update).toHaveBeenCalledWith(
       'account-1',
@@ -189,7 +227,15 @@ describe('WorkersService.updateProfile', () => {
 
     await service.updateProfile(
       'account-1',
-      { skillCategories: ['mason'], experienceYears: 2, existingPhotoUrls: ['https://cdn/a.jpg'] },
+      {
+        skillCategories: ['mason'],
+        experienceYears: 2,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+        existingPhotoUrls: ['https://cdn/a.jpg'],
+      },
       files,
     );
 
@@ -209,7 +255,15 @@ describe('WorkersService.updateProfile', () => {
     const service = new WorkersService(repo as unknown as WorkersRepository);
     await service.updateProfile(
       'account-1',
-      { skillCategories: ['mason'], experienceYears: 2, existingPhotoUrls: ['https://cdn/a.jpg'] },
+      {
+        skillCategories: ['mason'],
+        experienceYears: 2,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+        existingPhotoUrls: ['https://cdn/a.jpg'],
+      },
       [],
     );
 
@@ -222,7 +276,11 @@ describe('WorkersService.updateProfile', () => {
     repo.update.mockResolvedValue(buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg'] }));
 
     const service = new WorkersService(repo as unknown as WorkersRepository);
-    await service.updateProfile('account-1', { skillCategories: ['mason'], experienceYears: 2 }, []);
+    await service.updateProfile(
+      'account-1',
+      { skillCategories: ['mason'], experienceYears: 2, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+      [],
+    );
 
     expect(deletePhotosFromCloudinary).toHaveBeenCalledWith([]);
   });

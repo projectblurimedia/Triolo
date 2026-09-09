@@ -12,7 +12,7 @@ export interface AuthAccount {
   id: string;
   fullName: string;
   mobileNumber: string;
-  email: string;
+  email: string | null;
   role: AccountRole;
   status: AccountStatus;
   preferredLanguage: AccountLanguage;
@@ -25,10 +25,22 @@ interface AuthState {
   isHydrated: boolean;
   /** True for the duration of the logout request — drives a full-screen overlay (LogoutOverlay) rendered at the app root. Not persisted: a stuck-true value should never survive a restart. */
   isLoggingOut: boolean;
+  /**
+   * True while `RegisterWorkerScreen`/`RegisterBusinessScreen` are mid-flow — set on mount,
+   * cleared once that screen's own profile-create submission succeeds (or the screen
+   * unmounts for any other reason). RootNavigator normally swaps to `MainNavigator` the
+   * instant `accessToken` becomes truthy, which would otherwise unmount these screens right
+   * after inline OTP verification sets the session — before the user ever gets to fill in
+   * their Worker/Business fields. This flag keeps `AuthNavigator` (and this same screen)
+   * rendering through that gap. Not persisted: a stuck-true value should never survive a
+   * restart, since there'd be no way to complete or abandon the in-progress screen again.
+   */
+  isCompletingRegistration: boolean;
   setSession: (params: { accessToken: string; refreshToken: string; account: AuthAccount }) => void;
   setAccessToken: (accessToken: string) => void;
   clearSession: () => void;
   setLoggingOut: (value: boolean) => void;
+  setCompletingRegistration: (value: boolean) => void;
   setHydrated: () => void;
 }
 
@@ -40,6 +52,7 @@ export const useAuthStore = create<AuthState>()(
       account: null,
       isHydrated: false,
       isLoggingOut: false,
+      isCompletingRegistration: false,
       setSession: ({ accessToken, refreshToken, account }) => {
         set({ accessToken, refreshToken, account });
         // The account's saved language is authoritative on login/registration —
@@ -49,13 +62,15 @@ export const useAuthStore = create<AuthState>()(
       setAccessToken: (accessToken) => set({ accessToken }),
       clearSession: () => set({ accessToken: null, refreshToken: null, account: null }),
       setLoggingOut: (isLoggingOut) => set({ isLoggingOut }),
+      setCompletingRegistration: (isCompletingRegistration) => set({ isCompletingRegistration }),
       setHydrated: () => set({ isHydrated: true }),
     }),
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      // Excludes isLoggingOut only — a stuck `true` surviving an app kill mid-logout
-      // would otherwise show the full-screen LogoutOverlay forever on next launch.
+      // Excludes isLoggingOut/isCompletingRegistration — a stuck `true` surviving an app
+      // kill would otherwise show the full-screen LogoutOverlay forever, or strand the app
+      // on AuthNavigator despite a valid accessToken, on next launch.
       partialize: (state) => ({
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,

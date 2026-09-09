@@ -44,7 +44,22 @@
     "permissionDeniedTitle": "లొకేషన్ అనుమతి అవసరం",
     "permissionDeniedMessage": "మీ లొకేషన్‌ని ఆటోమేటిక్‌గా గుర్తించడానికి అనుమతి ఇవ్వండి, లేదా కింద మాన్యువల్‌గా నమోదు చేయండి.",
     "detectFailedTitle": "లొకేషన్ గుర్తించలేకపోయాము",
-    "detectFailedMessage": "మీ లొకేషన్ కనుగొనడంలో ఏదో సమస్య వచ్చింది. దయచేసి మాన్యువల్‌గా నమోదు చేయండి."
+    "detectFailedMessage": "మీ లొకేషన్ కనుగొనడంలో ఏదో సమస్య వచ్చింది. దయచేసి మాన్యువల్‌గా నమోదు చేయండి.",
+    "areaLabel": "ప్రాంతం / గుర్తు (ఐచ్ఛికం)",
+    "areaPlaceholder": "వీధి, ప్రాంతం లేదా సమీప గుర్తు",
+    "cityLabel": "నగరం",
+    "districtLabel": "జిల్లా",
+    "stateLabel": "రాష్ట్రం",
+    "pincodeLabel": "పిన్‌కోడ్",
+    "selectStatePlaceholder": "రాష్ట్రం ఎంచుకోండి",
+    "selectDistrictPlaceholder": "జిల్లా ఎంచుకోండి",
+    "selectStateFirst": "ముందు రాష్ట్రం ఎంచుకోండి",
+    "searchStatePlaceholder": "రాష్ట్రాలను వెతకండి",
+    "searchDistrictPlaceholder": "జిల్లాలను వెతకండి",
+    "noStatesFound": "రాష్ట్రాలు కనుగొనబడలేదు",
+    "noDistrictsFound": "జిల్లాలు కనుగొనబడలేదు",
+    "selectDistrictManually": "మేము మీ రాష్ట్రాన్ని గుర్తించాము, కానీ మీ జిల్లాను ఆటోమేటిక్‌గా సరిపోల్చలేకపోయాము — దయచేసి కింద ఎంచుకోండి.",
+    "selectStateAndDistrictManually": "మేము మీ రాష్ట్రం, జిల్లాను ఆటోమేటిక్‌గా సరిపోల్చలేకపోయాము — దయచేసి కింద ఎంచుకోండి."
   },
   "imagePicker": {
     "permissionDeniedTitle": "ఫోటో యాక్సెస్ అవసరం",

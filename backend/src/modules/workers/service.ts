@@ -32,7 +32,11 @@ export class WorkersService {
       experienceYears: dto.experienceYears,
       latitude: dto.latitude ?? null,
       longitude: dto.longitude ?? null,
-      locationAddress: dto.locationAddress ?? null,
+      area: dto.area ?? null,
+      city: dto.city,
+      district: dto.district,
+      state: dto.state,
+      pincode: dto.pincode,
       portfolioPhotoUrls,
     });
   }
@@ -69,7 +73,11 @@ export class WorkersService {
       experienceYears: dto.experienceYears,
       latitude: dto.latitude ?? null,
       longitude: dto.longitude ?? null,
-      locationAddress: dto.locationAddress ?? null,
+      area: dto.area ?? null,
+      city: dto.city,
+      district: dto.district,
+      state: dto.state,
+      pincode: dto.pincode,
       portfolioPhotoUrls,
       // Edits keep whatever verification status the profile already had — a confirmed
       // reversal of an earlier "any edit resets to pending_verification" design. Admin still

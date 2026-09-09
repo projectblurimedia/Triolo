@@ -8,6 +8,7 @@ import { VerificationBadge } from '@/components/VerificationBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { getErrorMessage } from '@/services/errorMessages';
 import { formatDate } from '@/utils/formatDate';
+import { formatAddress } from '@/utils/formatAddress';
 
 type Capability = 'worker' | 'business';
 type Profile = WorkerProfileWithAccount | BusinessProfileWithAccount;
@@ -132,7 +133,7 @@ function ProfileDetail({ capability }: { capability: Capability }) {
           </p>
         )}
         <p>
-          <strong>Location:</strong> {profile.locationAddress ?? '-'}
+          <strong>Location:</strong> {formatAddress(profile)}
         </p>
 
         {photoUrls.length > 0 ? (

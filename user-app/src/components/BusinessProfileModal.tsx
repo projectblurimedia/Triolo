@@ -5,7 +5,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TextField } from './TextField';
-import { LocationPicker, LocationValue } from './LocationPicker';
+import { AddressPicker, AddressValue, EMPTY_ADDRESS } from './AddressPicker';
 import { ImagePickerField, PickedImage } from './ImagePickerField';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
@@ -54,7 +54,7 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
   const [otherCategoryEntries, setOtherCategoryEntries] = useState<string[]>([]);
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherInputValue, setOtherInputValue] = useState('');
-  const [location, setLocation] = useState<LocationValue>({ latitude: null, longitude: null, address: '' });
+  const [address, setAddress] = useState<AddressValue>(EMPTY_ADDRESS);
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
   const [deliveryPricePerKm, setDeliveryPricePerKm] = useState('');
@@ -68,7 +68,15 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
       setOtherCategoryEntries(
         profile.otherCategoryDescription ? profile.otherCategoryDescription.split(', ').filter(Boolean) : [],
       );
-      setLocation({ latitude: profile.latitude, longitude: profile.longitude, address: profile.locationAddress ?? '' });
+      setAddress({
+        latitude: profile.latitude,
+        longitude: profile.longitude,
+        area: profile.area ?? '',
+        city: profile.city,
+        district: profile.district,
+        state: profile.state,
+        pincode: profile.pincode,
+      });
       setPhotos(
         profile.shopPhotoUrls.map((url) => ({ uri: url, name: url.split('/').pop() ?? 'photo.jpg', type: 'image/jpeg' })),
       );
@@ -122,7 +130,7 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
     setOtherCategoryEntries([]);
     setShowOtherInput(false);
     setOtherInputValue('');
-    setLocation({ latitude: null, longitude: null, address: '' });
+    setAddress(EMPTY_ADDRESS);
     setPhotos([]);
     setDeliveryAvailable(null);
     setDeliveryPricePerKm('');
@@ -142,7 +150,10 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
     if (
       !shopName.trim() ||
       (shopCategories.length === 0 && !includesOther) ||
-      !location.address.trim() ||
+      !address.city.trim() ||
+      !address.district.trim() ||
+      !address.state.trim() ||
+      !/^[0-9]{6}$/.test(address.pincode) ||
       deliveryAvailable === null ||
       (deliveryAvailable && !deliveryPricePerKm.trim())
     ) {
@@ -154,9 +165,13 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
       shopName,
       shopCategories: includesOther ? [...shopCategories, 'other'] : shopCategories,
       otherCategoryDescription: includesOther ? otherCategoryEntries.join(', ') : undefined,
-      latitude: location.latitude,
-      longitude: location.longitude,
-      locationAddress: location.address,
+      latitude: address.latitude,
+      longitude: address.longitude,
+      area: address.area.trim() || undefined,
+      city: address.city.trim(),
+      district: address.district.trim(),
+      state: address.state.trim(),
+      pincode: address.pincode,
       deliveryAvailable,
       deliveryPricePerKm: deliveryAvailable ? Number(deliveryPricePerKm) : undefined,
     };
@@ -290,32 +305,35 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
           </View>
 
           {showOtherInput ? (
-            <View style={styles.otherInputRow}>
-              <View style={styles.otherInputField}>
-                <TextField
-                  label={t('businessProfile.otherCategoryLabel')}
-                  value={otherInputValue}
-                  onChangeText={setOtherInputValue}
-                  maxLength={40}
-                  returnKeyType="done"
-                  onSubmitEditing={commitOtherEntry}
-                  autoFocus
-                />
+            <>
+              <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.otherCategoryLabel')}</Text>
+              <View style={styles.otherInputRow}>
+                <View style={styles.otherInputField}>
+                  <TextField
+                    containerStyle={styles.noMargin}
+                    value={otherInputValue}
+                    onChangeText={setOtherInputValue}
+                    maxLength={40}
+                    returnKeyType="done"
+                    onSubmitEditing={commitOtherEntry}
+                    autoFocus
+                  />
+                </View>
+                <Pressable
+                  style={{ opacity: otherInputValue.trim() ? 1 : 0.5 }}
+                  onPress={commitOtherEntry}
+                  disabled={!otherInputValue.trim()}
+                  accessibilityLabel={t('common.done')}
+                >
+                  <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
+                    <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
+                  </LinearGradient>
+                </Pressable>
               </View>
-              <Pressable
-                style={[styles.otherDoneButton, { opacity: otherInputValue.trim() ? 1 : 0.5 }]}
-                onPress={commitOtherEntry}
-                disabled={!otherInputValue.trim()}
-                accessibilityLabel={t('common.done')}
-              >
-                <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
-                  <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
-                </LinearGradient>
-              </Pressable>
-            </View>
+            </>
           ) : null}
 
-          <LocationPicker value={location} onChange={setLocation} accentColor={SHOP_GRADIENT[0]} />
+          <AddressPicker value={address} onChange={setAddress} accentColor={SHOP_GRADIENT[0]} />
 
           <ImagePickerField label={t('businessProfile.photosLabel')} images={photos} onChange={setPhotos} />
 
@@ -419,9 +437,9 @@ const styles = StyleSheet.create({
   addNewChip: { borderWidth: 1.5 },
   addNewBadge: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   chipLabel: { ...typography.caption, fontFamily: fonts.medium },
-  otherInputRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  otherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   otherInputField: { flex: 1 },
-  otherDoneButton: { marginTop: 22 },
+  noMargin: { marginBottom: 0 },
   otherDoneGradient: {
     width: 44,
     height: 44,

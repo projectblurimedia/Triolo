@@ -11,7 +11,11 @@ function mapBusinessProfile(row: QueryResultRow): BusinessProfile {
     otherCategoryDescription: row.other_category_description,
     latitude: row.latitude,
     longitude: row.longitude,
-    locationAddress: row.location_address,
+    area: row.area,
+    city: row.city,
+    district: row.district,
+    state: row.state,
+    pincode: row.pincode,
     shopPhotoUrls: row.shop_photo_urls ?? [],
     deliveryAvailable: row.delivery_available,
     deliveryPricePerKm: row.delivery_price_per_km,
@@ -45,14 +49,18 @@ export class BusinessesRepository {
     otherCategoryDescription: string | null;
     latitude: number | null;
     longitude: number | null;
-    locationAddress: string | null;
+    area: string | null;
+    city: string;
+    district: string;
+    state: string;
+    pincode: string;
     shopPhotoUrls: string[];
     deliveryAvailable: boolean;
     deliveryPricePerKm: number | null;
   }): Promise<BusinessProfile> {
     const result = await this.pool.query(
-      `INSERT INTO business_profiles (account_id, shop_name, shop_categories, other_category_description, latitude, longitude, location_address, shop_photo_urls, delivery_available, delivery_price_per_km)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO business_profiles (account_id, shop_name, shop_categories, other_category_description, latitude, longitude, area, city, district, state, pincode, shop_photo_urls, delivery_available, delivery_price_per_km)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         params.accountId,
@@ -61,7 +69,11 @@ export class BusinessesRepository {
         params.otherCategoryDescription,
         params.latitude,
         params.longitude,
-        params.locationAddress,
+        params.area,
+        params.city,
+        params.district,
+        params.state,
+        params.pincode,
         params.shopPhotoUrls,
         params.deliveryAvailable,
         params.deliveryPricePerKm,
@@ -78,7 +90,11 @@ export class BusinessesRepository {
       otherCategoryDescription: string | null;
       latitude: number | null;
       longitude: number | null;
-      locationAddress: string | null;
+      area: string | null;
+      city: string;
+      district: string;
+      state: string;
+      pincode: string;
       shopPhotoUrls: string[];
       deliveryAvailable: boolean;
       deliveryPricePerKm: number | null;
@@ -87,7 +103,7 @@ export class BusinessesRepository {
   ): Promise<BusinessProfile> {
     const result = await this.pool.query(
       `UPDATE business_profiles
-       SET shop_name = $2, shop_categories = $3, other_category_description = $4, latitude = $5, longitude = $6, location_address = $7, shop_photo_urls = $8, delivery_available = $9, delivery_price_per_km = $10, verification_status = $11, updated_at = now()
+       SET shop_name = $2, shop_categories = $3, other_category_description = $4, latitude = $5, longitude = $6, area = $7, city = $8, district = $9, state = $10, pincode = $11, shop_photo_urls = $12, delivery_available = $13, delivery_price_per_km = $14, verification_status = $15, updated_at = now()
        WHERE account_id = $1
        RETURNING *`,
       [
@@ -97,7 +113,11 @@ export class BusinessesRepository {
         params.otherCategoryDescription,
         params.latitude,
         params.longitude,
-        params.locationAddress,
+        params.area,
+        params.city,
+        params.district,
+        params.state,
+        params.pincode,
         params.shopPhotoUrls,
         params.deliveryAvailable,
         params.deliveryPricePerKm,

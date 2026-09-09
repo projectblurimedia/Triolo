@@ -31,7 +31,14 @@ export function Button({ label, onPress, loading, disabled, gradient }: ButtonPr
 
 const styles = StyleSheet.create({
   button: {
-    paddingVertical: 14,
+    // A fixed height (rather than paddingVertical sized to content) so the button is
+    // exactly the same height whether it's rendering its label Text or a LoadingIndicator —
+    // the two have slightly different natural heights, which otherwise made adjacent
+    // buttons (e.g. PhoneVerification's Confirm OTP/Change Number pair) visibly mismatch
+    // whenever one was loading and the other wasn't. 48 matches the prior
+    // paddingVertical:14 + ~20px text line height almost exactly, so normal buttons look
+    // unchanged.
+    height: 48,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',

@@ -3,7 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { AuthStackParamList } from './types';
 import { WelcomeScreen } from '@/screens/auth/WelcomeScreen';
-import { RegisterScreen } from '@/screens/auth/RegisterScreen';
+import { RegisterWorkerScreen } from '@/screens/auth/RegisterWorkerScreen';
+import { RegisterBusinessScreen } from '@/screens/auth/RegisterBusinessScreen';
 import { LoginScreen } from '@/screens/auth/LoginScreen';
 import { OtpScreen } from '@/screens/auth/OtpScreen';
 import { GradientHeader } from '@/components/GradientHeader';
@@ -17,9 +18,14 @@ export function AuthNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen
-        name="Register"
-        component={RegisterScreen}
-        options={{ headerShown: true, header: () => <GradientHeader title={t('auth.register')} showBack /> }}
+        name="RegisterWorker"
+        component={RegisterWorkerScreen}
+        options={{ headerShown: true, header: () => <GradientHeader title={t('workerProfile.title')} showBack /> }}
+      />
+      <Stack.Screen
+        name="RegisterBusiness"
+        component={RegisterBusinessScreen}
+        options={{ headerShown: true, header: () => <GradientHeader title={t('businessProfile.title')} showBack /> }}
       />
       <Stack.Screen
         name="Login"

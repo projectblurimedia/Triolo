@@ -58,7 +58,7 @@ function toPublicAccount(account: {
   id: string;
   fullName: string;
   mobileNumber: string;
-  email: string;
+  email: string | null;
   role: string;
   status: string;
   preferredLanguage: string;

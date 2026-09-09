@@ -7,7 +7,7 @@ export interface AuthAccount {
   id: string;
   fullName: string;
   mobileNumber: string;
-  email: string;
+  email: string | null;
   role: AccountRole;
   status: string;
   preferredLanguage: string;

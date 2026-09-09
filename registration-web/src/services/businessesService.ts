@@ -8,7 +8,11 @@ export interface BusinessProfile {
   otherCategoryDescription: string | null;
   latitude: number | null;
   longitude: number | null;
-  locationAddress: string | null;
+  area: string | null;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
   shopPhotoUrls: string[];
   deliveryAvailable: boolean;
   deliveryPricePerKm: number | null;
@@ -27,7 +31,11 @@ export interface CreateBusinessProfileParams {
   otherCategoryDescription?: string;
   latitude: number | null;
   longitude: number | null;
-  locationAddress: string;
+  area?: string;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
   shopPhotos: File[];
   deliveryAvailable: boolean;
   deliveryPricePerKm?: number;
@@ -43,7 +51,11 @@ export const businessesService = {
     if (params.otherCategoryDescription) formData.append('otherCategoryDescription', params.otherCategoryDescription);
     if (params.latitude != null) formData.append('latitude', String(params.latitude));
     if (params.longitude != null) formData.append('longitude', String(params.longitude));
-    formData.append('locationAddress', params.locationAddress);
+    if (params.area) formData.append('area', params.area);
+    formData.append('city', params.city);
+    formData.append('district', params.district);
+    formData.append('state', params.state);
+    formData.append('pincode', params.pincode);
     formData.append('deliveryAvailable', String(params.deliveryAvailable));
     if (params.deliveryAvailable && params.deliveryPricePerKm != null) {
       formData.append('deliveryPricePerKm', String(params.deliveryPricePerKm));

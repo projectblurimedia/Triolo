@@ -29,7 +29,11 @@ export interface BusinessProfile {
   otherCategoryDescription: string | null;
   latitude: number | null;
   longitude: number | null;
-  locationAddress: string | null;
+  area: string | null;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
   shopPhotoUrls: string[];
   deliveryAvailable: boolean;
   deliveryPricePerKm: number | null;

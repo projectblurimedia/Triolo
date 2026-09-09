@@ -36,7 +36,11 @@ function buildProfile(overrides: Partial<BusinessProfile> = {}): BusinessProfile
     otherCategoryDescription: null,
     latitude: 17.385,
     longitude: 78.4867,
-    locationAddress: 'Hyderabad, Telangana',
+    area: 'Ameerpet',
+    city: 'Hyderabad',
+    district: 'Hyderabad',
+    state: 'Telangana',
+    pincode: '500016',
     shopPhotoUrls: [],
     deliveryAvailable: false,
     deliveryPricePerKm: null,
@@ -60,7 +64,15 @@ describe('BusinessesService.createProfile', () => {
     await expect(
       service.createProfile(
         'account-1',
-        { shopName: 'Shop', shopCategories: ['grocery'], deliveryAvailable: false },
+        {
+          shopName: 'Shop',
+          shopCategories: ['grocery'],
+          deliveryAvailable: false,
+          city: 'Hyderabad',
+          district: 'Hyderabad',
+          state: 'Telangana',
+          pincode: '500016',
+        },
         [],
       ),
     ).rejects.toMatchObject({ statusCode: 409, code: 'BUSINESS_PROFILE_EXISTS' });
@@ -82,7 +94,10 @@ describe('BusinessesService.createProfile', () => {
       {
         shopName: 'My Shop',
         shopCategories: ['restaurant'],
-        locationAddress: 'Hyderabad',
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
         deliveryAvailable: false,
       },
       files,
@@ -94,7 +109,10 @@ describe('BusinessesService.createProfile', () => {
         accountId: 'account-1',
         shopName: 'My Shop',
         shopCategories: ['restaurant'],
-        locationAddress: 'Hyderabad',
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
         shopPhotoUrls: ['https://cdn/a.jpg'],
       }),
     );
@@ -108,7 +126,15 @@ describe('BusinessesService.createProfile', () => {
     const service = new BusinessesService(repo as unknown as BusinessesRepository);
     await service.createProfile(
       'account-1',
-      { shopName: 'Shop', shopCategories: ['other'], deliveryAvailable: false },
+      {
+        shopName: 'Shop',
+        shopCategories: ['other'],
+        deliveryAvailable: false,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+      },
       [],
     );
 
@@ -124,7 +150,16 @@ describe('BusinessesService.createProfile', () => {
     const service = new BusinessesService(repo as unknown as BusinessesRepository);
     await service.createProfile(
       'account-1',
-      { shopName: 'Shop', shopCategories: ['grocery'], deliveryAvailable: true, deliveryPricePerKm: 10 },
+      {
+        shopName: 'Shop',
+        shopCategories: ['grocery'],
+        deliveryAvailable: true,
+        deliveryPricePerKm: 10,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+      },
       [],
     );
 
@@ -141,7 +176,16 @@ describe('BusinessesService.createProfile', () => {
     const service = new BusinessesService(repo as unknown as BusinessesRepository);
     await service.createProfile(
       'account-1',
-      { shopName: 'Shop', shopCategories: ['grocery'], deliveryAvailable: false, deliveryPricePerKm: 10 },
+      {
+        shopName: 'Shop',
+        shopCategories: ['grocery'],
+        deliveryAvailable: false,
+        deliveryPricePerKm: 10,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+      },
       [],
     );
 
@@ -172,7 +216,19 @@ describe('BusinessesService.updateProfile', () => {
     const service = new BusinessesService(repo as unknown as BusinessesRepository);
 
     await expect(
-      service.updateProfile('account-1', { shopName: 'Shop', shopCategories: ['grocery'], deliveryAvailable: false }, []),
+      service.updateProfile(
+        'account-1',
+        {
+          shopName: 'Shop',
+          shopCategories: ['grocery'],
+          deliveryAvailable: false,
+          city: 'Hyderabad',
+          district: 'Hyderabad',
+          state: 'Telangana',
+          pincode: '500016',
+        },
+        [],
+      ),
     ).rejects.toMatchObject({ statusCode: 404, code: 'BUSINESS_PROFILE_NOT_FOUND' });
 
     expect(repo.update).not.toHaveBeenCalled();
@@ -188,7 +244,15 @@ describe('BusinessesService.updateProfile', () => {
     const service = new BusinessesService(repo as unknown as BusinessesRepository);
     await service.updateProfile(
       'account-1',
-      { shopName: 'New Name', shopCategories: ['restaurant'], deliveryAvailable: false },
+      {
+        shopName: 'New Name',
+        shopCategories: ['restaurant'],
+        deliveryAvailable: false,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+      },
       [],
     );
 
@@ -218,6 +282,10 @@ describe('BusinessesService.updateProfile', () => {
         shopName: 'Shop',
         shopCategories: ['grocery'],
         deliveryAvailable: false,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
         existingPhotoUrls: ['https://cdn/a.jpg'],
       },
       files,
@@ -243,6 +311,10 @@ describe('BusinessesService.updateProfile', () => {
         shopName: 'Shop',
         shopCategories: ['grocery'],
         deliveryAvailable: false,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
         existingPhotoUrls: ['https://cdn/a.jpg'],
       },
       [],

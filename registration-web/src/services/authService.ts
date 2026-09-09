@@ -11,10 +11,10 @@ export const authService = {
   requestRegistrationOtp: (params: {
     fullName: string;
     mobileNumber: string;
-    email: string;
-    latitude: number | null;
-    longitude: number | null;
-    locationAddress: string;
+    email?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    locationAddress?: string;
     preferredLanguage: string;
   }) => apiClient.post<{ mobileNumber: string }>('/auth/register/request-otp', params),
 

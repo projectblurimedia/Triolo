@@ -77,10 +77,15 @@ export function CategoryChips({ options, selected, onChange, otherEntries, onOth
       </div>
 
       {showOtherInput ? (
-        <div className="field" style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            <label>What's your category?</label>
+        <div className="field">
+          <label>What's your category?</label>
+          {/* Label sits above the row (not inside a per-input flex item beside the button) so
+              the input and the "done" button — genuine siblings with no hidden label offset
+              between them — center on each other exactly via alignItems:'center', rather than
+              the previous alignItems:'flex-end' approximation. */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <input
+              style={{ flex: 1, width: 'auto', minWidth: 0 }}
               value={otherValue}
               onChange={(e) => setOtherValue(e.target.value)}
               onKeyDown={(e) => {
@@ -94,10 +99,15 @@ export function CategoryChips({ options, selected, onChange, otherEntries, onOth
               }}
               autoFocus
             />
+            <button
+              type="button"
+              className="button"
+              style={{ width: 44, height: 44, padding: 0, flexShrink: 0 }}
+              onClick={commitOther}
+            >
+              ✓
+            </button>
           </div>
-          <button type="button" className="button" style={{ width: 44, padding: 12 }} onClick={commitOther}>
-            ✓
-          </button>
         </div>
       ) : null}
     </div>

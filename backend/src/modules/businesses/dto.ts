@@ -6,7 +6,11 @@ export interface CreateBusinessProfileDto {
   otherCategoryDescription?: string;
   latitude?: number | null;
   longitude?: number | null;
-  locationAddress?: string;
+  area?: string;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
   deliveryAvailable: boolean;
   deliveryPricePerKm?: number;
 }

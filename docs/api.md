@@ -7,9 +7,9 @@ Conventions: see [[.cloud/api-guidelines.md]]. Base path: `/api/v1`.
 ### POST /auth/register/request-otp
 Request OTP for a new account. Every self-registered account is a plain `user` — there is no `role` field; Worker/Business are optional capabilities added later via the Workers/Businesses modules (see below), not chosen at registration.
 - Auth: none
-- Body: `{ fullName: string, mobileNumber: string, email: string, latitude?: number, longitude?: number, locationAddress: string, preferredLanguage?: "en" | "te" }` — `latitude`/`longitude` are omitted when the client only has a manually-typed address (no GPS fix); `locationAddress` is always required. `preferredLanguage` defaults to `en` if omitted; the client should always send the app's currently active language (see `docs/localization.md`).
+- Body: `{ fullName: string, mobileNumber: string, email?: string, latitude?: number, longitude?: number, locationAddress?: string, preferredLanguage?: "en" | "te" }` — `email`/`latitude`/`longitude`/`locationAddress` are all optional (a client can register with just `fullName`/`mobileNumber`; `user-app` still collects and sends all of them, `partner-app` sends only name/mobile — see `.cloud/project-context.md`'s Account Model note on why). `preferredLanguage` defaults to `en` if omitted; the client should always send the app's currently active language (see `docs/localization.md`).
 - 200: `{ success: true, message: "OTP sent", data: { mobileNumber } }`
-- 400: validation error (missing/invalid email, location, etc.)
+- 400: validation error (invalid email format if provided, `fullName`/`mobileNumber` missing, etc.)
 - 409: mobile number already registered
 
 ### POST /auth/register/verify-otp
@@ -68,8 +68,8 @@ Adds the Worker capability to the authenticated (already self-registered) `user`
 ### POST /workers/me/profile
 Create the caller's worker profile. `multipart/form-data`, not JSON — the only such endpoint in this API so far, since it carries image files.
 - Auth: Bearer access token
-- Body (multipart fields): `skillCategories: string` — a JSON-stringified array of 1+ of `"electrician"|"plumber"|"painter"|"carpenter"|"mechanic"|"cleaner"|"mason"|"other"` (a worker can have multiple skills), `otherSkillDescription?: string` (required when `skillCategories` includes `"other"`), `experienceYears: number`, `latitude?: number`, `longitude?: number`, `locationAddress?: string`, plus 0-6 image files under the field name `portfolioPhotos` (JPEG/PNG/WEBP, 8MB each max).
-- 201: `{ success: true, message: "Worker profile created", data: { id, accountId, skillCategories, otherSkillDescription, experienceYears, latitude, longitude, locationAddress, portfolioPhotoUrls, verificationStatus, createdAt, updatedAt } }`
+- Body (multipart fields): `skillCategories: string` — a JSON-stringified array of 1+ of `"electrician"|"plumber"|"painter"|"carpenter"|"mechanic"|"cleaner"|"mason"|"other"` (a worker can have multiple skills), `otherSkillDescription?: string` (required when `skillCategories` includes `"other"`), `experienceYears: number`, `latitude?: number`, `longitude?: number`, `area?: string`, `city: string`, `district: string`, `state: string`, `pincode: string` (required, 6 digits — replaced a single free-text `locationAddress` field, which wasn't precise enough to filter/search on), plus 0-6 image files under the field name `portfolioPhotos` (JPEG/PNG/WEBP, 8MB each max).
+- 201: `{ success: true, message: "Worker profile created", data: { id, accountId, skillCategories, otherSkillDescription, experienceYears, latitude, longitude, area, city, district, state, pincode, portfolioPhotoUrls, verificationStatus, createdAt, updatedAt } }`
 - 400: validation error (including `otherSkillDescription` missing when `"other"` is selected), or `CLOUDINARY_NOT_CONFIGURED` if image uploads aren't set up on this server yet
 - 409: `WORKER_PROFILE_EXISTS` — one worker profile per account
 
@@ -98,8 +98,8 @@ Adds the Business capability to the authenticated `user` account — mirrors the
 ### POST /businesses/me/profile
 Create the caller's business profile. `multipart/form-data`.
 - Auth: Bearer access token
-- Body (multipart fields): `shopName: string`, `shopCategories: string` — a JSON-stringified array of 1+ of `"grocery"|"restaurant"|"pharmacy"|"electronics"|"clothing"|"hardware"|"salon"|"other"` (a shop can belong to multiple categories), `otherCategoryDescription?: string` (required when `shopCategories` includes `"other"`), `latitude?: number`, `longitude?: number`, `locationAddress?: string`, `deliveryAvailable: "true"|"false"`, `deliveryPricePerKm?: number` (required when `deliveryAvailable` is `"true"`), plus 0-6 image files under the field name `shopPhotos`.
-- 201: `{ success: true, message: "Business profile created", data: { id, accountId, shopName, shopCategories, otherCategoryDescription, latitude, longitude, locationAddress, shopPhotoUrls, deliveryAvailable, deliveryPricePerKm, verificationStatus, createdAt, updatedAt } }`
+- Body (multipart fields): `shopName: string`, `shopCategories: string` — a JSON-stringified array of 1+ of `"grocery"|"restaurant"|"pharmacy"|"electronics"|"clothing"|"hardware"|"salon"|"other"` (a shop can belong to multiple categories), `otherCategoryDescription?: string` (required when `shopCategories` includes `"other"`), `latitude?: number`, `longitude?: number`, `area?: string`, `city: string`, `district: string`, `state: string`, `pincode: string` (required, 6 digits — replaced a single free-text `locationAddress` field, same as the Workers endpoint), `deliveryAvailable: "true"|"false"`, `deliveryPricePerKm?: number` (required when `deliveryAvailable` is `"true"`), plus 0-6 image files under the field name `shopPhotos`.
+- 201: `{ success: true, message: "Business profile created", data: { id, accountId, shopName, shopCategories, otherCategoryDescription, latitude, longitude, area, city, district, state, pincode, shopPhotoUrls, deliveryAvailable, deliveryPricePerKm, verificationStatus, createdAt, updatedAt } }`
 - 400 / 409: same shape as the Workers endpoint (`BUSINESS_PROFILE_EXISTS` instead of `WORKER_PROFILE_EXISTS`; also validates `otherCategoryDescription`/`deliveryPricePerKm` requirements)
 
 ### GET /businesses/me/profile

@@ -7,6 +7,7 @@ import { VerificationBadge } from './VerificationBadge';
 import { SHOP_GRADIENT } from './BusinessProfileModal';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { BusinessProfile } from '@/services/businessesService';
+import { formatAddress } from '@/utils/formatAddress';
 
 interface BusinessProfileCardProps {
   profile: BusinessProfile;
@@ -69,11 +70,11 @@ export function BusinessProfileCard({ profile, onEdit }: BusinessProfileCardProp
           {t(profile.deliveryAvailable ? 'bazaar.deliveryAvailableYes' : 'bazaar.deliveryAvailableNo')}
         </Text>
       </View>
-      {profile.locationAddress ? (
+      {profile.city ? (
         <View style={styles.metaRow}>
           <FontAwesome6 name="location-dot" size={12} color={colors.textMuted} solid />
           <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
-            {profile.locationAddress}
+            {formatAddress(profile)}
           </Text>
         </View>
       ) : null}

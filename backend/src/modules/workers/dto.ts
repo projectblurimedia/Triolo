@@ -6,7 +6,11 @@ export interface CreateWorkerProfileDto {
   experienceYears: number;
   latitude?: number | null;
   longitude?: number | null;
-  locationAddress?: string;
+  area?: string;
+  city: string;
+  district: string;
+  state: string;
+  pincode: string;
 }
 
 export interface UpdateWorkerProfileDto extends CreateWorkerProfileDto {

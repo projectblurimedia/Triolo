@@ -13,7 +13,7 @@ export interface Account {
   id: string;
   fullName: string;
   mobileNumber: string;
-  email: string;
+  email: string | null;
   role: AccountRole;
   status: AccountStatus;
   preferredLanguage: PreferredLanguage;

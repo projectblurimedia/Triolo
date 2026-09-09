@@ -135,7 +135,7 @@ describe('AuthService.verifyRegistrationOtp', () => {
     expect(result.tokens.refreshToken).toContain('.');
   });
 
-  it('rejects if registration details (email/location) are missing from the OTP record', async () => {
+  it('rejects if the full name is missing from the OTP record', async () => {
     const repo = createMockRepository();
     const otpHash = await hashOtp('111111');
     repo.findLatestActiveOtp.mockResolvedValue({
@@ -143,7 +143,7 @@ describe('AuthService.verifyRegistrationOtp', () => {
       mobileNumber: '9876543210',
       otpHash,
       purpose: 'registration',
-      fullName: 'A',
+      fullName: null,
       email: null,
       latitude: null,
       longitude: null,
@@ -161,6 +161,34 @@ describe('AuthService.verifyRegistrationOtp', () => {
     ).rejects.toMatchObject({ statusCode: 400, code: 'OTP_CONTEXT_MISSING' });
 
     expect(repo.createAccount).not.toHaveBeenCalled();
+  });
+
+  it('creates an account when email/location are missing from the OTP record — both are optional now (e.g. partner-app registration, which only collects name/mobile)', async () => {
+    const repo = createMockRepository();
+    const otpHash = await hashOtp('111111');
+    repo.findLatestActiveOtp.mockResolvedValue({
+      id: 'otp-1',
+      mobileNumber: '9876543210',
+      otpHash,
+      purpose: 'registration',
+      fullName: 'A',
+      email: null,
+      latitude: null,
+      longitude: null,
+      locationAddress: null,
+      preferredLanguage: 'en',
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+      attemptCount: 0,
+    });
+    repo.findAccountByMobile.mockResolvedValue(null);
+    repo.createAccount.mockResolvedValue(buildAccount({ email: null, locationAddress: null }));
+
+    const service = new AuthService(repo as unknown as AuthRepository);
+    const result = await service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' });
+
+    expect(repo.createAccount).toHaveBeenCalledWith(expect.objectContaining({ email: null, locationAddress: null }));
+    expect(result.tokens.accessToken).toBeDefined();
   });
 
   it('rejects an incorrect OTP and records the attempt', async () => {

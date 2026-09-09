@@ -3,10 +3,10 @@ import { PreferredLanguage } from './interfaces';
 export interface RequestRegistrationOtpDto {
   fullName: string;
   mobileNumber: string;
-  email: string;
+  email?: string;
   latitude?: number | null;
   longitude?: number | null;
-  locationAddress: string;
+  locationAddress?: string;
   preferredLanguage?: PreferredLanguage;
 }
 

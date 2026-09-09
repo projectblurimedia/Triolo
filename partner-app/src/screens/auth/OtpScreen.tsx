@@ -7,34 +7,30 @@ import { TextField } from '@/components/TextField';
 import { Button } from '@/components/Button';
 import { colors, typography } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
-import { useVerifyLoginOtp, useVerifyRegistrationOtp } from '@/hooks/useAuthMutations';
+import { useVerifyLoginOtp } from '@/hooks/useAuthMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
-import { showToast } from '@/state/toastStore';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Otp'>;
 
+/**
+ * Login-only now — registration's own OTP verification moved inline into
+ * `PhoneVerification`/`RegisterWorkerScreen`/`RegisterBusinessScreen` (see those screens'
+ * doc comments), so `LoginScreen` is the only remaining caller of this screen.
+ */
 export function OtpScreen({ route }: Props) {
   const { t } = useTranslation();
-  const { mode, mobileNumber } = route.params;
+  const { mobileNumber } = route.params;
   const [otp, setOtp] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const verifyRegistration = useVerifyRegistrationOtp();
   const verifyLogin = useVerifyLoginOtp();
-  const mutation = mode === 'registration' ? verifyRegistration : verifyLogin;
 
   const handleSubmit = () => {
     setError(null);
-    mutation.mutate(
+    verifyLogin.mutate(
       { mobileNumber, otp },
       {
-        // Successful verification updates the auth store; RootNavigator automatically
-        // switches to MainNavigator (landing on ChooseCapability) once accessToken is set.
-        onSuccess: () => {
-          if (mode === 'registration') {
-            showToast({ variant: 'success', title: t('auth.accountCreatedTitle'), message: t('auth.accountCreatedMessage') });
-          }
-        },
+        // RootNavigator automatically switches to MainNavigator once accessToken is set.
         onError: (err) => setError(getLocalizedErrorMessage(err, t)),
       },
     );
@@ -50,7 +46,7 @@ export function OtpScreen({ route }: Props) {
         maxLength={6}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button label={t('auth.verifyOtp')} onPress={handleSubmit} loading={mutation.isPending} />
+      <Button label={t('auth.verifyOtp')} onPress={handleSubmit} loading={verifyLogin.isPending} />
     </ScreenContainer>
   );
 }

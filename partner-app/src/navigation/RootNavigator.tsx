@@ -15,6 +15,7 @@ import { MainNavigator } from './MainNavigator';
 export function RootNavigator() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const isAuthHydrated = useAuthStore((state) => state.isHydrated);
+  const isCompletingRegistration = useAuthStore((state) => state.isCompletingRegistration);
   const isThemeHydrated = useThemeStore((state) => state.isHydrated);
   const { colors, isDark } = useThemeColors();
 
@@ -38,9 +39,14 @@ export function RootNavigator() {
     },
   };
 
+  // `isCompletingRegistration` (see authStore's own doc comment) keeps AuthNavigator
+  // mounted for the brief window between "RegisterWorkerScreen/RegisterBusinessScreen's
+  // inline OTP verification set the session" and "that same screen's Worker/Business
+  // profile submission succeeded" — without it, this swap would happen the instant
+  // accessToken became truthy, unmounting the very screen the user is still filling in.
   return (
     <NavigationContainer theme={navigationTheme}>
-      {accessToken ? <MainNavigator /> : <AuthNavigator />}
+      {accessToken && !isCompletingRegistration ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
 }

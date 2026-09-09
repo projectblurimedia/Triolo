@@ -54,7 +54,7 @@ export class AuthService {
   async verifyRegistrationOtp(dto: VerifyRegistrationOtpDto): Promise<{ account: Account; tokens: AuthTokens }> {
     const otpRecord = await this.consumeValidOtp(dto.mobileNumber, dto.otp, 'registration');
 
-    if (!otpRecord.fullName || !otpRecord.email || !otpRecord.locationAddress) {
+    if (!otpRecord.fullName) {
       throw AppError.badRequest('Registration details missing. Please request a new OTP.', 'OTP_CONTEXT_MISSING');
     }
 

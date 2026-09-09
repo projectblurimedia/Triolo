@@ -44,7 +44,22 @@
     "permissionDeniedTitle": "Location Permission Needed",
     "permissionDeniedMessage": "Allow location access to auto-detect your location, or enter it manually below.",
     "detectFailedTitle": "Couldn't Detect Location",
-    "detectFailedMessage": "Something went wrong finding your location. Please enter it manually."
+    "detectFailedMessage": "Something went wrong finding your location. Please enter it manually.",
+    "areaLabel": "Area / Landmark (optional)",
+    "areaPlaceholder": "Street, locality or nearby landmark",
+    "cityLabel": "City",
+    "districtLabel": "District",
+    "stateLabel": "State",
+    "pincodeLabel": "Pincode",
+    "selectStatePlaceholder": "Select State",
+    "selectDistrictPlaceholder": "Select District",
+    "selectStateFirst": "Select a State first",
+    "searchStatePlaceholder": "Search states",
+    "searchDistrictPlaceholder": "Search districts",
+    "noStatesFound": "No states found",
+    "noDistrictsFound": "No districts found",
+    "selectDistrictManually": "We detected your state, but couldn't match your district automatically — please select it below.",
+    "selectStateAndDistrictManually": "We couldn't match your state and district automatically — please select them below."
   },
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",

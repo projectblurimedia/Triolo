@@ -48,12 +48,14 @@ export function ProfileScreen({ navigation }: Props) {
               <FontAwesome6 name="phone" size={11} color="rgba(255,255,255,0.85)" solid />
               <Text style={styles.heroMeta}>{account.mobileNumber}</Text>
             </View>
-            <View style={styles.heroMetaRow}>
-              <FontAwesome6 name="envelope" size={11} color="rgba(255,255,255,0.85)" solid />
-              <Text style={styles.heroMeta} numberOfLines={1}>
-                {account.email}
-              </Text>
-            </View>
+            {account.email ? (
+              <View style={styles.heroMetaRow}>
+                <FontAwesome6 name="envelope" size={11} color="rgba(255,255,255,0.85)" solid />
+                <Text style={styles.heroMeta} numberOfLines={1}>
+                  {account.email}
+                </Text>
+              </View>
+            ) : null}
           </LinearGradient>
         ) : null}
 
