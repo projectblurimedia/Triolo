@@ -13,7 +13,6 @@ import { ScreenContainer } from '@/components/ScreenContainer';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useListStore } from '@/state/listStore';
-import { useSettingsStore } from '@/state/settingsStore';
 import { showToast } from '@/state/toastStore';
 import { parseVoiceListText } from '@/utils/parseVoiceList';
 
@@ -34,7 +33,6 @@ export function PrepareListScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
-  const language = useSettingsStore((state) => state.language);
   const items = useListStore((state) => state.items);
   const addItems = useListStore((state) => state.addItems);
   const updateItem = useListStore((state) => state.updateItem);
@@ -107,7 +105,14 @@ export function PrepareListScreen() {
       return;
     }
     ExpoSpeechRecognitionModule.start({
-      lang: language === 'te' ? 'te-IN' : 'en-IN',
+      // Always te-IN, regardless of the app's own display-language setting — grocery item
+      // names here are predominantly Telugu words with English units/numbers mixed in
+      // (this app's whole MVP audience, per .cloud/project-context.md), and Google's
+      // regional-locale recognizers are specifically trained on exactly that kind of
+      // code-switched speech; en-IN was tried first and recognized common English loanwords
+      // fine but mangled Telugu quantity words like "nnara" ("one and a half") into
+      // unrecognizable fragments far more often.
+      lang: 'te-IN',
       interimResults: true,
       continuous: true,
     });
