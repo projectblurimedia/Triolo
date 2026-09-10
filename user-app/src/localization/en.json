@@ -187,8 +187,7 @@
     "rangeLabel": "Range",
     "unit": {
       "km": "KM",
-      "m": "M",
-      "mi": "Miles"
+      "m": "M"
     },
     "invalidRangeTitle": "Enter a Range",
     "invalidRangeMessage": "Type a range value above to search nearby workers and shops.",

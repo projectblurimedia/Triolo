@@ -16,7 +16,7 @@ import { formatDistanceValue, isWorkerResult, NearbyResult, NearbySearchMode } f
 
 export type { NearbySearchMode, NearbyResult };
 
-type RangeUnit = 'km' | 'm' | 'mi';
+type RangeUnit = 'km' | 'm';
 
 interface NearbySearchModalProps {
   visible: boolean;
@@ -39,8 +39,9 @@ type ResultsState =
 
 const DEFAULT_RANGE_VALUE = '5';
 const DEFAULT_RANGE_UNIT: RangeUnit = 'km';
-const RANGE_UNITS: RangeUnit[] = ['km', 'm', 'mi'];
-const MILES_TO_KM = 1.60934;
+// Listed M first, then KM, per explicit ordering request — this is display order only,
+// the default selected unit is still 'km' (DEFAULT_RANGE_UNIT above).
+const RANGE_UNITS: RangeUnit[] = ['m', 'km'];
 // Matches the backend's own nearbySearchQuerySchema (min 0.1, max 50) — clamped client-side
 // too so a typed value never produces a request the API would just reject as VALIDATION_ERROR.
 const MIN_RADIUS_KM = 0.1;
@@ -50,7 +51,7 @@ const SEARCH_DEBOUNCE_MS = 350;
 function toRadiusKm(value: string, unit: RangeUnit): number | null {
   const parsed = parseFloat(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  const km = unit === 'km' ? parsed : unit === 'm' ? parsed / 1000 : parsed * MILES_TO_KM;
+  const km = unit === 'km' ? parsed : parsed / 1000;
   return Math.min(MAX_RADIUS_KM, Math.max(MIN_RADIUS_KM, km));
 }
 
@@ -66,11 +67,13 @@ function toRadiusKm(value: string, unit: RangeUnit): number | null {
  * location via expo-location (same permission/getCurrentPositionAsync pattern already
  * proven in AddressPicker), then GET /workers/nearby or /businesses/nearby (Haversine
  * distance computed in SQL server-side, see backend repositories) filtered to verified
- * profiles within a user-typed range (a numeric input plus a KM/M/Miles unit picker,
- * defaulting to 5km — replaced an earlier fixed-chip-row version per explicit request for
- * free-form input instead of presets), re-queried (debounced) whenever the free-text
- * search box or the range changes. Tapping a result card opens `NearbyResultDetailModal`
- * for a fuller, read-only view of that profile.
+ * profiles within a user-typed range (a numeric input plus an M/KM unit picker, defaulting
+ * to 5km — replaced an earlier fixed-chip-row version per explicit request for free-form
+ * input instead of presets; Miles was dropped from the unit picker per a later explicit
+ * request too), re-queried (debounced) whenever the free-text search box or the range
+ * changes. The search box, range input, and unit picker trigger all sit in one row, per
+ * explicit request. Tapping a result card opens `NearbyResultDetailModal` for a fuller,
+ * read-only view of that profile.
  */
 export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalProps) {
   const { t } = useTranslation();
@@ -339,39 +342,35 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
           </View>
         </LinearGradient>
 
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <FontAwesome6 name="magnifying-glass" size={15} color={colors.textMuted} solid />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t(isWorker ? 'nearbySearch.searchWorkersPlaceholder' : 'nearbySearch.searchShopsPlaceholder')}
-            placeholderTextColor={colors.textMuted}
-            style={[styles.searchInput, { color: colors.text }]}
-            returnKeyType="search"
-          />
-        </View>
-
-        <View style={styles.radiusRow}>
-          <Text style={[styles.radiusLabel, { color: colors.textMuted }]}>{t('nearbySearch.rangeLabel')}</Text>
-          <View style={styles.radiusInputRow}>
-            <View style={[styles.radiusInputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <TextInput
-                value={rangeValue}
-                onChangeText={(text) => setRangeValue(text.replace(/[^0-9.]/g, ''))}
-                keyboardType="decimal-pad"
-                placeholder={DEFAULT_RANGE_VALUE}
-                placeholderTextColor={colors.textMuted}
-                style={[styles.radiusInput, { color: colors.text }]}
-              />
-            </View>
-            <Pressable
-              style={[styles.unitButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={() => setUnitPickerVisible(true)}
-            >
-              <Text style={[styles.unitButtonText, { color: colors.text }]}>{t(`nearbySearch.unit.${rangeUnit}`)}</Text>
-              <FontAwesome6 name="chevron-down" size={11} color={colors.textMuted} solid />
-            </Pressable>
+        <View style={styles.filterRow}>
+          <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <FontAwesome6 name="magnifying-glass" size={14} color={colors.textMuted} solid />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t(isWorker ? 'nearbySearch.searchWorkersPlaceholder' : 'nearbySearch.searchShopsPlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              style={[styles.searchInput, { color: colors.text }]}
+              returnKeyType="search"
+            />
           </View>
+          <View style={[styles.radiusInputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <TextInput
+              value={rangeValue}
+              onChangeText={(text) => setRangeValue(text.replace(/[^0-9.]/g, ''))}
+              keyboardType="decimal-pad"
+              placeholder={DEFAULT_RANGE_VALUE}
+              placeholderTextColor={colors.textMuted}
+              style={[styles.radiusInput, { color: colors.text }]}
+            />
+          </View>
+          <Pressable
+            style={[styles.unitButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setUnitPickerVisible(true)}
+          >
+            <Text style={[styles.unitButtonText, { color: colors.text }]}>{t(`nearbySearch.unit.${rangeUnit}`)}</Text>
+            <FontAwesome6 name="chevron-down" size={10} color={colors.textMuted} solid />
+          </Pressable>
         </View>
 
         {renderBody()}
@@ -430,41 +429,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  searchBar: {
+  // Search input, range input, and the unit picker trigger all share one row per
+  // explicit request — search takes the remaining space (flex: 1), the other two are
+  // narrow, fixed-width controls sized just for their short content.
+  filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: 8,
     marginHorizontal: 20,
     marginTop: 16,
   },
-  searchInput: { flex: 1, ...typography.body, padding: 0 },
-  radiusRow: { marginHorizontal: 20, marginTop: 14 },
-  radiusLabel: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 8 },
-  radiusInputRow: { flexDirection: 'row', gap: 10 },
-  radiusInputWrap: {
+  searchBar: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  radiusInput: { ...typography.body, padding: 0 },
-  unitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    minWidth: 90,
-    justifyContent: 'center',
+    paddingVertical: 11,
   },
-  unitButtonText: { ...typography.body, fontFamily: fonts.semiBold },
+  searchInput: { flex: 1, ...typography.body, fontSize: 14, padding: 0 },
+  radiusInputWrap: {
+    width: 52,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 11,
+  },
+  radiusInput: { ...typography.body, fontSize: 14, padding: 0, textAlign: 'center' },
+  unitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 11,
+  },
+  unitButtonText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 13 },
   unitOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
