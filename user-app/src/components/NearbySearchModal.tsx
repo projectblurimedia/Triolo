@@ -31,11 +31,14 @@ type LocationState =
   | { status: 'error' }
   | { status: 'ready'; latitude: number; longitude: number };
 
+// `mode` is tagged onto the ready state itself, not just trusted to match the component's
+// current `mode` prop — see the render-race note below on why that distinction is load-
+// bearing, not decorative.
 type ResultsState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; items: NearbyResult[] };
+  | { status: 'ready'; items: NearbyResult[]; mode: NearbySearchMode };
 
 const DEFAULT_RANGE_VALUE = '5';
 const DEFAULT_RANGE_UNIT: RangeUnit = 'km';
@@ -127,6 +130,7 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     if (!visible) return;
     setQuery('');
     setResults({ status: 'idle' });
+    setSelectedResult(null);
     if (locationRef.current.status !== 'ready') {
       detectLocation();
     }
@@ -134,18 +138,22 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
 
   const runSearch = useCallback(
     async (latitude: number, longitude: number, searchQuery: string, radius: number) => {
+      // Captured once, at the moment this specific search started — not re-read from the
+      // component's `mode` prop after the request resolves, since `mode` can have already
+      // moved on to the other tab by then (see the render-race note below).
+      const searchedMode = mode;
       setResults({ status: 'loading' });
       try {
         const params = { latitude, longitude, radiusKm: radius, query: searchQuery.trim() || undefined };
         const items: NearbyResult[] = isWorker
           ? await workersService.searchNearby(params)
           : await businessesService.searchNearby(params);
-        setResults({ status: 'ready', items });
+        setResults({ status: 'ready', items, mode: searchedMode });
       } catch {
         setResults({ status: 'error' });
       }
     },
-    [isWorker],
+    [isWorker, mode],
   );
 
   const readyLatitude = location.status === 'ready' ? location.latitude : null;
@@ -274,7 +282,14 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
       );
     }
 
-    if (results.status === 'idle' || results.status === 'loading') {
+    // Results tagged for the *other* mode are treated as not-ready-yet, same as idle/loading
+    // — see the render-race note on ResultsState/runSearch above. Without this check, a
+    // worker->shop (or shop->worker) switch could paint one frame of shop-mode `mode` with
+    // still-in-state worker-shaped result objects passed to `renderItem`, which reads
+    // shop-only fields (`shopCategories`, etc.) off them and throws — the crash then takes
+    // the whole screen blank with it, since nothing in this app renders an error boundary.
+    // That mismatch window is exactly what was reported as "shops sometimes blank page."
+    if (results.status === 'idle' || results.status === 'loading' || (results.status === 'ready' && results.mode !== mode)) {
       return (
         <View style={styles.body}>
           <LoadingIndicator size={40} dotSize={6} color={accentColor} />

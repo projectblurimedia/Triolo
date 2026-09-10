@@ -19,19 +19,19 @@ const PX_PER_MS = 0.045; // ~45px/sec — slow enough to read mid-scroll, not a 
  * full instead of being permanently cut off. Sits still — no animation — when the text
  * already fits.
  *
- * Measuring the "true" width needed a second, invisible copy of the text — the first
- * version measured the *visible* copy directly and consistently got back a width clamped to
- * `containerWidth` (never larger), so `textWidth <= containerWidth` was always true and
- * nothing ever animated; RN/Yoga passes the parent's available width down as an upper bound
- * to a normal-flow text node's own measurement, `alignSelf: 'flex-start'` included, so that
- * copy can never self-report as wider than its container. An **absolutely positioned**
- * sibling text node, on the other hand, is measured independently of the parent's available
- * width (no `left`/`right` given, so Yoga doesn't clamp it) — `measurer` below exists only
- * to read its real `onLayout` width via that mechanism, rendered invisibly (`opacity: 0`)
- * behind the visible copy. The visible copy also switched from the default `ellipsizeMode`
- * ("tail", which silently drew a trailing "…" instead of scrolling) to `"clip"` once it's
- * known to overflow, so the hidden tail becomes readable by scrolling into view rather than
- * being replaced by an ellipsis.
+ * Measuring the "true" width needs a second, invisible copy of the text — the first version
+ * measured the *visible* copy directly and consistently got back a width clamped to
+ * `containerWidth`, since RN/Yoga passes a normal-flow text node's parent width down as an
+ * upper bound during its own measurement, regardless of `alignSelf`. A second attempt nested
+ * an absolutely positioned measurer *inside* the same width-constrained, `overflow: hidden`
+ * clipping View — still unreliable in practice. This version renders the invisible measurer
+ * as a sibling **outside** that clipping View entirely (both under one plain, unconstrained
+ * wrapper), removing any ambiguity about whether being a descendant of a width-bound node
+ * affects how Yoga measures an absolutely positioned child. The visible copy also always
+ * uses `ellipsizeMode="clip"` (never the default `"tail"`) regardless of whether overflow
+ * has been confirmed yet — a stray "…" can then never appear even for the one frame before
+ * the measurer's first `onLayout` fires, since `"clip"` and `"tail"` look identical when the
+ * text isn't actually being cut.
  */
 export function AutoScrollText({ text, style, containerWidth, containerStyle }: AutoScrollTextProps) {
   const [textWidth, setTextWidth] = useState(0);
@@ -57,25 +57,19 @@ export function AutoScrollText({ text, style, containerWidth, containerStyle }: 
   }, [overflowing, textWidth, containerWidth, translateX]);
 
   return (
-    <View style={[{ width: containerWidth, overflow: 'hidden' }, containerStyle]}>
-      <Text
-        style={[style, styles.measurer]}
-        onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}
-        numberOfLines={1}
-      >
+    <View style={containerStyle}>
+      <View style={{ width: containerWidth, overflow: 'hidden' }}>
+        <Animated.Text numberOfLines={1} ellipsizeMode="clip" style={[style, { transform: [{ translateX }] }]}>
+          {text}
+        </Animated.Text>
+      </View>
+      <Text style={[style, styles.measurer]} onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}>
         {text}
       </Text>
-      <Animated.Text
-        numberOfLines={1}
-        ellipsizeMode={overflowing ? 'clip' : 'tail'}
-        style={[style, { transform: [{ translateX }] }]}
-      >
-        {text}
-      </Animated.Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  measurer: { position: 'absolute', opacity: 0 },
+  measurer: { position: 'absolute', top: 0, left: 0, opacity: 0 },
 });
