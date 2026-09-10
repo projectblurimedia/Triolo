@@ -1,6 +1,13 @@
 import { Pool, QueryResultRow } from 'pg';
 import { parsePgArray } from '@/common/utils/pgArray';
-import { AdminListFilter, AdminListResult, BusinessProfile, BusinessProfileWithAccount } from './interfaces';
+import {
+  AdminListFilter,
+  AdminListResult,
+  BusinessNearbyResult,
+  BusinessProfile,
+  BusinessProfileWithAccount,
+  NearbySearchFilter,
+} from './interfaces';
 
 function mapBusinessProfile(row: QueryResultRow): BusinessProfile {
   return {
@@ -178,5 +185,30 @@ export class BusinessesRepository {
       [id, status],
     );
     return result.rows[0] ? mapBusinessProfile(result.rows[0]) : null;
+  }
+
+  // --- Public nearby-search — same Haversine-in-SQL approach as WorkersRepository.findNearby,
+  // see that method's own doc comment for the acos() domain-clamp rationale.
+  async findNearby(excludeAccountId: string, filter: NearbySearchFilter): Promise<BusinessNearbyResult[]> {
+    const like = filter.query ? `%${filter.query}%` : null;
+    const result = await this.pool.query(
+      `SELECT * FROM (
+         SELECT b.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email,
+           (6371000 * acos(LEAST(1.0, GREATEST(-1.0,
+             cos(radians($1)) * cos(radians(b.latitude)) * cos(radians(b.longitude) - radians($2)) + sin(radians($1)) * sin(radians(b.latitude))
+           )))) AS distance_meters
+         FROM business_profiles b
+         JOIN accounts a ON a.id = b.account_id
+         WHERE b.verification_status = 'verified'
+           AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL
+           AND b.account_id != $3
+       ) sub
+       WHERE sub.distance_meters <= $4
+         AND ($5::text IS NULL OR sub.shop_name ILIKE $5 OR sub.other_category_description ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.shop_categories, ',') ILIKE $5)
+       ORDER BY sub.distance_meters ASC
+       LIMIT $6`,
+      [filter.latitude, filter.longitude, excludeAccountId, filter.radiusKm * 1000, like, filter.limit],
+    );
+    return result.rows.map((row) => ({ ...mapBusinessProfile(row), distanceMeters: Number(row.distance_meters) }));
   }
 }

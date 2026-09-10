@@ -33,6 +33,16 @@ export const createBusinessProfileSchema = z
     path: ['deliveryPricePerKm'],
   });
 
+// Query params arrive as strings (Express doesn't coerce) — same z.coerce convention as
+// admin's own listQuerySchema, for the same reason.
+export const nearbySearchQuerySchema = z.object({
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+  radiusKm: z.coerce.number().min(0.1).max(50).default(10),
+  query: z.string().trim().max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
 export const updateBusinessProfileSchema = z
   .object({
     shopName: z.string().trim().min(2, 'Shop name is too short').max(150),

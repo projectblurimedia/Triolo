@@ -32,3 +32,4 @@ businessesRouter.patch(
   controller.updateProfile,
 );
 businessesRouter.delete('/me/profile', authenticate, controller.deleteProfile);
+businessesRouter.get('/nearby', authenticate, controller.searchNearby);

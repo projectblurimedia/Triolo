@@ -91,6 +91,13 @@ Permanently remove the caller's worker profile.
 - 200: `{ success: true, message: "Worker profile deleted", data: null }`
 - 404: `WORKER_PROFILE_NOT_FOUND`
 
+### GET /workers/nearby
+Search for verified workers near a given point, ordered nearest-first. Distance is computed server-side (Haversine, in SQL) — this is not a client-side filter over a full list. Excludes the caller's own worker profile, if any.
+- Auth: Bearer access token
+- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against skill category, `otherSkillDescription`, city, and area), `limit?: number` (default 20, max 50)
+- 200: `{ success: true, data: Array<WorkerProfile & { distanceMeters: number; accountFullName: string }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned; `accountFullName` is included so a result has a "who" (mobile/email are deliberately not exposed here — no booking/contact flow exists yet)
+- 400: `VALIDATION_ERROR` — missing/invalid `latitude`/`longitude`, or an out-of-range `radiusKm`/`limit`
+
 ## Businesses Module
 
 Adds the Business capability to the authenticated `user` account — mirrors the Workers module exactly, shop-shaped instead of skill-shaped.
@@ -118,6 +125,13 @@ Permanently remove the caller's business profile.
 - Auth: Bearer access token
 - 200: `{ success: true, message: "Business profile deleted", data: null }`
 - 404: `BUSINESS_PROFILE_NOT_FOUND`
+
+### GET /businesses/nearby
+Search for verified businesses near a given point, ordered nearest-first — mirrors `GET /workers/nearby` exactly, shop-shaped instead of skill-shaped. Excludes the caller's own business profile, if any.
+- Auth: Bearer access token
+- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against shop name, shop category, `otherCategoryDescription`, city, and area), `limit?: number` (default 20, max 50)
+- 200: `{ success: true, data: Array<BusinessProfile & { distanceMeters: number }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned
+- 400: `VALIDATION_ERROR` — missing/invalid `latitude`/`longitude`, or an out-of-range `radiusKm`/`limit`
 
 ## Admin Module
 

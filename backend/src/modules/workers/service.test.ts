@@ -24,6 +24,7 @@ function createMockRepository(): MockRepository {
     findAll: jest.fn(),
     findById: jest.fn(),
     updateVerificationStatus: jest.fn(),
+    findNearby: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -321,6 +322,23 @@ describe('WorkersService.deleteProfile', () => {
 
     await service.deleteProfile('account-1');
     expect(deletePhotosFromCloudinary).toHaveBeenCalledWith(['https://cdn/a.jpg', 'https://cdn/b.jpg']);
+  });
+});
+
+describe('WorkersService.searchNearby', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('passes the searching account id and filter straight through to the repository', async () => {
+    const repo = createMockRepository();
+    const results = [{ ...buildProfile(), distanceMeters: 420 }];
+    repo.findNearby.mockResolvedValue(results);
+    const service = new WorkersService(repo as unknown as WorkersRepository);
+
+    const filter = { latitude: 17.385, longitude: 78.4867, radiusKm: 10, limit: 20 };
+    await expect(service.searchNearby('account-1', filter)).resolves.toBe(results);
+    expect(repo.findNearby).toHaveBeenCalledWith('account-1', filter);
   });
 });
 

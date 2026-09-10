@@ -3,6 +3,7 @@ import { asyncHandler } from '@/common/utils/asyncHandler';
 import { created, ok } from '@/common/utils/response';
 import { AppError } from '@/common/errors/AppError';
 import { WorkersService } from './service';
+import { nearbySearchQuerySchema } from './validation';
 
 export class WorkersController {
   constructor(private readonly service: WorkersService) {}
@@ -39,5 +40,17 @@ export class WorkersController {
     }
     await this.service.deleteProfile(req.account.accountId);
     return ok(res, null, 'Worker profile deleted');
+  });
+
+  searchNearby = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    const parsed = nearbySearchQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      throw AppError.badRequest('Invalid query parameters', 'VALIDATION_ERROR', parsed.error.flatten());
+    }
+    const results = await this.service.searchNearby(req.account.accountId, parsed.data);
+    return ok(res, results);
   });
 }

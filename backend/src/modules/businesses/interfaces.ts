@@ -61,3 +61,16 @@ export interface AdminListResult<T> {
   page: number;
   limit: number;
 }
+
+export interface NearbySearchFilter {
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  query?: string;
+  limit: number;
+}
+
+/** Public (non-admin) nearby-search result — a verified profile plus its computed distance from the searcher. */
+export interface BusinessNearbyResult extends BusinessProfile {
+  distanceMeters: number;
+}

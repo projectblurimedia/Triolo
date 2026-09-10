@@ -5,8 +5,10 @@ import { CreateBusinessProfileDto, UpdateBusinessProfileDto } from './dto';
 import {
   AdminListFilter,
   AdminListResult,
+  BusinessNearbyResult,
   BusinessProfile,
   BusinessProfileWithAccount,
+  NearbySearchFilter,
   ProfileVerificationStatus,
 } from './interfaces';
 
@@ -104,6 +106,10 @@ export class BusinessesService {
     }
     await deletePhotosFromCloudinary(existing.shopPhotoUrls);
     await this.repository.remove(accountId);
+  }
+
+  async searchNearby(accountId: string, filter: NearbySearchFilter): Promise<BusinessNearbyResult[]> {
+    return this.repository.findNearby(accountId, filter);
   }
 
   // --- Admin-facing (called only from modules/admin's service — see WorkersService's own

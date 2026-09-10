@@ -2,7 +2,15 @@ import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { WorkersRepository } from './repository';
 import { CreateWorkerProfileDto, UpdateWorkerProfileDto } from './dto';
-import { AdminListFilter, AdminListResult, ProfileVerificationStatus, WorkerProfile, WorkerProfileWithAccount } from './interfaces';
+import {
+  AdminListFilter,
+  AdminListResult,
+  NearbySearchFilter,
+  ProfileVerificationStatus,
+  WorkerNearbyResult,
+  WorkerProfile,
+  WorkerProfileWithAccount,
+} from './interfaces';
 
 const PORTFOLIO_FOLDER = 'triolo/workers/portfolio';
 
@@ -94,6 +102,10 @@ export class WorkersService {
     }
     await deletePhotosFromCloudinary(existing.portfolioPhotoUrls);
     await this.repository.remove(accountId);
+  }
+
+  async searchNearby(accountId: string, filter: NearbySearchFilter): Promise<WorkerNearbyResult[]> {
+    return this.repository.findNearby(accountId, filter);
   }
 
   // --- Admin-facing (called only from modules/admin's service — see its own doc comment

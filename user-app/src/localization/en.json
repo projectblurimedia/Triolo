@@ -184,9 +184,20 @@
     "shopsSubtitle": "Find shops and businesses around you",
     "searchWorkersPlaceholder": "Search by skill, name or area",
     "searchShopsPlaceholder": "Search by shop, category or area",
-    "comingSoonTitle": "Coming Soon",
-    "comingSoonWorkersMessage": "We're building nearby worker search. Soon you'll see verified workers near your location here.",
-    "comingSoonShopsMessage": "We're building nearby shop search. Soon you'll see verified shops near your location here."
+    "distanceAway": "{{distance}} away",
+    "detectingLocationTitle": "Finding Your Location",
+    "detectingLocationMessage": "Hold on while we detect where you are…",
+    "locationDeniedTitle": "Location Permission Needed",
+    "locationDeniedMessage": "Allow location access to find workers and shops near you.",
+    "locationErrorTitle": "Couldn't Get Your Location",
+    "locationErrorMessage": "Something went wrong finding your location. Please try again.",
+    "searchingTitle": "Searching Nearby",
+    "searchingMessage": "Looking for the closest matches…",
+    "resultsErrorMessage": "We couldn't load nearby results. Please try again.",
+    "noResultsWorkersTitle": "No Workers Found Nearby",
+    "noResultsWorkersMessage": "Try a different search, or check back later as more workers join Triolo.",
+    "noResultsShopsTitle": "No Shops Found Nearby",
+    "noResultsShopsMessage": "Try a different search, or check back later as more shops join Triolo."
   },
   "services": {
     "comingSoon": "Browsing services by category is coming soon.",

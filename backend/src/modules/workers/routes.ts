@@ -34,3 +34,4 @@ workersRouter.patch(
   controller.updateProfile,
 );
 workersRouter.delete('/me/profile', authenticate, controller.deleteProfile);
+workersRouter.get('/nearby', authenticate, controller.searchNearby);

@@ -59,3 +59,23 @@ export interface AdminListResult<T> {
   page: number;
   limit: number;
 }
+
+export interface NearbySearchFilter {
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  query?: string;
+  limit: number;
+}
+
+/**
+ * Public (non-admin) nearby-search result — a verified profile plus its computed distance
+ * from the searcher and the owning account's display name (so a result reads as "who",
+ * not just a skill list). Deliberately excludes mobile/email — unlike the admin-facing
+ * `WorkerProfileWithAccount`, this is visible to any authenticated searcher, and there's no
+ * booking/contact flow yet (Pending Module 4) that would justify exposing contact details.
+ */
+export interface WorkerNearbyResult extends WorkerProfile {
+  distanceMeters: number;
+  accountFullName: string;
+}

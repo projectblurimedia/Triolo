@@ -1,6 +1,13 @@
 import { Pool, QueryResultRow } from 'pg';
 import { parsePgArray } from '@/common/utils/pgArray';
-import { AdminListFilter, AdminListResult, WorkerProfile, WorkerProfileWithAccount } from './interfaces';
+import {
+  AdminListFilter,
+  AdminListResult,
+  NearbySearchFilter,
+  WorkerNearbyResult,
+  WorkerProfile,
+  WorkerProfileWithAccount,
+} from './interfaces';
 
 function mapWorkerProfile(row: QueryResultRow): WorkerProfile {
   return {
@@ -170,5 +177,37 @@ export class WorkersRepository {
       [id, status],
     );
     return result.rows[0] ? mapWorkerProfile(result.rows[0]) : null;
+  }
+
+  // --- Public nearby-search (see modules/search-equivalent note in businesses' own copy) —
+  // distance is computed in SQL via the great-circle (Haversine) formula rather than pulling
+  // every verified row into JS to compute it there; LEAST/GREATEST clamp the acos() argument
+  // to [-1, 1] since floating-point rounding can push it a hair outside that domain for two
+  // nearly-identical points, which would otherwise throw a Postgres "acos: input out of range".
+  async findNearby(excludeAccountId: string, filter: NearbySearchFilter): Promise<WorkerNearbyResult[]> {
+    const like = filter.query ? `%${filter.query}%` : null;
+    const result = await this.pool.query(
+      `SELECT * FROM (
+         SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email,
+           (6371000 * acos(LEAST(1.0, GREATEST(-1.0,
+             cos(radians($1)) * cos(radians(w.latitude)) * cos(radians(w.longitude) - radians($2)) + sin(radians($1)) * sin(radians(w.latitude))
+           )))) AS distance_meters
+         FROM worker_profiles w
+         JOIN accounts a ON a.id = w.account_id
+         WHERE w.verification_status = 'verified'
+           AND w.latitude IS NOT NULL AND w.longitude IS NOT NULL
+           AND w.account_id != $3
+       ) sub
+       WHERE sub.distance_meters <= $4
+         AND ($5::text IS NULL OR sub.other_skill_description ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.skill_categories, ',') ILIKE $5)
+       ORDER BY sub.distance_meters ASC
+       LIMIT $6`,
+      [filter.latitude, filter.longitude, excludeAccountId, filter.radiusKm * 1000, like, filter.limit],
+    );
+    return result.rows.map((row) => ({
+      ...mapWorkerProfile(row),
+      distanceMeters: Number(row.distance_meters),
+      accountFullName: row.account_full_name,
+    }));
   }
 }

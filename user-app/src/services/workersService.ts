@@ -37,8 +37,29 @@ export interface WorkerProfile {
   verificationStatus: string;
 }
 
+export interface WorkerNearbyResult extends WorkerProfile {
+  distanceMeters: number;
+  accountFullName: string;
+}
+
+export interface NearbySearchParams {
+  latitude: number;
+  longitude: number;
+  radiusKm?: number;
+  query?: string;
+}
+
 export const workersService = {
   getMyProfile: () => apiClient.get<WorkerProfile | null>('/workers/me/profile', true),
+
+  searchNearby: (params: NearbySearchParams) => {
+    const search = new URLSearchParams();
+    search.set('latitude', String(params.latitude));
+    search.set('longitude', String(params.longitude));
+    if (params.radiusKm != null) search.set('radiusKm', String(params.radiusKm));
+    if (params.query) search.set('query', params.query);
+    return apiClient.get<WorkerNearbyResult[]>(`/workers/nearby?${search.toString()}`, true);
+  },
 
   createProfile: (params: CreateWorkerProfileParams) => {
     const formData = new FormData();
