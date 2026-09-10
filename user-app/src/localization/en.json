@@ -185,7 +185,16 @@
     "searchWorkersPlaceholder": "Search by skill, name or area",
     "searchShopsPlaceholder": "Search by shop, category or area",
     "rangeLabel": "Range",
+    "unit": {
+      "km": "KM",
+      "m": "M",
+      "mi": "Miles"
+    },
+    "invalidRangeTitle": "Enter a Range",
+    "invalidRangeMessage": "Type a range value above to search nearby workers and shops.",
     "distanceAway": "{{distance}} away",
+    "detailSkillsLabel": "Skills",
+    "detailCategoriesLabel": "Categories",
     "detectingLocationTitle": "Finding Your Location",
     "detectingLocationMessage": "Hold on while we detect where you are…",
     "locationDeniedTitle": "Location Permission Needed",

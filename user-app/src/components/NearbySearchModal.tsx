@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -7,14 +7,16 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoadingIndicator } from './LoadingIndicator';
 import { SHOP_GRADIENT } from './BusinessProfileModal';
+import { NearbyResultDetailModal } from './NearbyResultDetailModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { workersService, WorkerNearbyResult } from '@/services/workersService';
 import { businessesService, BusinessNearbyResult } from '@/services/businessesService';
 import { formatAddress } from '@/utils/formatAddress';
+import { formatDistanceValue, isWorkerResult, NearbyResult, NearbySearchMode } from '@/utils/nearbyResult';
 
-export type NearbySearchMode = 'worker' | 'business';
+export type { NearbySearchMode, NearbyResult };
 
-type NearbyResult = WorkerNearbyResult | BusinessNearbyResult;
+type RangeUnit = 'km' | 'm' | 'mi';
 
 interface NearbySearchModalProps {
   visible: boolean;
@@ -35,27 +37,21 @@ type ResultsState =
   | { status: 'error' }
   | { status: 'ready'; items: NearbyResult[] };
 
-// Per explicit request, the radius is now a user-facing filter instead of one fixed
-// constant — options span the backend's validated range (0.1-50km), from a genuinely
-// walkable 500m up to a district-wide 50km. Default lands on 10km, the same value this
-// was fixed at before the filter existed.
-const RADIUS_OPTIONS_KM = [0.5, 1, 5, 10, 25, 50];
-const DEFAULT_RADIUS_KM = 10;
+const DEFAULT_RANGE_VALUE = '5';
+const DEFAULT_RANGE_UNIT: RangeUnit = 'km';
+const RANGE_UNITS: RangeUnit[] = ['km', 'm', 'mi'];
+const MILES_TO_KM = 1.60934;
+// Matches the backend's own nearbySearchQuerySchema (min 0.1, max 50) — clamped client-side
+// too so a typed value never produces a request the API would just reject as VALIDATION_ERROR.
+const MIN_RADIUS_KM = 0.1;
+const MAX_RADIUS_KM = 50;
 const SEARCH_DEBOUNCE_MS = 350;
 
-/** "500m" under 1km, "10km" at or above it — same threshold/format `formatDistanceValue` uses for a result's own distance. */
-function formatRadiusLabel(km: number): string {
-  return km < 1 ? `${Math.round(km * 1000)}m` : `${km}km`;
-}
-
-/** "420m" for under a km, "1.3km" otherwise — matches the "500m away"/"1km far" phrasing from the feature request. */
-function formatDistanceValue(meters: number): string {
-  if (meters < 1000) return `${Math.max(1, Math.round(meters))}m`;
-  return `${(meters / 1000).toFixed(1)}km`;
-}
-
-function isWorkerResult(mode: NearbySearchMode, item: NearbyResult): item is WorkerNearbyResult {
-  return mode === 'worker';
+function toRadiusKm(value: string, unit: RangeUnit): number | null {
+  const parsed = parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  const km = unit === 'km' ? parsed : unit === 'm' ? parsed / 1000 : parsed * MILES_TO_KM;
+  return Math.min(MAX_RADIUS_KM, Math.max(MIN_RADIUS_KM, km));
 }
 
 /**
@@ -70,22 +66,27 @@ function isWorkerResult(mode: NearbySearchMode, item: NearbyResult): item is Wor
  * location via expo-location (same permission/getCurrentPositionAsync pattern already
  * proven in AddressPicker), then GET /workers/nearby or /businesses/nearby (Haversine
  * distance computed in SQL server-side, see backend repositories) filtered to verified
- * profiles within a user-chosen radius (`RADIUS_OPTIONS_KM` chip row below the search bar
- * — 500m up to 50km, defaulting to 10km), re-queried (debounced) whenever the free-text
- * search box or the selected radius changes. Replaces the earlier coming-soon placeholder
- * body.
+ * profiles within a user-typed range (a numeric input plus a KM/M/Miles unit picker,
+ * defaulting to 5km — replaced an earlier fixed-chip-row version per explicit request for
+ * free-form input instead of presets), re-queried (debounced) whenever the free-text
+ * search box or the range changes. Tapping a result card opens `NearbyResultDetailModal`
+ * for a fuller, read-only view of that profile.
  */
 export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
+  const [rangeValue, setRangeValue] = useState(DEFAULT_RANGE_VALUE);
+  const [rangeUnit, setRangeUnit] = useState<RangeUnit>(DEFAULT_RANGE_UNIT);
+  const [unitPickerVisible, setUnitPickerVisible] = useState(false);
   const [location, setLocation] = useState<LocationState>({ status: 'idle' });
   const [results, setResults] = useState<ResultsState>({ status: 'idle' });
+  const [selectedResult, setSelectedResult] = useState<NearbyResult | null>(null);
   const isWorker = mode === 'worker';
   const accentColor = isWorker ? colors.primary : SHOP_GRADIENT[0];
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const radiusKm = useMemo(() => toRadiusKm(rangeValue, rangeUnit), [rangeValue, rangeUnit]);
 
   const detectLocation = useCallback(async () => {
     setLocation({ status: 'loading' });
@@ -130,7 +131,7 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
   const readyLongitude = location.status === 'ready' ? location.longitude : null;
 
   useEffect(() => {
-    if (readyLatitude == null || readyLongitude == null) return;
+    if (readyLatitude == null || readyLongitude == null || radiusKm == null) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       runSearch(readyLatitude, readyLongitude, query, radiusKm);
@@ -157,7 +158,10 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
       : (business as BusinessNearbyResult).otherCategoryDescription?.split(', ').filter(Boolean) ?? [];
 
     return (
-      <View style={[styles.resultCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Pressable
+        style={[styles.resultCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        onPress={() => setSelectedResult(item)}
+      >
         <View style={styles.resultHeaderRow}>
           <LinearGradient
             colors={isWorker ? headerGradient : SHOP_GRADIENT}
@@ -208,7 +212,7 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
             {formatAddress(item)}
           </Text>
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -238,6 +242,18 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
           <Pressable style={[styles.retryButton, { backgroundColor: accentColor }]} onPress={detectLocation}>
             <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
           </Pressable>
+        </View>
+      );
+    }
+
+    if (radiusKm == null) {
+      return (
+        <View style={styles.body}>
+          <View style={[styles.emptyIcon, { backgroundColor: `${colors.warning}1A` }]}>
+            <FontAwesome6 name="ruler" size={22} color={colors.warning} solid />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('nearbySearch.invalidRangeTitle')}</Text>
+          <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('nearbySearch.invalidRangeMessage')}</Text>
         </View>
       );
     }
@@ -337,35 +353,62 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
 
         <View style={styles.radiusRow}>
           <Text style={[styles.radiusLabel, { color: colors.textMuted }]}>{t('nearbySearch.rangeLabel')}</Text>
-          <View style={styles.radiusChipRow}>
-            {RADIUS_OPTIONS_KM.map((option) => {
-              const active = option === radiusKm;
-              return active ? (
-                <Pressable key={option} onPress={() => setRadiusKm(option)}>
-                  <LinearGradient
-                    colors={isWorker ? headerGradient : SHOP_GRADIENT}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.radiusChip}
-                  >
-                    <Text style={[styles.radiusChipText, { color: '#FFFFFF' }]}>{formatRadiusLabel(option)}</Text>
-                  </LinearGradient>
-                </Pressable>
-              ) : (
-                <Pressable
-                  key={option}
-                  onPress={() => setRadiusKm(option)}
-                  style={[styles.radiusChip, styles.radiusChipInactive, { borderColor: colors.border }]}
-                >
-                  <Text style={[styles.radiusChipText, { color: colors.text }]}>{formatRadiusLabel(option)}</Text>
-                </Pressable>
-              );
-            })}
+          <View style={styles.radiusInputRow}>
+            <View style={[styles.radiusInputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <TextInput
+                value={rangeValue}
+                onChangeText={(text) => setRangeValue(text.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                placeholder={DEFAULT_RANGE_VALUE}
+                placeholderTextColor={colors.textMuted}
+                style={[styles.radiusInput, { color: colors.text }]}
+              />
+            </View>
+            <Pressable
+              style={[styles.unitButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => setUnitPickerVisible(true)}
+            >
+              <Text style={[styles.unitButtonText, { color: colors.text }]}>{t(`nearbySearch.unit.${rangeUnit}`)}</Text>
+              <FontAwesome6 name="chevron-down" size={11} color={colors.textMuted} solid />
+            </Pressable>
           </View>
         </View>
 
         {renderBody()}
       </View>
+
+      <Modal visible={unitPickerVisible} transparent animationType="fade" onRequestClose={() => setUnitPickerVisible(false)} statusBarTranslucent>
+        <Pressable style={styles.unitOverlay} onPress={() => setUnitPickerVisible(false)}>
+          <Pressable style={[styles.unitCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={[styles.unitCardTitle, { color: colors.text }]}>{t('nearbySearch.rangeLabel')}</Text>
+            {RANGE_UNITS.map((unit) => {
+              const active = unit === rangeUnit;
+              return (
+                <Pressable
+                  key={unit}
+                  style={[styles.unitOption, { borderColor: active ? accentColor : colors.border, borderWidth: active ? 2 : 1 }]}
+                  onPress={() => {
+                    setRangeUnit(unit);
+                    setUnitPickerVisible(false);
+                  }}
+                >
+                  <Text style={[styles.unitOptionText, { color: active ? accentColor : colors.text }]}>
+                    {t(`nearbySearch.unit.${unit}`)}
+                  </Text>
+                  {active ? <FontAwesome6 name="check" size={13} color={accentColor} solid /> : null}
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <NearbyResultDetailModal
+        visible={selectedResult !== null}
+        onClose={() => setSelectedResult(null)}
+        mode={mode}
+        result={selectedResult}
+      />
     </Modal>
   );
 }
@@ -401,10 +444,46 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, ...typography.body, padding: 0 },
   radiusRow: { marginHorizontal: 20, marginTop: 14 },
   radiusLabel: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 8 },
-  radiusChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  radiusChip: { borderRadius: 16, paddingVertical: 7, paddingHorizontal: 14 },
-  radiusChipInactive: { borderWidth: 1 },
-  radiusChipText: { ...typography.caption, fontFamily: fonts.semiBold },
+  radiusInputRow: { flexDirection: 'row', gap: 10 },
+  radiusInputWrap: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  radiusInput: { ...typography.body, padding: 0 },
+  unitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minWidth: 90,
+    justifyContent: 'center',
+  },
+  unitButtonText: { ...typography.body, fontFamily: fonts.semiBold },
+  unitOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  unitCard: { width: '100%', maxWidth: 320, borderRadius: 18, padding: 18 },
+  unitCardTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginBottom: 12, textAlign: 'center' },
+  unitOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    marginBottom: 10,
+  },
+  unitOptionText: { ...typography.body, fontFamily: fonts.semiBold },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginBottom: 8, textAlign: 'center', marginTop: 16 },
