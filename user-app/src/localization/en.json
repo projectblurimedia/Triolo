@@ -235,7 +235,9 @@
     "quantityPlaceholder": "Qty",
     "unitPlaceholder": "Unit",
     "addItemManually": "Add Item Manually",
-    "newItemName": "New item"
+    "newItemName": "New item",
+    "done": "Done",
+    "editList": "Edit List"
   },
   "bazaar": {
     "comingSoon": "Shop ordering is coming soon.",

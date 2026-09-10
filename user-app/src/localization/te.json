@@ -235,7 +235,9 @@
     "quantityPlaceholder": "పరిమాణం",
     "unitPlaceholder": "యూనిట్",
     "addItemManually": "వస్తువును మాన్యువల్‌గా జోడించండి",
-    "newItemName": "కొత్త వస్తువు"
+    "newItemName": "కొత్త వస్తువు",
+    "done": "పూర్తయింది",
+    "editList": "జాబితాను సవరించండి"
   },
   "bazaar": {
     "comingSoon": "షాపింగ్ ఆర్డర్ చేసే సదుపాయం త్వరలో వస్తుంది.",

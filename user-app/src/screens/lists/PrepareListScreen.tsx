@@ -24,8 +24,12 @@ const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
  * ("senagapappu kg minapappu 3/2kg"), and each "<item> <quantity>? <unit>" run gets its
  * own row (see utils/parseVoiceList.ts for the exact parsing rules and why quantities are
  * kept verbatim rather than mathematically reinterpreted). Every row stays freely editable/
- * deletable afterward — voice is just a fast way to draft the list, not the only way to
- * change it. Items live only in AsyncStorage on this device (state/listStore.ts) —
+ * deletable while in "editing" `viewMode` — voice is just a fast way to draft the list, not
+ * the only way to change it. Tapping "Done" switches to a clean, read-only numbered view
+ * ("1. Kandipappu - 1KG") with an "Edit List" button to flip back; a list that already had
+ * items when the screen mounted starts in "done" view (a returning user most likely wants
+ * to look at their finished list, not land back in edit mode every time). Items live only
+ * in AsyncStorage on this device (state/listStore.ts) —
  * deliberately never sent to the backend; there is no server-side "list" concept and none
  * is planned, this is a personal scratch pad for getting ready before booking/shopping.
  */
@@ -42,6 +46,12 @@ export function PrepareListScreen() {
   const [recognizing, setRecognizing] = useState(false);
   const [interimText, setInterimText] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  // Starts in "done" (clean, read-only numbered list) if a list already exists from a
+  // previous session — a returning user most likely wants to look at their finished list,
+  // not land back in edit mode every time. New/empty lists start in "editing" since there's
+  // nothing to show yet. Deliberately computed once (not kept in sync with `items` after
+  // that), so finishing a fresh edit doesn't get silently overridden by this initial guess.
+  const [viewMode, setViewMode] = useState<'editing' | 'done'>(() => (useListStore.getState().items.length > 0 ? 'done' : 'editing'));
   const pulse = useRef(new Animated.Value(0)).current;
 
   // Same floating-tab-bar clearance fix as ProfileScreen's own ScrollView — CustomTabBar is
@@ -171,6 +181,15 @@ export function PrepareListScreen() {
             <FontAwesome6 name="list-check" size={28} color={colors.textMuted} solid />
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('prepareList.emptyMessage')}</Text>
           </View>
+        ) : viewMode === 'done' ? (
+          <View style={[styles.doneCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {items.map((item, index) => (
+              <Text key={item.id} style={[styles.doneLine, { color: colors.text }]}>
+                {index + 1}. {item.name} - {item.quantity}
+                {item.unit}
+              </Text>
+            ))}
+          </View>
         ) : (
           items.map((item, index) => (
             <View key={item.id} style={[styles.itemRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -208,10 +227,27 @@ export function PrepareListScreen() {
           ))
         )}
 
-        <Pressable style={[styles.addRow, { borderColor: colors.border }]} onPress={handleAddBlankItem}>
-          <FontAwesome6 name="plus" size={14} color={colors.primary} solid />
-          <Text style={[styles.addRowText, { color: colors.primary }]}>{t('prepareList.addItemManually')}</Text>
-        </Pressable>
+        {viewMode === 'editing' ? (
+          <>
+            <Pressable style={[styles.addRow, { borderColor: colors.border }]} onPress={handleAddBlankItem}>
+              <FontAwesome6 name="plus" size={14} color={colors.primary} solid />
+              <Text style={[styles.addRowText, { color: colors.primary }]}>{t('prepareList.addItemManually')}</Text>
+            </Pressable>
+            {items.length ? (
+              <Pressable style={styles.doneButton} onPress={() => setViewMode('done')}>
+                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.doneButtonGradient}>
+                  <FontAwesome6 name="check" size={14} color="#FFFFFF" solid />
+                  <Text style={styles.doneButtonText}>{t('prepareList.done')}</Text>
+                </LinearGradient>
+              </Pressable>
+            ) : null}
+          </>
+        ) : (
+          <Pressable style={[styles.editRow, { borderColor: colors.primary }]} onPress={() => setViewMode('editing')}>
+            <FontAwesome6 name="pen" size={13} color={colors.primary} solid />
+            <Text style={[styles.editRowText, { color: colors.primary }]}>{t('prepareList.editList')}</Text>
+          </Pressable>
+        )}
       </ScrollView>
 
       <ConfirmModal
@@ -271,4 +307,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addRowText: { ...typography.body, fontFamily: fonts.semiBold },
+  doneCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
+  doneLine: { ...typography.body, fontFamily: fonts.medium },
+  doneButton: { marginTop: 14, borderRadius: 14, overflow: 'hidden' },
+  doneButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+  doneButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  editRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingVertical: 14,
+    marginTop: 14,
+  },
+  editRowText: { ...typography.body, fontFamily: fonts.semiBold },
 });
