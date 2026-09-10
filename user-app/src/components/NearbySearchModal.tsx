@@ -39,7 +39,11 @@ type ResultsState =
 // city-wide directory — the "Nearby" framing in the UI copy implies a walkable/drivable
 // radius, not the whole state. No radius picker is exposed (not asked for); accuracy of
 // the distance itself (Haversine in SQL, see backend repositories) is what was asked for.
-const SEARCH_RADIUS_KM = 25;
+// Widened from an initial 25 to the backend's own max (50) after real-device testing:
+// device GPS/network location fixes routinely land tens of km from where someone actually
+// is in a rural district (India's districts commonly span 60-100km), so 25km left a real
+// searcher standing inside the same district as verified test profiles seeing zero results.
+const SEARCH_RADIUS_KM = 50;
 const SEARCH_DEBOUNCE_MS = 350;
 
 /** "420m" for under a km, "1.3km" otherwise — matches the "500m away"/"1km far" phrasing from the feature request. */
