@@ -17,6 +17,11 @@
  * 2. Units get spoken in Telugu too ("కిలో"/kilo, "గ్రాము"/gram, ...) — `TELUGU_UNIT_ALIASES`
  *    covers the common ones, merged into the same unit table English units use so both
  *    work interchangeably in one sentence.
+ * 3. The unit and its quantity word often come out as one glued token, not two separate
+ *    words with a pause between them — "1.5kg" in natural spoken Telugu *is* "kgnnara"
+ *    ("kg" + "nnara"), not "kg nnara". `splitGluedUnitQuantityWord()` below handles that by
+ *    checking whether a token is a known unit word with a known quantity word stuck
+ *    directly onto either end of it.
  *
  * Still deliberately does NOT try to be clever about *digit* fractions already present in
  * the transcript — a recognized "3/2" is kept as the literal string "3/2", never
@@ -170,6 +175,36 @@ const UNIT_PATTERN = Object.keys(UNIT_ALIASES)
 // (e.g. "kg", "3kg", "3.5kg", "3/2kg").
 const COMBINED_TOKEN = new RegExp(`^(\\d+(?:[./]\\d+)*)?(${UNIT_PATTERN})$`, 'iu');
 
+const UNIT_KEYS_BY_LENGTH = Object.keys(UNIT_ALIASES).sort((a, b) => b.length - a.length);
+
+/**
+ * A unit word glued directly to a *quantity word* (not a digit — that's COMBINED_TOKEN's
+ * job) on either side, with no space — e.g. "kgnnara" ("kg" + "nnara", 1.5kg spoken fast as
+ * one continuous word, which is the normal way this comes out in Telugu: "1.5kg" IS
+ * "kgnnara", not two separate words with a pause between them). Tries every known unit key
+ * as both a prefix and a suffix of the token and checks whether what's left over is a whole,
+ * exact quantity word — not a fuzzy/partial match, so this can't accidentally misfire on an
+ * unrelated item name that merely happens to start or end with a unit-like substring.
+ */
+function splitGluedUnitQuantityWord(token: string): { unit: string; quantity: string } | null {
+  for (const unitKey of UNIT_KEYS_BY_LENGTH) {
+    if (token.length <= unitKey.length) continue;
+    if (token.startsWith(unitKey)) {
+      const suffix = token.slice(unitKey.length);
+      if (NUMBER_WORDS[suffix]) {
+        return { unit: UNIT_ALIASES[unitKey], quantity: NUMBER_WORDS[suffix] };
+      }
+    }
+    if (token.endsWith(unitKey)) {
+      const prefix = token.slice(0, token.length - unitKey.length);
+      if (NUMBER_WORDS[prefix]) {
+        return { unit: UNIT_ALIASES[unitKey], quantity: NUMBER_WORDS[prefix] };
+      }
+    }
+  }
+  return null;
+}
+
 export interface ParsedListItem {
   name: string;
   quantity: string;
@@ -211,6 +246,16 @@ export function parseVoiceListText(rawText: string): ParsedListItem[] {
     const token = normalized[i];
     const match = token.match(COMBINED_TOKEN);
     if (!match) {
+      const glued = splitGluedUnitQuantityWord(token);
+      if (glued) {
+        const name = titleCase(nameTokens.join(' '));
+        if (name) {
+          items.push({ name, quantity: glued.quantity, unit: glued.unit });
+        }
+        nameTokens = [];
+        i++;
+        continue;
+      }
       nameTokens.push(token);
       i++;
       continue;
