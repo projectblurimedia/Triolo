@@ -5,7 +5,6 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VerificationBadge } from './VerificationBadge';
-import { SHOP_GRADIENT } from './BusinessProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BusinessNearbyResult } from '@/services/businessesService';
 import { formatAddress } from '@/utils/formatAddress';
@@ -28,13 +27,18 @@ interface NearbyResultDetailModalProps {
  * family rather than a bolted-on popup. No booking/contact action is offered here — that
  * flow doesn't exist yet (Worker/Business module remainders, Pending Modules 4/5); this is
  * purely a richer read of the same public profile data the card already had.
+ *
+ * Always the constant brand-blue `headerGradient`, never the orange `SHOP_GRADIENT`, in
+ * both modes — an earlier pass used `SHOP_GRADIENT` for `'business'` mode here (header,
+ * hero placeholder, tags, info-icon badges); removed per explicit follow-up instruction,
+ * matching `NearbySearchModal`'s own long-standing "never orange" rule for this surface.
  */
 export function NearbyResultDetailModal({ visible, onClose, mode, result }: NearbyResultDetailModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const isWorker = mode === 'worker';
-  const gradient = isWorker ? headerGradient : SHOP_GRADIENT;
+  const gradient = headerGradient;
 
   if (!result) {
     return null;

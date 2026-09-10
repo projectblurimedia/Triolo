@@ -6,7 +6,6 @@ import * as Location from 'expo-location';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoadingIndicator } from './LoadingIndicator';
-import { SHOP_GRADIENT } from './BusinessProfileModal';
 import { NearbyResultDetailModal } from './NearbyResultDetailModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { workersService, WorkerNearbyResult } from '@/services/workersService';
@@ -58,10 +57,12 @@ function toRadiusKm(value: string, unit: RangeUnit): number | null {
 /**
  * Opened from Home's menu ("Nearby Workers" / "Nearby Shops") — full-screen search UI,
  * same chrome pattern as WorkerProfileModal/BusinessProfileModal (gradient header, left
- * back button). Always the constant brand-blue `headerGradient` for the header itself
- * (both modes), per the earlier explicit instruction not to reintroduce `SHOP_GRADIENT`
- * there — only individual shop result rows use the orange accent, matching
- * BusinessProfileCard's own capability-identity convention.
+ * back button). Always the constant brand-blue `headerGradient` for both header and every
+ * accent in the body (result avatars, distance pill, tags, `NearbyResultDetailModal`) in
+ * **both** modes — an earlier pass gave `'business'` mode `SHOP_GRADIENT` (the orange
+ * Business-capability color) on result cards/tags/the detail view specifically, which was
+ * removed per explicit follow-up instruction; this modal never uses that orange anywhere,
+ * matching the header's own long-standing rule.
  *
  * Real GPS-based, distance-accurate search (Pending Module 4's discovery piece) — device
  * location via expo-location (same permission/getCurrentPositionAsync pattern already
@@ -87,7 +88,7 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
   const [results, setResults] = useState<ResultsState>({ status: 'idle' });
   const [selectedResult, setSelectedResult] = useState<NearbyResult | null>(null);
   const isWorker = mode === 'worker';
-  const accentColor = isWorker ? colors.primary : SHOP_GRADIENT[0];
+  const accentColor = colors.primary;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const radiusKm = useMemo(() => toRadiusKm(rangeValue, rangeUnit), [rangeValue, rangeUnit]);
 
@@ -166,12 +167,7 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
         onPress={() => setSelectedResult(item)}
       >
         <View style={styles.resultHeaderRow}>
-          <LinearGradient
-            colors={isWorker ? headerGradient : SHOP_GRADIENT}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.resultAvatar}
-          >
+          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.resultAvatar}>
             <FontAwesome6 name={isWorker ? 'screwdriver-wrench' : 'store'} size={18} color="#FFFFFF" solid />
           </LinearGradient>
           <View style={styles.resultHeaderInfo}>
@@ -450,8 +446,10 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   searchInput: { flex: 1, ...typography.body, fontSize: 14, padding: 0 },
+  // Wide enough that a 5-digit meters value (e.g. "50000", 50km expressed in M) doesn't get
+  // clipped — 52px was too narrow, per explicit feedback.
   radiusInputWrap: {
-    width: 52,
+    width: 72,
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 8,

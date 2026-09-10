@@ -182,8 +182,8 @@
     "workersSubtitle": "Find skilled workers around you",
     "shopsTitle": "Nearby Shops",
     "shopsSubtitle": "Find shops and businesses around you",
-    "searchWorkersPlaceholder": "Search by skill, name or area",
-    "searchShopsPlaceholder": "Search by shop, category or area",
+    "searchWorkersPlaceholder": "Search by skill or name",
+    "searchShopsPlaceholder": "Search by category or shop name",
     "rangeLabel": "Range",
     "unit": {
       "km": "KM",
