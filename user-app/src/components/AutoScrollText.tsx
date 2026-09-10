@@ -28,8 +28,13 @@ const PX_PER_MS = 0.045; // ~45px/sec — slow enough to read mid-scroll, not a 
  * viewport — that's its entire purpose — so this measurement isn't subject to the same
  * parent-width-clamping ambiguity a plain (even absolutely positioned) `Text` node has.
  * `scrollEnabled={false}`/`pointerEvents="none"` keep it purely a measuring instrument, never
- * interactive. The *visible* copy still animates via a plain `Animated.Text` + `translateX`,
- * unaffected by any of this — only the measurement mechanism changed.
+ * interactive. The *visible* copy animates via a plain `Animated.Text` + `translateX` —
+ * which needed its own fix too, once the measurement itself started working: without
+ * `alignSelf: 'flex-start'`, the parent's default `alignItems: 'stretch'` was shrinking the
+ * visible `Text`'s own layout box down to the container's width, so `numberOfLines`/
+ * `ellipsizeMode="clip"` truncated its actual *content* at that width before `translateX`
+ * ever ran — the overflowing tail was never laid out at all, so no amount of scrolling could
+ * reveal it. See the inline comment below for the fuller explanation.
  */
 export function AutoScrollText({ text, style, containerWidth, containerStyle }: AutoScrollTextProps) {
   const [textWidth, setTextWidth] = useState(0);
@@ -57,7 +62,21 @@ export function AutoScrollText({ text, style, containerWidth, containerStyle }: 
   return (
     <View style={containerStyle}>
       <View style={{ width: containerWidth, overflow: 'hidden' }}>
-        <Animated.Text numberOfLines={1} ellipsizeMode="clip" style={[style, { transform: [{ translateX }] }]}>
+        {/* `alignSelf: 'flex-start'` is load-bearing, not decoration: without it, the
+            parent's default `alignItems: 'stretch'` shrinks this Text's own layout box down
+            to `containerWidth` — which makes `numberOfLines`/`ellipsizeMode="clip"` truncate
+            the text's actual *content* at that width, before `translateX` ever runs. The
+            overflowing tail then simply never gets laid out at all, no matter how far the
+            transform slides it — reported as "shows the start of the placeholder, never the
+            rest, even though it's supposedly scrolling." `alignSelf: 'flex-start'` lets this
+            Text lay out at its own full natural width (extending past the parent's bound),
+            so the parent's `overflow: 'hidden'` is a pure paint-time clip and the transform
+            actually reveals real content that was already there. */}
+        <Animated.Text
+          numberOfLines={1}
+          ellipsizeMode="clip"
+          style={[style, { alignSelf: 'flex-start', transform: [{ translateX }] }]}
+        >
           {text}
         </Animated.Text>
       </View>
