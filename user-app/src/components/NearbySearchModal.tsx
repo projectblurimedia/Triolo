@@ -58,6 +58,14 @@ function toRadiusKm(value: string, unit: RangeUnit): number | null {
   return Math.min(MAX_RADIUS_KM, Math.max(MIN_RADIUS_KM, km));
 }
 
+// Module-level, not component state — survives even if `NearbySearchModal` itself
+// unmounts and remounts between opens (e.g. leaving and returning to the Home tab, or any
+// other remount path upstream of this component that a purely in-component "skip refetch
+// if already ready" check can't see across). Reused for the lifetime of the JS process;
+// there's no TTL, since a stale-by-a-few-minutes fix is still far more useful here than
+// forcing every reopen through a multi-second GPS round trip again.
+let cachedLocation: { latitude: number; longitude: number } | null = null;
+
 /**
  * Opened from Home's menu ("Nearby Workers" / "Nearby Shops") — full-screen search UI,
  * same chrome pattern as WorkerProfileModal/BusinessProfileModal (gradient header, left
@@ -93,7 +101,9 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
   const [rangeValue, setRangeValue] = useState(DEFAULT_RANGE_VALUE);
   const [rangeUnit, setRangeUnit] = useState<RangeUnit>(DEFAULT_RANGE_UNIT);
   const [unitPickerVisible, setUnitPickerVisible] = useState(false);
-  const [location, setLocation] = useState<LocationState>({ status: 'idle' });
+  const [location, setLocation] = useState<LocationState>(() =>
+    cachedLocation ? { status: 'ready', ...cachedLocation } : { status: 'idle' },
+  );
   const [results, setResults] = useState<ResultsState>({ status: 'idle' });
   const [selectedResult, setSelectedResult] = useState<NearbyResult | null>(null);
   const isWorker = mode === 'worker';
@@ -110,7 +120,9 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
         return;
       }
       const position = await Location.getCurrentPositionAsync({});
-      setLocation({ status: 'ready', latitude: position.coords.latitude, longitude: position.coords.longitude });
+      const next = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      cachedLocation = next;
+      setLocation({ status: 'ready', ...next });
     } catch {
       setLocation({ status: 'error' });
     }
@@ -118,11 +130,15 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
 
   // Read via a ref (not a `location` dependency) so this effect only fires on `visible`
   // transitions, never on every location-state change it causes. Skipping a fresh GPS fix
-  // when one's already `ready` matters because this same component instance stays mounted
-  // across a worker<->shop mode switch (see HomeMenuModal) — re-detecting location on every
-  // single reopen was the actual cause of "loading takes too long" whenever switching
-  // between Nearby Workers and Nearby Shops, since it re-ran the full permission+GPS round
-  // trip each time even though the device hadn't moved.
+  // when one's already `ready` matters — re-detecting on every single reopen was reported as
+  // "loading takes too long" whenever switching between Nearby Workers and Nearby Shops, a
+  // full permission+GPS round trip even though the device hadn't moved. This ref-based check
+  // alone wasn't enough, though: it only helps while this exact component instance stays
+  // mounted, and something upstream of this component apparently *does* tear it down and
+  // remount it between some opens (reported as specifically "whichever one is opened
+  // second" is slow, regardless of which mode that is) — the module-level `cachedLocation`
+  // above is what actually survives that, since a fresh instance's very first render already
+  // seeds its `location` state from it instead of starting at `'idle'`.
   const locationRef = useRef(location);
   locationRef.current = location;
 
@@ -293,7 +309,9 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
       return (
         <View style={styles.body}>
           <LoadingIndicator size={40} dotSize={6} color={accentColor} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('nearbySearch.searchingTitle')}</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            {t(isWorker ? 'nearbySearch.searchingWorkersTitle' : 'nearbySearch.searchingShopsTitle')}
+          </Text>
           <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('nearbySearch.searchingMessage')}</Text>
         </View>
       );
