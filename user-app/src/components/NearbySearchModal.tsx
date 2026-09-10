@@ -5,6 +5,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AutoScrollText } from './AutoScrollText';
 import { LoadingIndicator } from './LoadingIndicator';
 import { NearbyResultDetailModal } from './NearbyResultDetailModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -73,7 +74,11 @@ function toRadiusKm(value: string, unit: RangeUnit): number | null {
  * input instead of presets; Miles was dropped from the unit picker per a later explicit
  * request too), re-queried (debounced) whenever the free-text search box or the range
  * changes. The search box, range input, and unit picker trigger all sit in one row, per
- * explicit request. Tapping a result card opens `NearbyResultDetailModal` for a fuller,
+ * explicit request — the unit-picker trigger has no chevron icon (removed per explicit
+ * feedback), and the search box's own placeholder uses `AutoScrollText` instead of the
+ * native `placeholder` prop, since the box is now narrow enough to genuinely clip the
+ * longer placeholder strings — text that doesn't fit marquee-scrolls to reveal the rest
+ * rather than staying permanently cut off. Tapping a result card opens `NearbyResultDetailModal` for a fuller,
  * read-only view of that profile.
  */
 export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalProps) {
@@ -81,6 +86,7 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const [searchFieldWidth, setSearchFieldWidth] = useState(0);
   const [rangeValue, setRangeValue] = useState(DEFAULT_RANGE_VALUE);
   const [rangeUnit, setRangeUnit] = useState<RangeUnit>(DEFAULT_RANGE_UNIT);
   const [unitPickerVisible, setUnitPickerVisible] = useState(false);
@@ -341,14 +347,28 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
         <View style={styles.filterRow}>
           <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <FontAwesome6 name="magnifying-glass" size={14} color={colors.textMuted} solid />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t(isWorker ? 'nearbySearch.searchWorkersPlaceholder' : 'nearbySearch.searchShopsPlaceholder')}
-              placeholderTextColor={colors.textMuted}
-              style={[styles.searchInput, { color: colors.text }]}
-              returnKeyType="search"
-            />
+            <View style={styles.searchInputWrap} onLayout={(e) => setSearchFieldWidth(e.nativeEvent.layout.width)}>
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                accessibilityLabel={t(
+                  isWorker ? 'nearbySearch.searchWorkersPlaceholder' : 'nearbySearch.searchShopsPlaceholder',
+                )}
+                style={[styles.searchInput, { color: colors.text }]}
+                returnKeyType="search"
+              />
+              {query.length === 0 && searchFieldWidth > 0 ? (
+                <View style={styles.searchPlaceholderOverlay} pointerEvents="none">
+                  <AutoScrollText
+                    text={t(
+                      isWorker ? 'nearbySearch.searchWorkersPlaceholder' : 'nearbySearch.searchShopsPlaceholder',
+                    )}
+                    containerWidth={searchFieldWidth}
+                    style={[styles.searchPlaceholderText, { color: colors.textMuted }]}
+                  />
+                </View>
+              ) : null}
+            </View>
           </View>
           <View style={[styles.radiusInputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TextInput
@@ -365,7 +385,6 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
             onPress={() => setUnitPickerVisible(true)}
           >
             <Text style={[styles.unitButtonText, { color: colors.text }]}>{t(`nearbySearch.unit.${rangeUnit}`)}</Text>
-            <FontAwesome6 name="chevron-down" size={10} color={colors.textMuted} solid />
           </Pressable>
         </View>
 
@@ -427,13 +446,16 @@ const styles = StyleSheet.create({
   },
   // Search input, range input, and the unit picker trigger all share one row per
   // explicit request — search takes the remaining space (flex: 1), the other two are
-  // narrow, fixed-width controls sized just for their short content.
+  // narrow, fixed-width controls sized just for their short content. marginBottom gives
+  // the result list/body below it real breathing room — without it, the first scrolled
+  // card sat flush against the row, per explicit feedback.
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginHorizontal: 20,
     marginTop: 16,
+    marginBottom: 16,
   },
   searchBar: {
     flex: 1,
@@ -445,7 +467,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
-  searchInput: { flex: 1, ...typography.body, fontSize: 14, padding: 0 },
+  // Wraps the TextInput plus its own AutoScrollText placeholder overlay (see below) — the
+  // native `placeholder` prop can't marquee-scroll when the text is too long to fit, which
+  // this search bar's now-narrower width (sharing a row with the range input/unit picker)
+  // makes a real risk for the longer placeholder strings.
+  searchInputWrap: { flex: 1, position: 'relative', justifyContent: 'center' },
+  searchInput: { ...typography.body, fontSize: 14, padding: 0 },
+  searchPlaceholderOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center' },
+  searchPlaceholderText: { ...typography.body, fontSize: 14 },
   // Wide enough that a 5-digit meters value (e.g. "50000", 50km expressed in M) doesn't get
   // clipped — 52px was too narrow, per explicit feedback.
   radiusInputWrap: {
@@ -457,12 +486,11 @@ const styles = StyleSheet.create({
   },
   radiusInput: { ...typography.body, fontSize: 14, padding: 0, textAlign: 'center' },
   unitButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    justifyContent: 'center',
     borderWidth: 1,
     borderRadius: 14,
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
     paddingVertical: 11,
   },
   unitButtonText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 13 },
