@@ -113,10 +113,21 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     }
   }, []);
 
+  // Read via a ref (not a `location` dependency) so this effect only fires on `visible`
+  // transitions, never on every location-state change it causes. Skipping a fresh GPS fix
+  // when one's already `ready` matters because this same component instance stays mounted
+  // across a worker<->shop mode switch (see HomeMenuModal) — re-detecting location on every
+  // single reopen was the actual cause of "loading takes too long" whenever switching
+  // between Nearby Workers and Nearby Shops, since it re-ran the full permission+GPS round
+  // trip each time even though the device hadn't moved.
+  const locationRef = useRef(location);
+  locationRef.current = location;
+
   useEffect(() => {
-    if (visible) {
-      setQuery('');
-      setResults({ status: 'idle' });
+    if (!visible) return;
+    setQuery('');
+    setResults({ status: 'idle' });
+    if (locationRef.current.status !== 'ready') {
       detectLocation();
     }
   }, [visible, detectLocation]);
@@ -519,7 +530,9 @@ const styles = StyleSheet.create({
   emptyMessage: { ...typography.body, textAlign: 'center', lineHeight: 20 },
   retryButton: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
   retryButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  listContent: { padding: 20, paddingBottom: 40 },
+  // No paddingTop — filterRow's own marginBottom already provides the gap above the list;
+  // a top padding here on top of that doubled the space, per explicit feedback.
+  listContent: { paddingHorizontal: 20, paddingBottom: 40 },
   resultCard: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },
   resultHeaderRow: { flexDirection: 'row', alignItems: 'center' },
   resultAvatar: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
