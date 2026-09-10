@@ -1,10 +1,10 @@
 /**
  * Turns free-form recognized speech — Telugu, English, or (the common real case) both
- * mixed in the same sentence, e.g. "kandipappu kg nnara" (kandipappu, one and a half kg) or
+ * mixed in the same sentence, e.g. "kandipappu kgnnara" (kandipappu, one and a half kg) or
  * "senagapappu kg minapappu 3/2kg" — into a structured list of {name, quantity, unit}
  * entries, one per detected item run.
  *
- * Two things make Telugu grocery speech harder than plain English numbers-and-units text:
+ * Three things make Telugu grocery speech harder than plain English numbers-and-units text:
  *
  * 1. Quantity words aren't always digits. A speaker says "kandipappu kg nnara" — the
  *    quantity word ("nnara", short for "ఒకటిన్నర"/okatinnara, "one and a half") comes
@@ -14,14 +14,22 @@
  *    forms (what shows up in practice more often than you'd hope) — to a plain digit/
  *    fraction string, and the main loop looks for a quantity word both *before and after*
  *    the unit token, not just before it as a simpler English-only parser would.
- * 2. Units get spoken in Telugu too ("కిలో"/kilo, "గ్రాము"/gram, ...) — `TELUGU_UNIT_ALIASES`
- *    covers the common ones, merged into the same unit table English units use so both
- *    work interchangeably in one sentence.
+ * 2. Units get spoken in Telugu too ("కిలో"/kilo, "గ్రాము"/gram, ...) — the Telugu entries in
+ *    `UNIT_ALIASES` cover the common ones, merged into the same table English units use so
+ *    both work interchangeably in one sentence.
  * 3. The unit and its quantity word often come out as one glued token, not two separate
  *    words with a pause between them — "1.5kg" in natural spoken Telugu *is* "kgnnara"
  *    ("kg" + "nnara"), not "kg nnara". `splitGluedUnitQuantityWord()` below handles that by
  *    checking whether a token is a known unit word with a known quantity word stuck
  *    directly onto either end of it.
+ *
+ * A fourth, separate problem: multiple item names spoken together without their own
+ * individual quantity ("tomatoes and onions 3 kg") would otherwise fuse into one bogus
+ * item ("Tomatoes Onions"). Connector words ("and", "also", ...) are kept as explicit group
+ * boundaries (not just dropped) during normalization, so a run of name words is split back
+ * into separate name groups at those boundaries — each group becomes its own item, sharing
+ * whatever quantity/unit was found for the group as a whole (e.g. "Tomatoes - 3 KG" and
+ * "Onions - 3 KG").
  *
  * Still deliberately does NOT try to be clever about *digit* fractions already present in
  * the transcript — a recognized "3/2" is kept as the literal string "3/2", never
@@ -162,6 +170,11 @@ const NUMBER_WORDS: Record<string, string> = {
 };
 
 const CONNECTOR_WORDS = new Set(['and', 'also', 'then', 'plus', 'a', 'an']);
+// Stand-in for a connector word during normalization — a *marker*, not a dropped word, so
+// a run of name words can still be split into separate items at that position instead of
+// two item names silently fusing into one (see the grouping logic in parseVoiceListText).
+// Uppercase + pipes so it can never collide with a real (always-lowercased) token.
+const GROUP_SPLIT = '|GROUP-SPLIT|';
 
 // A token that's already a plain quantity — either a simple number/fraction ("1", "1/2",
 // "3.5", "31/2") or a resolved "N N/N" mixed-fraction compound ("1 1/2") produced by the
@@ -236,39 +249,65 @@ export function parseVoiceListText(rawText: string): ParsedListItem[] {
     .split(/\s+/)
     .filter(Boolean)
     .map((word) => NUMBER_WORDS[word] ?? word)
-    .filter((word) => !CONNECTOR_WORDS.has(word));
+    .map((word) => (CONNECTOR_WORDS.has(word) ? GROUP_SPLIT : word));
 
   const items: ParsedListItem[] = [];
-  let nameTokens: string[] = [];
+  // A "group" is one item-name run since the last connector word/unit — several groups can
+  // share one quantity+unit (see the fourth numbered point in this file's own doc comment).
+  let groups: string[][] = [];
+  let currentGroup: string[] = [];
   let i = 0;
+
+  const closeGroup = () => {
+    if (currentGroup.length) {
+      groups.push(currentGroup);
+      currentGroup = [];
+    }
+  };
+
+  const emitGroups = (quantity: string, unit: string) => {
+    for (const group of groups) {
+      const name = titleCase(group.join(' '));
+      if (name) {
+        items.push({ name, quantity, unit });
+      }
+    }
+    groups = [];
+  };
 
   while (i < normalized.length) {
     const token = normalized[i];
+
+    if (token === GROUP_SPLIT) {
+      closeGroup();
+      i++;
+      continue;
+    }
+
     const match = token.match(COMBINED_TOKEN);
     if (!match) {
       const glued = splitGluedUnitQuantityWord(token);
       if (glued) {
-        const name = titleCase(nameTokens.join(' '));
-        if (name) {
-          items.push({ name, quantity: glued.quantity, unit: glued.unit });
-        }
-        nameTokens = [];
+        closeGroup();
+        emitGroups(glued.quantity, glued.unit);
         i++;
         continue;
       }
-      nameTokens.push(token);
+      currentGroup.push(token);
       i++;
       continue;
     }
 
     const unit = UNIT_ALIASES[match[2].toLowerCase()];
     let quantity: string | null = match[1] ?? null;
-    let rest = nameTokens;
     if (!quantity) {
-      const pulled = pullTrailingQuantity(nameTokens);
+      // A trailing number before the unit belongs to the group right before it, not any
+      // earlier ones — pull only from the last (still-open) group.
+      const pulled = pullTrailingQuantity(currentGroup);
       quantity = pulled.quantity;
-      rest = pulled.rest;
+      currentGroup = pulled.rest;
     }
+    closeGroup();
     // Quantity word spoken *after* the unit instead of before it — e.g. "kandipappu kg
     // nnara" ("kandipappu, one-and-a-half kg"), a natural Telugu word order. Only consumed
     // when no quantity was already found before the unit, so "rice 2 kg onions" doesn't
@@ -277,23 +316,18 @@ export function parseVoiceListText(rawText: string): ParsedListItem[] {
       quantity = normalized[i + 1];
       i++;
     }
-
-    const name = titleCase(rest.join(' '));
-    if (name) {
-      items.push({ name, quantity: quantity ?? '1', unit });
-    }
-    nameTokens = [];
+    emitGroups(quantity ?? '1', unit);
     i++;
   }
 
   // Trailing words with no unit ever spoken (e.g. "...and onions") still become an item,
   // just with a blank unit — better than silently dropping the last thing someone said.
-  if (nameTokens.length) {
-    const { quantity, rest } = pullTrailingQuantity(nameTokens);
-    const name = titleCase(rest.join(' '));
-    if (name) {
-      items.push({ name, quantity: quantity ?? '1', unit: '' });
-    }
+  closeGroup();
+  if (groups.length) {
+    const lastGroup = groups[groups.length - 1];
+    const { quantity, rest } = pullTrailingQuantity(lastGroup);
+    groups[groups.length - 1] = rest;
+    emitGroups(quantity ?? '1', '');
   }
 
   return items;
