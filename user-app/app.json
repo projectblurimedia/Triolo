@@ -54,6 +54,14 @@
         {
           "photosPermission": "Triolo needs access to your photos to upload portfolio or shop images."
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Triolo uses your microphone to let you build your Prepare List by voice.",
+          "speechRecognitionPermission": "Triolo uses speech recognition to turn what you say into list items.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
       ]
     ],
     "extra": {

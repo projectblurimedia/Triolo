@@ -216,8 +216,26 @@
     "comingSoonTitle": "Coming Soon"
   },
   "prepareList": {
-    "comingSoon": "Preparing and saving your lists is coming soon.",
-    "tagline": "Get your list ready before you shop or book"
+    "tagline": "Get your list ready before you shop or book",
+    "micLabel": "Record your list",
+    "tapToSpeak": "Tap to speak your list",
+    "listening": "Listening...",
+    "exampleHint": "Try: \"rice 2 kg, onions 1 kg, milk 1 litre\"",
+    "itemsAddedTitle": "{{count}} item added to your list",
+    "itemsAddedTitle_other": "{{count}} items added to your list",
+    "micPermissionTitle": "Microphone Access Needed",
+    "micPermissionMessage": "Allow microphone and speech recognition access to build your list by voice.",
+    "recognitionErrorMessage": "Something went wrong listening. Please try again.",
+    "yourListHeading": "Your List ({{count}})",
+    "clearAll": "Clear All",
+    "clearAllConfirmTitle": "Clear Your List?",
+    "clearAllConfirmMessage": "This removes every item from your Prepare List. This can't be undone.",
+    "emptyMessage": "Tap the mic above and say your items — they'll show up here as an editable list.",
+    "namePlaceholder": "Item name",
+    "quantityPlaceholder": "Qty",
+    "unitPlaceholder": "Unit",
+    "addItemManually": "Add Item Manually",
+    "newItemName": "New item"
   },
   "bazaar": {
     "comingSoon": "Shop ordering is coming soon.",
