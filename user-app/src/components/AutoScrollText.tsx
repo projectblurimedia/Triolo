@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, ScrollView, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
+import { Animated, Easing, ScrollView, StyleProp, TextStyle, View, ViewStyle } from 'react-native';
 
 interface AutoScrollTextProps {
   text: string;
@@ -19,22 +19,27 @@ const PX_PER_MS = 0.045; // ~45px/sec — slow enough to read mid-scroll, not a 
  * full instead of being permanently cut off. Sits still — no animation — when the text
  * already fits.
  *
- * Two earlier versions of this component tried to measure the text's true natural width by
- * laying an (invisible, then invisible-and-absolutely-positioned) plain `Text` node next to
- * the visible one and reading its `onLayout` — neither reliably reported a width wider than
- * the container in practice. This version measures a fundamentally different way: a hidden
- * (`height: 0`, `opacity: 0`) horizontal `ScrollView` whose `onContentSizeChange` reports its
- * content's true size. A `ScrollView`'s content is explicitly allowed to exceed its own
- * viewport — that's its entire purpose — so this measurement isn't subject to the same
- * parent-width-clamping ambiguity a plain (even absolutely positioned) `Text` node has.
- * `scrollEnabled={false}`/`pointerEvents="none"` keep it purely a measuring instrument, never
- * interactive. The *visible* copy animates via a plain `Animated.Text` + `translateX` —
- * which needed its own fix too, once the measurement itself started working: without
- * `alignSelf: 'flex-start'`, the parent's default `alignItems: 'stretch'` was shrinking the
- * visible `Text`'s own layout box down to the container's width, so `numberOfLines`/
- * `ellipsizeMode="clip"` truncated its actual *content* at that width before `translateX`
- * ever ran — the overflowing tail was never laid out at all, so no amount of scrolling could
- * reveal it. See the inline comment below for the fuller explanation.
+ * Four earlier attempts at this component all failed on some combination of "measures the
+ * wrong width" or "only ever shows the first screenful, animation or not" — the common root
+ * cause turned out to be `numberOfLines`: any `Text` with `numberOfLines` set, laid out as a
+ * *normal-flow* child (even with `alignSelf: 'flex-start'`), gets measured with the nearest
+ * ancestor's available width as an upper bound — RN/Yoga needs a concrete width to decide
+ * *where* to truncate, so it measures "as if" constrained to that width regardless of
+ * `alignSelf`, which only affects final box positioning, not the measurement pass itself.
+ * That silently truncated the text's actual *content*, not just its paint, so no transform
+ * could ever reveal what was cut — matching the exact reports ("still cuts off after 'or'",
+ * "shop name never shows").
+ *
+ * The fix: don't use `numberOfLines` (or a plain `View`) for either the visible text or its
+ * measurement at all. A `ScrollView`'s content is explicitly exempt from that "available
+ * width" clamp — that's the entire premise of scrolling — so both problems disappear by
+ * rendering the (untruncated) text as a `ScrollView`'s content: `onContentSizeChange` reports
+ * its true natural width directly (no separate hidden measurer needed), the `ScrollView`'s
+ * own frame (`style={{ width: containerWidth }}`) clips whatever exceeds it exactly like a
+ * plain `overflow: 'hidden'` View would, and an `Animated.Text` + `translateX` inside it
+ * (unchanged from every earlier attempt) slides the *fully laid-out* text left to reveal the
+ * part that was clipped — since the text was never truncated at the content level this time,
+ * there's actually something there for the transform to reveal.
  */
 export function AutoScrollText({ text, style, containerWidth, containerStyle }: AutoScrollTextProps) {
   const [textWidth, setTextWidth] = useState(0);
@@ -60,42 +65,17 @@ export function AutoScrollText({ text, style, containerWidth, containerStyle }: 
   }, [overflowing, textWidth, containerWidth, translateX]);
 
   return (
-    <View style={containerStyle}>
-      <View style={{ width: containerWidth, overflow: 'hidden' }}>
-        {/* `alignSelf: 'flex-start'` is load-bearing, not decoration: without it, the
-            parent's default `alignItems: 'stretch'` shrinks this Text's own layout box down
-            to `containerWidth` — which makes `numberOfLines`/`ellipsizeMode="clip"` truncate
-            the text's actual *content* at that width, before `translateX` ever runs. The
-            overflowing tail then simply never gets laid out at all, no matter how far the
-            transform slides it — reported as "shows the start of the placeholder, never the
-            rest, even though it's supposedly scrolling." `alignSelf: 'flex-start'` lets this
-            Text lay out at its own full natural width (extending past the parent's bound),
-            so the parent's `overflow: 'hidden'` is a pure paint-time clip and the transform
-            actually reveals real content that was already there. */}
-        <Animated.Text
-          numberOfLines={1}
-          ellipsizeMode="clip"
-          style={[style, { alignSelf: 'flex-start', transform: [{ translateX }] }]}
-        >
-          {text}
-        </Animated.Text>
-      </View>
+    <View style={[{ width: containerWidth }, containerStyle]}>
       <ScrollView
         horizontal
         scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
         pointerEvents="none"
-        style={styles.measurerScroll}
+        style={{ width: containerWidth }}
         onContentSizeChange={(width) => setTextWidth(width)}
       >
-        <Text numberOfLines={1} style={style}>
-          {text}
-        </Text>
+        <Animated.Text style={[style, { transform: [{ translateX }] }]}>{text}</Animated.Text>
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  measurerScroll: { height: 0, opacity: 0 },
-});
