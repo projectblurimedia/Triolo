@@ -184,6 +184,7 @@
     "shopsSubtitle": "Find shops and businesses around you",
     "searchWorkersPlaceholder": "Search by skill, name or area",
     "searchShopsPlaceholder": "Search by shop, category or area",
+    "rangeLabel": "Range",
     "distanceAway": "{{distance}} away",
     "detectingLocationTitle": "Finding Your Location",
     "detectingLocationMessage": "Hold on while we detect where you are…",

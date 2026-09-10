@@ -35,12 +35,18 @@ type ResultsState =
   | { status: 'error' }
   | { status: 'ready'; items: NearbyResult[] };
 
-// "Nearby" means genuinely nearby — 10km, per explicit request, after confirming the
-// wider 25/50km radii tried earlier weren't a bug: they were only surfacing results that
-// were legitimately that far away (verified by checking the distance math directly against
-// the database — correct in both cases). No radius picker is exposed (not asked for).
-const SEARCH_RADIUS_KM = 10;
+// Per explicit request, the radius is now a user-facing filter instead of one fixed
+// constant — options span the backend's validated range (0.1-50km), from a genuinely
+// walkable 500m up to a district-wide 50km. Default lands on 10km, the same value this
+// was fixed at before the filter existed.
+const RADIUS_OPTIONS_KM = [0.5, 1, 5, 10, 25, 50];
+const DEFAULT_RADIUS_KM = 10;
 const SEARCH_DEBOUNCE_MS = 350;
+
+/** "500m" under 1km, "10km" at or above it — same threshold/format `formatDistanceValue` uses for a result's own distance. */
+function formatRadiusLabel(km: number): string {
+  return km < 1 ? `${Math.round(km * 1000)}m` : `${km}km`;
+}
 
 /** "420m" for under a km, "1.3km" otherwise — matches the "500m away"/"1km far" phrasing from the feature request. */
 function formatDistanceValue(meters: number): string {
@@ -64,14 +70,17 @@ function isWorkerResult(mode: NearbySearchMode, item: NearbyResult): item is Wor
  * location via expo-location (same permission/getCurrentPositionAsync pattern already
  * proven in AddressPicker), then GET /workers/nearby or /businesses/nearby (Haversine
  * distance computed in SQL server-side, see backend repositories) filtered to verified
- * profiles within SEARCH_RADIUS_KM, re-queried (debounced) whenever the free-text search
- * box changes. Replaces the earlier coming-soon placeholder body.
+ * profiles within a user-chosen radius (`RADIUS_OPTIONS_KM` chip row below the search bar
+ * — 500m up to 50km, defaulting to 10km), re-queried (debounced) whenever the free-text
+ * search box or the selected radius changes. Replaces the earlier coming-soon placeholder
+ * body.
  */
 export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [location, setLocation] = useState<LocationState>({ status: 'idle' });
   const [results, setResults] = useState<ResultsState>({ status: 'idle' });
   const isWorker = mode === 'worker';
@@ -102,10 +111,10 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
   }, [visible, detectLocation]);
 
   const runSearch = useCallback(
-    async (latitude: number, longitude: number, searchQuery: string) => {
+    async (latitude: number, longitude: number, searchQuery: string, radius: number) => {
       setResults({ status: 'loading' });
       try {
-        const params = { latitude, longitude, radiusKm: SEARCH_RADIUS_KM, query: searchQuery.trim() || undefined };
+        const params = { latitude, longitude, radiusKm: radius, query: searchQuery.trim() || undefined };
         const items: NearbyResult[] = isWorker
           ? await workersService.searchNearby(params)
           : await businessesService.searchNearby(params);
@@ -124,12 +133,12 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     if (readyLatitude == null || readyLongitude == null) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      runSearch(readyLatitude, readyLongitude, query);
+      runSearch(readyLatitude, readyLongitude, query, radiusKm);
     }, SEARCH_DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [readyLatitude, readyLongitude, query, runSearch]);
+  }, [readyLatitude, readyLongitude, query, radiusKm, runSearch]);
 
   const handleClose = () => {
     setQuery('');
@@ -169,7 +178,7 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
             ) : null}
           </View>
           <View style={[styles.distancePill, { backgroundColor: `${accentColor}16` }]}>
-            <FontAwesome6 name="location-dot" size={10} color={accentColor} solid />
+            <FontAwesome6 name="location-dot" size={13} color={accentColor} solid />
             <Text style={[styles.distanceText, { color: accentColor }]}>
               {t('nearbySearch.distanceAway', { distance: formatDistanceValue(item.distanceMeters) })}
             </Text>
@@ -253,7 +262,9 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
           <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('nearbySearch.resultsErrorMessage')}</Text>
           <Pressable
             style={[styles.retryButton, { backgroundColor: accentColor }]}
-            onPress={() => location.status === 'ready' && runSearch(location.latitude, location.longitude, query)}
+            onPress={() =>
+              location.status === 'ready' && runSearch(location.latitude, location.longitude, query, radiusKm)
+            }
           >
             <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
           </Pressable>
@@ -324,6 +335,35 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
           />
         </View>
 
+        <View style={styles.radiusRow}>
+          <Text style={[styles.radiusLabel, { color: colors.textMuted }]}>{t('nearbySearch.rangeLabel')}</Text>
+          <View style={styles.radiusChipRow}>
+            {RADIUS_OPTIONS_KM.map((option) => {
+              const active = option === radiusKm;
+              return active ? (
+                <Pressable key={option} onPress={() => setRadiusKm(option)}>
+                  <LinearGradient
+                    colors={isWorker ? headerGradient : SHOP_GRADIENT}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.radiusChip}
+                  >
+                    <Text style={[styles.radiusChipText, { color: '#FFFFFF' }]}>{formatRadiusLabel(option)}</Text>
+                  </LinearGradient>
+                </Pressable>
+              ) : (
+                <Pressable
+                  key={option}
+                  onPress={() => setRadiusKm(option)}
+                  style={[styles.radiusChip, styles.radiusChipInactive, { borderColor: colors.border }]}
+                >
+                  <Text style={[styles.radiusChipText, { color: colors.text }]}>{formatRadiusLabel(option)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
         {renderBody()}
       </View>
     </Modal>
@@ -359,6 +399,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   searchInput: { flex: 1, ...typography.body, padding: 0 },
+  radiusRow: { marginHorizontal: 20, marginTop: 14 },
+  radiusLabel: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 8 },
+  radiusChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  radiusChip: { borderRadius: 16, paddingVertical: 7, paddingHorizontal: 14 },
+  radiusChipInactive: { borderWidth: 1 },
+  radiusChipText: { ...typography.caption, fontFamily: fonts.semiBold },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginBottom: 8, textAlign: 'center', marginTop: 16 },
@@ -375,12 +421,12 @@ const styles = StyleSheet.create({
   distancePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
-  distanceText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10 },
+  distanceText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   tag: { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
   tagText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11 },
