@@ -50,12 +50,36 @@ const RANGE_UNITS: RangeUnit[] = ['m', 'km'];
 const MIN_RADIUS_KM = 0.1;
 const MAX_RADIUS_KM = 50;
 const SEARCH_DEBOUNCE_MS = 350;
+// Bounds how long a search or a GPS fix is allowed to sit on the loading spinner before
+// surfacing as a retryable error — a hung request (a slow Vercel cold start, a stuck GPS
+// fix indoors, ...) would otherwise leave the UI showing "Searching Nearby..." forever,
+// since axios's own default timeout (45s, see apiClient.ts) is far longer than anyone would
+// wait before assuming the app is broken, and expo-location's getCurrentPositionAsync has
+// no timeout option of its own to lean on here.
+const SEARCH_TIMEOUT_MS = 15000;
+const LOCATION_TIMEOUT_MS = 15000;
 
 function toRadiusKm(value: string, unit: RangeUnit): number | null {
   const parsed = parseFloat(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   const km = unit === 'km' ? parsed : parsed / 1000;
   return Math.min(MAX_RADIUS_KM, Math.max(MIN_RADIUS_KM, km));
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
 }
 
 // Module-level, not component state — survives even if `NearbySearchModal` itself
@@ -110,20 +134,30 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
   const accentColor = colors.primary;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const radiusKm = useMemo(() => toRadiusKm(rangeValue, rangeUnit), [rangeValue, rangeUnit]);
+  // Bumped on every new detectLocation()/runSearch() call — a stale call's own result is
+  // dropped if a newer one has since started, so an old, slow-to-settle request (network or
+  // GPS) can never overwrite state a fresher request already set. Two independent counters
+  // since location and search requests aren't the same operation.
+  const locationRequestIdRef = useRef(0);
+  const searchRequestIdRef = useRef(0);
 
   const detectLocation = useCallback(async () => {
+    const requestId = ++locationRequestIdRef.current;
     setLocation({ status: 'loading' });
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const permission = await withTimeout(Location.requestForegroundPermissionsAsync(), LOCATION_TIMEOUT_MS);
+      if (requestId !== locationRequestIdRef.current) return;
       if (!permission.granted) {
         setLocation({ status: 'denied' });
         return;
       }
-      const position = await Location.getCurrentPositionAsync({});
+      const position = await withTimeout(Location.getCurrentPositionAsync({}), LOCATION_TIMEOUT_MS);
+      if (requestId !== locationRequestIdRef.current) return;
       const next = { latitude: position.coords.latitude, longitude: position.coords.longitude };
       cachedLocation = next;
       setLocation({ status: 'ready', ...next });
     } catch {
+      if (requestId !== locationRequestIdRef.current) return;
       setLocation({ status: 'error' });
     }
   }, []);
@@ -142,11 +176,23 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
   const locationRef = useRef(location);
   locationRef.current = location;
 
+  // Bumped every time the modal actually opens — the debounced-search effect below includes
+  // this in its dependency array specifically so a reopen always kicks off a fresh search,
+  // even when every *other* input to that effect (location, query, radius, mode) happens to
+  // be byte-for-byte identical to how they were left before closing. Without this, reopening
+  // the *same* mode with an empty search box (the ordinary case — nothing left to reset)
+  // changed nothing the debounce effect was actually watching, so it silently never re-ran:
+  // `results` got reset to `'idle'` by the effect above, but nothing ever moved it past that,
+  // leaving the UI stuck on the "Searching Nearby..." spinner indefinitely — reported as
+  // "sometimes searching nearby workers or shops loading only, not getting."
+  const [openGeneration, setOpenGeneration] = useState(0);
+
   useEffect(() => {
     if (!visible) return;
     setQuery('');
     setResults({ status: 'idle' });
     setSelectedResult(null);
+    setOpenGeneration((generation) => generation + 1);
     if (locationRef.current.status !== 'ready') {
       detectLocation();
     }
@@ -158,14 +204,21 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
       // component's `mode` prop after the request resolves, since `mode` can have already
       // moved on to the other tab by then (see the render-race note below).
       const searchedMode = mode;
+      const requestId = ++searchRequestIdRef.current;
       setResults({ status: 'loading' });
       try {
         const params = { latitude, longitude, radiusKm: radius, query: searchQuery.trim() || undefined };
-        const items: NearbyResult[] = isWorker
-          ? await workersService.searchNearby(params)
-          : await businessesService.searchNearby(params);
+        const items = await withTimeout<NearbyResult[]>(
+          isWorker ? workersService.searchNearby(params) : businessesService.searchNearby(params),
+          SEARCH_TIMEOUT_MS,
+        );
+        // A newer search has since started (a keystroke, a range change, a mode switch) —
+        // this one's answer is stale even if it did eventually succeed, so it must not
+        // overwrite whatever the newer request already set (or is still waiting to set).
+        if (requestId !== searchRequestIdRef.current) return;
         setResults({ status: 'ready', items, mode: searchedMode });
       } catch {
+        if (requestId !== searchRequestIdRef.current) return;
         setResults({ status: 'error' });
       }
     },
@@ -184,7 +237,9 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [readyLatitude, readyLongitude, query, radiusKm, runSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openGeneration is a deliberate
+    // extra trigger (see its own declaration above), not a value this effect reads.
+  }, [readyLatitude, readyLongitude, query, radiusKm, runSearch, openGeneration]);
 
   const handleClose = () => {
     setQuery('');
