@@ -106,10 +106,15 @@
     "emptyMessage": "New nearby job requests matching your skills will show up here.",
     "distanceAway": "{{distance}} away",
     "accept": "Accept",
+    "decline": "Decline",
     "acceptedToastTitle": "Job Accepted",
     "acceptedToastMessage": "You've accepted this job. The customer has been notified.",
+    "declinedToastTitle": "Job Declined",
     "takenToastTitle": "Job Already Taken",
-    "takenToastMessage": "Another worker accepted this job first."
+    "takenToastMessage": "Another worker accepted this job first.",
+    "newJobTitle": "New Job Request",
+    "offerGoneTitle": "Job No Longer Available",
+    "offerGoneMessage": "This job was already taken, declined, or is no longer open."
   },
   "location": {
     "useCurrent": "Use My Current Location",

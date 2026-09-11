@@ -67,6 +67,16 @@ export class BookingsRepository {
     };
   }
 
+  /** No race to guard against — a worker can only touch their own offer, so a plain scoped
+   * UPDATE is enough (unlike acceptOffer, there's no contention between different workers
+   * here). Silently affects 0 rows if the offer is already gone (taken/declined already). */
+  async declineOffer(bookingRequestId: string, workerId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE booking_offers SET status = 'declined' WHERE booking_request_id = $1 AND worker_id = $2 AND status = 'pending'`,
+      [bookingRequestId, workerId],
+    );
+  }
+
   async findPendingOffersForWorker(workerId: string): Promise<PendingOffer[]> {
     const result = await this.pool.query(
       `SELECT bo.id AS offer_id, bo.booking_request_id, bo.distance_meters, bo.created_at, br.skill_categories

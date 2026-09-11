@@ -51,12 +51,21 @@ function getFirebaseApp(): App | null {
  * notification actually show big/heads-up instead of a quiet inbox entry, since Android's
  * per-channel importance (set client-side once, at channel-creation time) is what ultimately
  * governs display prominence — this `priority` field only requests it.
+ *
+ * `dataOnly` sends the message with **no** `notification` block at all — FCM's own
+ * `notification` payload type cannot carry action buttons on Android (there is no field for
+ * it), so a notification that needs real Accept/Reject buttons has to arrive as pure `data`
+ * and be composed into a local, actionable notification by the client itself (see
+ * partner-app's `backgroundNotificationTask.ts`, which runs even with the app fully killed).
+ * `tag`/`channelId`/`priority` are folded into `data` in this mode too, since the client is
+ * the one building the eventual notification and needs to know what to build it with.
  */
 export interface PushNotificationOptions {
   data?: Record<string, string>;
   tag?: string;
   channelId?: string;
   priority?: 'default' | 'high' | 'max';
+  dataOnly?: boolean;
 }
 
 export async function sendPushNotification(
@@ -70,20 +79,31 @@ export async function sendPushNotification(
     return;
   }
 
+  const data: Record<string, string> = { ...options.data };
+  if (options.tag) data.tag = options.tag;
+  if (options.channelId) data.channelId = options.channelId;
+  if (options.priority) data.priority = options.priority;
+  if (options.dataOnly) {
+    data.title = title;
+    data.body = body;
+  }
+
   try {
     await getMessaging(firebaseApp).send({
       token,
-      notification: { title, body },
-      data: options.data,
+      notification: options.dataOnly ? undefined : { title, body },
+      data: Object.keys(data).length > 0 ? data : undefined,
       android: {
         priority: 'high',
-        notification: {
-          tag: options.tag,
-          channelId: options.channelId,
-          priority: options.priority,
-          defaultSound: true,
-          visibility: options.priority === 'max' ? 'public' : undefined,
-        },
+        notification: options.dataOnly
+          ? undefined
+          : {
+              tag: options.tag,
+              channelId: options.channelId,
+              priority: options.priority,
+              defaultSound: true,
+              visibility: options.priority === 'max' ? 'public' : undefined,
+            },
       },
     });
   } catch (err) {

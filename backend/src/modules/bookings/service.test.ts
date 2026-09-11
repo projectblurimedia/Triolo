@@ -14,6 +14,7 @@ function createMockRepository(): MockRepository {
     findByIdForAccount: jest.fn(),
     findPendingOffersForWorker: jest.fn(),
     acceptOffer: jest.fn(),
+    declineOffer: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -77,7 +78,13 @@ describe('BookingsService.createQuickBooking', () => {
       'worker-account-1',
       expect.any(String),
       expect.stringContaining('Electrician'),
-      expect.objectContaining({ tag: 'request-1', channelId: 'booking-offers', priority: 'max' }),
+      expect.objectContaining({
+        tag: 'request-1',
+        channelId: 'booking-offers',
+        priority: 'max',
+        dataOnly: true,
+        data: { kind: 'booking_offer', bookingRequestId: 'request-1' },
+      }),
     );
   });
 
@@ -206,7 +213,38 @@ describe('BookingsService.acceptOffer', () => {
       'worker-account-2',
       expect.any(String),
       expect.any(String),
-      { tag: 'request-1', channelId: 'booking-offers' },
+      {
+        tag: 'request-1',
+        channelId: 'booking-offers',
+        dataOnly: true,
+        data: { kind: 'booking_taken', bookingRequestId: 'request-1' },
+      },
     );
+  });
+});
+
+describe('BookingsService.declineOffer', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('throws NOT_FOUND when the caller has no worker profile', async () => {
+    const repo = createMockRepository();
+    const workers = createMockWorkersService();
+    workers.getMyProfile.mockResolvedValue(null);
+
+    const service = new BookingsService(repo as unknown as BookingsRepository, workers, createMockNotificationsService());
+    await expect(service.declineOffer('account-1', 'request-1')).rejects.toThrow(AppError);
+    expect(repo.declineOffer).not.toHaveBeenCalled();
+  });
+
+  it('delegates to the repository using the caller\'s own worker profile id', async () => {
+    const repo = createMockRepository();
+    const workers = createMockWorkersService();
+    workers.getMyProfile.mockResolvedValue({ id: 'worker-2' } as never);
+
+    const service = new BookingsService(repo as unknown as BookingsRepository, workers, createMockNotificationsService());
+    await service.declineOffer('account-2', 'request-1');
+    expect(repo.declineOffer).toHaveBeenCalledWith('request-1', 'worker-2');
   });
 });

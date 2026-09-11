@@ -200,7 +200,7 @@ Mark every one of the caller's unread notifications as read.
 
 ## Bookings Module
 
-Quick Book — first real (non-placeholder) slice of broadcast booking (Pending Module 4's remainder): a user requests one or more skills within a radius; every verified worker with **all** of those skills (array containment, not overlap) gets a `booking_offers` row plus a big, high-priority push (channel `booking-offers`, FCM `notification.priority: "max"`, localized per recipient's `preferredLanguage`). First accept wins — the accept endpoint is race-safe (see `backend/src/modules/bookings/repository.ts`'s `acceptOffer`) — and every other pending offer for that request is atomically marked `lost`, with a same-tagged follow-up push that **replaces** the original notification on each losing worker's device (native Android tag behavior, not a custom dismiss handler). No PIN verification, cancellation, or full status pipeline yet.
+Quick Book — first real (non-placeholder) slice of broadcast booking (Pending Module 4's remainder): a user requests one or more skills within a radius; every verified worker with **all** of those skills (array containment, not overlap) gets a `booking_offers` row plus a big, actionable push notification (channel `booking-offers`, Accept/Reject buttons, localized per recipient's `preferredLanguage`). Every push for this feature is sent **data-only** (no FCM `notification` block at all) — Android's own `notification` payload type has no field for action buttons, so `partner-app` composes and displays the actual notification itself, client-side, via a background task that runs even with the app fully closed (see `.cloud/architecture.md`'s Notification Architecture section). First accept wins — the accept endpoint is race-safe (see `backend/src/modules/bookings/repository.ts`'s `acceptOffer`) — and every other pending offer for that request is atomically marked `lost`, with a follow-up push (same `bookingRequestId` used as the local notification's identifier) that **replaces** the original notification on each losing worker's device in place. A worker can also explicitly decline an offer (`POST /bookings/:id/decline`, also reachable via the notification's own Reject button) — affects only their own offer. No PIN verification, cancellation, or full status pipeline yet.
 
 ### POST /bookings/quick
 Broadcast a Quick Book request.
@@ -226,6 +226,12 @@ Accept a job offer. Exactly one worker can ever win a given request — see the 
 - 200: `{ success: true, message: "Job accepted", data: null }`
 - 404: `WORKER_PROFILE_NOT_FOUND` — caller has no worker profile
 - 409: `BOOKING_ALREADY_TAKEN` — another worker already won this request
+
+### POST /bookings/:id/decline
+Decline a job offer — this worker's own offer only; every other invited worker's offer for the same request is unaffected. Backs the notification's own "Reject" action button (see the Notification Architecture note in `.cloud/architecture.md`).
+- Auth: Bearer access token; caller must have a worker profile
+- 200: `{ success: true, message: "Job declined", data: null }` — also returned (silent no-op) if the offer is already gone (taken, or already declined)
+- 404: `WORKER_PROFILE_NOT_FOUND` — caller has no worker profile
 
 ---
 

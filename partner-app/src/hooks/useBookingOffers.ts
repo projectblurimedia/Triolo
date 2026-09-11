@@ -22,3 +22,11 @@ export function useAcceptBookingOffer() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY }),
   });
 }
+
+export function useDeclineBookingOffer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingRequestId: string) => bookingOffersService.decline(bookingRequestId),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY }),
+  });
+}

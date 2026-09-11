@@ -149,7 +149,7 @@ Migration `0010_create_push_tokens.sql`. Owned by the `notifications` module, no
 | id | uuid PK | |
 | booking_request_id | uuid FK → booking_requests.id, ON DELETE CASCADE | |
 | worker_id | uuid FK → worker_profiles.id, ON DELETE CASCADE | |
-| status | enum `booking_offer_status` (`pending`, `accepted`, `lost`) | flipped atomically alongside the parent request — see below |
+| status | enum `booking_offer_status` (`pending`, `accepted`, `lost`, `declined`) | `accepted`/`lost` flip atomically alongside the parent request (see below); `declined` is set independently, one row at a time, when a worker dismisses their own offer (`POST /bookings/:id/decline`) — added in migration `0012_booking_offer_declined_status.sql` via `ALTER TYPE ... ADD VALUE` |
 | distance_meters | double precision | computed once, at broadcast time, from the requester's location to this worker's |
 | created_at | timestamptz | |
 | | | `UNIQUE (booking_request_id, worker_id)` — one offer per worker per request |

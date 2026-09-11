@@ -61,7 +61,8 @@
         {
           "color": "#0055D3"
         }
-      ]
+      ],
+      "expo-task-manager"
     ],
     "extra": {
       "eas": {

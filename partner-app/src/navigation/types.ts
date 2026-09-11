@@ -1,3 +1,4 @@
+import { NavigatorScreenParams } from '@react-navigation/native';
 import { WorkerProfile } from '@/services/workersService';
 import { BusinessProfile } from '@/services/businessesService';
 
@@ -16,7 +17,11 @@ export type CapabilityType = 'worker' | 'business';
 
 export type MainStackParamList = {
   ChooseCapability: undefined;
-  MainTabs: undefined;
+  // NavigatorScreenParams (not plain `undefined`) so `navigationRef.navigate('MainTabs', {
+  // screen: 'Bookings' })` is valid and correctly typed — needed to jump straight to a
+  // specific tab (e.g. from a Quick Book push notification tap) rather than whichever tab
+  // happened to be active last. See navigation/navigationRef.ts.
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   // `profile` present switches the screen into edit mode (prefilled, PATCH instead of POST,
   // plus a delete action) — omitted (or undefined) for create. Passed as the already-fetched
   // profile object rather than just an id, since every entry point already has it in hand.

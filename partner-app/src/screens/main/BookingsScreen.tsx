@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
-import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { useAcceptBookingOffer, useBookingOffers } from '@/hooks/useBookingOffers';
+import { FocusedOfferModal } from '@/components/FocusedOfferModal';
+import { fonts, typography, useThemeColors } from '@/theme';
+import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from '@/hooks/useBookingOffers';
 import { PendingOffer } from '@/services/bookingOffersService';
+import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { showToast } from '@/state/toastStore';
 import { ApiError } from '@/services/apiClient';
 
@@ -21,21 +23,40 @@ function formatDistance(meters: number): string {
  * `.cloud/architecture.md`'s Notification Architecture section) — every job request this
  * worker's skills fully cover, still open for anyone to accept. Backed by `useBookingOffers`
  * (polled, same 8s order of magnitude as `useNotifications`); the real-time feel mostly
- * comes from the push itself (a big, high-priority notification via a dedicated
- * `booking-offers` Android channel, see `usePushNotifications.ts`) rather than this poll —
- * the poll is what keeps the list correct if the app is already open when an offer arrives
- * or gets taken by someone else.
+ * comes from the push itself (a big, actionable notification via a dedicated
+ * `booking-offers` Android channel with its own Accept/Reject buttons, see
+ * `usePushNotifications.ts`/`backgroundNotificationTask.ts`) rather than this poll — the
+ * poll is what keeps the list correct if the app is already open when an offer arrives or
+ * gets taken by someone else, and is also the data source for the focused single-offer
+ * modal below.
  */
 export function BookingsScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const { data: offers, isLoading } = useBookingOffers();
   const acceptMutation = useAcceptBookingOffer();
+  const declineMutation = useDeclineBookingOffer();
+
+  // Set by usePushNotifications.ts when a Quick Book notification's *body* (not an Accept/
+  // Reject button) is tapped — opens FocusedOfferModal for just that one job instead of
+  // leaving the worker to find it in the list themselves.
+  const focusedBookingRequestId = usePendingOfferStore((state) => state.focusedBookingRequestId);
+  const clearFocusedOffer = usePendingOfferStore((state) => state.clearFocusedOffer);
+  const [offersEverLoaded, setOffersEverLoaded] = useState(false);
+  useEffect(() => {
+    if (offers) setOffersEverLoaded(true);
+  }, [offers]);
+
+  const focusedOffer = useMemo(
+    () => offers?.find((item) => item.bookingRequestId === focusedBookingRequestId) ?? null,
+    [offers, focusedBookingRequestId],
+  );
 
   const handleAccept = (offer: PendingOffer) => {
     acceptMutation.mutate(offer.bookingRequestId, {
       onSuccess: () => {
         showToast({ variant: 'success', title: t('bookings.acceptedToastTitle'), message: t('bookings.acceptedToastMessage') });
+        if (offer.bookingRequestId === focusedBookingRequestId) clearFocusedOffer();
       },
       onError: (err) => {
         const alreadyTaken = err instanceof ApiError && err.code === 'BOOKING_ALREADY_TAKEN';
@@ -44,7 +65,15 @@ export function BookingsScreen() {
           title: t(alreadyTaken ? 'bookings.takenToastTitle' : 'common.errorTitle'),
           message: t(alreadyTaken ? 'bookings.takenToastMessage' : 'errors.generic'),
         });
+        if (alreadyTaken && offer.bookingRequestId === focusedBookingRequestId) clearFocusedOffer();
       },
+    });
+  };
+
+  const handleDecline = (offer: PendingOffer) => {
+    declineMutation.mutate(offer.bookingRequestId, {
+      onSuccess: () => showToast({ variant: 'info', title: t('bookings.declinedToastTitle') }),
+      onError: () => showToast({ variant: 'error', title: t('common.errorTitle'), message: t('errors.generic') }),
     });
   };
 
@@ -58,26 +87,22 @@ export function BookingsScreen() {
     );
   }
 
-  if (!offers || offers.length === 0) {
-    return (
-      <ScreenContainer edges={['left', 'right']}>
-        <View style={styles.centerWrap}>
-          <FontAwesome6 name="calendar-check" size={22} color={colors.textMuted} solid />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('bookings.emptyTitle')}</Text>
-          <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('bookings.emptyMessage')}</Text>
-        </View>
-      </ScreenContainer>
-    );
-  }
-
-  return (
-    <ScreenContainer edges={['left', 'right']}>
+  const body =
+    !offers || offers.length === 0 ? (
+      <View style={styles.centerWrap}>
+        <FontAwesome6 name="calendar-check" size={22} color={colors.textMuted} solid />
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('bookings.emptyTitle')}</Text>
+        <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('bookings.emptyMessage')}</Text>
+      </View>
+    ) : (
       <FlatList
         data={offers}
         keyExtractor={(item) => item.offerId}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => {
           const accepting = acceptMutation.isPending && acceptMutation.variables === item.bookingRequestId;
+          const declining = declineMutation.isPending && declineMutation.variables === item.bookingRequestId;
+          const busy = accepting || declining;
           return (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.cardHeaderRow}>
@@ -95,26 +120,55 @@ export function BookingsScreen() {
                   </View>
                 ))}
               </View>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.acceptButton,
-                  { backgroundColor: colors.primary, opacity: pressed || accepting ? 0.8 : 1 },
-                ]}
-                disabled={acceptMutation.isPending}
-                onPress={() => handleAccept(item)}
-              >
-                {accepting ? (
-                  <LoadingIndicator color="#FFFFFF" size={18} dotSize={4} />
-                ) : (
-                  <>
-                    <FontAwesome6 name="check" size={13} color="#FFFFFF" solid />
-                    <Text style={styles.acceptButtonText}>{t('bookings.accept')}</Text>
-                  </>
-                )}
-              </Pressable>
+              <View style={styles.actionRow}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.declineButton,
+                    { borderColor: colors.border, opacity: pressed || declining ? 0.8 : 1 },
+                  ]}
+                  disabled={busy}
+                  onPress={() => handleDecline(item)}
+                >
+                  {declining ? (
+                    <LoadingIndicator color={colors.textMuted} size={18} dotSize={4} />
+                  ) : (
+                    <Text style={[styles.declineButtonText, { color: colors.textMuted }]}>{t('bookings.decline')}</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.acceptButton,
+                    { backgroundColor: colors.primary, opacity: pressed || accepting ? 0.8 : 1 },
+                  ]}
+                  disabled={busy}
+                  onPress={() => handleAccept(item)}
+                >
+                  {accepting ? (
+                    <LoadingIndicator color="#FFFFFF" size={18} dotSize={4} />
+                  ) : (
+                    <>
+                      <FontAwesome6 name="check" size={13} color="#FFFFFF" solid />
+                      <Text style={styles.acceptButtonText}>{t('bookings.accept')}</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
             </View>
           );
         }}
+      />
+    );
+
+  return (
+    <ScreenContainer edges={['left', 'right']}>
+      {body}
+      <FocusedOfferModal
+        visible={focusedBookingRequestId !== null}
+        offer={focusedOffer}
+        notFound={offersEverLoaded && !focusedOffer}
+        accepting={acceptMutation.isPending && acceptMutation.variables === focusedOffer?.bookingRequestId}
+        onAccept={() => focusedOffer && handleAccept(focusedOffer)}
+        onClose={clearFocusedOffer}
       />
     </ScreenContainer>
   );
@@ -132,14 +186,24 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   tag: { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
   tagText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11 },
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  declineButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 12,
+  },
+  declineButtonText: { ...typography.body, fontFamily: fonts.medium },
   acceptButton: {
+    flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     borderRadius: 12,
     paddingVertical: 12,
-    marginTop: 14,
   },
   acceptButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
 });

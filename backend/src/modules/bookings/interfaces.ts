@@ -1,5 +1,5 @@
 export type BookingRequestStatus = 'broadcasting' | 'accepted';
-export type BookingOfferStatus = 'pending' | 'accepted' | 'lost';
+export type BookingOfferStatus = 'pending' | 'accepted' | 'lost' | 'declined';
 
 export interface BookingRequest {
   id: string;

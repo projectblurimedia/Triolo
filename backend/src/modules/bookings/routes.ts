@@ -27,3 +27,4 @@ bookingsRouter.post('/quick', authenticate, validateBody(createQuickBookingSchem
 bookingsRouter.get('/offers/mine', authenticate, controller.getMyOffers);
 bookingsRouter.get('/:id', authenticate, controller.getStatus);
 bookingsRouter.post('/:id/accept', authenticate, controller.acceptOffer);
+bookingsRouter.post('/:id/decline', authenticate, controller.declineOffer);

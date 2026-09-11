@@ -53,6 +53,10 @@ export class BookingsService {
 
       // Fire every push in parallel — a slow/failed send to one worker must never delay or
       // block delivery to the others (each is independently best-effort, see pushSender.ts).
+      // dataOnly: true — FCM's own `notification` payload type can't carry Accept/Reject
+      // action buttons on Android, so the client composes and displays the actual
+      // actionable notification itself (see partner-app's backgroundNotificationTask.ts),
+      // which also runs while the app is fully closed.
       await Promise.all(
         matches.map((match) =>
           this.notificationsService.sendRawPush(
@@ -60,10 +64,11 @@ export class BookingsService {
             bookingOfferTitle(match.preferredLanguage),
             bookingOfferBody(match.distanceMeters, dto.skillCategories, match.preferredLanguage),
             {
-              data: { type: 'booking_offer', bookingRequestId: request.id },
+              data: { kind: 'booking_offer', bookingRequestId: request.id },
               tag: request.id,
               channelId: BOOKING_OFFER_CHANNEL,
               priority: 'max',
+              dataOnly: true,
             },
           ),
         ),
@@ -102,19 +107,39 @@ export class BookingsService {
       throw AppError.conflict('This job has already been taken by another worker.', 'BOOKING_ALREADY_TAKEN');
     }
 
-    // Best-effort — replaces the same-tagged notification on every losing worker's device
-    // with a "taken" message via native Android tag-replacement (see pushSender.ts), so the
-    // big broadcast notification doesn't sit there stale once the job is gone. Never blocks
-    // the winning worker's own accept, which has already succeeded by this point.
+    // Best-effort — replaces the original notification on every losing worker's device with
+    // a "taken" message. Same `identifier`/data-only mechanism as the offer push itself: the
+    // client re-schedules a local notification under the same identifier (bookingRequestId),
+    // which replaces the one already showing, this time with no Accept/Reject actions. Never
+    // blocks the winning worker's own accept, which has already succeeded by this point.
     await Promise.all(
       result.losingWorkers.map((loser) =>
         this.notificationsService.sendRawPush(
           loser.accountId,
           jobTakenTitle(loser.preferredLanguage),
           jobTakenBody(loser.preferredLanguage),
-          { tag: bookingRequestId, channelId: BOOKING_OFFER_CHANNEL },
+          {
+            data: { kind: 'booking_taken', bookingRequestId },
+            tag: bookingRequestId,
+            channelId: BOOKING_OFFER_CHANNEL,
+            dataOnly: true,
+          },
         ),
       ),
     );
+  }
+
+  /** A worker dismissing an offer they don't want — server-side, this worker's own offer
+   * stops appearing in `getMyOffers()`; every other worker's offer for the same request is
+   * unaffected (declining is a purely local choice, not a signal that changes eligibility
+   * for anyone else). Idempotent-ish: silently no-ops if the offer is already gone (taken,
+   * or already declined) rather than throwing — a stale notification's decline button
+   * shouldn't be able to surface an error to the worker. */
+  async declineOffer(workerAccountId: string, bookingRequestId: string): Promise<void> {
+    const profile = await this.workersService.getMyProfile(workerAccountId);
+    if (!profile) {
+      throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
+    }
+    await this.repository.declineOffer(bookingRequestId, profile.id);
   }
 }

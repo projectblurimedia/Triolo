@@ -38,4 +38,12 @@ export class BookingsController {
     await this.service.acceptOffer(req.account.accountId, req.params.id);
     return ok(res, null, 'Job accepted');
   });
+
+  declineOffer = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    await this.service.declineOffer(req.account.accountId, req.params.id);
+    return ok(res, null, 'Job declined');
+  });
 }

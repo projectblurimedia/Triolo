@@ -5,6 +5,7 @@ import { useThemeStore } from '@/state/themeStore';
 import { useThemeColors } from '@/theme';
 import { AuthNavigator } from './AuthNavigator';
 import { MainNavigator } from './MainNavigator';
+import { navigationRef } from './navigationRef';
 
 /**
  * No first-launch language picker here (unlike user-app) — this app skips that chrome
@@ -45,7 +46,7 @@ export function RootNavigator() {
   // profile submission succeeded" — without it, this swap would happen the instant
   // accessToken became truthy, unmounting the very screen the user is still filling in.
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       {accessToken && !isCompletingRegistration ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
