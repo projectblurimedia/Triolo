@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.projectblurimedia.triolopartner",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#031F64",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -53,6 +54,12 @@
         "expo-image-picker",
         {
           "photosPermission": "Triolo Partner needs access to your photos to upload portfolio or shop images."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0055D3"
         }
       ]
     ],

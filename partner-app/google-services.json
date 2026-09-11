@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "946994084405",
+    "project_id": "triolo-bluri",
+    "storage_bucket": "triolo-bluri.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:946994084405:android:c8b385f114325c9a8c4f7c",
+        "android_client_info": {
+          "package_name": "com.projectblurimedia.triolopartner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqMis5H33l14ZoXnYXk2jtwqIx_2QH1Vw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
