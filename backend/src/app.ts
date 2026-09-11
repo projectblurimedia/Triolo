@@ -9,6 +9,7 @@ import { workersRouter } from '@/modules/workers/routes';
 import { businessesRouter } from '@/modules/businesses/routes';
 import { adminRouter } from '@/modules/admin/routes';
 import { notificationsRouter } from '@/modules/notifications/routes';
+import { bookingsRouter } from '@/modules/bookings/routes';
 
 export function createApp(): Express {
   const app = express();
@@ -50,6 +51,7 @@ export function createApp(): Express {
   app.use('/api/v1/businesses', businessesRouter);
   app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/notifications', notificationsRouter);
+  app.use('/api/v1/bookings', bookingsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

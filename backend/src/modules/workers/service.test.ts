@@ -26,6 +26,7 @@ function createMockRepository(): MockRepository {
     findById: jest.fn(),
     updateVerificationStatus: jest.fn(),
     findNearby: jest.fn(),
+    findMatchingForBroadcast: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -344,6 +345,22 @@ describe('WorkersService.searchNearby', () => {
     const filter = { latitude: 17.385, longitude: 78.4867, radiusKm: 10, limit: 20 };
     await expect(service.searchNearby('account-1', filter)).resolves.toBe(results);
     expect(repo.findNearby).toHaveBeenCalledWith('account-1', filter);
+  });
+});
+
+describe('WorkersService.findMatchingForBroadcast', () => {
+  it('passes the requester account id, skills, location, and radius straight through to the repository', async () => {
+    const repo = createMockRepository();
+    const matches = [
+      { workerId: 'worker-1', accountId: 'account-2', accountFullName: 'Rajesh', preferredLanguage: 'en' as const, distanceMeters: 480 },
+    ];
+    repo.findMatchingForBroadcast.mockResolvedValue(matches);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
+
+    await expect(
+      service.findMatchingForBroadcast('account-1', ['electrician', 'plumber'], 17.385, 78.4867, 50),
+    ).resolves.toBe(matches);
+    expect(repo.findMatchingForBroadcast).toHaveBeenCalledWith('account-1', ['electrician', 'plumber'], 17.385, 78.4867, 50);
   });
 });
 

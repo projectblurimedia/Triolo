@@ -8,6 +8,7 @@ import {
   AdminListResult,
   NearbySearchFilter,
   ProfileVerificationStatus,
+  WorkerBroadcastMatch,
   WorkerNearbyResult,
   WorkerProfile,
   WorkerProfileWithAccount,
@@ -110,6 +111,22 @@ export class WorkersService {
 
   async searchNearby(accountId: string, filter: NearbySearchFilter): Promise<WorkerNearbyResult[]> {
     return this.repository.findNearby(accountId, filter);
+  }
+
+  /**
+   * Called from modules/bookings' `BookingsService` (never touches `worker_profiles`
+   * itself) to find every verified worker eligible for a Quick Book broadcast — same
+   * module-boundary shape as `admin` calling into this service, just for a different
+   * purpose.
+   */
+  async findMatchingForBroadcast(
+    requesterAccountId: string,
+    skillCategories: string[],
+    latitude: number,
+    longitude: number,
+    radiusKm: number,
+  ): Promise<WorkerBroadcastMatch[]> {
+    return this.repository.findMatchingForBroadcast(requesterAccountId, skillCategories, latitude, longitude, radiusKm);
   }
 
   /** Fired when a user opens this worker's detail card from Nearby Workers search. */

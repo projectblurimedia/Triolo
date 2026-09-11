@@ -43,14 +43,49 @@ function getFirebaseApp(): App | null {
   return app;
 }
 
-export async function sendPushNotification(token: string, title: string, body: string): Promise<void> {
+/**
+ * `tag`/`channelId`/`priority` exist for the Quick Book broadcast (see modules/bookings) —
+ * `tag` makes a follow-up push (e.g. "this job was taken") REPLACE the original notification
+ * in place on the recipient's device via native Android OS behavior, rather than needing a
+ * custom dismiss-on-receipt handler; `channelId`/`priority: 'max'` is what makes that
+ * notification actually show big/heads-up instead of a quiet inbox entry, since Android's
+ * per-channel importance (set client-side once, at channel-creation time) is what ultimately
+ * governs display prominence — this `priority` field only requests it.
+ */
+export interface PushNotificationOptions {
+  data?: Record<string, string>;
+  tag?: string;
+  channelId?: string;
+  priority?: 'default' | 'high' | 'max';
+}
+
+export async function sendPushNotification(
+  token: string,
+  title: string,
+  body: string,
+  options: PushNotificationOptions = {},
+): Promise<void> {
   const firebaseApp = getFirebaseApp();
   if (!firebaseApp) {
     return;
   }
 
   try {
-    await getMessaging(firebaseApp).send({ token, notification: { title, body } });
+    await getMessaging(firebaseApp).send({
+      token,
+      notification: { title, body },
+      data: options.data,
+      android: {
+        priority: 'high',
+        notification: {
+          tag: options.tag,
+          channelId: options.channelId,
+          priority: options.priority,
+          defaultSound: true,
+          visibility: options.priority === 'max' ? 'public' : undefined,
+        },
+      },
+    });
   } catch (err) {
     logger.warn({ err }, 'Push notification failed to send');
   }

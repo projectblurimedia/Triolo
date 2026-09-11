@@ -1,5 +1,5 @@
 import { NotificationsRepository } from './repository';
-import { sendPushNotification } from './pushSender';
+import { PushNotificationOptions, sendPushNotification } from './pushSender';
 import { NotificationListResult } from './interfaces';
 
 const DEFAULT_LIST_LIMIT = 50;
@@ -37,6 +37,21 @@ export class NotificationsService {
 
   async registerPushToken(accountId: string, token: string): Promise<void> {
     await this.repository.upsertPushToken(accountId, token);
+  }
+
+  /**
+   * A push with no in-app `notifications` row behind it — for ephemeral, high-frequency
+   * events (Quick Book broadcast offers, see modules/bookings) that would otherwise flood
+   * the persistent in-app notification list with noise nobody wants to scroll back through
+   * later. Other modules call this instead of `notifyProfileViewed()`'s pattern when they
+   * want push delivery only. Best-effort like every other push here: no-ops silently if the
+   * recipient never registered a device token.
+   */
+  async sendRawPush(accountId: string, title: string, body: string, options?: PushNotificationOptions): Promise<void> {
+    const pushToken = await this.repository.findPushToken(accountId);
+    if (pushToken) {
+      await sendPushNotification(pushToken, title, body, options);
+    }
   }
 
   async listForAccount(accountId: string): Promise<NotificationListResult> {

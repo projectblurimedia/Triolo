@@ -79,3 +79,18 @@ export interface WorkerNearbyResult extends WorkerProfile {
   distanceMeters: number;
   accountFullName: string;
 }
+
+/**
+ * One verified worker eligible for a Quick Book broadcast (see modules/bookings) — has
+ * *all* the requested skills (array containment, not overlap) and sits within the
+ * requester's radius. Carries `preferredLanguage` so the broadcast push can be composed in
+ * the recipient's own language, per the Localization Architecture rule that anything the
+ * backend pushes unprompted is language-aware via per-recipient template lookup.
+ */
+export interface WorkerBroadcastMatch {
+  workerId: string;
+  accountId: string;
+  accountFullName: string;
+  preferredLanguage: 'en' | 'te';
+  distanceMeters: number;
+}

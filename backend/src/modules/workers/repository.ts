@@ -4,6 +4,7 @@ import {
   AdminListFilter,
   AdminListResult,
   NearbySearchFilter,
+  WorkerBroadcastMatch,
   WorkerNearbyResult,
   WorkerProfile,
   WorkerProfileWithAccount,
@@ -208,6 +209,43 @@ export class WorkersRepository {
       ...mapWorkerProfile(row),
       distanceMeters: Number(row.distance_meters),
       accountFullName: row.account_full_name,
+    }));
+  }
+
+  // --- Quick Book broadcast matching (see modules/bookings) — `skill_categories @>` is
+  // array *containment*: a worker only matches if their skills are a superset of every
+  // skill the requester asked for, not merely an overlap (a plumber-only worker doesn't
+  // match an "electrician AND plumber" request). Distance math mirrors findNearby above.
+  async findMatchingForBroadcast(
+    requesterAccountId: string,
+    skillCategories: string[],
+    latitude: number,
+    longitude: number,
+    radiusKm: number,
+  ): Promise<WorkerBroadcastMatch[]> {
+    const result = await this.pool.query(
+      `SELECT * FROM (
+         SELECT w.id AS worker_id, w.account_id, a.full_name AS account_full_name, a.preferred_language,
+           (6371000 * acos(LEAST(1.0, GREATEST(-1.0,
+             cos(radians($1)) * cos(radians(w.latitude)) * cos(radians(w.longitude) - radians($2)) + sin(radians($1)) * sin(radians(w.latitude))
+           )))) AS distance_meters
+         FROM worker_profiles w
+         JOIN accounts a ON a.id = w.account_id
+         WHERE w.verification_status = 'verified'
+           AND w.latitude IS NOT NULL AND w.longitude IS NOT NULL
+           AND w.account_id != $3
+           AND w.skill_categories @> $4::worker_skill_category[]
+       ) sub
+       WHERE sub.distance_meters <= $5
+       ORDER BY sub.distance_meters ASC`,
+      [latitude, longitude, requesterAccountId, skillCategories, radiusKm * 1000],
+    );
+    return result.rows.map((row) => ({
+      workerId: row.worker_id,
+      accountId: row.account_id,
+      accountFullName: row.account_full_name,
+      preferredLanguage: row.preferred_language,
+      distanceMeters: Number(row.distance_meters),
     }));
   }
 }

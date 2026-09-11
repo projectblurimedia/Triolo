@@ -130,3 +130,37 @@ describe('NotificationsService.registerPushToken', () => {
     expect(repo.upsertPushToken).toHaveBeenCalledWith('account-1', 'device-token-123');
   });
 });
+
+describe('NotificationsService.sendRawPush', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('sends a push with the given options when the recipient has a registered token, and writes no in-app row', async () => {
+    const repo = createMockRepository();
+    repo.findPushToken.mockResolvedValue('device-token-123');
+    const service = new NotificationsService(repo as unknown as NotificationsRepository);
+
+    await service.sendRawPush('account-1', 'New Job Nearby', 'Someone 500m away needs Electrician.', {
+      tag: 'booking-1',
+      channelId: 'booking-offers',
+      priority: 'max',
+    });
+
+    expect(sendPushNotification).toHaveBeenCalledWith('device-token-123', 'New Job Nearby', 'Someone 500m away needs Electrician.', {
+      tag: 'booking-1',
+      channelId: 'booking-offers',
+      priority: 'max',
+    });
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it('skips the send when the recipient has no registered token', async () => {
+    const repo = createMockRepository();
+    repo.findPushToken.mockResolvedValue(null);
+    const service = new NotificationsService(repo as unknown as NotificationsRepository);
+
+    await service.sendRawPush('account-1', 'title', 'body');
+    expect(sendPushNotification).not.toHaveBeenCalled();
+  });
+});
