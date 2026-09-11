@@ -1,6 +1,7 @@
 import { WorkersService } from './service';
 import { WorkersRepository } from './repository';
 import { WorkerProfile } from './interfaces';
+import { NotificationsService } from '@/modules/notifications/service';
 import * as cloudinaryService from '@/common/services/cloudinaryService';
 
 jest.mock('@/common/services/cloudinaryService', () => ({
@@ -26,6 +27,10 @@ function createMockRepository(): MockRepository {
     updateVerificationStatus: jest.fn(),
     findNearby: jest.fn(),
   } as unknown as MockRepository;
+}
+
+function createMockNotificationsService(): jest.Mocked<NotificationsService> {
+  return { notifyProfileViewed: jest.fn() } as unknown as jest.Mocked<NotificationsService>;
 }
 
 function buildProfile(overrides: Partial<WorkerProfile> = {}): WorkerProfile {
@@ -58,7 +63,7 @@ describe('WorkersService.createProfile', () => {
   it('rejects if the account already has a worker profile', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(buildProfile());
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(
       service.createProfile(
@@ -79,7 +84,7 @@ describe('WorkersService.createProfile', () => {
       .mockResolvedValueOnce({ url: 'https://cdn/a.jpg', publicId: 'a' })
       .mockResolvedValueOnce({ url: 'https://cdn/b.jpg', publicId: 'b' });
 
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     const files = [{ path: '/tmp/a.jpg' }, { path: '/tmp/b.jpg' }] as Express.Multer.File[];
 
     await service.createProfile(
@@ -116,7 +121,7 @@ describe('WorkersService.createProfile', () => {
     repo.findByAccountId.mockResolvedValue(null);
     repo.create.mockResolvedValue(buildProfile({ portfolioPhotoUrls: [] }));
 
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     await service.createProfile(
       'account-1',
       { skillCategories: ['mason'], experienceYears: 0, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
@@ -132,7 +137,7 @@ describe('WorkersService.createProfile', () => {
     repo.findByAccountId.mockResolvedValue(null);
     repo.create.mockResolvedValue(buildProfile({ skillCategories: ['other'], otherSkillDescription: 'Roofing' }));
 
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     await service.createProfile(
       'account-1',
       {
@@ -157,7 +162,7 @@ describe('WorkersService.getMyProfile', () => {
   it('returns null when no profile exists', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(null);
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(service.getMyProfile('account-1')).resolves.toBeNull();
   });
@@ -165,7 +170,7 @@ describe('WorkersService.getMyProfile', () => {
   it('returns the profile when one exists', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(buildProfile());
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(service.getMyProfile('account-1')).resolves.toMatchObject({ id: 'worker-1' });
   });
@@ -179,7 +184,7 @@ describe('WorkersService.updateProfile', () => {
   it('rejects if no profile exists yet', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(null);
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(
       service.updateProfile(
@@ -199,7 +204,7 @@ describe('WorkersService.updateProfile', () => {
     );
     repo.update.mockResolvedValue(buildProfile({ skillCategories: ['plumber'], experienceYears: 4 }));
 
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     await service.updateProfile(
       'account-1',
       { skillCategories: ['plumber'], experienceYears: 4, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
@@ -223,7 +228,7 @@ describe('WorkersService.updateProfile', () => {
     repo.update.mockResolvedValue(buildProfile());
     uploadToCloudinary.mockResolvedValueOnce({ url: 'https://cdn/new.jpg', publicId: 'new' });
 
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     const files = [{ path: '/tmp/new.jpg' }] as Express.Multer.File[];
 
     await service.updateProfile(
@@ -253,7 +258,7 @@ describe('WorkersService.updateProfile', () => {
     );
     repo.update.mockResolvedValue(buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg'] }));
 
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     await service.updateProfile(
       'account-1',
       {
@@ -276,7 +281,7 @@ describe('WorkersService.updateProfile', () => {
     repo.findByAccountId.mockResolvedValue(buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg'] }));
     repo.update.mockResolvedValue(buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg'] }));
 
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     await service.updateProfile(
       'account-1',
       { skillCategories: ['mason'], experienceYears: 2, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
@@ -295,7 +300,7 @@ describe('WorkersService.deleteProfile', () => {
   it('rejects if no profile exists yet', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(null);
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(service.deleteProfile('account-1')).rejects.toMatchObject({
       statusCode: 404,
@@ -307,7 +312,7 @@ describe('WorkersService.deleteProfile', () => {
   it('removes the profile when one exists', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(buildProfile());
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await service.deleteProfile('account-1');
     expect(repo.remove).toHaveBeenCalledWith('account-1');
@@ -318,7 +323,7 @@ describe('WorkersService.deleteProfile', () => {
     repo.findByAccountId.mockResolvedValue(
       buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }),
     );
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await service.deleteProfile('account-1');
     expect(deletePhotosFromCloudinary).toHaveBeenCalledWith(['https://cdn/a.jpg', 'https://cdn/b.jpg']);
@@ -334,11 +339,40 @@ describe('WorkersService.searchNearby', () => {
     const repo = createMockRepository();
     const results = [{ ...buildProfile(), distanceMeters: 420 }];
     repo.findNearby.mockResolvedValue(results);
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     const filter = { latitude: 17.385, longitude: 78.4867, radiusKm: 10, limit: 20 };
     await expect(service.searchNearby('account-1', filter)).resolves.toBe(results);
     expect(repo.findNearby).toHaveBeenCalledWith('account-1', filter);
+  });
+});
+
+describe('WorkersService.recordProfileView', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('throws 404 when no profile exists for that id', async () => {
+    const repo = createMockRepository();
+    repo.findById.mockResolvedValue(null);
+    const notifications = createMockNotificationsService();
+    const service = new WorkersService(repo as unknown as WorkersRepository, notifications);
+
+    await expect(service.recordProfileView('missing-id', 'viewer-1')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'WORKER_PROFILE_NOT_FOUND',
+    });
+    expect(notifications.notifyProfileViewed).not.toHaveBeenCalled();
+  });
+
+  it('notifies the profile owner, not the viewer', async () => {
+    const repo = createMockRepository();
+    repo.findById.mockResolvedValue({ ...buildProfile(), accountId: 'owner-1' });
+    const notifications = createMockNotificationsService();
+    const service = new WorkersService(repo as unknown as WorkersRepository, notifications);
+
+    await service.recordProfileView('worker-1', 'viewer-1');
+    expect(notifications.notifyProfileViewed).toHaveBeenCalledWith('owner-1', 'viewer-1');
   });
 });
 
@@ -351,7 +385,7 @@ describe('WorkersService admin-facing methods', () => {
     const repo = createMockRepository();
     const result = { items: [], total: 0, page: 1, limit: 20 };
     repo.findAll.mockResolvedValue(result);
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(service.adminListProfiles({ status: 'pending_verification', page: 1, limit: 20 })).resolves.toBe(
       result,
@@ -362,7 +396,7 @@ describe('WorkersService admin-facing methods', () => {
   it('adminGetProfile throws 404 when no profile exists for that id', async () => {
     const repo = createMockRepository();
     repo.findById.mockResolvedValue(null);
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(service.adminGetProfile('missing-id')).rejects.toMatchObject({
       statusCode: 404,
@@ -374,7 +408,7 @@ describe('WorkersService admin-facing methods', () => {
     const repo = createMockRepository();
     const withAccount = { ...buildProfile(), accountFullName: 'Asha', accountMobileNumber: '9999999999', accountEmail: 'asha@example.com' };
     repo.findById.mockResolvedValue(withAccount);
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(service.adminGetProfile('worker-1')).resolves.toBe(withAccount);
   });
@@ -382,7 +416,7 @@ describe('WorkersService admin-facing methods', () => {
   it('adminSetVerificationStatus throws 404 when no profile exists for that id', async () => {
     const repo = createMockRepository();
     repo.updateVerificationStatus.mockResolvedValue(null);
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(service.adminSetVerificationStatus('missing-id', 'verified')).rejects.toMatchObject({
       statusCode: 404,
@@ -393,7 +427,7 @@ describe('WorkersService admin-facing methods', () => {
   it('adminSetVerificationStatus updates and returns the profile', async () => {
     const repo = createMockRepository();
     repo.updateVerificationStatus.mockResolvedValue(buildProfile({ verificationStatus: 'verified' }));
-    const service = new WorkersService(repo as unknown as WorkersRepository);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await expect(service.adminSetVerificationStatus('worker-1', 'verified')).resolves.toMatchObject({
       verificationStatus: 'verified',

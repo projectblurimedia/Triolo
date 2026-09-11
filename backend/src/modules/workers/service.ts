@@ -1,5 +1,6 @@
 import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
+import { NotificationsService } from '@/modules/notifications/service';
 import { WorkersRepository } from './repository';
 import { CreateWorkerProfileDto, UpdateWorkerProfileDto } from './dto';
 import {
@@ -15,7 +16,10 @@ import {
 const PORTFOLIO_FOLDER = 'triolo/workers/portfolio';
 
 export class WorkersService {
-  constructor(private readonly repository: WorkersRepository) {}
+  constructor(
+    private readonly repository: WorkersRepository,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async createProfile(
     accountId: string,
@@ -106,6 +110,15 @@ export class WorkersService {
 
   async searchNearby(accountId: string, filter: NearbySearchFilter): Promise<WorkerNearbyResult[]> {
     return this.repository.findNearby(accountId, filter);
+  }
+
+  /** Fired when a user opens this worker's detail card from Nearby Workers search. */
+  async recordProfileView(id: string, viewerAccountId: string): Promise<void> {
+    const profile = await this.repository.findById(id);
+    if (!profile) {
+      throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
+    }
+    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId);
   }
 
   // --- Admin-facing (called only from modules/admin's service — see its own doc comment

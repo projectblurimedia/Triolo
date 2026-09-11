@@ -53,4 +53,12 @@ export class WorkersController {
     const results = await this.service.searchNearby(req.account.accountId, parsed.data);
     return ok(res, results);
   });
+
+  recordView = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    await this.service.recordProfileView(req.params.id, req.account.accountId);
+    return ok(res, null, 'Profile view recorded');
+  });
 }

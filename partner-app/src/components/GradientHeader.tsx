@@ -12,6 +12,8 @@ export interface HeaderAction {
   /** Optional visible text — renders as a labeled pill (icon + text) instead of a bare icon-only circle. */
   label?: string;
   onPress?: () => void;
+  /** Small red badge in the icon button's corner — e.g. an unread notification count. 0/undefined hides it; caps the displayed text at "9+". */
+  badgeCount?: number;
 }
 
 interface GradientHeaderProps {
@@ -89,6 +91,13 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
                     style={styles.iconButton}
                   >
                     <FontAwesome6 name={action.icon} size={17} color={colors.white} solid />
+                    {action.badgeCount ? (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText} numberOfLines={1}>
+                          {action.badgeCount > 9 ? '9+' : action.badgeCount}
+                        </Text>
+                      </View>
+                    ) : null}
                   </Pressable>
                 ),
               )}
@@ -151,7 +160,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.32)',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: headerGradient[0],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: { fontSize: 10, fontFamily: fonts.semiBold, color: colors.white },
   leadingIconButton: {
     width: LEADING_ICON_BUTTON_SIZE,
     height: LEADING_ICON_BUTTON_SIZE,

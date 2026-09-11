@@ -21,7 +21,7 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | orders | orders | Business shopping-list order lifecycle |
 | order_items | orders | Line items with availability status |
 | order_pins | orders | Pickup/delivery PINs per order |
-| notifications | notifications | Delivery record per recipient |
+| notifications | notifications | Implemented — `profile_view` event only so far, in-app/polled, not push yet; see its own section below |
 | ratings_reviews | ratings/reviews | Polymorphic: worker or business target |
 | verification_requests | verification | Worker/Business admin verification queue |
 | audit_logs | audit-logs | Immutable admin action log |
@@ -106,6 +106,18 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | delivery_price_per_km | double precision nullable | required (validated at the API layer) when `delivery_available` is true |
 | verification_status | enum `profile_verification_status` | shared enum with `worker_profiles` |
 | created_at / updated_at | timestamptz | |
+
+### notifications (Notifications module — implemented, in-app only for now)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| account_id | uuid FK → accounts.id, ON DELETE CASCADE | the recipient — not the actor who triggered the notification |
+| type | enum `notification_type` | just `profile_view` for now; more event types append to this enum as they're built, no table redesign needed |
+| title / body | text | plain, not per-language — see `docs/localization.md`; this module doesn't localize server-side yet since it composes exactly one fixed, English-only string per event type so far |
+| is_read | boolean, default false | |
+| created_at | timestamptz | |
+
+Migration `0009_create_notifications.sql`. One composite index, `(account_id, created_at DESC)`, covers both read patterns this module has (list newest-first, count unread) — no separate index needed for either. Raised by `POST /api/v1/workers/:id/view` / `POST /api/v1/businesses/:id/view` via `NotificationsService.notifyProfileViewed()` (see `.cloud/architecture.md`'s Backend Module Boundaries). Delivery is polling (`GET /api/v1/notifications`, `partner-app`'s `useNotifications()` hook), not push — FCM delivery is still pending, see `.cloud/project-context.md`'s Pending Modules list.
 
 ## Planned Tables (subsequent modules — outline only, refine when implemented)
 

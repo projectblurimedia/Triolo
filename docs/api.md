@@ -98,6 +98,12 @@ Search for verified workers near a given point, ordered nearest-first. Distance 
 - 200: `{ success: true, data: Array<WorkerProfile & { distanceMeters: number; accountFullName: string }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned; `accountFullName` is included so a result has a "who" (mobile/email are deliberately not exposed here — no booking/contact flow exists yet)
 - 400: `VALIDATION_ERROR` — missing/invalid `latitude`/`longitude`, or an out-of-range `radiusKm`/`limit`
 
+### POST /workers/:id/view
+Records that the caller viewed this worker's profile (fired by `user-app` when opening a Nearby Workers result's detail card) and raises a `profile_view` notification for the worker's own account — see the Notifications Module below. A no-op (no notification) if the caller is viewing their own profile.
+- Auth: Bearer access token
+- 200: `{ success: true, message: "Profile view recorded", data: null }`
+- 404: `WORKER_PROFILE_NOT_FOUND`
+
 ## Businesses Module
 
 Adds the Business capability to the authenticated `user` account — mirrors the Workers module exactly, shop-shaped instead of skill-shaped.
@@ -133,6 +139,12 @@ Search for verified businesses near a given point, ordered nearest-first — mir
 - 200: `{ success: true, data: Array<BusinessProfile & { distanceMeters: number }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned
 - 400: `VALIDATION_ERROR` — missing/invalid `latitude`/`longitude`, or an out-of-range `radiusKm`/`limit`
 
+### POST /businesses/:id/view
+Records that the caller viewed this business's profile (fired by `user-app` when opening a Nearby Shops result's detail card) and raises a `profile_view` notification for the business's own account — mirrors `POST /workers/:id/view` exactly.
+- Auth: Bearer access token
+- 200: `{ success: true, message: "Profile view recorded", data: null }`
+- 404: `BUSINESS_PROFILE_NOT_FOUND`
+
 ## Admin Module
 
 Every route requires `authorize('admin')` in addition to `authenticate` — a valid access token for a non-`admin` account gets `403 FORBIDDEN`, not just a hidden UI. `admin` accounts are provisioned via `backend/scripts/seedAdmin.ts` (`npm run seed:admin -- <mobileNumber> <fullName> [email]`), never self-registered — the admin then logs in through the same `/auth/login/*` endpoints above. This module has no data of its own — it lists/reviews the `worker_profiles`/`business_profiles` rows the Workers/Businesses modules already own, via those modules' own service layer (see `.cloud/architecture.md`'s Backend Module Boundaries).
@@ -160,8 +172,27 @@ Approve or reject a worker profile.
 ### GET /admin/businesses, GET /admin/businesses/:id, PATCH /admin/businesses/:id/verification
 Same shape as the three Worker endpoints above, `BusinessProfile`-flavored (`BUSINESS_PROFILE_NOT_FOUND` instead of `WORKER_PROFILE_NOT_FOUND`).
 
+## Notifications Module
+
+First slice of the planned Notifications module (Pending Module 6) — in-app only for this pass, polled by the client (`partner-app`'s `useNotifications` hook, ~8s interval); no FCM/push wiring yet, that's a separate, much larger native lift layered onto this same table later. Currently raises exactly one event type, `profile_view`, fired by `POST /workers/:id/view` / `POST /businesses/:id/view` above. Other backend modules reach this one through `NotificationsService`, never the `notifications` table directly — the same module-boundary pattern `admin` already established for reaching into `workers`/`businesses`.
+
+### GET /notifications
+List the caller's own notifications, newest first, plus their unread count.
+- Auth: Bearer access token
+- 200: `{ success: true, data: { items: Array<{ id, accountId, type: "profile_view", title, body, isRead, createdAt }>, unreadCount: number } }` — capped at the 50 most recent
+
+### PATCH /notifications/:id/read
+Mark one notification as read. Scoped to the caller's own account — an `id` belonging to a different account is silently a no-op (no leak, no error), not a 404, since the query itself is `WHERE id = $1 AND account_id = $2`.
+- Auth: Bearer access token
+- 200: `{ success: true, message: "Notification marked as read", data: null }`
+
+### POST /notifications/read-all
+Mark every one of the caller's unread notifications as read.
+- Auth: Bearer access token
+- 200: `{ success: true, message: "All notifications marked as read", data: null }`
+
 ---
 
 **Localization note**: `message` fields and validation error text on any endpoint are for logs/debugging, not for display — the client resolves `error.code` to a localized string itself. See `docs/localization.md`.
 
-Further modules (Users, Booking, Orders, Notifications) documented here as they're implemented — never left to drift from the actual routes. Admin currently covers only listing/verifying Worker/Business profiles; the rest of its planned scope (user/worker/business management, complaints, warnings, suspension, announcements, audit logs — see `.cloud/project-context.md`) is still pending.
+Further modules (Users, Booking, Orders) documented here as they're implemented — never left to drift from the actual routes. Admin currently covers only listing/verifying Worker/Business profiles; the rest of its planned scope (user/worker/business management, complaints, warnings, suspension, announcements, audit logs — see `.cloud/project-context.md`) is still pending. Notifications currently covers only the `profile_view` event described above; push (FCM) delivery and other event types are still pending.

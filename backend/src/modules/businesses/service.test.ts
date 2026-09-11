@@ -1,6 +1,7 @@
 import { BusinessesService } from './service';
 import { BusinessesRepository } from './repository';
 import { BusinessProfile } from './interfaces';
+import { NotificationsService } from '@/modules/notifications/service';
 import * as cloudinaryService from '@/common/services/cloudinaryService';
 
 jest.mock('@/common/services/cloudinaryService', () => ({
@@ -26,6 +27,10 @@ function createMockRepository(): MockRepository {
     updateVerificationStatus: jest.fn(),
     findNearby: jest.fn(),
   } as unknown as MockRepository;
+}
+
+function createMockNotificationsService(): jest.Mocked<NotificationsService> {
+  return { notifyProfileViewed: jest.fn() } as unknown as jest.Mocked<NotificationsService>;
 }
 
 function buildProfile(overrides: Partial<BusinessProfile> = {}): BusinessProfile {
@@ -60,7 +65,7 @@ describe('BusinessesService.createProfile', () => {
   it('rejects if the account already has a business profile', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(buildProfile());
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(
       service.createProfile(
@@ -87,7 +92,7 @@ describe('BusinessesService.createProfile', () => {
     repo.create.mockResolvedValue(buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg'] }));
     uploadToCloudinary.mockResolvedValueOnce({ url: 'https://cdn/a.jpg', publicId: 'a' });
 
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
     const files = [{ path: '/tmp/a.jpg' }] as Express.Multer.File[];
 
     await service.createProfile(
@@ -124,7 +129,7 @@ describe('BusinessesService.createProfile', () => {
     repo.findByAccountId.mockResolvedValue(null);
     repo.create.mockResolvedValue(buildProfile({ shopPhotoUrls: [] }));
 
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
     await service.createProfile(
       'account-1',
       {
@@ -148,7 +153,7 @@ describe('BusinessesService.createProfile', () => {
     repo.findByAccountId.mockResolvedValue(null);
     repo.create.mockResolvedValue(buildProfile({ deliveryAvailable: true, deliveryPricePerKm: 10 }));
 
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
     await service.createProfile(
       'account-1',
       {
@@ -174,7 +179,7 @@ describe('BusinessesService.createProfile', () => {
     repo.findByAccountId.mockResolvedValue(null);
     repo.create.mockResolvedValue(buildProfile({ deliveryAvailable: false, deliveryPricePerKm: null }));
 
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
     await service.createProfile(
       'account-1',
       {
@@ -200,7 +205,7 @@ describe('BusinessesService.getMyProfile', () => {
   it('returns null when no profile exists', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(null);
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(service.getMyProfile('account-1')).resolves.toBeNull();
   });
@@ -214,7 +219,7 @@ describe('BusinessesService.updateProfile', () => {
   it('rejects if no profile exists yet', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(null);
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(
       service.updateProfile(
@@ -242,7 +247,7 @@ describe('BusinessesService.updateProfile', () => {
     );
     repo.update.mockResolvedValue(buildProfile({ shopName: 'New Name' }));
 
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
     await service.updateProfile(
       'account-1',
       {
@@ -274,7 +279,7 @@ describe('BusinessesService.updateProfile', () => {
     repo.update.mockResolvedValue(buildProfile());
     uploadToCloudinary.mockResolvedValueOnce({ url: 'https://cdn/new.jpg', publicId: 'new' });
 
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
     const files = [{ path: '/tmp/new.jpg' }] as Express.Multer.File[];
 
     await service.updateProfile(
@@ -305,7 +310,7 @@ describe('BusinessesService.updateProfile', () => {
     );
     repo.update.mockResolvedValue(buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg'] }));
 
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
     await service.updateProfile(
       'account-1',
       {
@@ -333,7 +338,7 @@ describe('BusinessesService.deleteProfile', () => {
   it('rejects if no profile exists yet', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(null);
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(service.deleteProfile('account-1')).rejects.toMatchObject({
       statusCode: 404,
@@ -345,7 +350,7 @@ describe('BusinessesService.deleteProfile', () => {
   it('removes the profile when one exists', async () => {
     const repo = createMockRepository();
     repo.findByAccountId.mockResolvedValue(buildProfile());
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await service.deleteProfile('account-1');
     expect(repo.remove).toHaveBeenCalledWith('account-1');
@@ -356,7 +361,7 @@ describe('BusinessesService.deleteProfile', () => {
     repo.findByAccountId.mockResolvedValue(
       buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }),
     );
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await service.deleteProfile('account-1');
     expect(deletePhotosFromCloudinary).toHaveBeenCalledWith(['https://cdn/a.jpg', 'https://cdn/b.jpg']);
@@ -372,11 +377,40 @@ describe('BusinessesService.searchNearby', () => {
     const repo = createMockRepository();
     const results = [{ ...buildProfile(), distanceMeters: 850 }];
     repo.findNearby.mockResolvedValue(results);
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     const filter = { latitude: 17.385, longitude: 78.4867, radiusKm: 10, limit: 20 };
     await expect(service.searchNearby('account-1', filter)).resolves.toBe(results);
     expect(repo.findNearby).toHaveBeenCalledWith('account-1', filter);
+  });
+});
+
+describe('BusinessesService.recordProfileView', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('throws 404 when no profile exists for that id', async () => {
+    const repo = createMockRepository();
+    repo.findById.mockResolvedValue(null);
+    const notifications = createMockNotificationsService();
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, notifications);
+
+    await expect(service.recordProfileView('missing-id', 'viewer-1')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'BUSINESS_PROFILE_NOT_FOUND',
+    });
+    expect(notifications.notifyProfileViewed).not.toHaveBeenCalled();
+  });
+
+  it('notifies the profile owner, not the viewer', async () => {
+    const repo = createMockRepository();
+    repo.findById.mockResolvedValue({ ...buildProfile(), accountId: 'owner-1' });
+    const notifications = createMockNotificationsService();
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, notifications);
+
+    await service.recordProfileView('business-1', 'viewer-1');
+    expect(notifications.notifyProfileViewed).toHaveBeenCalledWith('owner-1', 'viewer-1');
   });
 });
 
@@ -389,7 +423,7 @@ describe('BusinessesService admin-facing methods', () => {
     const repo = createMockRepository();
     const result = { items: [], total: 0, page: 1, limit: 20 };
     repo.findAll.mockResolvedValue(result);
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(service.adminListProfiles({ status: 'pending_verification', page: 1, limit: 20 })).resolves.toBe(
       result,
@@ -400,7 +434,7 @@ describe('BusinessesService admin-facing methods', () => {
   it('adminGetProfile throws 404 when no profile exists for that id', async () => {
     const repo = createMockRepository();
     repo.findById.mockResolvedValue(null);
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(service.adminGetProfile('missing-id')).rejects.toMatchObject({
       statusCode: 404,
@@ -412,7 +446,7 @@ describe('BusinessesService admin-facing methods', () => {
     const repo = createMockRepository();
     const withAccount = { ...buildProfile(), accountFullName: 'Ravi', accountMobileNumber: '9999999999', accountEmail: 'ravi@example.com' };
     repo.findById.mockResolvedValue(withAccount);
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(service.adminGetProfile('business-1')).resolves.toBe(withAccount);
   });
@@ -420,7 +454,7 @@ describe('BusinessesService admin-facing methods', () => {
   it('adminSetVerificationStatus throws 404 when no profile exists for that id', async () => {
     const repo = createMockRepository();
     repo.updateVerificationStatus.mockResolvedValue(null);
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(service.adminSetVerificationStatus('missing-id', 'rejected')).rejects.toMatchObject({
       statusCode: 404,
@@ -431,7 +465,7 @@ describe('BusinessesService admin-facing methods', () => {
   it('adminSetVerificationStatus updates and returns the profile', async () => {
     const repo = createMockRepository();
     repo.updateVerificationStatus.mockResolvedValue(buildProfile({ verificationStatus: 'rejected' }));
-    const service = new BusinessesService(repo as unknown as BusinessesRepository);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(service.adminSetVerificationStatus('business-1', 'rejected')).resolves.toMatchObject({
       verificationStatus: 'rejected',

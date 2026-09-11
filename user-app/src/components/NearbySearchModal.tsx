@@ -246,6 +246,16 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     onClose();
   };
 
+  // Fire-and-forget: raises a "Someone viewed your profile" notification for the profile
+  // owner (see backend's POST /workers|businesses/:id/view). Never blocks or surfaces an
+  // error to the viewer — this is a side effect of looking at the detail card, not something
+  // the viewer's own experience should ever depend on or wait for.
+  const handleSelectResult = (item: NearbyResult) => {
+    setSelectedResult(item);
+    const record = isWorker ? workersService.recordView(item.id) : businessesService.recordView(item.id);
+    record.catch(() => {});
+  };
+
   const renderItem = ({ item }: { item: NearbyResult }) => {
     const worker = isWorkerResult(mode, item) ? item : null;
     const business = !worker ? (item as BusinessNearbyResult) : null;
@@ -260,7 +270,7 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     return (
       <Pressable
         style={[styles.resultCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        onPress={() => setSelectedResult(item)}
+        onPress={() => handleSelectResult(item)}
       >
         <View style={styles.resultHeaderRow}>
           <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.resultAvatar}>

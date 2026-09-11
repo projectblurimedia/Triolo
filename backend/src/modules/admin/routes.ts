@@ -7,6 +7,8 @@ import { WorkersRepository } from '@/modules/workers/repository';
 import { WorkersService } from '@/modules/workers/service';
 import { BusinessesRepository } from '@/modules/businesses/repository';
 import { BusinessesService } from '@/modules/businesses/service';
+import { NotificationsRepository } from '@/modules/notifications/repository';
+import { NotificationsService } from '@/modules/notifications/service';
 import { AdminController } from './controller';
 import { AdminService } from './service';
 import { setVerificationStatusSchema } from './validation';
@@ -15,8 +17,9 @@ import { setVerificationStatusSchema } from './validation';
 // matches how every other module's routes.ts already wires up its own repository/service
 // independently (no shared module registry exists in this codebase); these are stateless
 // wrappers over the pool, so a second instance is harmless.
-const workersService = new WorkersService(new WorkersRepository(pool));
-const businessesService = new BusinessesService(new BusinessesRepository(pool));
+const notificationsService = new NotificationsService(new NotificationsRepository(pool));
+const workersService = new WorkersService(new WorkersRepository(pool), notificationsService);
+const businessesService = new BusinessesService(new BusinessesRepository(pool), notificationsService);
 const service = new AdminService(workersService, businessesService);
 const controller = new AdminController(service);
 

@@ -1,5 +1,6 @@
 import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
+import { NotificationsService } from '@/modules/notifications/service';
 import { BusinessesRepository } from './repository';
 import { CreateBusinessProfileDto, UpdateBusinessProfileDto } from './dto';
 import {
@@ -15,7 +16,10 @@ import {
 const SHOP_PHOTO_FOLDER = 'triolo/businesses/shop-photos';
 
 export class BusinessesService {
-  constructor(private readonly repository: BusinessesRepository) {}
+  constructor(
+    private readonly repository: BusinessesRepository,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async createProfile(
     accountId: string,
@@ -110,6 +114,15 @@ export class BusinessesService {
 
   async searchNearby(accountId: string, filter: NearbySearchFilter): Promise<BusinessNearbyResult[]> {
     return this.repository.findNearby(accountId, filter);
+  }
+
+  /** Fired when a user opens this business's detail card from Nearby Shops search. */
+  async recordProfileView(id: string, viewerAccountId: string): Promise<void> {
+    const profile = await this.repository.findById(id);
+    if (!profile) {
+      throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
+    }
+    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId);
   }
 
   // --- Admin-facing (called only from modules/admin's service — see WorkersService's own

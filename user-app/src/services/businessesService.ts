@@ -64,6 +64,9 @@ export const businessesService = {
     return apiClient.get<BusinessNearbyResult[]>(`/businesses/nearby?${search.toString()}`, true);
   },
 
+  /** Fire-and-forget — raises a "Someone viewed your profile" notification for this business's own account. */
+  recordView: (businessId: string) => apiClient.post<null>(`/businesses/${businessId}/view`, undefined, true),
+
   createProfile: (params: CreateBusinessProfileParams) => {
     const formData = new FormData();
     formData.append('shopName', params.shopName);

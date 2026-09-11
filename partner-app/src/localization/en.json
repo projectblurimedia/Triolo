@@ -58,6 +58,14 @@
   "settingsMenu": {
     "title": "Settings"
   },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "Activity on your profile",
+    "markAllRead": "Mark all read",
+    "justNow": "Just now",
+    "emptyTitle": "No Notifications Yet",
+    "emptyMessage": "When someone views your profile, you'll see it here."
+  },
   "themePicker": {
     "title": "Choose Theme",
     "subtitle": "Select your preferred app theme"

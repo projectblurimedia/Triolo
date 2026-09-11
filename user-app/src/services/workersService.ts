@@ -61,6 +61,9 @@ export const workersService = {
     return apiClient.get<WorkerNearbyResult[]>(`/workers/nearby?${search.toString()}`, true);
   },
 
+  /** Fire-and-forget — raises a "Someone viewed your profile" notification for this worker's own account. */
+  recordView: (workerId: string) => apiClient.post<null>(`/workers/${workerId}/view`, undefined, true),
+
   createProfile: (params: CreateWorkerProfileParams) => {
     const formData = new FormData();
     formData.append('skillCategories', JSON.stringify(params.skillCategories));
