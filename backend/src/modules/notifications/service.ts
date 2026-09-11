@@ -1,4 +1,5 @@
 import { NotificationsRepository } from './repository';
+import { sendPushNotification } from './pushSender';
 import { NotificationListResult } from './interfaces';
 
 const DEFAULT_LIST_LIMIT = 50;
@@ -20,12 +21,22 @@ export class NotificationsService {
     if (recipientAccountId === viewerAccountId) {
       return;
     }
-    await this.repository.create({
-      accountId: recipientAccountId,
-      type: 'profile_view',
-      title: 'Profile Viewed',
-      body: 'Someone viewed your profile.',
-    });
+    const title = 'Profile Viewed';
+    const body = 'Someone viewed your profile.';
+    await this.repository.create({ accountId: recipientAccountId, type: 'profile_view', title, body });
+
+    // Best-effort, real-time delivery on top of the in-app row above — reaches the
+    // recipient's device even if their app is fully closed (see pushSender.ts), same as the
+    // in-app list either way once they open the app. No-ops silently if the recipient never
+    // registered a push token, or if push isn't configured on this server at all.
+    const pushToken = await this.repository.findPushToken(recipientAccountId);
+    if (pushToken) {
+      await sendPushNotification(pushToken, title, body);
+    }
+  }
+
+  async registerPushToken(accountId: string, token: string): Promise<void> {
+    await this.repository.upsertPushToken(accountId, token);
   }
 
   async listForAccount(accountId: string): Promise<NotificationListResult> {

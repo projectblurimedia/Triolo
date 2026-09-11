@@ -1,6 +1,13 @@
 import { NotificationsService } from './service';
 import { NotificationsRepository } from './repository';
 import { AppNotification } from './interfaces';
+import * as pushSender from './pushSender';
+
+jest.mock('./pushSender', () => ({
+  sendPushNotification: jest.fn(),
+}));
+
+const sendPushNotification = jest.mocked(pushSender.sendPushNotification);
 
 type MockRepository = {
   [K in keyof NotificationsRepository]: jest.Mock;
@@ -12,6 +19,8 @@ function createMockRepository(): MockRepository {
     findForAccount: jest.fn(),
     markRead: jest.fn(),
     markAllRead: jest.fn(),
+    upsertPushToken: jest.fn(),
+    findPushToken: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -36,6 +45,7 @@ describe('NotificationsService.notifyProfileViewed', () => {
   it('creates a profile_view notification for the recipient', async () => {
     const repo = createMockRepository();
     repo.create.mockResolvedValue(buildNotification());
+    repo.findPushToken.mockResolvedValue(null);
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await service.notifyProfileViewed('owner-1', 'viewer-1');
@@ -55,6 +65,29 @@ describe('NotificationsService.notifyProfileViewed', () => {
     await service.notifyProfileViewed('account-1', 'account-1');
 
     expect(repo.create).not.toHaveBeenCalled();
+    expect(repo.findPushToken).not.toHaveBeenCalled();
+  });
+
+  it('sends a push notification when the recipient has a registered token', async () => {
+    const repo = createMockRepository();
+    repo.create.mockResolvedValue(buildNotification());
+    repo.findPushToken.mockResolvedValue('device-token-123');
+    const service = new NotificationsService(repo as unknown as NotificationsRepository);
+
+    await service.notifyProfileViewed('owner-1', 'viewer-1');
+
+    expect(sendPushNotification).toHaveBeenCalledWith('device-token-123', 'Profile Viewed', 'Someone viewed your profile.');
+  });
+
+  it('skips the push send when the recipient has no registered token', async () => {
+    const repo = createMockRepository();
+    repo.create.mockResolvedValue(buildNotification());
+    repo.findPushToken.mockResolvedValue(null);
+    const service = new NotificationsService(repo as unknown as NotificationsRepository);
+
+    await service.notifyProfileViewed('owner-1', 'viewer-1');
+
+    expect(sendPushNotification).not.toHaveBeenCalled();
   });
 });
 
@@ -85,5 +118,15 @@ describe('NotificationsService.markRead / markAllRead', () => {
 
     await service.markAllRead('account-1');
     expect(repo.markAllRead).toHaveBeenCalledWith('account-1');
+  });
+});
+
+describe('NotificationsService.registerPushToken', () => {
+  it('delegates to the repository, scoped to the caller', async () => {
+    const repo = createMockRepository();
+    const service = new NotificationsService(repo as unknown as NotificationsRepository);
+
+    await service.registerPushToken('account-1', 'device-token-123');
+    expect(repo.upsertPushToken).toHaveBeenCalledWith('account-1', 'device-token-123');
   });
 });

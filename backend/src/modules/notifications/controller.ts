@@ -30,4 +30,12 @@ export class NotificationsController {
     await this.service.markAllRead(req.account.accountId);
     return ok(res, null, 'All notifications marked as read');
   });
+
+  registerPushToken = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    await this.service.registerPushToken(req.account.accountId, req.body.token);
+    return ok(res, null, 'Push token registered');
+  });
 }

@@ -15,6 +15,7 @@ import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -46,6 +47,10 @@ export default function App() {
   });
   const { colors, isDark } = useThemeColors();
   const isLoggingOut = useAuthStore((state) => state.isLoggingOut);
+
+  // Real push notifications (device registration) — see the hook's own doc comment for why
+  // this stays a harmless no-op until the app is built with real Firebase/FCM config.
+  usePushNotifications();
 
   // OTA updates (EAS Update) — checked periodically and whenever the app returns to the
   // foreground, so a shipped JS/asset change reaches an already-installed build without a

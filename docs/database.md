@@ -21,7 +21,8 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | orders | orders | Business shopping-list order lifecycle |
 | order_items | orders | Line items with availability status |
 | order_pins | orders | Pickup/delivery PINs per order |
-| notifications | notifications | Implemented — `profile_view` event only so far, in-app/polled, not push yet; see its own section below |
+| notifications | notifications | Implemented — `profile_view` event only so far, delivered in-app (polled) and via push when configured; see its own section below |
+| push_tokens | notifications | Implemented — one device token per account, feeds the push side of `notifications` above |
 | ratings_reviews | ratings/reviews | Polymorphic: worker or business target |
 | verification_requests | verification | Worker/Business admin verification queue |
 | audit_logs | audit-logs | Immutable admin action log |
@@ -117,7 +118,16 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | is_read | boolean, default false | |
 | created_at | timestamptz | |
 
-Migration `0009_create_notifications.sql`. One composite index, `(account_id, created_at DESC)`, covers both read patterns this module has (list newest-first, count unread) — no separate index needed for either. Raised by `POST /api/v1/workers/:id/view` / `POST /api/v1/businesses/:id/view` via `NotificationsService.notifyProfileViewed()` (see `.cloud/architecture.md`'s Backend Module Boundaries). Delivery is polling (`GET /api/v1/notifications`, `partner-app`'s `useNotifications()` hook), not push — FCM delivery is still pending, see `.cloud/project-context.md`'s Pending Modules list.
+Migration `0009_create_notifications.sql`. One composite index, `(account_id, created_at DESC)`, covers both read patterns this module has (list newest-first, count unread) — no separate index needed for either. Raised by `POST /api/v1/workers/:id/view` / `POST /api/v1/businesses/:id/view` via `NotificationsService.notifyProfileViewed()` (see `.cloud/architecture.md`'s Backend Module Boundaries). Delivered two ways: polling (`GET /api/v1/notifications`, `partner-app`'s `useNotifications()` hook) always works; a real FCM push additionally fires if the recipient has a row in `push_tokens` below and the server has push configured.
+
+### push_tokens (Notifications module — implemented)
+| column | type | notes |
+|---|---|---|
+| account_id | uuid PK, FK → accounts.id, ON DELETE CASCADE | one row per account — a newer registration (reinstall, new device) overwrites the old token, no multi-device support yet |
+| token | text | the device's native FCM registration token, not an Expo push token — see `backend/src/modules/notifications/pushSender.ts`'s doc comment for why this bypasses Expo's own push relay |
+| updated_at | timestamptz | |
+
+Migration `0010_create_push_tokens.sql`. Owned by the `notifications` module, not `auth`/`accounts` — deliberately kept as its own table rather than a column on `accounts`, so nothing outside this module ever needs to reach into it. Registered via `PATCH /api/v1/notifications/push-token`; consumed by `NotificationsService.notifyProfileViewed()`, which looks the token up right before sending a push and silently skips the push (the in-app row above is unaffected) if none is registered.
 
 ## Planned Tables (subsequent modules — outline only, refine when implemented)
 

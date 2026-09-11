@@ -174,7 +174,14 @@ Same shape as the three Worker endpoints above, `BusinessProfile`-flavored (`BUS
 
 ## Notifications Module
 
-First slice of the planned Notifications module (Pending Module 6) — in-app only for this pass, polled by the client (`partner-app`'s `useNotifications` hook, ~8s interval); no FCM/push wiring yet, that's a separate, much larger native lift layered onto this same table later. Currently raises exactly one event type, `profile_view`, fired by `POST /workers/:id/view` / `POST /businesses/:id/view` above. Other backend modules reach this one through `NotificationsService`, never the `notifications` table directly — the same module-boundary pattern `admin` already established for reaching into `workers`/`businesses`.
+First slice of the planned Notifications module (Pending Module 6) — currently raises exactly one event type, `profile_view`, fired by `POST /workers/:id/view` / `POST /businesses/:id/view` above. Other backend modules reach this one through `NotificationsService`, never the `notifications`/`push_tokens` tables directly — the same module-boundary pattern `admin` already established for reaching into `workers`/`businesses`. Delivered two ways at once: an in-app row the client polls (`partner-app`'s `useNotifications` hook, ~8s interval) **and**, if the recipient has registered a device via `PUT /notifications/push-token`, a real push notification sent directly to Google's FCM HTTP v1 API (`firebase-admin`, not Expo's own push relay — see `backend/src/modules/notifications/pushSender.ts`'s own doc comment for why) so it reaches the device even with the app fully closed. Push requires the server's `FIREBASE_SERVICE_ACCOUNT_JSON` env var to be configured; if it isn't, `notifyProfileViewed` silently skips the push send and the in-app row still works normally — push is a supplementary delivery channel, never a dependency of the base feature.
+
+### PATCH /notifications/push-token
+Register (or replace) the caller's device push token — one per account; a newer registration (reinstall, new device) simply overwrites the previous one.
+- Auth: Bearer access token
+- Body: `{ token: string }` — the device's native FCM registration token (`expo-notifications`' `getDevicePushTokenAsync()` on Android, not an Expo push token)
+- 200: `{ success: true, message: "Push token registered", data: null }`
+- 400: `VALIDATION_ERROR` — empty/missing `token`
 
 ### GET /notifications
 List the caller's own notifications, newest first, plus their unread count.

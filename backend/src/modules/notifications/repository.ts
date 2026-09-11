@@ -44,4 +44,21 @@ export class NotificationsRepository {
       accountId,
     ]);
   }
+
+  // --- push_tokens — a second table this same module owns (see migration 0010's own doc
+  // comment for why it lives here rather than on `accounts`). One row per account; a newer
+  // registration (a reinstall, a different device) simply replaces the old token.
+
+  async upsertPushToken(accountId: string, token: string): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO push_tokens (account_id, token) VALUES ($1, $2)
+       ON CONFLICT (account_id) DO UPDATE SET token = EXCLUDED.token, updated_at = now()`,
+      [accountId, token],
+    );
+  }
+
+  async findPushToken(accountId: string): Promise<string | null> {
+    const result = await this.pool.query('SELECT token FROM push_tokens WHERE account_id = $1', [accountId]);
+    return result.rows[0]?.token ?? null;
+  }
 }
