@@ -198,6 +198,35 @@ Mark every one of the caller's unread notifications as read.
 - Auth: Bearer access token
 - 200: `{ success: true, message: "All notifications marked as read", data: null }`
 
+## Bookings Module
+
+Quick Book — first real (non-placeholder) slice of broadcast booking (Pending Module 4's remainder): a user requests one or more skills within a radius; every verified worker with **all** of those skills (array containment, not overlap) gets a `booking_offers` row plus a big, high-priority push (channel `booking-offers`, FCM `notification.priority: "max"`, localized per recipient's `preferredLanguage`). First accept wins — the accept endpoint is race-safe (see `backend/src/modules/bookings/repository.ts`'s `acceptOffer`) — and every other pending offer for that request is atomically marked `lost`, with a same-tagged follow-up push that **replaces** the original notification on each losing worker's device (native Android tag behavior, not a custom dismiss handler). No PIN verification, cancellation, or full status pipeline yet.
+
+### POST /bookings/quick
+Broadcast a Quick Book request.
+- Auth: Bearer access token
+- Body: `{ skillCategories: string[], latitude: number, longitude: number, radiusKm?: number }` — `radiusKm` defaults to `50` (also the max), matching `nearbySearchQuerySchema`'s own ceiling; skills must be non-empty and each one a valid `worker_skill_category`
+- 201: `{ success: true, data: { bookingRequestId: string, matchedWorkerCount: number } }`
+- 400: `VALIDATION_ERROR`
+
+### GET /bookings/:id
+Poll the status of a request the caller made — used by `user-app`'s Quick Book screen while waiting.
+- Auth: Bearer access token; scoped to the caller's own request
+- 200: `{ success: true, data: { id, accountId, skillCategories, latitude, longitude, radiusKm, status: "broadcasting"|"accepted", acceptedWorkerId, acceptedAt, createdAt, acceptedWorkerFullName: string|null, acceptedWorkerSkillCategories: string[]|null } }`
+- 404: `BOOKING_REQUEST_NOT_FOUND` — no such request, or it belongs to a different account
+
+### GET /bookings/offers/mine
+List the caller's own still-open offers (worker side) — feeds `partner-app`'s Bookings tab.
+- Auth: Bearer access token; caller must have a worker profile (returns `[]` otherwise, not an error)
+- 200: `{ success: true, data: Array<{ offerId, bookingRequestId, skillCategories: string[], distanceMeters: number, createdAt }> }`
+
+### POST /bookings/:id/accept
+Accept a job offer. Exactly one worker can ever win a given request — see the module's own doc comment for the atomic-accept mechanics.
+- Auth: Bearer access token; caller must have a worker profile
+- 200: `{ success: true, message: "Job accepted", data: null }`
+- 404: `WORKER_PROFILE_NOT_FOUND` — caller has no worker profile
+- 409: `BOOKING_ALREADY_TAKEN` — another worker already won this request
+
 ---
 
 **Localization note**: `message` fields and validation error text on any endpoint are for logs/debugging, not for display — the client resolves `error.code` to a localized string itself. See `docs/localization.md`.

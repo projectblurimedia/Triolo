@@ -83,8 +83,7 @@
     },
     "Bookings": {
       "title": "Bookings",
-      "subtitle": "Your job and order requests",
-      "comingSoon": "Job and order requests will show up here once this is ready."
+      "subtitle": "Your job and order requests"
     },
     "Earnings": {
       "title": "Earnings",
@@ -101,6 +100,16 @@
       "addWorker": "Register as a Worker",
       "addBusiness": "Add your Shop"
     }
+  },
+  "bookings": {
+    "emptyTitle": "No Job Requests Yet",
+    "emptyMessage": "New nearby job requests matching your skills will show up here.",
+    "distanceAway": "{{distance}} away",
+    "accept": "Accept",
+    "acceptedToastTitle": "Job Accepted",
+    "acceptedToastMessage": "You've accepted this job. The customer has been notified.",
+    "takenToastTitle": "Job Already Taken",
+    "takenToastMessage": "Another worker accepted this job first."
   },
   "location": {
     "useCurrent": "Use My Current Location",

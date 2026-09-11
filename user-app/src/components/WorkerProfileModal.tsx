@@ -17,7 +17,9 @@ import { WorkerProfile } from '@/services/workersService';
 
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
-const SKILL_CATEGORIES = [
+// Exported so QuickBookModal (Services menu's "Quick Book") can reuse the exact same
+// key/icon list for its skill-select grid instead of maintaining a second copy in-app.
+export const SKILL_CATEGORIES = [
   { key: 'electrician', icon: 'bolt' as const },
   { key: 'plumber', icon: 'faucet' as const },
   { key: 'painter', icon: 'paint-roller' as const },

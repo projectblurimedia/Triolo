@@ -16,8 +16,9 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | worker_profiles | workers | Optional Worker capability a `user` account can add |
 | business_profiles | businesses | Optional Business capability a `user` account can add |
 | business_staff | staff | Staff membership + permissions, linked to a business_profile |
-| bookings | booking | Worker booking lifecycle |
-| booking_pins | booking | Single-use arrival PIN per booking |
+| booking_requests | bookings | Implemented — Quick Book's broadcast request (skills, location, radius, status); see its own section below |
+| booking_offers | bookings | Implemented — one row per invited worker per request; first-accept-wins is enforced here |
+| booking_pins | bookings | Not yet built — PIN verification is still planned, see Planned Tables |
 | orders | orders | Business shopping-list order lifecycle |
 | order_items | orders | Line items with availability status |
 | order_pins | orders | Pickup/delivery PINs per order |
@@ -129,10 +130,36 @@ Migration `0009_create_notifications.sql`. One composite index, `(account_id, cr
 
 Migration `0010_create_push_tokens.sql`. Owned by the `notifications` module, not `auth`/`accounts` — deliberately kept as its own table rather than a column on `accounts`, so nothing outside this module ever needs to reach into it. Registered via `PATCH /api/v1/notifications/push-token`; consumed by `NotificationsService.notifyProfileViewed()`, which looks the token up right before sending a push and silently skips the push (the in-app row above is unaffected) if none is registered.
 
+### booking_requests (Bookings module — implemented, Quick Book slice only)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| account_id | uuid FK → accounts.id, ON DELETE CASCADE | the requesting user |
+| skill_categories | `worker_skill_category[]` | every skill required — a matching worker must have **all** of these, not just one |
+| latitude / longitude | double precision | the requester's location at broadcast time |
+| radius_km | numeric | how far the broadcast reached — currently always `50` (a testing-only default, also the max the API allows) |
+| status | enum `booking_request_status` (`broadcasting`, `accepted`) | no `cancelled`/`expired` yet — out of scope for this first slice |
+| accepted_worker_id | uuid FK → worker_profiles.id, ON DELETE SET NULL, nullable | set atomically the moment a worker wins the accept race |
+| accepted_at | timestamptz, nullable | |
+| created_at | timestamptz | |
+
+### booking_offers (Bookings module — implemented, Quick Book slice only)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| booking_request_id | uuid FK → booking_requests.id, ON DELETE CASCADE | |
+| worker_id | uuid FK → worker_profiles.id, ON DELETE CASCADE | |
+| status | enum `booking_offer_status` (`pending`, `accepted`, `lost`) | flipped atomically alongside the parent request — see below |
+| distance_meters | double precision | computed once, at broadcast time, from the requester's location to this worker's |
+| created_at | timestamptz | |
+| | | `UNIQUE (booking_request_id, worker_id)` — one offer per worker per request |
+
+Migration `0011_create_booking_requests.sql`. Two indexes: `(account_id, created_at DESC)` on `booking_requests` (a requester's own history, not yet surfaced in any UI), `(worker_id, status)` on `booking_offers` (a worker's pending-offers list, `GET /api/v1/bookings/offers/mine`). **First-accept-wins is enforced entirely by `booking_requests`' own row lock**, not application logic: `BookingsRepository.acceptOffer()` runs `UPDATE booking_requests SET status='accepted', ... WHERE id=$1 AND status='broadcasting'` inside a transaction — a second, concurrent call for the same request blocks on Postgres's row lock until the first commits, then affects 0 rows since `status` no longer matches, so exactly one worker can ever win. The same transaction flips every other still-`pending` offer for that request to `lost` and returns the losing workers' account ids/languages so the service layer can push a "job taken" notification to each (see `docs/api.md`'s Bookings Module section, and `.cloud/architecture.md`'s Notification Architecture).
+
 ## Planned Tables (subsequent modules — outline only, refine when implemented)
 
 - **business_staff**: business_profile_id FK, account_id FK, permissions jsonb.
-- **bookings**: user_id FK, worker_id FK, status enum (pipeline per product-specification §2), requested_at, accepted_at, completed_at.
+- **Booking status pipeline beyond Quick Book's first-accept-wins slice**: PIN verification, cancellation, full status progression (pipeline per product-specification §2) still need their own tables/columns on `booking_requests` (or a successor) — not built yet.
 - **booking_pins**: booking_id FK, pin_hash, single_use, verified_at nullable, attempt_count.
 - **orders**: user_id FK, business_profile_id FK, status enum (pipeline per product-specification §3), fulfillment_type enum(pickup, delivery).
 - **order_items**: order_id FK, item_name, quantity, availability_status enum(available, partial, out_of_stock).

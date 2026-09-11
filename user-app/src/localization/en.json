@@ -236,6 +236,21 @@
     "favoriteWorkersComingSoonMessage": "We're building saved workers. Soon you'll be able to bookmark workers here for quick rebooking.",
     "comingSoonTitle": "Coming Soon"
   },
+  "quickBook": {
+    "title": "Quick Book",
+    "subtitle": "Get a nearby worker in minutes",
+    "skillsLabel": "What do you need help with?",
+    "bookNearby": "Book Nearby",
+    "locationDeniedTitle": "Location Permission Needed",
+    "locationDeniedMessage": "Allow location access so we can find nearby workers for you.",
+    "noWorkersTitle": "No Workers Nearby",
+    "noWorkersMessage": "No verified workers with all the selected skills were found nearby right now. Try different skills or check back later.",
+    "searchingTitle": "Searching Nearby Workers",
+    "searchingMessage": "Notifying verified workers who match your request…",
+    "cancelSearch": "Cancel Search",
+    "acceptedTitle": "{{name}} accepted your request!",
+    "acceptedMessage": "They'll be in touch shortly to help with {{skills}}."
+  },
   "prepareList": {
     "tagline": "Get your list ready before you shop or book",
     "micLabel": "Record your list",

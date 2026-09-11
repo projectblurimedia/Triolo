@@ -45,6 +45,21 @@ export function usePushNotifications() {
           name: 'default',
           importance: Notifications.AndroidImportance.HIGH,
         });
+        // Dedicated channel for Quick Book's broadcast offers (see backend's
+        // modules/bookings) — separate from 'default' so a job offer reads as visibly more
+        // urgent (its own vibration pattern, heads-up at Android's channel ceiling, HIGH —
+        // there's no channel-level importance above that; FCM's own per-message
+        // `notification.priority: 'max'`, set server-side, is what actually pushes display
+        // priority to the top *within* that ceiling). The server sets this channel id and a
+        // `tag` equal to the booking request id on every push for one broadcast, so a
+        // follow-up "job taken" push replaces the original in place via native Android
+        // notification-tag behavior instead of needing a custom dismiss handler here.
+        await Notifications.setNotificationChannelAsync('booking-offers', {
+          name: 'Job Offers',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 400, 200, 400],
+          sound: 'default',
+        });
 
         const permission = await Notifications.requestPermissionsAsync();
         if (!permission.granted || cancelled) {

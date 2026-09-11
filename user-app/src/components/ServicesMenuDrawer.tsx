@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
 import { ComingSoonModal } from './ComingSoonModal';
+import { QuickBookModal } from './QuickBookModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 interface ServicesMenuDrawerProps {
@@ -111,7 +112,11 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
         />
       </SideMenuDrawer>
 
-      {activeConfig ? (
+      {/* Quick Book is real now (see QuickBookModal's own doc comment) — every other item
+          still opens the shared ComingSoonModal placeholder. */}
+      <QuickBookModal visible={activeItem === 'quickBook'} onClose={() => setActiveItem(null)} />
+
+      {activeConfig && activeItem !== 'quickBook' ? (
         <ComingSoonModal
           visible={activeItem !== null}
           onClose={() => setActiveItem(null)}
