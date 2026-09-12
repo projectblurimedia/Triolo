@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
 import { pushTokenService } from '@/services/pushTokenService';
-import { bookingOffersService } from '@/services/bookingOffersService';
+import { attemptAccept, attemptDecline, updateOfferNotification } from '@/utils/bookingOfferOutcome';
 import { useAuthStore } from '@/state/authStore';
 import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { navigateToBookings } from '@/navigation/navigationRef';
@@ -26,25 +26,43 @@ Notifications.setNotificationHandler({
 
 interface OfferActionLabels {
   accepted: string;
+  acceptedMessage: string;
   declined: string;
+  taken: string;
+  takenMessage: string;
   error: string;
 }
 
-/** Handles an Accept/Reject tap that reached JS while the app is alive (foreground or
+/**
+ * Handles an Accept/Reject tap that reached JS while the app is alive (foreground or
  * backgrounded-but-not-killed) — the fully-killed case is handled independently, headlessly,
- * by backgroundNotificationTask.ts, which cannot show a toast (there's no mounted UI), so
- * this success/error feedback is genuinely a "when it can be shown" bonus, not load-bearing. */
+ * by backgroundNotificationTask.ts (which cannot show a toast, so it relies entirely on
+ * `updateOfferNotification` for feedback). Here, both are used: a toast for the visible,
+ * in-the-moment feedback, plus rewriting the notification itself so the outcome is still
+ * correct even after the toast fades — this is what makes "someone else won the race" read
+ * as an explicit, clear "Job Already Taken" instead of the ambiguous, generic error a losing
+ * device used to show (or nothing at all, if the tap happened via the notification action
+ * with no UI mounted to surface even a toast).
+ */
 async function handleOfferAction(actionIdentifier: string, bookingRequestId: string, labels: OfferActionLabels) {
-  try {
-    if (actionIdentifier === ACCEPT_ACTION) {
-      await bookingOffersService.accept(bookingRequestId);
-      showToast({ variant: 'success', title: labels.accepted });
-    } else if (actionIdentifier === DECLINE_ACTION) {
-      await bookingOffersService.decline(bookingRequestId);
-      showToast({ variant: 'info', title: labels.declined });
+  if (actionIdentifier === ACCEPT_ACTION) {
+    const outcome = await attemptAccept(bookingRequestId);
+    await updateOfferNotification(bookingRequestId, outcome);
+    if (outcome === 'accepted') {
+      showToast({ variant: 'success', title: labels.accepted, message: labels.acceptedMessage });
+    } else if (outcome === 'already_taken') {
+      showToast({ variant: 'info', title: labels.taken, message: labels.takenMessage });
+    } else {
+      showToast({ variant: 'error', title: labels.error });
     }
-  } catch {
-    showToast({ variant: 'error', title: labels.error });
+  } else if (actionIdentifier === DECLINE_ACTION) {
+    const outcome = await attemptDecline(bookingRequestId);
+    await updateOfferNotification(bookingRequestId, outcome);
+    if (outcome === 'declined') {
+      showToast({ variant: 'info', title: labels.declined });
+    } else {
+      showToast({ variant: 'error', title: labels.error });
+    }
   }
 }
 
@@ -152,13 +170,41 @@ export function usePushNotifications() {
 
       handleOfferAction(response.actionIdentifier, bookingRequestId, {
         accepted: t('bookings.acceptedToastTitle'),
+        acceptedMessage: t('bookings.acceptedToastMessage'),
         declined: t('bookings.declinedToastTitle'),
+        taken: t('bookings.takenToastTitle'),
+        takenMessage: t('bookings.takenToastMessage'),
         error: t('common.errorTitle'),
       });
     });
 
     return () => subscription.remove();
   }, [t]);
+
+  // Fires the instant a booking-offer notification is received while this app's JS is
+  // alive (foreground or backgrounded-but-not-killed) — *before* any tap. This is what
+  // pops the big, Rapido-style `IncomingJobModal` (mounted once at the app root, see
+  // App.tsx) up immediately over whatever screen the worker happens to be on, rather than
+  // waiting for them to pull down the notification tray — the system notification itself
+  // (composed by backgroundNotificationTask.ts) is still there underneath as the
+  // fully-closed-app fallback, but this is the "big card" experience for the common case
+  // of the app already being open or recently used.
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data as { bookingRequestId?: string; kind?: string } | undefined;
+      if (!data?.bookingRequestId || data.kind !== 'booking_offer') {
+        return;
+      }
+      Vibration.vibrate([0, 400, 200, 400]);
+      usePendingOfferStore.getState().setFocusedOffer(data.bookingRequestId);
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   // Covers the specific case `addNotificationResponseReceivedListener` above can miss: the
   // exact tap that *launched* the app (the listener wasn't attached yet at that instant) —

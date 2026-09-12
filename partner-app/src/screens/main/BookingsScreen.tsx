@@ -1,14 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import * as Notifications from 'expo-notifications';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
-import { FocusedOfferModal } from '@/components/FocusedOfferModal';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from '@/hooks/useBookingOffers';
 import { PendingOffer } from '@/services/bookingOffersService';
-import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { showToast } from '@/state/toastStore';
 import { ApiError } from '@/services/apiClient';
 
@@ -23,12 +22,12 @@ function formatDistance(meters: number): string {
  * `.cloud/architecture.md`'s Notification Architecture section) — every job request this
  * worker's skills fully cover, still open for anyone to accept. Backed by `useBookingOffers`
  * (polled, same 8s order of magnitude as `useNotifications`); the real-time feel mostly
- * comes from the push itself (a big, actionable notification via a dedicated
- * `booking-offers` Android channel with its own Accept/Reject buttons, see
- * `usePushNotifications.ts`/`backgroundNotificationTask.ts`) rather than this poll — the
- * poll is what keeps the list correct if the app is already open when an offer arrives or
- * gets taken by someone else, and is also the data source for the focused single-offer
- * modal below.
+ * comes from the push itself — a big, actionable notification (dedicated `booking-offers`
+ * Android channel with its own Accept/Reject buttons) plus, whenever the app is alive, the
+ * full-screen `IncomingJobModal` (mounted once at the app root, `App.tsx` — not here, so it
+ * can pop up over whatever screen the worker is on, not just this tab) — rather than this
+ * poll, which mainly exists to keep this list correct if the app is already open when an
+ * offer arrives or gets taken by someone else.
  */
 export function BookingsScreen() {
   const { t } = useTranslation();
@@ -37,26 +36,11 @@ export function BookingsScreen() {
   const acceptMutation = useAcceptBookingOffer();
   const declineMutation = useDeclineBookingOffer();
 
-  // Set by usePushNotifications.ts when a Quick Book notification's *body* (not an Accept/
-  // Reject button) is tapped — opens FocusedOfferModal for just that one job instead of
-  // leaving the worker to find it in the list themselves.
-  const focusedBookingRequestId = usePendingOfferStore((state) => state.focusedBookingRequestId);
-  const clearFocusedOffer = usePendingOfferStore((state) => state.clearFocusedOffer);
-  const [offersEverLoaded, setOffersEverLoaded] = useState(false);
-  useEffect(() => {
-    if (offers) setOffersEverLoaded(true);
-  }, [offers]);
-
-  const focusedOffer = useMemo(
-    () => offers?.find((item) => item.bookingRequestId === focusedBookingRequestId) ?? null,
-    [offers, focusedBookingRequestId],
-  );
-
   const handleAccept = (offer: PendingOffer) => {
     acceptMutation.mutate(offer.bookingRequestId, {
       onSuccess: () => {
         showToast({ variant: 'success', title: t('bookings.acceptedToastTitle'), message: t('bookings.acceptedToastMessage') });
-        if (offer.bookingRequestId === focusedBookingRequestId) clearFocusedOffer();
+        Notifications.dismissNotificationAsync(offer.bookingRequestId).catch(() => {});
       },
       onError: (err) => {
         const alreadyTaken = err instanceof ApiError && err.code === 'BOOKING_ALREADY_TAKEN';
@@ -65,14 +49,20 @@ export function BookingsScreen() {
           title: t(alreadyTaken ? 'bookings.takenToastTitle' : 'common.errorTitle'),
           message: t(alreadyTaken ? 'bookings.takenToastMessage' : 'errors.generic'),
         });
-        if (alreadyTaken && offer.bookingRequestId === focusedBookingRequestId) clearFocusedOffer();
+        // A generic error leaves the offer genuinely still open (worth retrying), but
+        // "already taken" is final — clear the matching system notification either way
+        // so it doesn't keep showing dead Accept/Reject buttons for a job that's gone.
+        if (alreadyTaken) Notifications.dismissNotificationAsync(offer.bookingRequestId).catch(() => {});
       },
     });
   };
 
   const handleDecline = (offer: PendingOffer) => {
     declineMutation.mutate(offer.bookingRequestId, {
-      onSuccess: () => showToast({ variant: 'info', title: t('bookings.declinedToastTitle') }),
+      onSuccess: () => {
+        showToast({ variant: 'info', title: t('bookings.declinedToastTitle') });
+        Notifications.dismissNotificationAsync(offer.bookingRequestId).catch(() => {});
+      },
       onError: () => showToast({ variant: 'error', title: t('common.errorTitle'), message: t('errors.generic') }),
     });
   };
@@ -159,19 +149,7 @@ export function BookingsScreen() {
       />
     );
 
-  return (
-    <ScreenContainer edges={['left', 'right']}>
-      {body}
-      <FocusedOfferModal
-        visible={focusedBookingRequestId !== null}
-        offer={focusedOffer}
-        notFound={offersEverLoaded && !focusedOffer}
-        accepting={acceptMutation.isPending && acceptMutation.variables === focusedOffer?.bookingRequestId}
-        onAccept={() => focusedOffer && handleAccept(focusedOffer)}
-        onClose={clearFocusedOffer}
-      />
-    </ScreenContainer>
-  );
+  return <ScreenContainer edges={['left', 'right']}>{body}</ScreenContainer>;
 }
 
 const styles = StyleSheet.create({

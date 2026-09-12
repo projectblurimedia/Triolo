@@ -1,7 +1,7 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
-import { bookingOffersService } from '@/services/bookingOffersService';
-import { ACCEPT_ACTION, BOOKING_OFFER_CATEGORY, DECLINE_ACTION } from '@/constants/bookingNotifications';
+import { attemptAccept, attemptDecline, updateOfferNotification } from '@/utils/bookingOfferOutcome';
+import { ACCEPT_ACTION, BOOKING_OFFER_CATEGORY, BOOKING_OFFER_CHANNEL, DECLINE_ACTION } from '@/constants/bookingNotifications';
 
 export const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
 
@@ -24,7 +24,11 @@ export const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
  * re-registered here) — which, per expo-notifications' Android notification builder, is
  * automatically shown with `BigTextStyle` (the full body text, not truncated), i.e. the
  * "bigger, like a mini app" presentation that was asked for, plus the Accept/Reject buttons
- * themselves.
+ * themselves. Every `scheduleNotificationAsync` call here uses `trigger: { channelId:
+ * BOOKING_OFFER_CHANNEL }`, not `trigger: null` — a locally scheduled notification's Android
+ * channel is selected by the *trigger*, not `content` (`content` has no `channelId` field at
+ * all), so `null` was silently falling back to expo-notifications' own generic fallback
+ * channel instead of this app's dedicated big/high-importance one.
  */
 TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => {
   if (error) {
@@ -42,16 +46,13 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
     if (!bookingRequestId) {
       return;
     }
-    try {
-      if (payload.actionIdentifier === ACCEPT_ACTION) {
-        await bookingOffersService.accept(bookingRequestId);
-      } else if (payload.actionIdentifier === DECLINE_ACTION) {
-        await bookingOffersService.decline(bookingRequestId);
-      }
-    } catch {
-      // Best-effort, same as every other push-adjacent call in this app — the polled
-      // Bookings list (useBookingOffers) is the source of truth regardless of whether this
-      // silent, headless call happened to succeed; there is no UI here to surface an error to.
+    // Rewrites the notification with the real outcome — accepted, lost the race, or
+    // declined — since there's no mounted UI here to show a toast from; the notification
+    // itself IS the only feedback surface available in this headless case.
+    if (payload.actionIdentifier === ACCEPT_ACTION) {
+      await updateOfferNotification(bookingRequestId, await attemptAccept(bookingRequestId));
+    } else if (payload.actionIdentifier === DECLINE_ACTION) {
+      await updateOfferNotification(bookingRequestId, await attemptDecline(bookingRequestId));
     }
     return;
   }
@@ -70,7 +71,7 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
     await Notifications.scheduleNotificationAsync({
       identifier: bookingRequestId,
       content: { title: remoteData.title, body: remoteData.body, data: { bookingRequestId } },
-      trigger: null,
+      trigger: { channelId: BOOKING_OFFER_CHANNEL },
     });
     return;
   }
@@ -85,7 +86,7 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
         categoryIdentifier: BOOKING_OFFER_CATEGORY,
         priority: 'max',
       },
-      trigger: null,
+      trigger: { channelId: BOOKING_OFFER_CHANNEL },
     });
   }
 });

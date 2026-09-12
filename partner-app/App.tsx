@@ -13,6 +13,7 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
+import { IncomingJobModal } from '@/components/IncomingJobModal';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -151,6 +152,10 @@ export default function App() {
         <RootNavigator />
         {isLoggingOut ? <LogoutOverlay /> : null}
         {showUpdateOverlay ? <UpdateOverlay progress={downloadProgress} /> : null}
+        {/* Mounted at the root (not inside BookingsScreen) so a Quick Book offer's big,
+            full-screen takeover card can pop up over whatever screen the worker is
+            currently on — see the component's own doc comment. */}
+        <IncomingJobModal />
         <ToastHost />
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}
