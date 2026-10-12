@@ -50,6 +50,7 @@ export interface NearbySearchParams {
   longitude: number;
   radiusKm?: number;
   query?: string;
+  limit?: number;
 }
 
 export const businessesService = {
@@ -61,6 +62,7 @@ export const businessesService = {
     search.set('longitude', String(params.longitude));
     if (params.radiusKm != null) search.set('radiusKm', String(params.radiusKm));
     if (params.query) search.set('query', params.query);
+    if (params.limit != null) search.set('limit', String(params.limit));
     return apiClient.get<BusinessNearbyResult[]>(`/businesses/nearby?${search.toString()}`, true);
   },
 

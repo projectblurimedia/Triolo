@@ -9,7 +9,8 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
-  Services: undefined;
+  /** Optional deep link from Home's Browse Services tiles — preselects a category chip. */
+  Services: { category?: string; linkedAt?: number } | undefined;
   PrepareList: undefined;
   Bazaar: undefined;
   Profile: undefined;

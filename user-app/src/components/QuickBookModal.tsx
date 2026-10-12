@@ -6,7 +6,8 @@ import * as Location from 'expo-location';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { LoadingIndicator } from './LoadingIndicator';
+import { RadarPulse } from './RadarPulse';
+import { ToastHost } from './ToastHost';
 import { Button } from './Button';
 import { SKILL_CATEGORIES } from './WorkerProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -26,6 +27,8 @@ const QUICK_BOOK_RADIUS_KM = 50;
 // hammering the serverless function — same order of magnitude as partner-app's own
 // useNotifications() polling interval.
 const STATUS_POLL_MS = 3000;
+const LAST_KNOWN_MAX_AGE_MS = 2 * 60 * 1000;
+const LAST_KNOWN_MAX_ACCURACY_M = 500;
 
 type Stage =
   | { kind: 'selecting' }
@@ -92,7 +95,13 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
         showToast({ variant: 'error', title: t('quickBook.locationDeniedTitle'), message: t('quickBook.locationDeniedMessage') });
         return;
       }
-      const position = await Location.getCurrentPositionAsync({});
+      // A fresh GPS fix can take several seconds and was most of the wait before workers got
+      // notified. A recent last-known fix (≤2 min old, ≤500m accuracy) is plenty for a
+      // 50km broadcast radius, so use it when available and only wait for a fresh fix
+      // (balanced accuracy, not high) when there isn't one.
+      const position =
+        (await Location.getLastKnownPositionAsync({ maxAge: LAST_KNOWN_MAX_AGE_MS, requiredAccuracy: LAST_KNOWN_MAX_ACCURACY_M })) ??
+        (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
       const result = await bookingsService.createQuickBooking({
         skillCategories: selectedSkills,
         latitude: position.coords.latitude,
@@ -111,14 +120,24 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
     }
   };
 
+  // The radar's centre shows what's being searched for: the chosen skill's own icon (bolt
+  // for an electrician, faucet for a plumber…), or a general tools icon for several skills.
+  const radarIcon =
+    selectedSkills.length === 1
+      ? (SKILL_CATEGORIES.find((skill) => skill.key === selectedSkills[0])?.icon ?? 'screwdriver-wrench')
+      : 'screwdriver-wrench';
+
   const skillLabelList = (keys: string[]) => keys.map((key) => t(`workerProfile.skills.${key}`)).join(', ');
 
   const renderBody = () => {
-    if (stage.kind === 'broadcasting') {
+    // Shown from the moment "Book Nearby" is tapped (`submitting` — GPS fix + creating the
+    // request) through the whole broadcast, so the radar starts immediately instead of
+    // after a plain button spinner.
+    if (submitting || stage.kind === 'broadcasting') {
       return (
         <View style={styles.centerBody}>
-          <LoadingIndicator size={40} dotSize={6} color={accentColor} />
-          <Text style={[styles.stateTitle, { color: colors.text }]}>{t('quickBook.searchingTitle')}</Text>
+          <RadarPulse icon={radarIcon} />
+          <Text style={[styles.stateTitle, styles.radarTitle, { color: colors.text }]}>{t('quickBook.searchingTitle')}</Text>
           <Text style={[styles.stateMessage, { color: colors.textMuted }]}>{t('quickBook.searchingMessage')}</Text>
           <View style={[styles.skillSummaryRow]}>
             {selectedSkills.map((key) => (
@@ -219,6 +238,9 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
         </LinearGradient>
 
         {renderBody()}
+        {/* The app-root ToastHost sits under this native Modal — render one here so
+            location / no-workers / error toasts are actually visible. */}
+        <ToastHost />
       </View>
     </Modal>
   );
@@ -258,6 +280,7 @@ const styles = StyleSheet.create({
   centerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   successIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   stateTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginTop: 16, marginBottom: 8, textAlign: 'center' },
+  radarTitle: { marginTop: 28 },
   stateMessage: { ...typography.body, textAlign: 'center', lineHeight: 20 },
   skillSummaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 18 },
   summaryChip: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },

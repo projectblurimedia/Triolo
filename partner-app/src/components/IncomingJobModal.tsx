@@ -1,41 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { LoadingIndicator } from './LoadingIndicator';
-import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from '@/hooks/useBookingOffers';
 import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { showToast } from '@/state/toastStore';
 import { ApiError } from '@/services/apiClient';
+import { formatDistance } from '@/utils/formatDistance';
 
-function formatDistance(meters: number): string {
-  if (meters < 1000) return `${Math.max(1, Math.round(meters))}m`;
-  return `${(meters / 1000).toFixed(1)}km`;
-}
+const ACCEPT_GRADIENT = ['#16A34A', '#22C55E'] as const;
+
+// Only the header (including the status-bar area above it) is glass — the same even,
+// cool-white frost + single hairline as user-app's glass tab bar. The rest of the screen
+// stays the plain, bold original design.
+const HEADER_GLASS_LIGHT = { fill: 'rgba(236, 244, 255, 0.85)', hairline: 'rgba(255, 255, 255, 0.9)', underline: 'rgba(15, 35, 80, 0.06)' };
+const HEADER_GLASS_DARK = { fill: 'rgba(18, 22, 30, 0.85)', hairline: 'rgba(255, 255, 255, 0.10)', underline: 'rgba(0, 0, 0, 0.3)' };
 
 /**
  * The Rapido/Uber-driver-style "incoming job" takeover screen — genuinely full-screen and
- * opaque (not a small centered card over a dim backdrop), per explicit follow-up feedback
- * that the earlier version still read as "the same size" as a plain notification. Mounted
- * ONCE at the app root (`App.tsx`), not inside `BookingsScreen` — the only thing that
+ * opaque, not a small card over a dim backdrop. Header (and status bar area) in frosted glass
+ * matching user-app's tab bar; two labelled buttons, Decline and Accept.
+ *
+ * Mounted ONCE at the app root (`App.tsx`), not inside `BookingsScreen` — the only thing that
  * controls its visibility is `pendingOfferStore.focusedBookingRequestId`, set from two
  * places in `usePushNotifications.ts`: `addNotificationReceivedListener` (fires the
  * instant a push arrives while the app is alive, no tap needed — this is what makes it
- * pop up over *whatever* screen the worker happens to be on, matching how a ride-request
- * app interrupts you) and the notification-response handler (tapping the notification
- * body). The system notification itself (composed by `backgroundNotificationTask.ts`)
- * remains the fallback for when the app is genuinely fully closed — this screen is the
- * "big card" experience for every other case, which in practice is most of them.
+ * pop up over *whatever* screen the worker happens to be on) and the notification-response
+ * handler (tapping the notification body). The system notification itself (composed by
+ * `backgroundNotificationTask.ts`) remains the fallback for when the app is fully closed.
  */
 export function IncomingJobModal() {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
+  const { colors, isDark } = useThemeColors();
   const insets = useSafeAreaInsets();
-  const { data: offers } = useBookingOffers();
+  const { data: offers, refetch: refetchOffers } = useBookingOffers();
   const acceptMutation = useAcceptBookingOffer();
   const declineMutation = useDeclineBookingOffer();
 
@@ -44,10 +48,25 @@ export function IncomingJobModal() {
   const visible = focusedBookingRequestId !== null;
   const offer = offers?.find((item) => item.bookingRequestId === focusedBookingRequestId) ?? null;
 
-  const [offersEverLoaded, setOffersEverLoaded] = useState(false);
+  // The push opens this screen instantly, but the offer list is only polled every 8s — so a
+  // brand-new offer usually isn't in the cached list yet and the worker sat on a spinner for
+  // up to 8 seconds. Fetch right away whenever a new offer is focused. "Offer gone" is only
+  // decided once *that* fetch settles, never from the stale pre-push list (which would flash
+  // "no longer available" for a perfectly valid new offer).
+  const [checkedForId, setCheckedForId] = useState<string | null>(null);
   useEffect(() => {
-    if (offers) setOffersEverLoaded(true);
-  }, [offers]);
+    if (!focusedBookingRequestId) {
+      setCheckedForId(null);
+      return;
+    }
+    let cancelled = false;
+    refetchOffers().finally(() => {
+      if (!cancelled) setCheckedForId(focusedBookingRequestId);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedBookingRequestId, refetchOffers]);
 
   useEffect(() => {
     if (!visible) {
@@ -97,15 +116,32 @@ export function IncomingJobModal() {
   };
 
   const busy = acceptMutation.isPending || declineMutation.isPending;
-  const notFound = offersEverLoaded && !offer;
+  const notFound = !offer && checkedForId === focusedBookingRequestId && focusedBookingRequestId !== null;
+  const acceptDisabled = busy || !offer || notFound;
+  const glass = isDark ? HEADER_GLASS_DARK : HEADER_GLASS_LIGHT;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={handleDecline} statusBarTranslucent>
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.headerBand}>
-          <FontAwesome6 name="bolt" size={16} color="#FFFFFF" solid />
-          <Text style={styles.headerText}>{t('bookings.newJobTitle')}</Text>
-        </LinearGradient>
+      {/* The app's global status bar is light-on-blue; this header is light glass, so the
+          status bar icons switch to dark while this screen is up (popped again on close). */}
+      {visible ? <StatusBar style={isDark ? 'light' : 'dark'} /> : null}
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View
+          style={[
+            styles.header,
+            {
+              paddingTop: insets.top + 14,
+              backgroundColor: glass.fill,
+              borderBottomColor: glass.underline,
+            },
+          ]}
+        >
+          <View style={[styles.headerHairline, { backgroundColor: glass.hairline }]} />
+          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerIcon}>
+            <FontAwesome6 name="bolt" size={16} color="#FFFFFF" solid />
+          </LinearGradient>
+          <Text style={[styles.headerText, { color: colors.text }]}>{t('bookings.newJobTitle')}</Text>
+        </View>
 
         <View style={styles.body}>
           {notFound ? (
@@ -142,28 +178,39 @@ export function IncomingJobModal() {
 
         <View style={[styles.actionRow, { paddingBottom: insets.bottom + 20, borderTopColor: colors.border }]}>
           <Pressable
-            style={[styles.declineButton, { borderColor: colors.border }]}
+            style={({ pressed }) => [
+              styles.declineButton,
+              { borderColor: `${brandColors.error}59`, backgroundColor: `${brandColors.error}0D`, opacity: pressed ? 0.75 : 1 },
+            ]}
             onPress={handleDecline}
             disabled={busy}
+            accessibilityRole="button"
             accessibilityLabel={t('bookings.decline')}
           >
             {declineMutation.isPending ? (
-              <LoadingIndicator color={colors.textMuted} size={20} dotSize={4} />
+              <LoadingIndicator color={brandColors.error} size={20} dotSize={4} />
             ) : (
-              <FontAwesome6 name="xmark" size={22} color={colors.textMuted} solid />
+              <>
+                <FontAwesome6 name="xmark" size={16} color={brandColors.error} solid />
+                <Text style={[styles.declineText, { color: brandColors.error }]}>{t('bookings.decline')}</Text>
+              </>
             )}
           </Pressable>
-          <Pressable style={styles.acceptButtonWrap} onPress={handleAccept} disabled={busy || !offer || notFound}>
-            <LinearGradient
-              colors={headerGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.acceptButton, (busy || !offer || notFound) && styles.acceptButtonDisabled]}
-            >
+          <Pressable
+            style={({ pressed }) => [styles.acceptButtonWrap, { opacity: acceptDisabled ? 0.6 : pressed ? 0.85 : 1 }]}
+            onPress={handleAccept}
+            disabled={acceptDisabled}
+            accessibilityRole="button"
+            accessibilityLabel={t('bookings.accept')}
+          >
+            <LinearGradient colors={ACCEPT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.acceptButton}>
               {acceptMutation.isPending ? (
                 <LoadingIndicator size={22} dotSize={4.5} />
               ) : (
-                <Text style={styles.acceptButtonText}>{t('bookings.accept')}</Text>
+                <>
+                  <FontAwesome6 name="check" size={17} color="#FFFFFF" solid />
+                  <Text style={styles.acceptButtonText}>{t('bookings.accept')}</Text>
+                </>
               )}
             </LinearGradient>
           </Pressable>
@@ -175,31 +222,42 @@ export function IncomingJobModal() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerBand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 18 },
-  headerText: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  // A bright hairline along the glass's bottom edge, just above the soft underline.
+  headerHairline: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 1 },
+  headerIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  headerText: { ...typography.subheading, fontFamily: fonts.semiBold },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
   centerWrap: { alignItems: 'center', gap: 8 },
   iconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   offerGoneTitle: { ...typography.subheading, fontFamily: fonts.semiBold, textAlign: 'center' },
   offerGoneMessage: { ...typography.body, textAlign: 'center', lineHeight: 20 },
-  // Deliberately huge — this is the single most load-bearing number on the whole screen,
-  // matching the visual weight a fare figure carries on a ride-hailing driver app's own
-  // incoming-request card.
+  // Deliberately huge — the single most load-bearing number on the whole screen, matching
+  // the visual weight a fare figure carries on a ride-hailing driver app's request card.
   distanceHeadline: { fontSize: 44, fontFamily: fonts.semiBold, textAlign: 'center', marginBottom: 24 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
   tagText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15 },
-  actionRow: { flexDirection: 'row', gap: 14, paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1 },
+  actionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1 },
   declineButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    flex: 1,
+    height: 58,
+    borderRadius: 18,
     borderWidth: 1.5,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
-  acceptButtonWrap: { flex: 1, borderRadius: 16, overflow: 'hidden' },
-  acceptButton: { height: 60, alignItems: 'center', justifyContent: 'center' },
-  acceptButtonDisabled: { opacity: 0.6 },
-  acceptButtonText: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 18 },
+  declineText: { ...typography.subheading, fontFamily: fonts.semiBold, fontSize: 16 },
+  acceptButtonWrap: { flex: 1.4, borderRadius: 18, overflow: 'hidden' },
+  acceptButton: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  acceptButtonText: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 17 },
 });

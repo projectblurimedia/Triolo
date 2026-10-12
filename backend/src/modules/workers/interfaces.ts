@@ -36,6 +36,9 @@ export interface WorkerProfile {
   pincode: string;
   portfolioPhotoUrls: string[];
   verificationStatus: ProfileVerificationStatus;
+  /** Average of customer star ratings (1 decimal), or null before the first rating. */
+  ratingAverage: number | null;
+  ratingCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +68,9 @@ export interface NearbySearchFilter {
   longitude: number;
   radiusKm: number;
   query?: string;
+  /** Only workers who have this skill (validated against WORKER_SKILL_CATEGORIES at the route). */
+  skillCategory?: string;
+  sort?: 'distance' | 'rating';
   limit: number;
 }
 

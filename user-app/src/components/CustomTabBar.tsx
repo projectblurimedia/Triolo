@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { headerGradient, useThemeColors } from '@/theme';
+import { ANDROID_REAL_BLUR, useBlurTargetStore } from '@/state/blurTargetStore';
 
 // Floats on every side by the same amount — `MARGIN_H` insets the bar from the left/right
 // screen edges, and `barBottom` (below) is at least `MARGIN_H` too, so the gap reads
@@ -29,6 +31,49 @@ const DOT_MARGIN_TOP = -2;
 // earlier 52 now that it has to share the bar's vertical space with the dot below it rather
 // than the icon alone owning the bar's full height.
 const ICON_BG_SIZE = 40;
+
+// Glassmorphism, kept deliberately simple so it reads as ONE even colour of frosted glass:
+//   1. strong real blur of whatever is behind the bar — iOS natively (Apple's thin
+//      material); Android 12+ via expo-blur's Dimezis method, blurring the active tab
+//      screen's BlurTargetView (see state/blurTargetStore.ts). Older Android gets no blur
+//      (too slow) and a near-opaque frosted fill instead.
+//   2. one uniform, light translucent tint over the blur (light enough that the blurred
+//      content behind actually shows — that is what makes it read as glass)
+// plus a single even hairline border. No sheen/inner-shade gradients or per-side rim colours
+// (they made the bar look two-toned), and no Android elevation — an elevation shadow shows
+// *through* translucent glass and read as a grey box inside the bar.
+const IOS_BLUR_INTENSITY = 100;
+// On Android, expo-blur's `intensity` drives TWO things (see its TintStyle.kt/ExpoBlurView.kt):
+// the blur radius (intensity / reductionFactor) AND the opacity of its own built-in tint
+// overlay (intensity% × ~0.7–0.8 for light/dark). At intensity 100 that built-in tint alone
+// was ~78% opaque white, which — stacked with our own tint — hid the blur completely and
+// read as a flat background colour. So: a LOW intensity keeps the built-in tint light (~25%),
+// and a reduction factor below 1 still gives a strong ~40px blur radius (32 / 0.8).
+const ANDROID_BLUR_INTENSITY = 32;
+const ANDROID_BLUR_REDUCTION = 0.8;
+const GLASS_LIGHT = {
+  iosTint: 'systemThinMaterialLight' as const,
+  // 'default' = expo-blur's pure-white tint (255) at ~14% here; 'light' is a neutral grey
+  // (249) at ~25%, which made the light bar look dull/sandy instead of the app's cool white.
+  androidTint: 'default' as const,
+  // A cool, slightly blue-leaning white (a touch cooler than the app background #F9FCFF,
+  // theme/colors.ts) so the bar reads crisp and cool, never sandy, even over warm content.
+  tintIos: 'rgba(236, 244, 255, 0.5)',
+  tintAndroidBlur: 'rgba(236, 244, 255, 0.5)',
+  // Android without blur — near-opaque so content behind doesn't read as a mess.
+  solidAndroid: 'rgba(240, 247, 255, 0.95)',
+  border: 'rgba(255, 255, 255, 0.55)',
+  shadowOpacity: 0.08,
+};
+const GLASS_DARK = {
+  iosTint: 'systemThinMaterialDark' as const,
+  androidTint: 'dark' as const,
+  tintIos: 'rgba(18, 22, 30, 0.15)',
+  tintAndroidBlur: 'rgba(18, 22, 30, 0.15)',
+  solidAndroid: 'rgba(22, 27, 36, 0.94)',
+  border: 'rgba(255, 255, 255, 0.12)',
+  shadowOpacity: 0.3,
+};
 
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
   Home: 'house',
@@ -67,7 +112,7 @@ const ACTIVE_GRADIENTS: Record<string, readonly [string, string]> = {
  * no height to the screen's flex layout and content can render/scroll behind it.
  */
 export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
-  const { colors } = useThemeColors();
+  const { colors, isDark } = useThemeColors();
   const progressAnims = useRef(
     state.routes.map((_, index) => new Animated.Value(index === state.index ? 1 : 0)),
   ).current;
@@ -106,20 +151,51 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   }, [state.index]);
 
   const barBottom = Math.max(insets.bottom, MARGIN_H);
+  const glass = isDark ? GLASS_DARK : GLASS_LIGHT;
+  const activeRouteKey = state.routes[state.index]?.key;
+  const blurTarget = useBlurTargetStore((store) => (activeRouteKey ? store.targets[activeRouteKey] : undefined));
+  const androidBlurring = ANDROID_REAL_BLUR && !!blurTarget;
+
+  // Android has no elevation shadow (see the comment above GLASS_LIGHT), so the shell only
+  // needs a background when it *is* the glass — older Android without blur.
+  const shellBackground = Platform.OS === 'android' && !androidBlurring ? glass.solidAndroid : undefined;
 
   return (
     <View style={[styles.wrapper, { height: barBottom + BAR_HEIGHT }]} pointerEvents="box-none">
+      {/* Shadow lives on this outer shell; the inner `glassClip` clips the glass layers to
+          the pill shape (iOS can't draw a shadow on a view that also clips its children). */}
       <View
         style={[
-          styles.bar,
-          {
-            marginHorizontal: MARGIN_H,
-            marginBottom: barBottom,
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-          },
+          styles.shadowShell,
+          { marginHorizontal: MARGIN_H, marginBottom: barBottom, backgroundColor: shellBackground },
+          Platform.OS === 'ios' ? { shadowOpacity: glass.shadowOpacity } : null,
         ]}
       >
+        <View style={[styles.glassClip, { borderColor: glass.border }]} pointerEvents="none">
+          {Platform.OS === 'ios' ? (
+            <>
+              <BlurView intensity={IOS_BLUR_INTENSITY} tint={glass.iosTint} style={StyleSheet.absoluteFill} />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: glass.tintIos }]} />
+            </>
+          ) : null}
+          {androidBlurring ? (
+            <>
+              {/* Keyed by tab so switching tabs re-attaches the blur to the new screen. */}
+              <BlurView
+                key={activeRouteKey}
+                blurTarget={blurTarget}
+                blurMethod="dimezisBlurViewSdk31Plus"
+                intensity={ANDROID_BLUR_INTENSITY}
+                blurReductionFactor={ANDROID_BLUR_REDUCTION}
+                tint={glass.androidTint}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: glass.tintAndroidBlur }]} />
+            </>
+          ) : null}
+        </View>
+
+        <View style={styles.bar}>
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
           const progress = progressAnims[index];
@@ -155,7 +231,8 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
                     style={[
                       styles.iconBg,
                       {
-                        backgroundColor: `${gradient[0]}1A`,
+                        // A small brand-tinted bubble — no rim/border, per explicit feedback.
+                        backgroundColor: isDark ? `${gradient[1]}3D` : `${gradient[0]}24`,
                         opacity: progress,
                         transform: [{ scale: bgScale }, { scale: popScale }],
                       },
@@ -194,6 +271,7 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
             </Pressable>
           );
         })}
+        </View>
       </View>
     </View>
   );
@@ -214,16 +292,29 @@ const styles = StyleSheet.create({
     right: 0,
     justifyContent: 'flex-end',
   },
+  // A barely-there, wide shadow on iOS only (opacity per theme, inline). No Android
+  // elevation — it shows through the translucent glass as a grey box.
+  shadowShell: {
+    height: BAR_HEIGHT,
+    borderRadius: BAR_RADIUS,
+    ...Platform.select({
+      ios: { shadowColor: '#0B1B3F', shadowOffset: { width: 0, height: 8 }, shadowRadius: 24 },
+    }),
+  },
+  glassClip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: BAR_RADIUS,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
   bar: {
     flexDirection: 'row',
     height: BAR_HEIGHT,
-    borderRadius: BAR_RADIUS,
-    borderWidth: 1,
     paddingHorizontal: BAR_PADDING_H,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16 },
-      android: { elevation: 14 },
-    }),
   },
   tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   // `dotShadowWrap` is the only other child, and it's `position: 'absolute'` — so this box's

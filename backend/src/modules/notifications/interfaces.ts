@@ -1,4 +1,6 @@
-export type NotificationType = 'profile_view';
+export type NotificationType = 'profile_view' | 'problem_accepted' | 'problem_work_done' | 'problem_completed';
+
+export const MAX_BULK_DELETE = 100;
 
 export interface AppNotification {
   id: string;

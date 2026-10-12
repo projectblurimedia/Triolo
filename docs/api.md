@@ -92,9 +92,10 @@ Permanently remove the caller's worker profile.
 - 404: `WORKER_PROFILE_NOT_FOUND`
 
 ### GET /workers/nearby
-Search for verified workers near a given point, ordered nearest-first. Distance is computed server-side (Haversine, in SQL) — this is not a client-side filter over a full list. Excludes the caller's own worker profile, if any.
+Search for verified workers near a given point — backs both Home's Nearby Workers search and the Services tab. Distance is computed server-side (Haversine, in SQL) — this is not a client-side filter over a full list. Excludes the caller's own worker profile, if any.
 - Auth: Bearer access token
-- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against skill category, `otherSkillDescription`, city, and area), `limit?: number` (default 20, max 50)
+- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against skill category, `otherSkillDescription`, city, and area), `skillCategory?: string` (only workers who have this skill; a valid `worker_skill_category`), `sort?: "distance" | "rating"` (default `distance`; `rating` = best average first, unrated workers last, more ratings then distance breaking ties), `limit?: number` (default 20, max 50)
+- Every `WorkerProfile` (this endpoint and `/workers/me/profile`) now carries `ratingAverage: number | null` (1 decimal; null before the first rating) and `ratingCount: number` — from customers rating finished Your Problems jobs (`POST /problems/:id/complete`)
 - 200: `{ success: true, data: Array<WorkerProfile & { distanceMeters: number; accountFullName: string }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned; `accountFullName` is included so a result has a "who" (mobile/email are deliberately not exposed here — no booking/contact flow exists yet)
 - 400: `VALIDATION_ERROR` — missing/invalid `latitude`/`longitude`, or an out-of-range `radiusKm`/`limit`
 
@@ -198,6 +199,20 @@ Mark every one of the caller's unread notifications as read.
 - Auth: Bearer access token
 - 200: `{ success: true, message: "All notifications marked as read", data: null }`
 
+### POST /notifications/delete
+Delete several of the caller's notifications at once (both apps' selection mode).
+- Auth: Bearer access token
+- Body: `{ ids: string[] }` — 1–100 UUIDs. Ids that aren't the caller's (or don't exist) are silently skipped, never deleted.
+- 200: `{ success: true, message: "Notifications deleted", data: { deleted: number } }`
+- 400: `VALIDATION_ERROR`
+
+### DELETE /notifications/:id
+Delete one of the caller's notifications (no-op if it isn't theirs).
+- Auth: Bearer access token
+- 200: `{ success: true, message: "Notification deleted", data: null }`
+
+Notification `type` values: `profile_view` (worker/shop profile viewed), and — since migration `0017` — `problem_accepted` / `problem_work_done` (to the customer) and `problem_completed` (to the worker). The Your Problems job updates are saved as in-app notifications **and** pushed (`NotificationsService.notify()`), so they appear in both apps' notification lists.
+
 ## Bookings Module
 
 Quick Book — first real (non-placeholder) slice of broadcast booking (Pending Module 4's remainder): a user requests one or more skills within a radius; every verified worker with **all** of those skills (array containment, not overlap) gets a `booking_offers` row plus a big, actionable push notification (channel `booking-offers`, Accept/Reject buttons, localized per recipient's `preferredLanguage`). Every push for this feature is sent **data-only** (no FCM `notification` block at all) — Android's own `notification` payload type has no field for action buttons, so `partner-app` composes and displays the actual notification itself, client-side, via a background task that runs even with the app fully closed (see `.cloud/architecture.md`'s Notification Architecture section). First accept wins — the accept endpoint is race-safe (see `backend/src/modules/bookings/repository.ts`'s `acceptOffer`) — and every other pending offer for that request is atomically marked `lost`, with a follow-up push (same `bookingRequestId` used as the local notification's identifier) that **replaces** the original notification on each losing worker's device in place. A worker can also explicitly decline an offer (`POST /bookings/:id/decline`, also reachable via the notification's own Reject button) — affects only their own offer. No PIN verification, cancellation, or full status pipeline yet.
@@ -232,6 +247,84 @@ Decline a job offer — this worker's own offer only; every other invited worker
 - Auth: Bearer access token; caller must have a worker profile
 - 200: `{ success: true, message: "Job declined", data: null }` — also returned (silent no-op) if the offer is already gone (taken, or already declined)
 - 404: `WORKER_PROFILE_NOT_FOUND` — caller has no worker profile
+
+## Problems Module
+
+"Your Problems" (`user-app` → Services menu, formerly "Post a Problem"): a user lists, adds, edits, and deletes their own problem posts. Each post saves a non-emergency issue — location, the worker type(s) it needs, their quotation, and up to 5 photos. **Save-only for now**: nothing is pushed or shown to workers yet. Photos are attached **one per request** after the post is created — Vercel rejects any request body over 4.5MB before it reaches the app, and several phone-camera photos in one multipart body routinely exceed that. The client deletes the post again if any photo upload fails, so a failed submit never leaves a half-saved post behind.
+
+`ProblemPost` shape: `{ id, accountId, skillCategories: string[], description: string|null, quotationAmount: number, photoUrls: string[], locationAddress: string|null, latitude: number|null, longitude: number|null, status, acceptedWorkerId: string|null, acceptedAt, workDoneAt, completedAt, createdAt }`
+
+**Job flow** (`status`): `open` → `accepted` (a verified worker with a matching skill accepts — first accept wins) → `work_done` (that worker marks it done) → `completed` (the **customer** confirms it finished — they can also confirm straight from `accepted`). Edit and photo changes are only allowed while `open`; delete is allowed while `open` or `completed`, never mid-job. Each transition pushes the other side (`kind`: `problem_accepted` / `problem_work_done` → customer, `problem_completed` → worker; text localized per recipient). `closed` exists in the DB enum but is unused.
+
+Customer-side endpoints:
+
+### POST /problems
+Create a problem post (no photos yet).
+- Auth: Bearer access token
+- Body (JSON): `{ skillCategories: string[] (non-empty, each a valid worker_skill_category), quotationAmount: number (whole rupees, 1–1000000), locationAddress: string (3–300 chars), description?: string (≤500), latitude?: number, longitude?: number }`
+- 201: `{ success: true, message: "Problem posted", data: ProblemPost }`
+- 400: `VALIDATION_ERROR`
+
+### PATCH /problems/:id
+Edit the caller's own post. New photos are added afterwards via `POST /problems/:id/photos`, same as on create.
+- Auth: Bearer access token
+- Body (JSON): same fields as `POST /problems`, plus `keepPhotoUrls: string[]` (≤5) — which of the post's current photos to keep. Any current photo not listed is removed from the post and deleted from Cloudinary; URLs the post doesn't actually have are ignored.
+- 200: `{ success: true, message: "Problem updated", data: ProblemPost }`
+- 400: `VALIDATION_ERROR`
+- 404: `PROBLEM_POST_NOT_FOUND`
+
+### POST /problems/:id/photos
+Attach one photo to the caller's own post.
+- Auth: Bearer access token
+- Content-Type: `multipart/form-data`, single file field `photo` (JPEG/PNG/WEBP, ≤8MB, effectively ≤4.5MB on Vercel), uploaded to Cloudinary under `triolo/problems`
+- 200: `{ success: true, message: "Photo added", data: ProblemPost }`
+- 400: `PHOTO_REQUIRED`, `FILE_UPLOAD_ERROR`, `INVALID_FILE_TYPE`
+- 404: `PROBLEM_POST_NOT_FOUND` — no such post, or it belongs to another account
+- 409: `PROBLEM_PHOTO_LIMIT` — already has 5 photos (enforced atomically in the `UPDATE`)
+
+### DELETE /problems/:id
+Delete the caller's own post and its Cloudinary photos. Silent no-op if the post doesn't exist or isn't the caller's.
+- Auth: Bearer access token
+- 200: `{ success: true, message: "Problem post deleted", data: null }`
+
+### GET /problems/mine
+The caller's own problem posts, newest first (max 50) — backs the "Your Problems" list.
+- Auth: Bearer access token
+- 200: `{ success: true, data: Array<ProblemPost & { acceptedWorkerFullName: string|null, acceptedWorkerMobileNumber: string|null }> }`
+
+### POST /problems/:id/complete
+Customer confirms the job is finished (`accepted` or `work_done` → `completed`) and rates the worker. Pushes the worker.
+- Auth: Bearer access token; caller must own the post
+- Body (JSON, optional): `{ rating?: 1-5 (integer), review?: string (≤300) }` — stored once on the job (`workerRating`/`workerReview`) and added to the worker's `ratingAverage`/`ratingCount`. The API accepts no rating; `user-app` always requires one.
+- 200: `{ success: true, message: "Problem marked finished", data: ProblemPost }`
+- 404: `PROBLEM_POST_NOT_FOUND`; 409: `PROBLEM_INVALID_STATE` (no worker yet, already finished, or not the caller's)
+
+Edit/delete lock errors: `PATCH /problems/:id` and `POST /problems/:id/photos` return 409 `PROBLEM_NOT_EDITABLE` once a worker has accepted; `DELETE /problems/:id` returns 409 `PROBLEM_IN_PROGRESS` while `accepted`/`work_done`.
+
+Worker-side endpoints (`partner-app` Home):
+
+### GET /problems/nearby
+Open problems within 50km (testing radius, same as Quick Book) that need **at least one** of the caller's worker skills, nearest first (max 50). Excludes the caller's own posts and posts with no GPS coordinates (typed-only location). Returns `[]` if the worker profile has no GPS location.
+- Auth: Bearer access token; caller must have a **verified** worker profile
+- 200: `{ success: true, data: Array<{ id, skillCategories, description, quotationAmount, photoUrls, locationAddress, distanceMeters, createdAt }> }` — no customer identity before accepting
+- 403: `WORKER_NOT_VERIFIED`; 404: `WORKER_PROFILE_NOT_FOUND`
+
+### GET /problems/assigned
+Problems this worker accepted (active first, then finished; max 50), with the customer's contact details.
+- Auth: Bearer access token (returns `[]` without a worker profile)
+- 200: `{ success: true, data: Array<ProblemPost & { customerFullName: string, customerMobileNumber: string }> }`
+
+### POST /problems/:id/accept
+Accept an open problem. Race-safe — `UPDATE ... WHERE status = 'open'` lets exactly one worker win. Pushes the customer.
+- Auth: Bearer access token; verified worker profile; can't be the caller's own post
+- 200: `{ success: true, message: "Problem accepted", data: ProblemPost }`
+- 403: `WORKER_NOT_VERIFIED`; 404: `PROBLEM_POST_NOT_FOUND` / `WORKER_PROFILE_NOT_FOUND`; 409: `PROBLEM_ALREADY_TAKEN`
+
+### POST /problems/:id/work-done
+The accepted worker marks the work done (`accepted` → `work_done`). Pushes the customer to confirm.
+- Auth: Bearer access token; must be the worker who accepted it
+- 200: `{ success: true, message: "Work marked done", data: ProblemPost }`
+- 404: `PROBLEM_POST_NOT_FOUND` / `WORKER_PROFILE_NOT_FOUND`; 409: `PROBLEM_INVALID_STATE`
 
 ---
 

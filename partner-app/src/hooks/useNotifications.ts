@@ -1,19 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { notificationsService } from '@/services/notificationsService';
+import { NotificationListResult, notificationsService } from '@/services/notificationsService';
+import { useAuthStore } from '@/state/authStore';
 
 export const NOTIFICATIONS_QUERY_KEY = ['notifications'];
-// No FCM/push yet (see docs/api.md's Notifications Module) — this polling interval is what
-// makes new notifications (e.g. "Someone viewed your profile") show up close to real-time
-// while the app is open. Paired with App.tsx's existing AppState->focusManager wiring, which
-// already refetches every mounted query on foreground, so backgrounding and returning also
-// picks up anything that arrived while away, not just this interval.
-const POLL_INTERVAL_MS = 8000;
+// Push delivers the alert itself; this poll keeps the in-app list and the bell's unread
+// badge current while the app is open (App.tsx's AppState→focusManager wiring also
+// refetches on return to the foreground).
+const POLL_INTERVAL_MS = 15000;
 
 export function useNotifications() {
+  const accessToken = useAuthStore((state) => state.accessToken);
   return useQuery({
     queryKey: NOTIFICATIONS_QUERY_KEY,
     queryFn: notificationsService.list,
     refetchInterval: POLL_INTERVAL_MS,
+    enabled: !!accessToken,
   });
 }
 
@@ -30,5 +31,31 @@ export function useMarkAllNotificationsRead() {
   return useMutation({
     mutationFn: () => notificationsService.markAllRead(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }),
+  });
+}
+
+/** Optimistic — rows disappear immediately; restored if the request fails. */
+export function useDeleteNotifications() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => notificationsService.deleteMany(ids),
+    onMutate: async (ids: string[]) => {
+      await queryClient.cancelQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      const previous = queryClient.getQueryData<NotificationListResult>(NOTIFICATIONS_QUERY_KEY);
+      if (previous) {
+        const removing = new Set(ids);
+        const items = previous.items.filter((item) => !removing.has(item.id));
+        const unreadRemoved = previous.items.filter((item) => removing.has(item.id) && !item.isRead).length;
+        queryClient.setQueryData<NotificationListResult>(NOTIFICATIONS_QUERY_KEY, {
+          items,
+          unreadCount: Math.max(0, previous.unreadCount - unreadRemoved),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _ids, context) => {
+      if (context?.previous) queryClient.setQueryData(NOTIFICATIONS_QUERY_KEY, context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }),
   });
 }

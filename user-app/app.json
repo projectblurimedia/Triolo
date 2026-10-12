@@ -53,7 +53,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Triolo needs access to your photos to upload portfolio or shop images."
+          "photosPermission": "Triolo needs access to your photos to upload portfolio, shop, or problem images.",
+          "cameraPermission": "Triolo uses your camera to take photos of the problem you need help with."
         }
       ],
       [

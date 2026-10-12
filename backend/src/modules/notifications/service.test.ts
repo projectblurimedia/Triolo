@@ -21,6 +21,7 @@ function createMockRepository(): MockRepository {
     markAllRead: jest.fn(),
     upsertPushToken: jest.fn(),
     findPushToken: jest.fn(),
+    deleteMany: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -162,5 +163,49 @@ describe('NotificationsService.sendRawPush', () => {
 
     await service.sendRawPush('account-1', 'title', 'body');
     expect(sendPushNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe('NotificationsService.notify', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('saves an in-app notification and pushes it when the recipient has a device token', async () => {
+    const repository = createMockRepository();
+    repository.findPushToken.mockResolvedValue('device-token');
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    await service.notify('account-1', 'problem_accepted', 'Worker Found', 'A worker accepted.', { channelId: 'default' });
+
+    expect(repository.create).toHaveBeenCalledWith({
+      accountId: 'account-1',
+      type: 'problem_accepted',
+      title: 'Worker Found',
+      body: 'A worker accepted.',
+    });
+    expect(sendPushNotification).toHaveBeenCalledWith('device-token', 'Worker Found', 'A worker accepted.', { channelId: 'default' });
+  });
+
+  it('still saves the notification when there is no device token', async () => {
+    const repository = createMockRepository();
+    repository.findPushToken.mockResolvedValue(null);
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    await service.notify('account-1', 'problem_completed', 'Job Finished', 'Confirmed.');
+
+    expect(repository.create).toHaveBeenCalled();
+    expect(sendPushNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe('NotificationsService.deleteNotifications', () => {
+  it('deletes only within the caller’s own account', async () => {
+    const repository = createMockRepository();
+    repository.deleteMany.mockResolvedValue(2);
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    const deleted = await service.deleteNotifications('account-1', ['n-1', 'n-2']);
+
+    expect(repository.deleteMany).toHaveBeenCalledWith('account-1', ['n-1', 'n-2']);
+    expect(deleted).toBe(2);
   });
 });

@@ -113,6 +113,11 @@ export class WorkersService {
     return this.repository.findNearby(accountId, filter);
   }
 
+  /** Called from modules/problems when a customer rates a finished job (never touches this table itself). */
+  async recordRating(workerId: string, stars: number): Promise<void> {
+    await this.repository.addRating(workerId, stars);
+  }
+
   /**
    * Called from modules/bookings' `BookingsService` (never touches `worker_profiles`
    * itself) to find every verified worker eligible for a Quick Book broadcast — same

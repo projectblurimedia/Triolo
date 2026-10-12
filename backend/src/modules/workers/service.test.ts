@@ -27,6 +27,7 @@ function createMockRepository(): MockRepository {
     updateVerificationStatus: jest.fn(),
     findNearby: jest.fn(),
     findMatchingForBroadcast: jest.fn(),
+    addRating: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -50,6 +51,8 @@ function buildProfile(overrides: Partial<WorkerProfile> = {}): WorkerProfile {
     pincode: '500016',
     portfolioPhotoUrls: [],
     verificationStatus: 'pending_verification',
+    ratingAverage: null,
+    ratingCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -345,6 +348,17 @@ describe('WorkersService.searchNearby', () => {
     const filter = { latitude: 17.385, longitude: 78.4867, radiusKm: 10, limit: 20 };
     await expect(service.searchNearby('account-1', filter)).resolves.toBe(results);
     expect(repo.findNearby).toHaveBeenCalledWith('account-1', filter);
+  });
+});
+
+describe('WorkersService.recordRating', () => {
+  it('adds the rating to the worker’s running total', async () => {
+    const repository = createMockRepository();
+    const service = new WorkersService(repository as unknown as WorkersRepository, createMockNotificationsService());
+
+    await service.recordRating('worker-1', 5);
+
+    expect(repository.addRating).toHaveBeenCalledWith('worker-1', 5);
   });
 });
 

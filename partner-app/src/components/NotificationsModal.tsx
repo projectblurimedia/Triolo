@@ -1,22 +1,40 @@
-import React from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoadingIndicator } from './LoadingIndicator';
-import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/hooks/useNotifications';
-import { AppNotification } from '@/services/notificationsService';
+import { ConfirmModal } from './ConfirmModal';
+import { SwipeableRow } from './SwipeableRow';
+import { ToastHost } from './ToastHost';
+import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import {
+  useDeleteNotifications,
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  useNotifications,
+} from '@/hooks/useNotifications';
+import { AppNotification, NotificationType } from '@/services/notificationsService';
+import { showToast } from '@/state/toastStore';
 
 interface NotificationsModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
+const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const TYPE_ICONS: Record<NotificationType, React.ComponentProps<typeof FontAwesome6>['name']> = {
+  profile_view: 'eye',
+  problem_accepted: 'user-check',
+  problem_work_done: 'clipboard-check',
+  problem_completed: 'circle-check',
+};
 
 function formatRelativeTime(iso: string, justNowLabel: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -26,54 +44,318 @@ function formatRelativeTime(iso: string, justNowLabel: string): string {
   return `${Math.floor(diffMs / DAY_MS)}d`;
 }
 
+// Manual, not toLocale* — Hermes on Android doesn't reliably ship full Intl data.
+function formatFullDate(iso: string): string {
+  const date = new Date(iso);
+  const hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()} · ${hour12}:${minutes} ${hours < 12 ? 'AM' : 'PM'}`;
+}
+
 /**
- * First slice of real, in-app notifications (Pending Module 6) — polled (see
- * `useNotifications`), not push/FCM yet. Opened from every tab's header bell icon
- * (`MainTabNavigator`), same "modal rendered as a sibling of the tab navigator, own
- * visibility state" pattern `SettingsMenuModal` already established. A full-screen list
- * rather than a bottom sheet (unlike `SettingsMenuModal`) since the content here can grow —
- * a handful of settings rows fits a sheet, an open-ended notification history doesn't.
- * Deliberately doesn't reuse `GradientHeader`'s own `showBack` — that calls the enclosing
- * navigator's `goBack()`, which would try to navigate the real screen stack instead of just
- * closing this locally-controlled modal, so the header here is self-contained instead.
+ * Full-screen notification centre (same component in user-app and partner-app — no shared
+ * package, keep both copies in sync):
+ *  - tap a notification to open it on its own (marks it read)
+ *  - swipe a row left to reveal Delete
+ *  - long-press a row (or tap "Select") to enter selection mode: every row gets a checkbox,
+ *    with Select all and a bulk Delete (confirmed) at the bottom
+ *  - "Mark all read" in the header while anything is unread
+ * Renders its own ToastHost — the app-root one sits underneath this native Modal.
  */
 export function NotificationsModal({ visible, onClose }: NotificationsModalProps) {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
+  const { colors, isDark } = useThemeColors();
   const insets = useSafeAreaInsets();
+  // Solid (not translucent) so nothing behind the row can ever show through it.
+  const selectedBackground = isDark ? '#16223A' : '#EAF2FF';
   const { data, isLoading, isError, refetch } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
+  const deleteNotifications = useDeleteNotifications();
+
+  const [openRowId, setOpenRowId] = useState<string | null>(null);
+  // Rows currently showing their delete panel (sliding, open, or still sliding closed) —
+  // their right corners go square so they meet the panel flush.
+  const [revealedRowIds, setRevealedRowIds] = useState<Set<string>>(new Set());
+  const setRowRevealed = (id: string, revealed: boolean) =>
+    setRevealedRowIds((current) => {
+      if (current.has(id) === revealed) return current;
+      const next = new Set(current);
+      if (revealed) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  // Only a user pull shows the spinner; the 15s background poll must not (it made the list
+  // look like it was reloading constantly).
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [detail, setDetail] = useState<AppNotification | null>(null);
+  const [confirmBulk, setConfirmBulk] = useState(false);
 
   const items = data?.items ?? [];
   const unreadCount = data?.unreadCount ?? 0;
+  const allSelected = items.length > 0 && selectedIds.size === items.length;
 
-  const renderItem = ({ item }: { item: AppNotification }) => (
-    <Pressable
+  useEffect(() => {
+    if (!visible) {
+      setOpenRowId(null);
+      setSelectionMode(false);
+      setSelectedIds(new Set());
+      setDetail(null);
+      setConfirmBulk(false);
+    }
+  }, [visible]);
+
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const deleteIds = (ids: string[], onDone?: () => void) => {
+    deleteNotifications.mutate(ids, {
+      onSuccess: () => showToast({ variant: 'success', title: t('notifications.deletedToast', { count: ids.length }) }),
+      onError: () => showToast({ variant: 'error', title: t('common.errorTitle'), message: t('errors.generic') }),
+      onSettled: onDone,
+    });
+  };
+
+  const openDetail = (item: AppNotification) => {
+    setDetail(item);
+    if (!item.isRead) markRead.mutate(item.id);
+  };
+
+  const handleRowPress = (item: AppNotification) => {
+    if (selectionMode) {
+      toggleSelected(item.id);
+    } else if (openRowId) {
+      setOpenRowId(null);
+    } else {
+      openDetail(item);
+    }
+  };
+
+  const handleRowLongPress = (item: AppNotification) => {
+    if (selectionMode) return;
+    setOpenRowId(null);
+    setSelectionMode(true);
+    setSelectedIds(new Set([item.id]));
+  };
+
+  const handleBack = () => {
+    if (detail) setDetail(null);
+    else if (selectionMode) exitSelection();
+    else onClose();
+  };
+
+  const renderCheckbox = (checked: boolean) => (
+    <View
       style={[
-        styles.card,
-        { backgroundColor: colors.surface, borderColor: item.isRead ? colors.border : colors.primary },
+        styles.checkbox,
+        checked ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.textMuted },
       ]}
-      onPress={() => !item.isRead && markRead.mutate(item.id)}
     >
-      <View style={[styles.icon, { backgroundColor: `${colors.primary}1A` }]}>
-        <FontAwesome6 name="eye" size={15} color={colors.primary} solid />
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={[styles.cardMessage, { color: colors.textMuted }]}>{item.body}</Text>
-        <Text style={[styles.cardTime, { color: colors.textMuted }]}>
-          {formatRelativeTime(item.createdAt, t('notifications.justNow'))}
-        </Text>
-      </View>
-      {!item.isRead ? <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} /> : null}
-    </Pressable>
+      {checked ? <FontAwesome6 name="check" size={11} color="#FFFFFF" solid /> : null}
+    </View>
   );
 
+  const renderItem = ({ item }: { item: AppNotification }) => {
+    const selected = selectedIds.has(item.id);
+    const squareRight = revealedRowIds.has(item.id);
+    return (
+      <SwipeableRow
+        isOpen={openRowId === item.id}
+        onOpen={() => setOpenRowId(item.id)}
+        onClose={() => setOpenRowId((current) => (current === item.id ? null : current))}
+        onRevealChange={(revealed) => setRowRevealed(item.id, revealed)}
+        onDelete={() => {
+          setOpenRowId(null);
+          deleteIds([item.id]);
+        }}
+        deleteLabel={t('notifications.delete')}
+        enabled={!selectionMode}
+      >
+        <Pressable
+          style={[
+            styles.card,
+            {
+              backgroundColor: selected ? selectedBackground : colors.surface,
+              borderColor: selected ? colors.primary : item.isRead ? colors.border : `${colors.primary}66`,
+            },
+            squareRight ? styles.cardSquareRight : null,
+          ]}
+          onPress={() => handleRowPress(item)}
+          onLongPress={() => handleRowLongPress(item)}
+          delayLongPress={350}
+        >
+          {selectionMode ? renderCheckbox(selected) : null}
+          <View style={[styles.icon, { backgroundColor: `${colors.primary}1A` }]}>
+            <FontAwesome6 name={TYPE_ICONS[item.type] ?? 'bell'} size={15} color={colors.primary} solid />
+          </View>
+          <View style={styles.cardBody}>
+            {/* Title on the left, time (+ unread dot) on the right of the same line. */}
+            <View style={styles.titleRow}>
+              <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+                {item.title}
+              </Text>
+              <Text style={[styles.cardTime, { color: item.isRead ? colors.textMuted : colors.primary }]}>
+                {formatRelativeTime(item.createdAt, t('notifications.justNow'))}
+              </Text>
+              {!item.isRead && !selectionMode ? <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} /> : null}
+            </View>
+            <Text style={[styles.cardMessage, { color: colors.textMuted }]} numberOfLines={1} ellipsizeMode="tail">
+              {item.body}
+            </Text>
+          </View>
+        </Pressable>
+      </SwipeableRow>
+    );
+  };
+
+  const renderHeaderActions = () => {
+    if (detail) return null;
+    if (selectionMode) {
+      return (
+        <Pressable
+          style={styles.headerPill}
+          onPress={() => setSelectedIds(allSelected ? new Set() : new Set(items.map((item) => item.id)))}
+        >
+          <Text style={styles.headerPillText}>{t(allSelected ? 'notifications.deselectAll' : 'notifications.selectAll')}</Text>
+        </Pressable>
+      );
+    }
+    return (
+      <View style={styles.headerActions}>
+        {unreadCount > 0 ? (
+          <Pressable style={styles.headerPill} onPress={() => markAllRead.mutate()} disabled={markAllRead.isPending}>
+            <Text style={styles.headerPillText} numberOfLines={1}>
+              {t('notifications.markAllRead')}
+            </Text>
+          </Pressable>
+        ) : null}
+        {items.length > 0 ? (
+          <Pressable
+            style={styles.headerIconButton}
+            onPress={() => {
+              setOpenRowId(null);
+              setSelectionMode(true);
+            }}
+            accessibilityLabel={t('notifications.select')}
+            hitSlop={6}
+          >
+            <FontAwesome6 name="list-check" size={15} color="#FFFFFF" solid />
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  };
+
+  const headerTitle = detail
+    ? t('notifications.detailTitle')
+    : selectionMode
+      ? t('notifications.selectedCount', { count: selectedIds.size })
+      : t('notifications.title');
+  const headerSubtitle = detail || selectionMode ? null : t('notifications.subtitle');
+
+  const renderDetail = (item: AppNotification) => (
+    <ScrollView contentContainerStyle={styles.detailBody}>
+      <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.detailIcon}>
+          <FontAwesome6 name={TYPE_ICONS[item.type] ?? 'bell'} size={24} color="#FFFFFF" solid />
+        </LinearGradient>
+        <Text style={[styles.detailTitle, { color: colors.text }]}>{item.title}</Text>
+        <View style={styles.detailTimeRow}>
+          <FontAwesome6 name="clock" size={11} color={colors.textMuted} />
+          <Text style={[styles.detailTime, { color: colors.textMuted }]}>{formatFullDate(item.createdAt)}</Text>
+        </View>
+        <View style={[styles.detailDivider, { backgroundColor: colors.border }]} />
+        <Text style={[styles.detailMessage, { color: colors.text }]}>{item.body}</Text>
+      </View>
+      <Pressable
+        style={[styles.detailDelete, { borderColor: `${brandColors.error}59`, backgroundColor: `${brandColors.error}0D` }]}
+        onPress={() => {
+          const id = item.id;
+          setDetail(null);
+          deleteIds([id]);
+        }}
+      >
+        <FontAwesome6 name="trash" size={14} color={brandColors.error} solid />
+        <Text style={[styles.detailDeleteText, { color: brandColors.error }]}>{t('notifications.deleteThis')}</Text>
+      </Pressable>
+    </ScrollView>
+  );
+
+  const renderBody = () => {
+    if (detail) return renderDetail(detail);
+    if (isLoading) {
+      return (
+        <View style={styles.centerBody}>
+          <LoadingIndicator size={40} dotSize={6} color={colors.primary} />
+        </View>
+      );
+    }
+    if (isError) {
+      return (
+        <View style={styles.centerBody}>
+          <View style={[styles.emptyIcon, { backgroundColor: `${brandColors.error}1A` }]}>
+            <FontAwesome6 name="triangle-exclamation" size={22} color={brandColors.error} solid />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('common.errorTitle')}</Text>
+          <Pressable style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={() => refetch()}>
+            <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    if (items.length === 0) {
+      return (
+        <View style={styles.centerBody}>
+          <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}1A` }]}>
+            <FontAwesome6 name="bell" size={22} color={colors.primary} solid />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('notifications.emptyTitle')}</Text>
+          <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('notifications.emptyMessage')}</Text>
+        </View>
+      );
+    }
+    return (
+      <>
+        {!selectionMode ? (
+          <Text style={[styles.hint, { color: colors.textMuted }]}>{t('notifications.gestureHint')}</Text>
+        ) : null}
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          extraData={{ openRowId, revealedRowIds, selectionMode, selectedIds }}
+          contentContainerStyle={[styles.listContent, selectionMode ? { paddingBottom: 120 } : null]}
+          onRefresh={async () => {
+            setManualRefreshing(true);
+            try {
+              await refetch();
+            } finally {
+              setManualRefreshing(false);
+            }
+          }}
+          refreshing={manualRefreshing}
+          onScrollBeginDrag={() => setOpenRowId(null)}
+        />
+      </>
+    );
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleBack} statusBarTranslucent>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <LinearGradient
           colors={headerGradient}
@@ -82,58 +364,59 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
           style={[styles.header, { paddingTop: insets.top + 14 }]}
         >
           <View style={styles.headerRow}>
-            <Pressable style={styles.backButton} onPress={onClose} accessibilityLabel={t('common.close')} hitSlop={8}>
-              <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
+            <Pressable style={styles.backButton} onPress={handleBack} accessibilityLabel={t('common.close')} hitSlop={8}>
+              <FontAwesome6 name={selectionMode && !detail ? 'xmark' : 'chevron-left'} size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.titleGroup}>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {t('notifications.title')}
+                {headerTitle}
               </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {t('notifications.subtitle')}
-              </Text>
-            </View>
-            {unreadCount > 0 ? (
-              <Pressable
-                onPress={() => markAllRead.mutate()}
-                disabled={markAllRead.isPending}
-                accessibilityLabel={t('notifications.markAllRead')}
-                style={styles.markAllButton}
-              >
-                <Text style={styles.markAllButtonText} numberOfLines={1}>
-                  {t('notifications.markAllRead')}
+              {headerSubtitle ? (
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  {headerSubtitle}
                 </Text>
-              </Pressable>
-            ) : null}
+              ) : null}
+            </View>
+            {renderHeaderActions()}
           </View>
         </LinearGradient>
 
-        {isLoading ? (
-          <View style={styles.body}>
-            <LoadingIndicator size={40} dotSize={6} color={colors.primary} />
-          </View>
-        ) : isError ? (
-          <View style={styles.body}>
-            <View style={[styles.emptyIcon, { backgroundColor: `${colors.error}1A` }]}>
-              <FontAwesome6 name="triangle-exclamation" size={22} color={colors.error} solid />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('common.errorTitle')}</Text>
-            <Pressable style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={() => refetch()}>
-              <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+        {renderBody()}
+
+        {selectionMode && !detail ? (
+          <View style={[styles.selectionBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            <Pressable
+              style={[styles.deleteSelected, { opacity: selectedIds.size === 0 ? 0.5 : 1 }]}
+              onPress={() => setConfirmBulk(true)}
+              disabled={selectedIds.size === 0}
+            >
+              <LinearGradient colors={DELETE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.deleteSelectedInner}>
+                <FontAwesome6 name="trash" size={15} color="#FFFFFF" solid />
+                <Text style={styles.deleteSelectedText}>{t('notifications.deleteSelected', { count: selectedIds.size })}</Text>
+              </LinearGradient>
             </Pressable>
           </View>
-        ) : items.length === 0 ? (
-          <View style={styles.body}>
-            <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}1A` }]}>
-              <FontAwesome6 name="bell" size={22} color={colors.primary} solid />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('notifications.emptyTitle')}</Text>
-            <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('notifications.emptyMessage')}</Text>
-          </View>
-        ) : (
-          <FlatList data={items} keyExtractor={(item) => item.id} renderItem={renderItem} contentContainerStyle={styles.listContent} />
-        )}
+        ) : null}
+
+        <ToastHost />
       </View>
+
+      <ConfirmModal
+        visible={confirmBulk}
+        icon="trash"
+        gradient={DELETE_GRADIENT}
+        title={t('notifications.deleteConfirmTitle', { count: selectedIds.size })}
+        message={t('notifications.deleteConfirmMessage')}
+        confirmLabel={t('notifications.delete')}
+        loading={deleteNotifications.isPending}
+        onConfirm={() => {
+          const ids = [...selectedIds];
+          setConfirmBulk(false);
+          exitSelection();
+          deleteIds(ids);
+        }}
+        onCancel={() => setConfirmBulk(false)}
+      />
     </Modal>
   );
 }
@@ -155,7 +438,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  markAllButton: {
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerPill: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 14,
@@ -163,19 +447,57 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.32)',
   },
-  markAllButtonText: { ...typography.caption, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  body: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  headerPillText: { ...typography.caption, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  headerIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginBottom: 8, textAlign: 'center' },
   emptyMessage: { ...typography.body, textAlign: 'center', lineHeight: 20 },
   retryButton: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
   retryButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  listContent: { padding: 20, paddingBottom: 40 },
-  card: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },
+  hint: { ...typography.caption, fontSize: 11, textAlign: 'center', marginTop: 12 },
+  listContent: { padding: 20, paddingTop: 12, paddingBottom: 40 },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14 },
+  // alignSelf: center — the row itself is top-aligned (multi-line text), the checkbox is centred.
+  cardSquareRight: { borderTopRightRadius: 0, borderBottomRightRadius: 0 },
+  checkbox: { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
   icon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1 },
-  cardTitle: { ...typography.body, fontFamily: fonts.semiBold },
-  cardMessage: { ...typography.caption, marginTop: 2, lineHeight: 16 },
-  cardTime: { ...typography.caption, fontSize: 11, marginTop: 6 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardTitle: { ...typography.body, fontFamily: fonts.semiBold, flex: 1 },
+  cardMessage: { ...typography.caption, marginTop: 3, lineHeight: 16 },
+  cardTime: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4 },
+  detailBody: { padding: 20 },
+  detailCard: { borderRadius: 20, borderWidth: 1, padding: 22, alignItems: 'center' },
+  detailIcon: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  detailTitle: { ...typography.subheading, fontFamily: fonts.semiBold, textAlign: 'center', marginTop: 14 },
+  detailTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  detailTime: { ...typography.caption },
+  detailDivider: { height: 1, alignSelf: 'stretch', marginVertical: 18 },
+  detailMessage: { ...typography.body, lineHeight: 22, alignSelf: 'stretch' },
+  detailDelete: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginTop: 18,
+  },
+  detailDeleteText: { ...typography.body, fontFamily: fonts.semiBold },
+  selectionBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1 },
+  deleteSelected: { borderRadius: 16, overflow: 'hidden' },
+  deleteSelectedInner: { height: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  deleteSelectedText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 15 },
 });

@@ -5,6 +5,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VerificationBadge } from './VerificationBadge';
+import { RatingStars } from './RatingStars';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BusinessNearbyResult } from '@/services/businessesService';
 import { formatAddress } from '@/utils/formatAddress';
@@ -97,6 +98,11 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
           <View style={styles.badgeRow}>
             <VerificationBadge status={result.verificationStatus} />
           </View>
+          {worker ? (
+            <View style={styles.badgeRow}>
+              <RatingStars average={worker.ratingAverage} count={worker.ratingCount} variant="full" />
+            </View>
+          ) : null}
 
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.cardLabel, { color: colors.textMuted }]}>

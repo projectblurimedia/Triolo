@@ -60,11 +60,25 @@
   },
   "notifications": {
     "title": "Notifications",
-    "subtitle": "Activity on your profile",
+    "subtitle": "Profile views and job updates",
     "markAllRead": "Mark all read",
     "justNow": "Just now",
     "emptyTitle": "No Notifications Yet",
-    "emptyMessage": "When someone views your profile, you'll see it here."
+    "emptyMessage": "Profile views and job updates will appear here.",
+    "delete": "Delete",
+    "deleteThis": "Delete notification",
+    "select": "Select",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "selectedCount": "{{count}} selected",
+    "deleteSelected": "Delete ({{count}})",
+    "deleteConfirmTitle": "Delete {{count}} notification?",
+    "deleteConfirmTitle_other": "Delete {{count}} notifications?",
+    "deleteConfirmMessage": "This can't be undone.",
+    "deletedToast": "Notification deleted",
+    "deletedToast_other": "{{count}} notifications deleted",
+    "detailTitle": "Notification",
+    "gestureHint": "Swipe left to delete · Long-press to select"
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -77,9 +91,8 @@
   "mainTabs": {
     "Home": {
       "title": "Home",
-      "subtitle": "Your Triolo Partner dashboard",
-      "greeting": "Hi, {{name}}",
-      "comingSoon": "Job and order requests will show up here once this is ready."
+      "subtitle": "Problems near you and your jobs",
+      "greeting": "Hi, {{name}}"
     },
     "Bookings": {
       "title": "Bookings",
@@ -242,6 +255,41 @@
     "UNAUTHORIZED": "Your session has expired. Please log in again.",
     "FORBIDDEN": "You don't have permission to do that.",
     "NOT_FOUND": "We couldn't find what you're looking for.",
-    "CONFLICT": "This already exists."
+    "CONFLICT": "This already exists.",
+    "PROBLEM_ALREADY_TAKEN": "Another worker accepted this problem first.",
+    "PROBLEM_INVALID_STATE": "This job has changed. Pull down to refresh.",
+    "PROBLEM_POST_NOT_FOUND": "This problem is no longer available.",
+    "WORKER_NOT_VERIFIED": "Your Worker profile is not verified yet."
+  },
+  "problems": {
+    "myJobsTitle": "My Jobs",
+    "nearbyTitle": "Problems Near You",
+    "finishedTitle": "Finished Jobs",
+    "distanceAway": "{{distance}} away",
+    "accept": "Accept Job",
+    "acceptedTitle": "Job Accepted",
+    "acceptedMessage": "Call the customer to fix a time. It is now under My Jobs.",
+    "takenTitle": "Already Taken",
+    "takenMessage": "Another worker accepted this problem first.",
+    "customer": "Customer",
+    "callCustomer": "Call customer",
+    "markWorkDone": "Mark Work Done",
+    "confirmDoneTitle": "Finished the work?",
+    "confirmDoneMessage": "The customer will be asked to confirm the job is finished.",
+    "workDoneTitle": "Marked as Done",
+    "workDoneMessage": "Waiting for the customer to confirm.",
+    "waitingForCustomer": "Waiting for the customer to confirm it is finished",
+    "status": {
+      "accepted": "In Progress",
+      "work_done": "Awaiting Confirmation",
+      "completed": "Finished"
+    },
+    "noneNearbyTitle": "No Problems Nearby",
+    "noneNearbyMessage": "New problems that need your skills will appear here. Pull down to refresh.",
+    "noLocationTitle": "Location Needed",
+    "noLocationMessage": "Add your current location to your Worker profile (Profile → edit) to see problems near you.",
+    "workersOnlyTitle": "For Workers",
+    "workersOnlyMessage": "Problems posted by customers near you show up here once your Worker profile is verified.",
+    "loadFailedTitle": "Couldn't Load Jobs"
   }
 }

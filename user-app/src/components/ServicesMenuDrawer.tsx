@@ -5,6 +5,7 @@ import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
 import { ComingSoonModal } from './ComingSoonModal';
 import { QuickBookModal } from './QuickBookModal';
+import { YourProblemsModal } from './YourProblemsModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 interface ServicesMenuDrawerProps {
@@ -22,7 +23,7 @@ const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
 const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
 const PINK_GRADIENT = ['#DB2777', '#F472B6'] as const;
 
-type ServicesMenuItemKey = 'quickBook' | 'postProblem' | 'myBookings' | 'favoriteWorkers';
+type ServicesMenuItemKey = 'quickBook' | 'yourProblems' | 'myBookings' | 'favoriteWorkers';
 
 const ITEMS: {
   key: ServicesMenuItemKey;
@@ -30,7 +31,7 @@ const ITEMS: {
   gradient: readonly [string, string];
 }[] = [
   { key: 'quickBook', icon: 'bolt', gradient: BLUE_GRADIENT },
-  { key: 'postProblem', icon: 'triangle-exclamation', gradient: PURPLE_GRADIENT },
+  { key: 'yourProblems', icon: 'clipboard-list', gradient: PURPLE_GRADIENT },
   { key: 'myBookings', icon: 'calendar-check', gradient: GREEN_GRADIENT },
   { key: 'favoriteWorkers', icon: 'star', gradient: PINK_GRADIENT },
 ];
@@ -39,7 +40,7 @@ const ITEMS: {
  * Services tab's menu — replaced the earlier compact `SideDockMenu` icon dock (Filters/
  * Sort/Favorites/History) with a full drawer matching Home's own, per explicit feedback
  * that this tab's menu should look and work like Home's. "Quick Book" (search/book a
- * worker directly) and "Post a Problem" (describe a non-emergency issue so nearby workers
+ * worker directly) and "Your Problems" (post a non-emergency issue so nearby workers
  * can pick it up — the broadcast-style discovery already planned in
  * .cloud/architecture.md's Search Architecture section) are the two things a user actually
  * comes to this tab to do; "My Bookings"/"Favorite Workers" round out the tab's own
@@ -79,11 +80,11 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
         <DrawerMenuItem
           icon={ITEMS[1].icon}
           gradient={ITEMS[1].gradient}
-          title={t('servicesMenu.postProblemTitle')}
-          subtitle={t('servicesMenu.postProblemSubtitle')}
+          title={t('servicesMenu.yourProblemsTitle')}
+          subtitle={t('servicesMenu.yourProblemsSubtitle')}
           onPress={() => {
             onClose();
-            setActiveItem('postProblem');
+            setActiveItem('yourProblems');
           }}
         />
 
@@ -112,11 +113,12 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
         />
       </SideMenuDrawer>
 
-      {/* Quick Book is real now (see QuickBookModal's own doc comment) — every other item
-          still opens the shared ComingSoonModal placeholder. */}
+      {/* Quick Book and Your Problems are real now (see each modal's own doc comment) —
+          every other item still opens the shared ComingSoonModal placeholder. */}
       <QuickBookModal visible={activeItem === 'quickBook'} onClose={() => setActiveItem(null)} />
+      <YourProblemsModal visible={activeItem === 'yourProblems'} onClose={() => setActiveItem(null)} />
 
-      {activeConfig && activeItem !== 'quickBook' ? (
+      {activeConfig && activeItem !== 'quickBook' && activeItem !== 'yourProblems' ? (
         <ComingSoonModal
           visible={activeItem !== null}
           onClose={() => setActiveItem(null)}

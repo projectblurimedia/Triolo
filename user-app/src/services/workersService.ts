@@ -35,7 +35,12 @@ export interface WorkerProfile {
   pincode: string;
   portfolioPhotoUrls: string[];
   verificationStatus: string;
+  /** Average customer star rating (1 decimal), null until the first rating. */
+  ratingAverage: number | null;
+  ratingCount: number;
 }
+
+export type NearbyWorkerSort = 'distance' | 'rating';
 
 export interface WorkerNearbyResult extends WorkerProfile {
   distanceMeters: number;
@@ -47,6 +52,9 @@ export interface NearbySearchParams {
   longitude: number;
   radiusKm?: number;
   query?: string;
+  skillCategory?: string;
+  sort?: NearbyWorkerSort;
+  limit?: number;
 }
 
 export const workersService = {
@@ -58,6 +66,9 @@ export const workersService = {
     search.set('longitude', String(params.longitude));
     if (params.radiusKm != null) search.set('radiusKm', String(params.radiusKm));
     if (params.query) search.set('query', params.query);
+    if (params.skillCategory) search.set('skillCategory', params.skillCategory);
+    if (params.sort) search.set('sort', params.sort);
+    if (params.limit != null) search.set('limit', String(params.limit));
     return apiClient.get<WorkerNearbyResult[]>(`/workers/nearby?${search.toString()}`, true);
   },
 

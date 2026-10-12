@@ -33,6 +33,8 @@ export const nearbySearchQuerySchema = z.object({
   longitude: z.coerce.number().min(-180).max(180),
   radiusKm: z.coerce.number().min(0.1).max(50).default(10),
   query: z.string().trim().max(100).optional(),
+  skillCategory: z.enum(WORKER_SKILL_CATEGORIES as [string, ...string[]]).optional(),
+  sort: z.enum(['distance', 'rating']).default('distance'),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 

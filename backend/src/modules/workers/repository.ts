@@ -26,6 +26,8 @@ function mapWorkerProfile(row: QueryResultRow): WorkerProfile {
     pincode: row.pincode,
     portfolioPhotoUrls: row.portfolio_photo_urls ?? [],
     verificationStatus: row.verification_status,
+    ratingAverage: row.rating_count > 0 ? Math.round((row.rating_sum / row.rating_count) * 10) / 10 : null,
+    ratingCount: row.rating_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -161,6 +163,14 @@ export class WorkersRepository {
     return { items: rows.rows.map(mapWorkerProfileWithAccount), total, page: filter.page, limit: filter.limit };
   }
 
+  /** Adds one 1–5 star rating to the worker's running total (see migration 0016). */
+  async addRating(workerId: string, stars: number): Promise<void> {
+    await this.pool.query(
+      `UPDATE worker_profiles SET rating_sum = rating_sum + $2, rating_count = rating_count + 1 WHERE id = $1`,
+      [workerId, stars],
+    );
+  }
+
   async findById(id: string): Promise<WorkerProfileWithAccount | null> {
     const result = await this.pool.query(
       `SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
@@ -187,6 +197,13 @@ export class WorkersRepository {
   // nearly-identical points, which would otherwise throw a Postgres "acos: input out of range".
   async findNearby(excludeAccountId: string, filter: NearbySearchFilter): Promise<WorkerNearbyResult[]> {
     const like = filter.query ? `%${filter.query}%` : null;
+    // 'rating': best average first (unrated workers last), more ratings breaking ties, then
+    // nearest. The CASE keeps the division out of rows with no ratings yet.
+    const orderBy =
+      filter.sort === 'rating'
+        ? `CASE WHEN sub.rating_count > 0 THEN sub.rating_sum::float / sub.rating_count END DESC NULLS LAST,
+           sub.rating_count DESC, sub.distance_meters ASC`
+        : 'sub.distance_meters ASC';
     const result = await this.pool.query(
       `SELECT * FROM (
          SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email,
@@ -201,9 +218,18 @@ export class WorkersRepository {
        ) sub
        WHERE sub.distance_meters <= $4
          AND ($5::text IS NULL OR sub.other_skill_description ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.skill_categories, ',') ILIKE $5)
-       ORDER BY sub.distance_meters ASC
+         AND ($7::worker_skill_category IS NULL OR $7::worker_skill_category = ANY(sub.skill_categories))
+       ORDER BY ${orderBy}
        LIMIT $6`,
-      [filter.latitude, filter.longitude, excludeAccountId, filter.radiusKm * 1000, like, filter.limit],
+      [
+        filter.latitude,
+        filter.longitude,
+        excludeAccountId,
+        filter.radiusKm * 1000,
+        like,
+        filter.limit,
+        filter.skillCategory ?? null,
+      ],
     );
     return result.rows.map((row) => ({
       ...mapWorkerProfile(row),

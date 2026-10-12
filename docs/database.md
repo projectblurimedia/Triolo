@@ -89,6 +89,7 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | pincode | text, `CHECK (pincode ~ '^[0-9]{6}$')` | required, 6-digit Indian postal code — indexed (`idx_worker_profiles_pincode`, plus `idx_worker_profiles_city`) for future area-based search |
 | portfolio_photo_urls | text[] | Cloudinary-hosted URLs, uploaded via `POST /api/v1/workers/me/profile` (multipart) |
 | verification_status | enum `profile_verification_status` (pending_verification, verified, rejected) | admin review gate for this capability specifically, independent of `accounts.status` |
+| rating_sum / rating_count | integer, default 0 | running total of customer star ratings (migration `0016`) — the API exposes `ratingAverage = rating_sum / rating_count` (null when count is 0). Only ever incremented via `WorkersService.recordRating()`, called by the problems module when a job is rated, so the workers module never reads `problem_posts` |
 | created_at / updated_at | timestamptz | |
 
 ### business_profiles (Businesses module — implemented)
@@ -155,6 +156,26 @@ Migration `0010_create_push_tokens.sql`. Owned by the `notifications` module, no
 | | | `UNIQUE (booking_request_id, worker_id)` — one offer per worker per request |
 
 Migration `0011_create_booking_requests.sql`. Two indexes: `(account_id, created_at DESC)` on `booking_requests` (a requester's own history, not yet surfaced in any UI), `(worker_id, status)` on `booking_offers` (a worker's pending-offers list, `GET /api/v1/bookings/offers/mine`). **First-accept-wins is enforced entirely by `booking_requests`' own row lock**, not application logic: `BookingsRepository.acceptOffer()` runs `UPDATE booking_requests SET status='accepted', ... WHERE id=$1 AND status='broadcasting'` inside a transaction — a second, concurrent call for the same request blocks on Postgres's row lock until the first commits, then affects 0 rows since `status` no longer matches, so exactly one worker can ever win. The same transaction flips every other still-`pending` offer for that request to `lost` and returns the losing workers' account ids/languages so the service layer can push a "job taken" notification to each (see `docs/api.md`'s Bookings Module section, and `.cloud/architecture.md`'s Notification Architecture).
+
+### problem_posts (Problems module — implemented, save-only)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| account_id | uuid FK → accounts.id, ON DELETE CASCADE | the user who posted it |
+| skill_categories | `worker_skill_category[]` | worker type(s) needed, GIN-indexed |
+| description | text, nullable | optional, ≤500 chars (API-enforced) |
+| quotation_amount | integer, `CHECK (> 0)` | the user's offered price, whole rupees |
+| photo_urls | text[], default `{}` | 0–5 Cloudinary URLs, appended one at a time (`POST /problems/:id/photos`) |
+| location_address | text, nullable | GPS-detected (reverse-geocoded) or typed address — added in migration `0014`; nullable at the DB level only because it was added to an existing table, the API requires it |
+| latitude / longitude | double precision, nullable | set when the address came from "Use My Current Location"; null for a typed address |
+| status | enum `problem_post_status` (`open`, `accepted`, `work_done`, `completed`; `closed` unused) | job flow — see `docs/api.md`'s Problems Module; `accepted`/`work_done`/`completed` added in migration `0015` |
+| accepted_worker_id | uuid FK → worker_profiles.id, ON DELETE SET NULL, nullable | set atomically when a worker wins the accept (`WHERE status = 'open'` row lock) |
+| accepted_at / work_done_at / completed_at | timestamptz, nullable | when each transition happened |
+| worker_rating | smallint, nullable, `CHECK (1..5)` | the customer's star rating of the worker, set once when confirming finished (migration `0016`) |
+| worker_review | text, nullable | optional short review with that rating |
+| created_at | timestamptz | |
+
+Migrations `0013_create_problem_posts.sql`, `0014_problem_posts_location_address.sql`, `0015_problem_posts_job_flow.sql`. Indexes: `(status, created_at DESC)` and `(accepted_worker_id, created_at DESC)` (both 0015) for the worker-side nearby/assigned queries, plus `(account_id, created_at DESC)` for `GET /problems/mine`, and a GIN index on `skill_categories` for the future "show open posts to matching workers" query.
 
 ## Planned Tables (subsequent modules — outline only, refine when implemented)
 

@@ -1,11 +1,15 @@
 import multer, { FileFilterCallback } from 'multer';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { NextFunction, Request, Response } from 'express';
 import { AppError } from '@/common/errors/AppError';
 import { logger } from '@/common/utils/logger';
 
-const TEMP_DIR = path.resolve(process.cwd(), 'temp/uploads');
+// The OS temp dir, not a folder under the project — on Vercel the deployed code directory
+// (/var/task) is read-only and only /tmp is writable, so a project-relative path made
+// every multipart upload fail with ENOENT in production.
+const TEMP_DIR = path.join(os.tmpdir(), 'triolo-uploads');
 const ALLOWED_EXTENSIONS = /\.(jpe?g|png|webp)$/i;
 const ALLOWED_MIME_TYPES = /^image\/(jpeg|png|webp)$/;
 

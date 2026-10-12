@@ -17,12 +17,30 @@ interface ImagePickerFieldProps {
   images: PickedImage[];
   onChange: (images: PickedImage[]) => void;
   maxImages?: number;
+  /** Shows separate Camera/Gallery tiles instead of the single gallery-only "+" tile. */
+  allowCamera?: boolean;
 }
 
 const THUMB_SIZE = 72;
 
-/** Multi-image picker (gallery only, no camera) — images upload as multipart FormData on submit, not at pick time. */
-export function ImagePickerField({ label, images, onChange, maxImages = 6 }: ImagePickerFieldProps) {
+// Android gallery picks are often content:// URIs with no real file extension —
+// asset.uri.split('.').pop() on those returns garbage (the whole URI), which would corrupt
+// the multipart file's type/name. Trust asset.mimeType first; fall back to a safe,
+// always-valid default rather than guessing from the URI.
+function toPickedImages(assets: ImagePicker.ImagePickerAsset[]): PickedImage[] {
+  return assets.map((asset, index) => {
+    const type = asset.mimeType ?? 'image/jpeg';
+    const extension = type.split('/').pop() ?? 'jpg';
+    return {
+      uri: asset.uri,
+      name: asset.fileName ?? `photo_${Date.now()}_${index}.${extension}`,
+      type,
+    };
+  });
+}
+
+/** Multi-image picker (gallery, plus camera when `allowCamera`) — images upload as multipart FormData on submit, not at pick time. */
+export function ImagePickerField({ label, images, onChange, maxImages = 6, allowCamera = false }: ImagePickerFieldProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
 
@@ -49,23 +67,33 @@ export function ImagePickerField({ label, images, onChange, maxImages = 6 }: Ima
       });
 
       if (!result.canceled) {
-        const picked: PickedImage[] = result.assets.map((asset, index) => {
-          // Android gallery picks are often content:// URIs with no real file extension —
-          // asset.uri.split('.').pop() on those returns garbage (the whole URI), which
-          // would corrupt the multipart file's type/name. Trust asset.mimeType first;
-          // fall back to a safe, always-valid default rather than guessing from the URI.
-          const type = asset.mimeType ?? 'image/jpeg';
-          const extension = type.split('/').pop() ?? 'jpg';
-          return {
-            uri: asset.uri,
-            name: asset.fileName ?? `photo_${Date.now()}_${index}.${extension}`,
-            type,
-          };
-        });
-        onChange([...images, ...picked].slice(0, maxImages));
+        onChange([...images, ...toPickedImages(result.assets)].slice(0, maxImages));
       }
     } catch {
       showToast({ variant: 'error', title: t('imagePicker.pickFailedTitle'), message: t('imagePicker.pickFailedMessage') });
+    }
+  };
+
+  const handleCamera = async () => {
+    if (images.length >= maxImages) return;
+
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        showToast({
+          variant: 'error',
+          title: t('imagePicker.cameraPermissionDeniedTitle'),
+          message: t('imagePicker.cameraPermissionDeniedMessage'),
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+      if (!result.canceled) {
+        onChange([...images, ...toPickedImages(result.assets)].slice(0, maxImages));
+      }
+    } catch {
+      showToast({ variant: 'error', title: t('imagePicker.cameraFailedTitle'), message: t('imagePicker.cameraFailedMessage') });
     }
   };
 
@@ -90,7 +118,27 @@ export function ImagePickerField({ label, images, onChange, maxImages = 6 }: Ima
             </Pressable>
           </View>
         ))}
-        {images.length < maxImages ? (
+        {images.length < maxImages && allowCamera ? (
+          <>
+            <Pressable
+              style={[styles.addButton, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={handleCamera}
+              accessibilityLabel={t('imagePicker.camera')}
+            >
+              <FontAwesome6 name="camera" size={18} color={colors.textMuted} solid />
+              <Text style={[styles.addLabel, { color: colors.textMuted }]}>{t('imagePicker.camera')}</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.addButton, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={handlePick}
+              accessibilityLabel={t('imagePicker.gallery')}
+            >
+              <FontAwesome6 name="images" size={18} color={colors.textMuted} solid />
+              <Text style={[styles.addLabel, { color: colors.textMuted }]}>{t('imagePicker.gallery')}</Text>
+            </Pressable>
+          </>
+        ) : null}
+        {images.length < maxImages && !allowCamera ? (
           <Pressable
             style={[styles.addButton, { borderColor: colors.border, backgroundColor: colors.background }]}
             onPress={handlePick}
@@ -132,5 +180,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  addLabel: { ...typography.caption, fontSize: 10, marginTop: 4 },
   hint: { ...typography.caption, marginTop: 8 },
 });

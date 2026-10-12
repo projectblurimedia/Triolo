@@ -14,6 +14,7 @@ import { ServicesHeader } from '@/components/ServicesHeader';
 import { BazaarHeader } from '@/components/BazaarHeader';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { CustomTabBar } from '@/components/CustomTabBar';
+import { ScreenBlurTarget } from './ScreenBlurTarget';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -48,6 +49,9 @@ export function AppNavigator() {
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
+      // Each screen is its own blur target so the glass tab bar can really blur it on
+      // Android 12+ (see ScreenBlurTarget / state/blurTargetStore.ts).
+      screenLayout={({ route, children }) => <ScreenBlurTarget routeKey={route.key}>{children}</ScreenBlurTarget>}
       screenOptions={({ route }) => ({
         header: () => (
           <GradientHeader

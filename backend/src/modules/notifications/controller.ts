@@ -31,6 +31,22 @@ export class NotificationsController {
     return ok(res, null, 'All notifications marked as read');
   });
 
+  deleteOne = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    await this.service.deleteNotifications(req.account.accountId, [req.params.id]);
+    return ok(res, null, 'Notification deleted');
+  });
+
+  deleteMany = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    const deleted = await this.service.deleteNotifications(req.account.accountId, req.body.ids);
+    return ok(res, { deleted }, 'Notifications deleted');
+  });
+
   registerPushToken = asyncHandler(async (req: Request, res: Response) => {
     if (!req.account) {
       throw AppError.unauthorized();

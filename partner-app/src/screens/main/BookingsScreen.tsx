@@ -10,12 +10,7 @@ import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from 
 import { PendingOffer } from '@/services/bookingOffersService';
 import { showToast } from '@/state/toastStore';
 import { ApiError } from '@/services/apiClient';
-
-/** "420m away" under 1km, "1.3km away" otherwise — matches user-app's own nearby-search phrasing. */
-function formatDistance(meters: number): string {
-  if (meters < 1000) return `${Math.max(1, Math.round(meters))}m`;
-  return `${(meters / 1000).toFixed(1)}km`;
-}
+import { formatDistance } from '@/utils/formatDistance';
 
 /**
  * The receiving side of Quick Book's broadcast (see backend's modules/bookings and

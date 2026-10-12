@@ -45,6 +45,15 @@ export class NotificationsRepository {
     ]);
   }
 
+  /** Deletes only the caller's own notifications — ids belonging to anyone else are silently ignored. */
+  async deleteMany(accountId: string, ids: string[]): Promise<number> {
+    const result = await this.pool.query(`DELETE FROM notifications WHERE account_id = $1 AND id = ANY($2::uuid[])`, [
+      accountId,
+      ids,
+    ]);
+    return result.rowCount ?? 0;
+  }
+
   // --- push_tokens — a second table this same module owns (see migration 0010's own doc
   // comment for why it lives here rather than on `accounts`). One row per account; a newer
   // registration (a reinstall, a different device) simply replaces the old token.

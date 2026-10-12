@@ -1,6 +1,6 @@
 import { NotificationsRepository } from './repository';
 import { PushNotificationOptions, sendPushNotification } from './pushSender';
-import { NotificationListResult } from './interfaces';
+import { NotificationListResult, NotificationType } from './interfaces';
 
 const DEFAULT_LIST_LIMIT = 50;
 
@@ -52,6 +52,30 @@ export class NotificationsService {
     if (pushToken) {
       await sendPushNotification(pushToken, title, body, options);
     }
+  }
+
+  /**
+   * An in-app notification row (so it shows in the recipient's notification list) plus a
+   * best-effort push — the general form of notifyProfileViewed() for other modules' events
+   * (e.g. modules/problems' job updates). Use sendRawPush() instead for ephemeral events that
+   * shouldn't pile up in the list.
+   */
+  async notify(
+    accountId: string,
+    type: NotificationType,
+    title: string,
+    body: string,
+    pushOptions?: PushNotificationOptions,
+  ): Promise<void> {
+    await this.repository.create({ accountId, type, title, body });
+    const pushToken = await this.repository.findPushToken(accountId);
+    if (pushToken) {
+      await sendPushNotification(pushToken, title, body, pushOptions);
+    }
+  }
+
+  async deleteNotifications(accountId: string, ids: string[]): Promise<number> {
+    return this.repository.deleteMany(accountId, ids);
   }
 
   async listForAccount(accountId: string): Promise<NotificationListResult> {
