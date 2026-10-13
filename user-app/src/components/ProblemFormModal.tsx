@@ -14,6 +14,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { ProblemPost, problemsService } from '@/services/problemsService';
 import { MY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
 import { showToast } from '@/state/toastStore';
+import { ensureLocation } from '@/state/locationStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 
 interface ProblemFormModalProps {
@@ -95,13 +96,22 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
     if (!canSubmit || submitting) return;
     setSubmitting(true);
 
+    // Workers only see problems that have map coordinates, so location must be on: a GPS-
+    // detected address keeps its own point; a typed one is pinned to where the customer is now.
+    const here = await ensureLocation();
+    if (!here) {
+      showToast({ variant: 'error', title: t('location.requiredTitle'), message: t('location.requiredMessage') });
+      setSubmitting(false);
+      return;
+    }
+
     const fields = {
       skillCategories: selectedSkills,
       description: description.trim() || undefined,
       quotationAmount,
       locationAddress: location.address.trim(),
-      latitude: location.latitude ?? undefined,
-      longitude: location.longitude ?? undefined,
+      latitude: location.latitude ?? here.latitude,
+      longitude: location.longitude ?? here.longitude,
     };
     const newPhotos = photos.filter((image) => !isRemote(image));
     let createdPostId: string | null = null;

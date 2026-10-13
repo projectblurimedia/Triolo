@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, LayoutChangeEvent, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BlurTargetView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +11,8 @@ import { RatingStars } from './RatingStars';
 import { Avatar } from './WorkerMiniCard';
 import { NearbyResultDetailModal } from './NearbyResultDetailModal';
 import { ToastHost } from './ToastHost';
+import { GlassPanel } from './GlassPanel';
+import { ANDROID_REAL_BLUR } from '@/state/blurTargetStore';
 import { SKILL_CATEGORIES } from './WorkerProfileModal';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
 import { SERVICES_RADIUS_KM } from '@/hooks/useNearbyWorkers';
@@ -42,7 +45,7 @@ const SHOP_SUGGESTIONS = ['grocery', 'restaurant', 'pharmacy', 'electronics', 'c
  */
 export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
+  const { colors, isDark } = useThemeColors();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   // A tapped suggestion shows its (possibly Telugu) label in the box but searches by the
@@ -51,10 +54,17 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<Scope>('all');
-  const [selected, setSelected] = useState<{ mode: NearbySearchMode; result: WorkerNearbyResult | BusinessNearbyResult } | null>(
-    null,
-  );
+  const [selected, setSelected] = useState<{
+    mode: NearbySearchMode;
+    result: WorkerNearbyResult | BusinessNearbyResult;
+  } | null>(null);
   const { location, refresh: refreshLocation } = useDeviceLocation();
+  // The glass search panel floats over the results; content starts below it and scrolls
+  // under it (blurred), like the bottom tab bar.
+  const blurTargetRef = useRef<View>(null);
+  const [panelHeight, setPanelHeight] = useState(118);
+  const contentTop = panelHeight + 24;
+  const onPanelLayout = (event: LayoutChangeEvent) => setPanelHeight(Math.round(event.nativeEvent.layout.height));
   const coords = location.status === 'ready' ? location : null;
 
   useEffect(() => {
@@ -106,11 +116,21 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
 
   const rows: Row[] = [];
   if (workerResults.length > 0) {
-    if (scope === 'all') rows.push({ kind: 'header', key: 'h-workers', title: t('homeSearch.workersCount', { count: workerResults.length }) });
+    if (scope === 'all')
+      rows.push({
+        kind: 'header',
+        key: 'h-workers',
+        title: t('homeSearch.workersCount', { count: workerResults.length }),
+      });
     workerResults.forEach((worker) => rows.push({ kind: 'worker', key: `w-${worker.id}`, worker }));
   }
   if (shopResults.length > 0) {
-    if (scope === 'all') rows.push({ kind: 'header', key: 'h-shops', title: t('homeSearch.shopsCount', { count: shopResults.length }) });
+    if (scope === 'all')
+      rows.push({
+        kind: 'header',
+        key: 'h-shops',
+        title: t('homeSearch.shopsCount', { count: shopResults.length }),
+      });
     shopResults.forEach((shop) => rows.push({ kind: 'shop', key: `s-${shop.id}`, shop }));
   }
 
@@ -153,7 +173,9 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
             </Text>
             <View style={[styles.kindPill, { backgroundColor: `${colors.primary}14` }]}>
               <FontAwesome6 name={isWorker ? 'screwdriver-wrench' : 'store'} size={9} color={colors.primary} solid />
-              <Text style={[styles.kindText, { color: colors.primary }]}>{t(isWorker ? 'homeSearch.worker' : 'homeSearch.shop')}</Text>
+              <Text style={[styles.kindText, { color: colors.primary }]}>
+                {t(isWorker ? 'homeSearch.worker' : 'homeSearch.shop')}
+              </Text>
             </View>
           </View>
           <Text style={[styles.resultTags, { color: colors.textMuted }]} numberOfLines={1}>
@@ -162,7 +184,9 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
           <View style={styles.resultMeta}>
             {isWorker ? <RatingStars average={item.worker.ratingAverage} count={item.worker.ratingCount} /> : null}
             <Text style={[styles.resultDistance, { color: colors.primary }]}>
-              {t('nearbySearch.distanceAway', { distance: formatDistanceValue(distance) })}
+              {t('nearbySearch.distanceAway', {
+                distance: formatDistanceValue(distance),
+              })}
             </Text>
           </View>
         </View>
@@ -171,8 +195,13 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
     );
   };
 
-  const renderState = (icon: React.ComponentProps<typeof FontAwesome6>['name'], title: string, message?: string, action?: () => void) => (
-    <View style={styles.stateBody}>
+  const renderState = (
+    icon: React.ComponentProps<typeof FontAwesome6>['name'],
+    title: string,
+    message?: string,
+    action?: () => void,
+  ) => (
+    <View style={[styles.stateBody, { paddingTop: contentTop }]}>
       <View style={[styles.stateIcon, { backgroundColor: `${colors.primary}14` }]}>
         <FontAwesome6 name={icon} size={22} color={colors.primary} solid />
       </View>
@@ -187,7 +216,11 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
   );
 
   const renderSuggestions = () => (
-    <View style={styles.suggestions}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={[styles.suggestions, { paddingTop: contentTop }]}
+    >
       <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{t('homeSearch.tryServices')}</Text>
       <View style={styles.chipRow}>
         {SKILL_CATEGORIES.map((skill) => (
@@ -214,7 +247,7 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
           </Pressable>
         ))}
       </View>
-    </View>
+    </ScrollView>
   );
 
   const renderBody = () => {
@@ -225,7 +258,7 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
     if (!query) return renderSuggestions();
     if (loading) {
       return (
-        <View style={styles.stateBody}>
+        <View style={[styles.stateBody, { paddingTop: contentTop }]}>
           <LoadingIndicator size={36} dotSize={5} color={colors.primary} />
         </View>
       );
@@ -238,11 +271,14 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
         data={rows}
         keyExtractor={(row) => row.key}
         renderItem={renderRow}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingTop: contentTop }]}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       />
     );
   };
+
+  const searchFill = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.75)';
 
   const scopes: { key: Scope; label: string }[] = [
     { key: 'all', label: t('homeSearch.scopeAll') },
@@ -260,49 +296,99 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
       onShow={() => setTimeout(() => inputRef.current?.focus(), 150)}
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <LinearGradient
+          colors={headerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.header, { paddingTop: insets.top + 14 }]}
+        >
           <View style={styles.headerRow}>
             <Pressable style={styles.backButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
-            <View style={styles.searchBox}>
-              <FontAwesome6 name="magnifying-glass" size={14} color="rgba(255,255,255,0.85)" solid />
-              <TextInput
-                ref={inputRef}
-                style={styles.searchInput}
-                value={input}
-                onChangeText={setInput}
-                placeholder={t('homeSearch.placeholder')}
-                placeholderTextColor="rgba(255,255,255,0.75)"
-                returnKeyType="search"
-                onSubmitEditing={() =>
-                  setQuery(suggestionRef.current?.label === input ? suggestionRef.current.key : input.trim())
-                }
-              />
-              {input ? (
-                <Pressable onPress={() => applySuggestion('', '')} hitSlop={8} accessibilityLabel={t('common.close')}>
-                  <FontAwesome6 name="circle-xmark" size={15} color="rgba(255,255,255,0.85)" solid />
-                </Pressable>
-              ) : null}
+            <View style={styles.flex}>
+              <Text style={styles.headerTitle}>{t('homeSearch.title')}</Text>
+              <Text style={styles.headerSubtitle}>{t('homeSearch.subtitle')}</Text>
             </View>
-          </View>
-          <View style={styles.scopeRow}>
-            {scopes.map((option) => {
-              const active = scope === option.key;
-              return (
-                <Pressable
-                  key={option.key}
-                  onPress={() => setScope(option.key)}
-                  style={[styles.scopeChip, active ? styles.scopeChipActive : null]}
-                >
-                  <Text style={[styles.scopeText, { color: active ? headerGradient[0] : '#FFFFFF' }]}>{option.label}</Text>
-                </Pressable>
-              );
-            })}
           </View>
         </LinearGradient>
 
-        {renderBody()}
+        <View style={styles.flex}>
+          {/* Results live in a blur target so the glass panel really blurs them (Android 12+). */}
+          {ANDROID_REAL_BLUR ? (
+            <BlurTargetView ref={blurTargetRef} style={styles.flex}>
+              {renderBody()}
+            </BlurTargetView>
+          ) : (
+            <View ref={blurTargetRef} style={styles.flex}>
+              {renderBody()}
+            </View>
+          )}
+
+          <View style={styles.panelWrap} onLayout={onPanelLayout}>
+            <GlassPanel blurTarget={blurTargetRef} style={styles.panel}>
+              <View
+                style={[
+                  styles.searchBox,
+                  {
+                    backgroundColor: searchFill,
+                    borderColor: `${colors.primary}26`,
+                  },
+                ]}
+              >
+                <FontAwesome6 name="magnifying-glass" size={14} color={colors.primary} solid />
+                <TextInput
+                  ref={inputRef}
+                  style={[styles.searchInput, { color: colors.text }]}
+                  value={input}
+                  onChangeText={setInput}
+                  placeholder={t('homeSearch.placeholder')}
+                  placeholderTextColor={colors.textMuted}
+                  returnKeyType="search"
+                  onSubmitEditing={() =>
+                    setQuery(suggestionRef.current?.label === input ? suggestionRef.current.key : input.trim())
+                  }
+                />
+                {input ? (
+                  <Pressable onPress={() => applySuggestion('', '')} hitSlop={8} accessibilityLabel={t('common.close')}>
+                    <FontAwesome6 name="circle-xmark" size={15} color={colors.textMuted} solid />
+                  </Pressable>
+                ) : null}
+              </View>
+              <View style={styles.scopeRow}>
+                {scopes.map((option) => {
+                  const active = scope === option.key;
+                  return (
+                    <Pressable key={option.key} onPress={() => setScope(option.key)} style={styles.scopeChipWrap}>
+                      {active ? (
+                        <LinearGradient
+                          colors={headerGradient}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.scopeChip}
+                        >
+                          <Text style={[styles.scopeText, { color: '#FFFFFF' }]}>{option.label}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View
+                          style={[
+                            styles.scopeChip,
+                            {
+                              borderColor: `${colors.primary}33`,
+                              borderWidth: 1,
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.scopeText, { color: colors.text }]}>{option.label}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </GlassPanel>
+          </View>
+        </View>
         <ToastHost />
       </View>
 
@@ -330,48 +416,130 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  flex: { flex: 1 },
+  headerTitle: {
+    ...typography.subheading,
+    fontFamily: fonts.semiBold,
+    color: '#FFFFFF',
+    lineHeight: 22,
+  },
+  headerSubtitle: {
+    ...typography.caption,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 1,
+  },
+  panelWrap: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    right: 16,
+    borderRadius: 22,
+    shadowColor: '#0B3A8A',
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  panel: { borderRadius: 22, padding: 12 },
   searchBox: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    height: 42,
+    height: 46,
     borderRadius: 14,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.32)',
-  },
-  searchInput: { flex: 1, color: '#FFFFFF', fontSize: 14, fontFamily: fonts.regular, padding: 0 },
-  scopeRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  scopeChip: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
-  scopeChipActive: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: fonts.regular, padding: 0 },
+  scopeRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  scopeChipWrap: { borderRadius: 16, overflow: 'hidden' },
+  scopeChip: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 16 },
   scopeText: { ...typography.caption, fontFamily: fonts.semiBold },
   listContent: { padding: 20, paddingBottom: 40 },
-  groupHeader: { ...typography.caption, fontFamily: fonts.semiBold, marginBottom: 10, marginTop: 4 },
-  resultRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12, marginBottom: 10 },
+  groupHeader: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 10,
+  },
   resultInfo: { flex: 1, gap: 2 },
   resultTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   resultName: { ...typography.body, fontFamily: fonts.semiBold, flexShrink: 1 },
-  kindPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  kindPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   kindText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10 },
   resultTags: { ...typography.caption, fontSize: 12 },
-  resultMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  resultDistance: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
+  resultMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  resultDistance: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    fontSize: 11,
+  },
   suggestions: { padding: 20 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
   chipText: { ...typography.caption, fontFamily: fonts.medium },
-  stateBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  stateIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  stateTitle: { ...typography.subheading, fontFamily: fonts.semiBold, textAlign: 'center' },
-  stateMessage: { ...typography.body, textAlign: 'center', marginTop: 6, lineHeight: 20 },
-  stateButton: { marginTop: 18, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12 },
-  stateButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  stateBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  stateIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  stateTitle: {
+    ...typography.subheading,
+    fontFamily: fonts.semiBold,
+    textAlign: 'center',
+  },
+  stateMessage: {
+    ...typography.body,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 20,
+  },
+  stateButton: {
+    marginTop: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  stateButtonText: {
+    ...typography.body,
+    fontFamily: fonts.semiBold,
+    color: '#FFFFFF',
+  },
 });

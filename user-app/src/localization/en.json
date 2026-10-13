@@ -69,7 +69,9 @@
     "disabledMessage": "Turn on location to see workers and shops near you.",
     "deniedForeverMessage": "Location permission is off for Triolo. Allow it in Settings to see what is near you.",
     "turnOn": "Turn On Location",
-    "openSettings": "Open Settings"
+    "openSettings": "Open Settings",
+    "requiredTitle": "Turn On Location",
+    "requiredMessage": "Location must be on to do this — so workers know exactly where to come."
   },
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",
@@ -202,7 +204,8 @@
       "postProblem": "Workers come to you",
       "nearbyShops": "Shops around you",
       "prepareList": "Plan your list by voice"
-    }
+    },
+    "trackBooking": "Track"
   },
   "homeMenu": {
     "title": "Triolo",
@@ -281,7 +284,6 @@
     "manageSection": "Manage",
     "myBookingsTitle": "My Bookings",
     "myBookingsSubtitle": "Track your booking status and history",
-    "myBookingsComingSoonMessage": "We're building your bookings dashboard. Soon you'll be able to track every booking's status and history here.",
     "favoriteWorkersTitle": "Favorite Workers",
     "favoriteWorkersSubtitle": "Workers you've saved for later",
     "favoriteWorkersComingSoonMessage": "We're building saved workers. Soon you'll be able to bookmark workers here for quick rebooking.",
@@ -299,10 +301,7 @@
     "noWorkersTitle": "No Workers Nearby",
     "noWorkersMessage": "No verified workers with all the selected skills were found nearby right now. Try different skills or check back later.",
     "searchingTitle": "Searching Nearby Workers",
-    "searchingMessage": "Notifying verified workers who match your request…",
-    "cancelSearch": "Cancel Search",
-    "acceptedTitle": "{{name}} accepted your request!",
-    "acceptedMessage": "They'll be in touch shortly to help with {{skills}}."
+    "searchingMessage": "Notifying verified workers who match your request…"
   },
   "prepareList": {
     "tagline": "Get your list ready before you shop or book",
@@ -363,12 +362,20 @@
     "noCapabilitiesMessage": "Want to work or sell on Triolo? Register as a Worker or Business using the Triolo Partner app or website.",
     "ratingValue": "4.8",
     "ratingCount": "126 reviews",
-    "servicesDoneValue": "128",
-    "servicesDoneLabel": "Services Completed",
     "ordersDoneValue": "94",
     "ordersDoneLabel": "Orders Fulfilled",
     "logoutConfirmTitle": "Confirm Logout",
-    "logoutConfirmMessage": "Are you sure you want to logout from your account?"
+    "logoutConfirmMessage": "Are you sure you want to logout from your account?",
+    "activity": {
+      "title": "My Activity",
+      "quickBooks": "Quick Books",
+      "problemsPosted": "Problems posted",
+      "finished": "Finished",
+      "inProgress": "In progress",
+      "notDone": "Cancelled / no worker",
+      "rated": "Workers rated",
+      "viewAll": "View all bookings"
+    }
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -406,7 +413,13 @@
     "PROBLEM_NOT_EDITABLE": "A worker has already accepted this problem, so it can no longer be edited.",
     "PROBLEM_IN_PROGRESS": "This job is in progress and cannot be deleted.",
     "PROBLEM_INVALID_STATE": "This problem has changed. Pull down to refresh.",
-    "PROBLEM_POST_NOT_FOUND": "This problem no longer exists."
+    "PROBLEM_POST_NOT_FOUND": "This problem no longer exists.",
+    "BOOKING_ALREADY_TAKEN": "This job was already taken by another worker.",
+    "BOOKING_REQUEST_NOT_FOUND": "This booking could not be found.",
+    "BOOKING_INVALID_STATE": "This booking has already moved on. Please refresh.",
+    "BOOKING_TRIP_NOT_ACTIVE": "This trip is no longer active.",
+    "BOOKING_PIN_INVALID": "That PIN is not correct.",
+    "BOOKING_PIN_LOCKED": "Too many wrong PIN attempts. Ask the customer to cancel and book again."
   },
   "problemForm": {
     "photosLabel": "Photos of the problem (up to 5)",
@@ -461,7 +474,8 @@
     "starsLabel": "{{count}} star",
     "starsLabel_other": "{{count}} stars",
     "reviewPlaceholder": "Write a short review (optional)",
-    "yourRating": "Your rating"
+    "yourRating": "Your rating",
+    "trackJob": "Track Your Worker"
   },
   "rating": {
     "new": "New",
@@ -502,6 +516,107 @@
     "tryServices": "Popular services",
     "tryShops": "Shop categories",
     "noResultsTitle": "No matches nearby",
-    "noResultsMessage": "Nothing near you matches \"{{query}}\". Try a different word."
+    "noResultsMessage": "Nothing near you matches \"{{query}}\". Try a different word.",
+    "title": "Search",
+    "subtitle": "Workers and shops near you"
+  },
+  "liveMap": {
+    "unavailable": "Map unavailable right now",
+    "loading": "Loading map…",
+    "recenter": "Re-centre"
+  },
+  "myBookings": {
+    "title": "My Bookings",
+    "subtitle": "Quick Book and problem jobs in one place",
+    "active": "Active",
+    "history": "History",
+    "typeQuickBook": "Quick Book",
+    "typeProblem": "Problem",
+    "emptyActiveTitle": "No Active Bookings",
+    "emptyHistoryTitle": "No Past Bookings Yet",
+    "emptyMessage": "Book a worker with Quick Book or post a problem to get started."
+  },
+  "tracking": {
+    "title": "Your Booking",
+    "subtitle": "For {{skills}}",
+    "yourWorker": "Your Worker",
+    "distanceAway": "{{distance}} away",
+    "pinLabel": "Your Arrival PIN",
+    "pinHint": "Tell this PIN to the worker only after they reach you.",
+    "callWorker": "Call",
+    "progress": "Progress",
+    "step": {
+      "accepted": "Accepted",
+      "on_the_way": "On the way",
+      "arrived": "Arrived",
+      "in_progress": "PIN verified, work started",
+      "work_done": "Work done",
+      "completed": "Finished"
+    },
+    "yourRating": "Your Rating",
+    "loadFailed": "Could not load this booking. Please try again.",
+    "cancelBooking": "Cancel Booking",
+    "cancelConfirmTitle": "Cancel This Booking?",
+    "cancelConfirmMessage": "The worker will be told the booking is cancelled.",
+    "cancelledToast": "Booking cancelled",
+    "finishedToast": "Thanks! Your rating was saved.",
+    "markFinished": "Mark as Finished",
+    "status": {
+      "broadcasting": {
+        "title": "Finding a Worker",
+        "message": "Asking verified workers near you…"
+      },
+      "accepted": {
+        "title": "Worker Found",
+        "message": "{{name}} accepted and will start soon."
+      },
+      "on_the_way": {
+        "title": "Worker On The Way",
+        "message": "{{name}} is coming to you."
+      },
+      "arrived": {
+        "title": "Worker Has Arrived",
+        "message": "Share your PIN with {{name}} to start the work."
+      },
+      "in_progress": {
+        "title": "Work In Progress",
+        "message": "{{name}} is working on it. You can confirm and rate once they mark the work done."
+      },
+      "work_done": {
+        "title": "Work Done",
+        "message": "{{name}} marked the work done. Please confirm and rate."
+      },
+      "completed": {
+        "title": "Problem Solved!",
+        "message": "Your problem is solved. Thanks for using Triolo!"
+      },
+      "cancelled": {
+        "title": "Booking Cancelled",
+        "message": "This booking was cancelled."
+      },
+      "expired": {
+        "title": "No Worker Found",
+        "message": "No nearby worker accepted in time. Try again — more workers may be free now."
+      }
+    },
+    "quotation": "Quotation: ₹{{amount}}",
+    "bookAgain": "Try Again"
+  },
+  "workerReviews": {
+    "title": "Ratings & Reviews",
+    "ratingsCount_one": "{{count}} rating",
+    "ratingsCount_other": "{{count}} ratings",
+    "noRatings": "No ratings yet",
+    "whatCustomersSay": "What customers say",
+    "noReviewsTitle": "No reviews yet",
+    "noReviewsMessage": "Ratings and feedback from finished jobs will show here.",
+    "loadFailed": "Could not load reviews right now.",
+    "statRating": "Rating",
+    "statRatedJobs": "Rated jobs",
+    "statExperience": "Experience",
+    "experienceValue_one": "{{count}} yr",
+    "experienceValue_other": "{{count}} yrs",
+    "new": "New",
+    "workPhotos": "Work photos"
   }
 }

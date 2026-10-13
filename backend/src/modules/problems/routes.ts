@@ -7,6 +7,8 @@ import { WorkersRepository } from '@/modules/workers/repository';
 import { WorkersService } from '@/modules/workers/service';
 import { NotificationsRepository } from '@/modules/notifications/repository';
 import { NotificationsService } from '@/modules/notifications/service';
+import { BookingsRepository } from '@/modules/bookings/repository';
+import { BookingsService } from '@/modules/bookings/service';
 import { ProblemsController } from './controller';
 import { ProblemsService } from './service';
 import { ProblemsRepository } from './repository';
@@ -15,7 +17,10 @@ import { completeProblemSchema, createProblemPostSchema, updateProblemPostSchema
 // Own instances over the shared pool — same wiring style as bookings/routes.ts.
 const notificationsService = new NotificationsService(new NotificationsRepository(pool));
 const workersService = new WorkersService(new WorkersRepository(pool), notificationsService);
-const service = new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService);
+// Accepting a problem starts a trip in the bookings module; that trip reports back here.
+const bookingsService = new BookingsService(new BookingsRepository(pool), workersService, notificationsService);
+const service = new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService, bookingsService);
+bookingsService.setLifecycleListener(service);
 const controller = new ProblemsController(service);
 
 export const problemsRouter = Router();

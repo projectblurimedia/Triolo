@@ -94,7 +94,7 @@ Permanently remove the caller's worker profile.
 ### GET /workers/nearby
 Search for verified workers near a given point — backs both Home's Nearby Workers search and the Services tab. Distance is computed server-side (Haversine, in SQL) — this is not a client-side filter over a full list. Excludes the caller's own worker profile, if any.
 - Auth: Bearer access token
-- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against skill category, `otherSkillDescription`, city, and area), `skillCategory?: string` (only workers who have this skill; a valid `worker_skill_category`), `sort?: "distance" | "rating"` (default `distance`; `rating` = best average first, unrated workers last, more ratings then distance breaking ties), `limit?: number` (default 20, max 50)
+- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against the worker's name, skill category, `otherSkillDescription`, city, and area), `skillCategory?: string` (only workers who have this skill; a valid `worker_skill_category`), `sort?: "distance" | "rating"` (default `distance`; `rating` = best average first, unrated workers last, more ratings then distance breaking ties), `limit?: number` (default 20, max 50)
 - Every `WorkerProfile` (this endpoint and `/workers/me/profile`) now carries `ratingAverage: number | null` (1 decimal; null before the first rating) and `ratingCount: number` — from customers rating finished Your Problems jobs (`POST /problems/:id/complete`)
 - 200: `{ success: true, data: Array<WorkerProfile & { distanceMeters: number; accountFullName: string }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned; `accountFullName` is included so a result has a "who" (mobile/email are deliberately not exposed here — no booking/contact flow exists yet)
 - 400: `VALIDATION_ERROR` — missing/invalid `latitude`/`longitude`, or an out-of-range `radiusKm`/`limit`
@@ -215,44 +215,117 @@ Notification `type` values: `profile_view` (worker/shop profile viewed), and —
 
 ## Bookings Module
 
-Quick Book — first real (non-placeholder) slice of broadcast booking (Pending Module 4's remainder): a user requests one or more skills within a radius; every verified worker with **all** of those skills (array containment, not overlap) gets a `booking_offers` row plus a big, actionable push notification (channel `booking-offers`, Accept/Reject buttons, localized per recipient's `preferredLanguage`). Every push for this feature is sent **data-only** (no FCM `notification` block at all) — Android's own `notification` payload type has no field for action buttons, so `partner-app` composes and displays the actual notification itself, client-side, via a background task that runs even with the app fully closed (see `.cloud/architecture.md`'s Notification Architecture section). First accept wins — the accept endpoint is race-safe (see `backend/src/modules/bookings/repository.ts`'s `acceptOffer`) — and every other pending offer for that request is atomically marked `lost`, with a follow-up push (same `bookingRequestId` used as the local notification's identifier) that **replaces** the original notification on each losing worker's device in place. A worker can also explicitly decline an offer (`POST /bookings/:id/decline`, also reachable via the notification's own Reject button) — affects only their own offer. No PIN verification, cancellation, or full status pipeline yet.
+Quick Book — a Rapido-style booking from broadcast to rating. A user requests one or more skills within a radius; every verified worker with **all** of those skills (array containment, not overlap) gets a `booking_offers` row plus a big, actionable push (channel `booking-offers`, Accept/Reject buttons, localized per recipient). Those offer pushes are **data-only** — `partner-app` composes the notification itself so it can carry action buttons (see `.cloud/architecture.md`'s Notification Architecture). First accept wins (race-safe, see `BookingsRepository.acceptOffer`); every other pending offer flips to `lost` and gets a replacing "job taken" push.
 
-### POST /bookings/quick
+**Status flow** (`booking_request_status`):
+
+```
+broadcasting → accepted → on_the_way → arrived → in_progress → work_done → completed
+broadcasting → expired   (no worker accepted within BROADCAST_TTL_MINUTES = 3)
+       └──────────────┴──────────┴──────────┴──→ cancelled   (customer only, before the PIN is verified)
+```
+
+- **Arrival PIN** — 4 digits (`crypto.randomInt`), generated when a worker accepts. Returned **only to the customer** (`arrivalPin`, and only while the trip is in `accepted`/`on_the_way`/`arrived`), never to the worker and never in a push. The worker types it in on arrival; it's single-use (cleared once verified), compared with `timingSafeEqual`, and locked after 5 wrong attempts (`pin_attempts`, counted under a `SELECT … FOR UPDATE` row lock).
+- **Live location** — while the trip is `accepted`/`on_the_way`/`arrived`, the worker app sends its position (`PUT /bookings/:id/location`, every ~8s/15m from an Android foreground service, so it keeps going when minimised); the customer app polls `GET /bookings/:id` (4s during the trip) and reads `worker.latitude/longitude`. The worker's position is only exposed during those three statuses.
+- **Notifications** — every customer-facing step (accepted, on the way, arrived, work done) and every worker-facing one (cancelled, completed) is saved to the recipient's notification list and pushed (`NotificationsService.notify`, channel `default`, `data: { kind, bookingId }`). The data key is `bookingId`, not `bookingRequestId` — `partner-app` treats `bookingRequestId` as a *new offer* to pop up. Texts come from `bookings/pushTemplates.ts`' `tripTemplate(event, language)` (en + te). Verifying the PIN sends nothing — both people are standing together.
+- **Rating** — the customer confirms finished (`POST /bookings/:id/complete`) with an optional 1–5 star rating and review (the app makes the rating required). Stored on the booking and added to the worker's running average via `WorkersService.recordRating()` — the same average Your Problems ratings feed.
+
+Common errors on the trip endpoints: `404 BOOKING_REQUEST_NOT_FOUND` (no such booking, or not yours), `409 BOOKING_INVALID_STATE` (the booking isn't in a status that allows this step — e.g. arriving twice, cancelling after the PIN), `404 WORKER_PROFILE_NOT_FOUND` (worker endpoints, caller has no worker profile).
+
+### Customer side
+
+#### POST /bookings/quick
 Broadcast a Quick Book request.
 - Auth: Bearer access token
-- Body: `{ skillCategories: string[], latitude: number, longitude: number, radiusKm?: number }` — `radiusKm` defaults to `50` (also the max), matching `nearbySearchQuerySchema`'s own ceiling; skills must be non-empty and each one a valid `worker_skill_category`
-- 201: `{ success: true, data: { bookingRequestId: string, matchedWorkerCount: number } }`
+- Body: `{ skillCategories: string[], latitude: number, longitude: number, radiusKm?: number, locationAddress?: string }` — `radiusKm` defaults to `50` (also the max; testing value); `locationAddress` (≤300 chars) is a reverse-geocoded label shown to the worker
+- 201: `{ success: true, data: { bookingRequestId: string, matchedWorkerCount: number } }` — the app cancels the request straight away when `matchedWorkerCount` is 0
 - 400: `VALIDATION_ERROR`
 
-### GET /bookings/:id
-Poll the status of a request the caller made — used by `user-app`'s Quick Book screen while waiting.
-- Auth: Bearer access token; scoped to the caller's own request
-- 200: `{ success: true, data: { id, accountId, skillCategories, latitude, longitude, radiusKm, status: "broadcasting"|"accepted", acceptedWorkerId, acceptedAt, createdAt, acceptedWorkerFullName: string|null, acceptedWorkerSkillCategories: string[]|null } }`
-- 404: `BOOKING_REQUEST_NOT_FOUND` — no such request, or it belongs to a different account
+#### GET /bookings/mine
+The caller's own bookings, newest first (max 50) — feeds `user-app`'s My Bookings and Home's live-booking card.
+- Auth: Bearer access token
+- 200: `{ success: true, data: CustomerBooking[] }` (shape below)
 
-### GET /bookings/offers/mine
-List the caller's own still-open offers (worker side) — feeds `partner-app`'s Bookings tab.
-- Auth: Bearer access token; caller must have a worker profile (returns `[]` otherwise, not an error)
+#### GET /bookings/:id
+One booking the caller made — polled by `user-app`'s tracker (dynamic interval: 3s while broadcasting, 4s during the trip, slower afterwards).
+- Auth: Bearer access token; scoped to the caller's own request
+- 200: `{ success: true, data: CustomerBooking }`:
+  `{ id, accountId, skillCategories, latitude, longitude, locationAddress, radiusKm, status, acceptedWorkerId, acceptedAt, startedAt, arrivedAt, pinVerifiedAt, workDoneAt, completedAt, cancelledAt, workerRating, workerReview, createdAt, arrivalPin: string|null, worker: { fullName, mobileNumber, skillCategories, ratingAverage, ratingCount, latitude, longitude, locationUpdatedAt } | null, acceptedWorkerFullName, acceptedWorkerSkillCategories }` — `arrivalPin` and `worker.latitude/longitude` are null outside `accepted`/`on_the_way`/`arrived`; the two `acceptedWorker*` fields are kept for older app builds
+- 404: `BOOKING_REQUEST_NOT_FOUND`
+
+#### POST /bookings/:id/cancel
+Cancel while `broadcasting`, `accepted`, `on_the_way` or `arrived` (not once the PIN is verified). Any still-pending offers flip to `lost`; an assigned worker is notified (`booking_cancelled`).
+- Auth: Bearer access token (the requester)
+- 200: `{ success: true, message: "Booking cancelled", data: null }`
+- 404 / 409 as above
+
+#### POST /bookings/:id/complete
+Confirm the job is finished — only once the worker has marked it `work_done`, so no step is skipped (the app shows Mark as Finished only then). Notifies the worker (`booking_completed`).
+- Auth: Bearer access token (the requester)
+- Body: `{ rating?: 1..5, review?: string (≤300) }`
+- 200: `{ success: true, message: "Booking completed", data: null }`
+- 400: `VALIDATION_ERROR`; 404 / 409 as above
+
+### Worker side
+
+#### GET /bookings/offers/mine
+The caller's own still-open offers (only requests still `broadcasting`) — `partner-app`'s Bookings → Requests tab and `IncomingJobModal`.
+- Auth: Bearer access token; returns `[]` if the caller has no worker profile
 - 200: `{ success: true, data: Array<{ offerId, bookingRequestId, skillCategories: string[], distanceMeters: number, createdAt }> }`
 
-### POST /bookings/:id/accept
-Accept a job offer. Exactly one worker can ever win a given request — see the module's own doc comment for the atomic-accept mechanics.
+#### POST /bookings/:id/accept
+Accept an offer — exactly one worker can win. Generates the arrival PIN, notifies the customer (`booking_accepted`), pushes "job taken" to every other invited worker.
 - Auth: Bearer access token; caller must have a worker profile
 - 200: `{ success: true, message: "Job accepted", data: null }`
-- 404: `WORKER_PROFILE_NOT_FOUND` — caller has no worker profile
-- 409: `BOOKING_ALREADY_TAKEN` — another worker already won this request
+- 404: `WORKER_PROFILE_NOT_FOUND`; 409: `BOOKING_ALREADY_TAKEN`
 
-### POST /bookings/:id/decline
-Decline a job offer — this worker's own offer only; every other invited worker's offer for the same request is unaffected. Backs the notification's own "Reject" action button (see the Notification Architecture note in `.cloud/architecture.md`).
+#### POST /bookings/:id/decline
+Decline this worker's own offer only. Backs the notification's Reject button.
 - Auth: Bearer access token; caller must have a worker profile
-- 200: `{ success: true, message: "Job declined", data: null }` — also returned (silent no-op) if the offer is already gone (taken, or already declined)
-- 404: `WORKER_PROFILE_NOT_FOUND` — caller has no worker profile
+- 200: `{ success: true, message: "Job declined", data: null }` — also a silent no-op if the offer is already gone
+- 404: `WORKER_PROFILE_NOT_FOUND`
+
+#### GET /bookings/jobs/mine
+Every Quick Book job this worker won — active ones first, then newest first. `partner-app`'s Bookings → Active / History tabs.
+- Auth: Bearer access token; caller must have a worker profile
+- 200: `{ success: true, data: WorkerJob[] }`
+
+#### GET /bookings/jobs/:id
+One job this worker won — polled by `partner-app`'s job screen (6s while active).
+- 200: `{ success: true, data: WorkerJob }`:
+  `{ ...the BookingRequest fields above (no arrivalPin), customerFullName, customerMobileNumber, distanceMeters: number|null, workerLatitude, workerLongitude, pinAttemptsLeft }`
+- 404: `BOOKING_REQUEST_NOT_FOUND`
+
+#### POST /bookings/:id/start
+`accepted` → `on_the_way`. Notifies the customer (`booking_on_the_way`). The app then starts background location sharing and opens Google Maps directions (a plain `https://www.google.com/maps/dir/?api=1&destination=…` link — free, no API key).
+- 200: `{ success: true, message: "Trip started", data: null }`
+
+#### PUT /bookings/:id/location
+Report the worker's current position during the trip.
+- Body: `{ latitude: -90..90, longitude: -180..180 }`
+- 200: `{ success: true, message: "Location updated", data: null }`
+- 409: `BOOKING_TRIP_NOT_ACTIVE` — the trip is over (cancelled, PIN verified, …); the app stops its location service when it sees this
+
+#### POST /bookings/:id/arrive
+`accepted` or `on_the_way` → `arrived`. Notifies the customer (`booking_arrived`) to have their PIN ready.
+- 200: `{ success: true, message: "Marked as arrived", data: null }`
+
+#### POST /bookings/:id/verify-pin
+`arrived` → `in_progress`, if the PIN matches.
+- Body: `{ pin: "dddd" }` (exactly 4 digits)
+- 200: `{ success: true, message: "PIN verified", data: null }`
+- 400: `BOOKING_PIN_INVALID` with `error.details: { attemptsLeft }`
+- 409: `BOOKING_PIN_LOCKED` — 5 wrong attempts; the customer has to cancel and rebook
+
+#### POST /bookings/:id/work-done
+`in_progress` → `work_done`. Notifies the customer (`booking_work_done`) to confirm and rate.
+- 200: `{ success: true, message: "Work marked done", data: null }`
 
 ## Problems Module
 
-"Your Problems" (`user-app` → Services menu, formerly "Post a Problem"): a user lists, adds, edits, and deletes their own problem posts. Each post saves a non-emergency issue — location, the worker type(s) it needs, their quotation, and up to 5 photos. **Save-only for now**: nothing is pushed or shown to workers yet. Photos are attached **one per request** after the post is created — Vercel rejects any request body over 4.5MB before it reaches the app, and several phone-camera photos in one multipart body routinely exceed that. The client deletes the post again if any photo upload fails, so a failed submit never leaves a half-saved post behind.
+"Your Problems" (`user-app` → Services menu, formerly "Post a Problem"): a user lists, adds, edits, and deletes their own problem posts. Each post saves a non-emergency issue — location, the worker type(s) it needs, their quotation, and up to 5 photos. Verified workers nearby see open posts and the first to accept gets the job, which then runs as a Quick Book-style trip (see `POST /problems/:id/accept`). Photos are attached **one per request** after the post is created — Vercel rejects any request body over 4.5MB before it reaches the app, and several phone-camera photos in one multipart body routinely exceed that. The client deletes the post again if any photo upload fails, so a failed submit never leaves a half-saved post behind.
 
-`ProblemPost` shape: `{ id, accountId, skillCategories: string[], description: string|null, quotationAmount: number, photoUrls: string[], locationAddress: string|null, latitude: number|null, longitude: number|null, status, acceptedWorkerId: string|null, acceptedAt, workDoneAt, completedAt, createdAt }`
+`ProblemPost` shape: `{ id, accountId, skillCategories: string[], description: string|null, quotationAmount: number, photoUrls: string[], locationAddress: string|null, latitude: number|null, longitude: number|null, status, acceptedWorkerId: string|null, acceptedAt, workDoneAt, completedAt, workerRating, workerReview, bookingRequestId: string|null, createdAt }`
 
 **Job flow** (`status`): `open` → `accepted` (a verified worker with a matching skill accepts — first accept wins) → `work_done` (that worker marks it done) → `completed` (the **customer** confirms it finished — they can also confirm straight from `accepted`). Edit and photo changes are only allowed while `open`; delete is allowed while `open` or `completed`, never mid-job. Each transition pushes the other side (`kind`: `problem_accepted` / `problem_work_done` → customer, `problem_completed` → worker; text localized per recipient). `closed` exists in the DB enum but is unused.
 
@@ -315,16 +388,36 @@ Problems this worker accepted (active first, then finished; max 50), with the cu
 - 200: `{ success: true, data: Array<ProblemPost & { customerFullName: string, customerMobileNumber: string }> }`
 
 ### POST /problems/:id/accept
-Accept an open problem. Race-safe — `UPDATE ... WHERE status = 'open'` lets exactly one worker win. Pushes the customer.
+Accept an open problem. Race-safe — `UPDATE ... WHERE status = 'open'` lets exactly one worker win. **The job then runs as a trip:** the problems module asks bookings (`BookingsService.createForAcceptedProblem`) to create an already-`accepted` booking for it, with an arrival PIN, the worker's distance, `problem_post_id` and the quotation. From there it's the Quick Book flow — start trip / live location / arrive / PIN / work done / customer finishes with a rating (see the Bookings Module). If creating the trip fails, the post is reopened. The customer gets a `problem_accepted` notification whose `data.bookingId` opens the tracker.
 - Auth: Bearer access token; verified worker profile; can't be the caller's own post
-- 200: `{ success: true, message: "Problem accepted", data: ProblemPost }`
+- 200: `{ success: true, message: "Problem accepted", data: ProblemPost }` — `data.bookingRequestId` is the new trip
 - 403: `WORKER_NOT_VERIFIED`; 404: `PROBLEM_POST_NOT_FOUND` / `WORKER_PROFILE_NOT_FOUND`; 409: `PROBLEM_ALREADY_TAKEN`
+
+**Trip-linked problems** (`bookingRequestId` set): `GET /problems/mine` and `GET /problems/assigned` add `bookingStatus` (the trip's live status, e.g. `on_the_way`). When the trip completes, the post becomes `completed` with the trip's rating/review copied over. When the customer cancels the trip, the post goes back to `open` (unlinked) for other workers. Bookings tells problems through a `BookingLifecycleListener` registered in the routes files, so neither module touches the other's table. The two endpoints below only apply to jobs accepted before this change (they 409 `PROBLEM_INVALID_STATE` for a trip-linked post).
 
 ### POST /problems/:id/work-done
 The accepted worker marks the work done (`accepted` → `work_done`). Pushes the customer to confirm.
 - Auth: Bearer access token; must be the worker who accepted it
 - 200: `{ success: true, message: "Work marked done", data: ProblemPost }`
 - 404: `PROBLEM_POST_NOT_FOUND` / `WORKER_PROFILE_NOT_FOUND`; 409: `PROBLEM_INVALID_STATE`
+
+## Reviews Module
+
+A worker's ratings and written feedback, for the profile screens (partner-app Profile tab, user-app worker profile). Owns no tables: it reads finished, rated jobs through `BookingsService` (Quick Book trips and trip-linked problems) and `ProblemsService` (problem jobs finished before they became trips — trip-linked ones are skipped there so nothing is counted twice).
+
+`WorkerReviewsSummary`: `{ ratingAverage: number|null, ratingCount: number, distribution: [n1, n2, n3, n4, n5], reviews: Array<{ rating: number|null, review: string|null, customerName, skillCategories, completedAt }> }`. `ratingAverage`/`ratingCount` come from the worker profile's running totals. `distribution` counts ratings per star (index 0 = 1 star) over the last 200 rated jobs. `reviews` holds the newest 30. `customerName` is the first name plus last initial only ("Ravi K.").
+
+### GET /reviews/workers/:workerId
+A worker's public ratings and reviews.
+- Auth: Bearer access token
+- 200: `{ success: true, data: WorkerReviewsSummary }`
+- 404: `WORKER_PROFILE_NOT_FOUND` (also for a malformed id)
+
+### GET /reviews/me
+The signed-in worker's own ratings and reviews.
+- Auth: Bearer access token; caller must have a worker profile
+- 200: `{ success: true, data: WorkerReviewsSummary }`
+- 404: `WORKER_PROFILE_NOT_FOUND`
 
 ---
 

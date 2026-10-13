@@ -4,9 +4,11 @@ import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/service
 import { WorkersService } from '@/modules/workers/service';
 import { WorkerProfile } from '@/modules/workers/interfaces';
 import { NotificationsService } from '@/modules/notifications/service';
+import { BookingsService } from '@/modules/bookings/service';
+import { BookingLifecycleListener } from '@/modules/bookings/interfaces';
 import { ProblemsRepository } from './repository';
 import { CompleteProblemDto, CreateProblemPostDto, UpdateProblemPostDto } from './dto';
-import { AssignedProblem, NearbyProblem, OwnProblemPost, ProblemPost, ProblemTransitionResult } from './interfaces';
+import { AssignedProblem, NearbyProblem, OwnProblemPost, ProblemPost, ProblemTransitionResult, RatedJob, WithTripStatus } from './interfaces';
 import { problemPushTemplates } from './pushTemplates';
 
 const PROBLEM_PHOTOS_FOLDER = 'triolo/problems';
@@ -26,11 +28,12 @@ type PushKind = 'problem_accepted' | 'problem_work_done' | 'problem_completed';
  * side. Depends on WorkersService/NotificationsService (never their tables directly) — the
  * same module-boundary shape as bookings.
  */
-export class ProblemsService {
+export class ProblemsService implements BookingLifecycleListener {
   constructor(
     private readonly repository: ProblemsRepository,
     private readonly workersService: WorkersService,
     private readonly notificationsService: NotificationsService,
+    private readonly bookingsService: BookingsService,
   ) {}
 
   // --- Customer side ---
@@ -107,7 +110,7 @@ export class ProblemsService {
   }
 
   async listMyPosts(accountId: string): Promise<OwnProblemPost[]> {
-    return this.repository.findForAccount(accountId, DEFAULT_LIST_LIMIT);
+    return this.withTripStatuses(await this.repository.findForAccount(accountId, DEFAULT_LIST_LIMIT));
   }
 
   async completeProblem(accountId: string, postId: string, dto: CompleteProblemDto = {}): Promise<ProblemPost> {
@@ -145,9 +148,14 @@ export class ProblemsService {
     if (!worker) {
       return [];
     }
-    return this.repository.findAssignedToWorker(worker.id, DEFAULT_LIST_LIMIT);
+    return this.withTripStatuses(await this.repository.findAssignedToWorker(worker.id, DEFAULT_LIST_LIMIT));
   }
 
+  /**
+   * First accept wins, then the job runs as a trip: an already-accepted booking is started
+   * for it (map, live tracking, arrival PIN, work done, rating — the same flow as Quick
+   * Book). If starting the trip fails, the post is reopened so it isn't stuck half-accepted.
+   */
   async acceptProblem(accountId: string, postId: string): Promise<ProblemPost> {
     const worker = await this.getVerifiedWorker(accountId);
     const result = await this.repository.accept(postId, worker.id, accountId);
@@ -157,8 +165,45 @@ export class ProblemsService {
       }
       throw AppError.conflict('Another worker has already accepted this problem.', 'PROBLEM_ALREADY_TAKEN');
     }
-    await this.push(result, problemPushTemplates.accepted(result.notifyLanguage), 'problem_accepted');
-    return result.post;
+
+    const post = result.post;
+    let bookingRequestId: string;
+    try {
+      bookingRequestId = await this.bookingsService.createForAcceptedProblem({
+        customerAccountId: post.accountId,
+        workerId: worker.id,
+        skillCategories: post.skillCategories,
+        // Nearby only lists posts with GPS coordinates, so an accepted post always has them.
+        latitude: post.latitude as number,
+        longitude: post.longitude as number,
+        locationAddress: post.locationAddress,
+        distanceMeters: distanceBetween(worker.latitude, worker.longitude, post.latitude, post.longitude),
+        problemPostId: post.id,
+        quotationAmount: post.quotationAmount,
+      });
+      await this.repository.setBookingRequest(post.id, bookingRequestId);
+    } catch (err) {
+      await this.repository.reopen(post.id);
+      throw err;
+    }
+
+    await this.push(result, problemPushTemplates.accepted(result.notifyLanguage), 'problem_accepted', bookingRequestId);
+    return { ...post, bookingRequestId };
+  }
+
+  // --- Trip lifecycle (BookingLifecycleListener, called by the bookings module) ---
+
+  async onProblemTripCompleted(problemPostId: string, rating: number | null, review: string | null): Promise<void> {
+    await this.repository.completeFromTrip(problemPostId, rating, review);
+  }
+
+  async onProblemTripCancelled(problemPostId: string): Promise<void> {
+    await this.repository.reopen(problemPostId);
+  }
+
+  /** Rated jobs accepted before trips existed — trip-linked ones are listed by bookings. */
+  async listRatedJobsForWorker(workerId: string, limit: number): Promise<RatedJob[]> {
+    return this.repository.findRatedForWorker(workerId, limit);
   }
 
   async markWorkDone(accountId: string, postId: string): Promise<ProblemPost> {
@@ -209,10 +254,39 @@ export class ProblemsService {
    * Saved as an in-app notification (so it shows in the recipient's notification list in
    * either app) plus a best-effort push. The push never fails the transition itself.
    */
-  private async push(result: ProblemTransitionResult, text: { title: string; body: string }, kind: PushKind) {
+  private async push(
+    result: ProblemTransitionResult,
+    text: { title: string; body: string },
+    kind: PushKind,
+    bookingId?: string,
+  ) {
+    // `bookingId` lets a tap open the trip tracker straight away.
+    const data: Record<string, string> = { kind, problemId: result.post.id };
+    if (bookingId) data.bookingId = bookingId;
     await this.notificationsService.notify(result.notifyAccountId, kind, text.title, text.body, {
-      data: { kind, problemId: result.post.id },
+      data,
       channelId: 'default',
     });
   }
+
+  /** Fills in each post's linked trip status (one query for the whole list). */
+  private async withTripStatuses<T extends ProblemPost & WithTripStatus>(posts: T[]): Promise<T[]> {
+    const ids = posts.map((post) => post.bookingRequestId).filter((id): id is string => id !== null);
+    if (ids.length === 0) return posts;
+    const statuses = await this.bookingsService.getStatuses(ids);
+    return posts.map((post) => ({
+      ...post,
+      bookingStatus: post.bookingRequestId ? (statuses.get(post.bookingRequestId) ?? null) : null,
+    }));
+  }
+}
+
+/** Haversine distance in meters, or null when either point is unknown. */
+function distanceBetween(lat1: number | null, lng1: number | null, lat2: number | null, lng2: number | null): number | null {
+  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+  const a =
+    Math.sin(toRad(lat2 - lat1) / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lng2 - lng1) / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(a)));
 }

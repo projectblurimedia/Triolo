@@ -217,7 +217,7 @@ export class WorkersRepository {
            AND w.account_id != $3
        ) sub
        WHERE sub.distance_meters <= $4
-         AND ($5::text IS NULL OR sub.other_skill_description ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.skill_categories, ',') ILIKE $5)
+         AND ($5::text IS NULL OR sub.account_full_name ILIKE $5 OR sub.other_skill_description ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.skill_categories, ',') ILIKE $5)
          AND ($7::worker_skill_category IS NULL OR $7::worker_skill_category = ANY(sub.skill_categories))
        ORDER BY ${orderBy}
        LIMIT $6`,

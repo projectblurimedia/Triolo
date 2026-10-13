@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,13 +6,20 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
+import { useQueryClient } from '@tanstack/react-query';
 import { LoadingIndicator } from './LoadingIndicator';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from '@/hooks/useBookingOffers';
 import { usePendingOfferStore } from '@/state/pendingOfferStore';
+import { openJob } from '@/state/jobFocusStore';
 import { showToast } from '@/state/toastStore';
 import { ApiError } from '@/services/apiClient';
 import { formatDistance } from '@/utils/formatDistance';
+import { jobQueryKey } from '@/hooks/useJobs';
+import { jobsService } from '@/services/jobsService';
+
+// Lets the job screen finish fading in on top before this one closes underneath it.
+const MODAL_HANDOFF_MS = 350;
 
 const ACCEPT_GRADIENT = ['#16A34A', '#22C55E'] as const;
 
@@ -41,6 +48,8 @@ export function IncomingJobModal() {
   const insets = useSafeAreaInsets();
   const { data: offers, refetch: refetchOffers } = useBookingOffers();
   const acceptMutation = useAcceptBookingOffer();
+  const queryClient = useQueryClient();
+  const [handingOff, setHandingOff] = useState(false);
   const declineMutation = useDeclineBookingOffer();
 
   const focusedBookingRequestId = usePendingOfferStore((state) => state.focusedBookingRequestId);
@@ -79,10 +88,21 @@ export function IncomingJobModal() {
   const handleAccept = () => {
     if (!offer) return;
     acceptMutation.mutate(offer.bookingRequestId, {
-      onSuccess: () => {
+      onSuccess: async () => {
+        const id = offer.bookingRequestId;
+        Notifications.dismissNotificationAsync(id).catch(() => {});
+        // The job screen is the first thing the worker sees: load the job while Accept is
+        // still spinning (so it opens with the map and customer, not a spinner), open it on
+        // top, and only then close this screen underneath — opening and closing two native
+        // modals in the same instant could leave the wrong one showing on Android.
+        setHandingOff(true);
+        await queryClient.prefetchQuery({ queryKey: jobQueryKey(id), queryFn: () => jobsService.get(id) }).catch(() => {});
+        openJob(id);
         showToast({ variant: 'success', title: t('bookings.acceptedToastTitle'), message: t('bookings.acceptedToastMessage') });
-        Notifications.dismissNotificationAsync(offer.bookingRequestId).catch(() => {});
-        clearFocusedOffer();
+        setTimeout(() => {
+          clearFocusedOffer();
+          setHandingOff(false);
+        }, MODAL_HANDOFF_MS);
       },
       onError: (err) => {
         const alreadyTaken = err instanceof ApiError && err.code === 'BOOKING_ALREADY_TAKEN';
@@ -115,8 +135,21 @@ export function IncomingJobModal() {
     });
   };
 
-  const busy = acceptMutation.isPending || declineMutation.isPending;
   const notFound = !offer && checkedForId === focusedBookingRequestId && focusedBookingRequestId !== null;
+
+  // The worker already tapped Accept on the notification: accept as soon as the offer is
+  // loaded (once per offer), showing Accept as spinning the whole time.
+  const autoAccept = usePendingOfferStore((state) => state.autoAccept);
+  const autoAcceptedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!autoAccept || !offer || autoAcceptedIdRef.current === offer.bookingRequestId) return;
+    autoAcceptedIdRef.current = offer.bookingRequestId;
+    handleAccept();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per auto-accepted offer
+  }, [autoAccept, offer]);
+  const autoAccepting = autoAccept && !notFound && !acceptMutation.isError;
+
+  const busy = acceptMutation.isPending || declineMutation.isPending || handingOff || autoAccepting;
   const acceptDisabled = busy || !offer || notFound;
   const glass = isDark ? HEADER_GLASS_DARK : HEADER_GLASS_LIGHT;
 
@@ -204,7 +237,7 @@ export function IncomingJobModal() {
             accessibilityLabel={t('bookings.accept')}
           >
             <LinearGradient colors={ACCEPT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.acceptButton}>
-              {acceptMutation.isPending ? (
+              {acceptMutation.isPending || handingOff || autoAccepting ? (
                 <LoadingIndicator size={22} dotSize={4.5} />
               ) : (
                 <>

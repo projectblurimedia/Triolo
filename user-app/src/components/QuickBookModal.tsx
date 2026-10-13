@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
 import { RadarPulse } from './RadarPulse';
 import { ToastHost } from './ToastHost';
 import { Button } from './Button';
 import { SKILL_CATEGORIES } from './WorkerProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { bookingsService } from '@/services/bookingsService';
+import { bookingsService, CustomerBooking } from '@/services/bookingsService';
+import { bookingQueryKey } from '@/hooks/useBookings';
 import { showToast } from '@/state/toastStore';
+import { openBookingTracker } from '@/state/bookingTrackerStore';
+import { ensureLocation } from '@/state/locationStore';
 
 interface QuickBookModalProps {
   visible: boolean;
@@ -23,60 +26,50 @@ interface QuickBookModalProps {
 // — a real production default would likely be much smaller. The backend's own
 // createQuickBookingSchema caps radiusKm at 50 too, so this is already at that ceiling.
 const QUICK_BOOK_RADIUS_KM = 50;
-// Fast enough that "first accept wins" reads as close to real-time to the requester without
-// hammering the serverless function — same order of magnitude as partner-app's own
-// useNotifications() polling interval.
-const STATUS_POLL_MS = 3000;
-const LAST_KNOWN_MAX_AGE_MS = 2 * 60 * 1000;
-const LAST_KNOWN_MAX_ACCURACY_M = 500;
+// Lets the tracker finish fading in on top before this screen closes underneath it.
+const MODAL_HANDOFF_MS = 350;
+const GEOCODE_TIMEOUT_MS = 4000;
 
-type Stage =
-  | { kind: 'selecting' }
-  | { kind: 'broadcasting'; bookingRequestId: string }
-  | { kind: 'accepted'; workerName: string; skillCategories: string[] };
+/** A readable address for the worker, from the phone's own (free) geocoder — best-effort, never blocks booking. */
+async function addressFor(latitude: number, longitude: number): Promise<string | undefined> {
+  try {
+    const places = await Promise.race([
+      Location.reverseGeocodeAsync({ latitude, longitude }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), GEOCODE_TIMEOUT_MS)),
+    ]);
+    const place = places?.[0];
+    if (!place) return undefined;
+    const parts = [place.name, place.street, place.district ?? place.subregion, place.city, place.postalCode].filter(
+      (part, index, all): part is string => !!part && all.indexOf(part) === index,
+    );
+    return parts.join(', ').slice(0, 300) || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
- * Services menu's "Quick Book" — pick one or more skills, tap "Book Nearby", and every
- * verified worker within QUICK_BOOK_RADIUS_KM who has *all* of those skills (not just one)
- * gets a big, high-priority push (see backend's modules/bookings). Whoever accepts first
- * wins; this screen just polls GET /bookings/:id (STATUS_POLL_MS) while broadcasting and
- * flips to a success state the moment `status` becomes 'accepted'. No "My Bookings" history
- * yet (that's still the separate, not-yet-built drawer item) — closing this modal mid-search
- * abandons tracking that specific request, though the broadcast itself keeps running
- * server-side; a worker can still accept it, just with nothing here watching for it anymore.
+ * Services menu's / Home's "Quick Book" — pick one or more skills, tap "Book Nearby", and
+ * every verified worker within QUICK_BOOK_RADIUS_KM who has *all* of those skills gets a big,
+ * high-priority push (see backend's modules/bookings). This screen only picks skills and sends
+ * the request (radar while it does); it then hands over to the root-mounted
+ * BookingTrackingModal, which follows the booking through the whole trip and can be reopened
+ * any time from My Bookings or Home. A request that matched nobody is cancelled straight away
+ * so it doesn't linger in history as "searching".
  */
 export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
-  const accentColor = colors.primary;
-  const [stage, setStage] = useState<Stage>({ kind: 'selecting' });
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!visible) return;
-    setStage({ kind: 'selecting' });
     setSelectedSkills([]);
+    setSubmitting(false);
   }, [visible]);
-
-  const bookingRequestId = stage.kind === 'broadcasting' ? stage.bookingRequestId : null;
-  const { data: status } = useQuery({
-    queryKey: ['quickBookStatus', bookingRequestId],
-    queryFn: () => bookingsService.getStatus(bookingRequestId as string),
-    enabled: bookingRequestId !== null,
-    refetchInterval: STATUS_POLL_MS,
-  });
-
-  useEffect(() => {
-    if (status?.status === 'accepted' && stage.kind === 'broadcasting') {
-      setStage({
-        kind: 'accepted',
-        workerName: status.acceptedWorkerFullName ?? '',
-        skillCategories: status.acceptedWorkerSkillCategories ?? [],
-      });
-    }
-  }, [status, stage.kind]);
 
   const toggleSkill = (key: string) => {
     setSelectedSkills((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
@@ -90,32 +83,62 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
     if (selectedSkills.length === 0 || submitting) return;
     setSubmitting(true);
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!permission.granted) {
-        showToast({ variant: 'error', title: t('quickBook.locationDeniedTitle'), message: t('quickBook.locationDeniedMessage') });
+      // Location must really be ON: Android still hands out a last-known position with location
+      // switched off, which let a booking go out without it. ensureLocation() turns it on (or
+      // explains why it can't) and only then returns a position.
+      const coords = await ensureLocation();
+      if (!coords) {
+        showToast({ variant: 'error', title: t('location.requiredTitle'), message: t('location.requiredMessage') });
+        setSubmitting(false);
         return;
       }
-      // A fresh GPS fix can take several seconds and was most of the wait before workers got
-      // notified. A recent last-known fix (≤2 min old, ≤500m accuracy) is plenty for a
-      // 50km broadcast radius, so use it when available and only wait for a fresh fix
-      // (balanced accuracy, not high) when there isn't one.
-      const position =
-        (await Location.getLastKnownPositionAsync({ maxAge: LAST_KNOWN_MAX_AGE_MS, requiredAccuracy: LAST_KNOWN_MAX_ACCURACY_M })) ??
-        (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+      const position = { coords };
+      const locationAddress = await addressFor(position.coords.latitude, position.coords.longitude);
       const result = await bookingsService.createQuickBooking({
         skillCategories: selectedSkills,
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         radiusKm: QUICK_BOOK_RADIUS_KM,
+        locationAddress,
       });
       if (result.matchedWorkerCount === 0) {
+        bookingsService.cancel(result.bookingRequestId).catch(() => {});
         showToast({ variant: 'info', title: t('quickBook.noWorkersTitle'), message: t('quickBook.noWorkersMessage') });
+        setSubmitting(false);
         return;
       }
-      setStage({ kind: 'broadcasting', bookingRequestId: result.bookingRequestId });
+      // Seamless handoff: seed the tracker with the request we just created so it opens
+      // straight onto the same radar (no spinner flash while its first poll runs), open it
+      // on top first, and only then close this screen underneath it — opening and closing
+      // two native modals in the same instant made the swap flicker on Android.
+      const now = new Date().toISOString();
+      const seeded: CustomerBooking = {
+        id: result.bookingRequestId,
+        status: 'broadcasting',
+        skillCategories: selectedSkills,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        locationAddress: locationAddress ?? null,
+        acceptedAt: null,
+        startedAt: null,
+        arrivedAt: null,
+        pinVerifiedAt: null,
+        workDoneAt: null,
+        completedAt: null,
+        cancelledAt: null,
+        workerRating: null,
+        workerReview: null,
+        problemPostId: null,
+        quotationAmount: null,
+        createdAt: now,
+        worker: null,
+        arrivalPin: null,
+      };
+      queryClient.setQueryData(bookingQueryKey(result.bookingRequestId), seeded);
+      openBookingTracker(result.bookingRequestId);
+      setTimeout(onClose, MODAL_HANDOFF_MS);
     } catch {
       showToast({ variant: 'error', title: t('common.errorTitle'), message: t('errors.generic') });
-    } finally {
       setSubmitting(false);
     }
   };
@@ -127,13 +150,10 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
       ? (SKILL_CATEGORIES.find((skill) => skill.key === selectedSkills[0])?.icon ?? 'screwdriver-wrench')
       : 'screwdriver-wrench';
 
-  const skillLabelList = (keys: string[]) => keys.map((key) => t(`workerProfile.skills.${key}`)).join(', ');
-
   const renderBody = () => {
-    // Shown from the moment "Book Nearby" is tapped (`submitting` — GPS fix + creating the
-    // request) through the whole broadcast, so the radar starts immediately instead of
-    // after a plain button spinner.
-    if (submitting || stage.kind === 'broadcasting') {
+    // Shown from the moment "Book Nearby" is tapped (GPS fix + creating the request), so the
+    // radar starts immediately; the tracking screen continues it once the request is sent.
+    if (submitting) {
       return (
         <View style={styles.centerBody}>
           <RadarPulse icon={radarIcon} />
@@ -141,32 +161,10 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
           <Text style={[styles.stateMessage, { color: colors.textMuted }]}>{t('quickBook.searchingMessage')}</Text>
           <View style={[styles.skillSummaryRow]}>
             {selectedSkills.map((key) => (
-              <View key={key} style={[styles.summaryChip, { backgroundColor: `${accentColor}16` }]}>
-                <Text style={[styles.summaryChipText, { color: accentColor }]}>{t(`workerProfile.skills.${key}`)}</Text>
+              <View key={key} style={[styles.summaryChip, { backgroundColor: `${colors.primary}16` }]}>
+                <Text style={[styles.summaryChipText, { color: colors.primary }]}>{t(`workerProfile.skills.${key}`)}</Text>
               </View>
             ))}
-          </View>
-          <Pressable style={styles.cancelLink} onPress={handleClose}>
-            <Text style={[styles.cancelLinkText, { color: colors.textMuted }]}>{t('quickBook.cancelSearch')}</Text>
-          </Pressable>
-        </View>
-      );
-    }
-
-    if (stage.kind === 'accepted') {
-      return (
-        <View style={styles.centerBody}>
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.successIcon}>
-            <FontAwesome6 name="circle-check" size={30} color="#FFFFFF" solid />
-          </LinearGradient>
-          <Text style={[styles.stateTitle, { color: colors.text }]}>
-            {t('quickBook.acceptedTitle', { name: stage.workerName || t('common.appName') })}
-          </Text>
-          <Text style={[styles.stateMessage, { color: colors.textMuted }]}>
-            {t('quickBook.acceptedMessage', { skills: skillLabelList(stage.skillCategories) })}
-          </Text>
-          <View style={styles.doneButtonWrap}>
-            <Button label={t('common.done')} onPress={handleClose} />
           </View>
         </View>
       );
@@ -278,14 +276,10 @@ const styles = StyleSheet.create({
   chipLabel: { ...typography.body, fontFamily: fonts.medium, fontSize: 13 },
   bookButtonWrap: { paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1 },
   centerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  successIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   stateTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginTop: 16, marginBottom: 8, textAlign: 'center' },
   radarTitle: { marginTop: 28 },
   stateMessage: { ...typography.body, textAlign: 'center', lineHeight: 20 },
   skillSummaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 18 },
   summaryChip: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   summaryChipText: { ...typography.caption, fontFamily: fonts.medium },
-  cancelLink: { marginTop: 28, padding: 8 },
-  cancelLinkText: { ...typography.body, fontFamily: fonts.medium },
-  doneButtonWrap: { width: '100%', marginTop: 28 },
 });

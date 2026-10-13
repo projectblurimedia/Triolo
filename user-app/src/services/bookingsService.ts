@@ -1,12 +1,39 @@
 import { apiClient } from './apiClient';
 
-export type BookingRequestStatus = 'broadcasting' | 'accepted';
+/**
+ * broadcasting → accepted → on_the_way → arrived → in_progress (PIN verified) → work_done
+ * → completed; 'cancelled' any time before the PIN is verified.
+ */
+export type BookingRequestStatus =
+  | 'broadcasting'
+  | 'accepted'
+  | 'on_the_way'
+  | 'arrived'
+  | 'in_progress'
+  | 'work_done'
+  | 'completed'
+  | 'cancelled'
+  /** No worker accepted within a few minutes. */
+  | 'expired';
+
+export const ACTIVE_BOOKING_STATUSES: BookingRequestStatus[] = [
+  'broadcasting',
+  'accepted',
+  'on_the_way',
+  'arrived',
+  'in_progress',
+  'work_done',
+];
+/** The worker is assigned and travelling / at the door — map, live location and PIN apply. */
+export const TRIP_STATUSES: BookingRequestStatus[] = ['accepted', 'on_the_way', 'arrived'];
+export const CANCELLABLE_STATUSES: BookingRequestStatus[] = ['broadcasting', 'accepted', 'on_the_way', 'arrived'];
 
 export interface CreateQuickBookingParams {
   skillCategories: string[];
   latitude: number;
   longitude: number;
   radiusKm?: number;
+  locationAddress?: string;
 }
 
 export interface CreateQuickBookingResult {
@@ -14,18 +41,54 @@ export interface CreateQuickBookingResult {
   matchedWorkerCount: number;
 }
 
-export interface BookingRequestStatusResult {
+export interface BookingWorker {
+  fullName: string;
+  mobileNumber: string;
+  skillCategories: string[];
+  ratingAverage: number | null;
+  ratingCount: number;
+  latitude: number | null;
+  longitude: number | null;
+  locationUpdatedAt: string | null;
+}
+
+/** The customer's view of one Quick Book booking. */
+export interface CustomerBooking {
   id: string;
   status: BookingRequestStatus;
   skillCategories: string[];
-  acceptedWorkerFullName: string | null;
-  acceptedWorkerSkillCategories: string[] | null;
+  latitude: number;
+  longitude: number;
+  locationAddress: string | null;
+  acceptedAt: string | null;
+  startedAt: string | null;
+  arrivedAt: string | null;
+  pinVerifiedAt: string | null;
+  workDoneAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  workerRating: number | null;
+  workerReview: string | null;
+  /** Set when this booking is a Your Problems job a worker accepted. */
+  problemPostId: string | null;
+  /** That problem’s quotation in rupees. */
+  quotationAmount: number | null;
+  createdAt: string;
+  worker: BookingWorker | null;
+  /** Shown while the worker is on the way / at the door; the worker never receives it. */
+  arrivalPin: string | null;
 }
 
 export const bookingsService = {
   createQuickBooking: (params: CreateQuickBookingParams) =>
     apiClient.post<CreateQuickBookingResult>('/bookings/quick', params, true),
 
-  getStatus: (bookingRequestId: string) =>
-    apiClient.get<BookingRequestStatusResult>(`/bookings/${bookingRequestId}`, true),
+  getBooking: (bookingRequestId: string) => apiClient.get<CustomerBooking>(`/bookings/${bookingRequestId}`, true),
+
+  listMine: () => apiClient.get<CustomerBooking[]>('/bookings/mine', true),
+
+  cancel: (bookingRequestId: string) => apiClient.post<null>(`/bookings/${bookingRequestId}/cancel`, undefined, true),
+
+  complete: (bookingRequestId: string, rating: number, review?: string) =>
+    apiClient.post<null>(`/bookings/${bookingRequestId}/complete`, { rating, review: review || undefined }, true),
 };

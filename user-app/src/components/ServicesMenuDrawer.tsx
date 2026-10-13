@@ -6,6 +6,7 @@ import { DrawerMenuItem } from './DrawerMenuItem';
 import { ComingSoonModal } from './ComingSoonModal';
 import { QuickBookModal } from './QuickBookModal';
 import { YourProblemsModal } from './YourProblemsModal';
+import { MyBookingsModal } from './MyBookingsModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 interface ServicesMenuDrawerProps {
@@ -113,12 +114,13 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
         />
       </SideMenuDrawer>
 
-      {/* Quick Book and Your Problems are real now (see each modal's own doc comment) —
+      {/* Quick Book, Your Problems and My Bookings are real (see each modal's own doc comment) —
           every other item still opens the shared ComingSoonModal placeholder. */}
       <QuickBookModal visible={activeItem === 'quickBook'} onClose={() => setActiveItem(null)} />
       <YourProblemsModal visible={activeItem === 'yourProblems'} onClose={() => setActiveItem(null)} />
+      <MyBookingsModal visible={activeItem === 'myBookings'} onClose={() => setActiveItem(null)} />
 
-      {activeConfig && activeItem !== 'quickBook' && activeItem !== 'yourProblems' ? (
+      {activeConfig && activeItem === 'favoriteWorkers' ? (
         <ComingSoonModal
           visible={activeItem !== null}
           onClose={() => setActiveItem(null)}

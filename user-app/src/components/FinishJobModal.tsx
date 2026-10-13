@@ -9,7 +9,7 @@ import { fonts, typography, useThemeColors } from '@/theme';
 
 const FINISH_GRADIENT = ['#16A34A', '#22C55E'] as const;
 
-interface FinishProblemModalProps {
+interface FinishJobModalProps {
   visible: boolean;
   workerName: string | null;
   loading: boolean;
@@ -18,11 +18,11 @@ interface FinishProblemModalProps {
 }
 
 /**
- * "Mark as Finished" for a Your Problems job — the customer confirms the work is done and
+ * "Mark as Finished" for a Your Problems job or a Quick Book booking — the customer confirms the work is done and
  * rates the worker 1–5 stars (required — ratings are what the Services tab's Top Rated
  * sorting runs on) with an optional short review. Same centered-card shell as ConfirmModal.
  */
-export function FinishProblemModal({ visible, workerName, loading, onConfirm, onCancel }: FinishProblemModalProps) {
+export function FinishJobModal({ visible, workerName, loading, onConfirm, onCancel }: FinishJobModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const [rating, setRating] = useState(0);

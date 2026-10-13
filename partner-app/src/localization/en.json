@@ -127,7 +127,16 @@
     "takenToastMessage": "Another worker accepted this job first.",
     "newJobTitle": "New Job Request",
     "offerGoneTitle": "Job No Longer Available",
-    "offerGoneMessage": "This job was already taken, declined, or is no longer open."
+    "offerGoneMessage": "This job was already taken, declined, or is no longer open.",
+    "tabRequests": "Requests",
+    "tabActive": "Active",
+    "tabHistory": "History",
+    "typeQuickBook": "Quick Book",
+    "typeProblem": "Problem",
+    "emptyActiveTitle": "No Active Jobs",
+    "emptyActiveMessage": "Jobs you accept show up here until they are finished.",
+    "emptyHistoryTitle": "No Past Jobs Yet",
+    "emptyHistoryMessage": "Finished and cancelled jobs, with customer ratings, will appear here."
   },
   "location": {
     "useCurrent": "Use My Current Location",
@@ -259,7 +268,13 @@
     "PROBLEM_ALREADY_TAKEN": "Another worker accepted this problem first.",
     "PROBLEM_INVALID_STATE": "This job has changed. Pull down to refresh.",
     "PROBLEM_POST_NOT_FOUND": "This problem is no longer available.",
-    "WORKER_NOT_VERIFIED": "Your Worker profile is not verified yet."
+    "WORKER_NOT_VERIFIED": "Your Worker profile is not verified yet.",
+    "BOOKING_ALREADY_TAKEN": "This job was already taken by another worker.",
+    "BOOKING_REQUEST_NOT_FOUND": "This booking could not be found.",
+    "BOOKING_INVALID_STATE": "This booking has already moved on. Please refresh.",
+    "BOOKING_TRIP_NOT_ACTIVE": "This trip is no longer active.",
+    "BOOKING_PIN_INVALID": "That PIN is not correct.",
+    "BOOKING_PIN_LOCKED": "Too many wrong PIN attempts. Ask the customer to cancel and book again."
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -291,5 +306,110 @@
     "workersOnlyTitle": "For Workers",
     "workersOnlyMessage": "Problems posted by customers near you show up here once your Worker profile is verified.",
     "loadFailedTitle": "Couldn't Load Jobs"
+  },
+  "liveMap": {
+    "unavailable": "Map unavailable right now",
+    "loading": "Loading map…",
+    "recenter": "Re-centre"
+  },
+  "job": {
+    "title": "Job",
+    "trackingTitle": "Sharing your location",
+    "trackingBody": "Your customer can see you on the way.",
+    "tripStartedTitle": "Trip Started",
+    "tripStartedMessage": "Your customer can now track you live.",
+    "locationOffTitle": "Location Not Shared",
+    "locationOffMessage": "Allow location so your customer can track you. The trip has still started.",
+    "arrivedTitle": "Arrival Marked",
+    "arrivedMessage": "Ask the customer for their 4-digit PIN.",
+    "pinVerifiedTitle": "PIN Verified",
+    "pinVerifiedMessage": "You can start the work now.",
+    "pinWrong_one": "Wrong PIN. {{count}} attempt left.",
+    "pinWrong_other": "Wrong PIN. {{count}} attempts left.",
+    "workDoneTitle": "Marked As Done",
+    "workDoneMessage": "The customer will confirm and rate your work.",
+    "distanceAway": "{{distance}} away",
+    "customer": "Customer",
+    "callCustomer": "Call",
+    "pinTitle": "Customer PIN",
+    "pinHint": "Ask the customer for the 4-digit PIN shown in their app.",
+    "verifyPin": "Verify",
+    "customerFeedback": "Customer Feedback",
+    "noRating": "The customer did not leave a rating.",
+    "directions": "Directions",
+    "startTrip": "Start Trip",
+    "arrived": "I've Arrived",
+    "markWorkDone": "Mark Work Done",
+    "waitingForCustomer": "Waiting for the customer to confirm the job is finished.",
+    "loadFailed": "Could not load this job. Please try again.",
+    "confirmDoneTitle": "Mark Work Done?",
+    "confirmDoneMessage": "Only do this once the work is fully finished. The customer will then confirm and rate you.",
+    "status": {
+      "broadcasting": {
+        "title": "Waiting",
+        "message": "This job is still being offered."
+      },
+      "accepted": {
+        "title": "Job Accepted",
+        "message": "Start the trip when you are ready to go to {{name}}."
+      },
+      "on_the_way": {
+        "title": "On The Way",
+        "message": "{{name}} can see your live location."
+      },
+      "arrived": {
+        "title": "You Have Arrived",
+        "message": "Ask {{name}} for the 4-digit PIN to start work."
+      },
+      "in_progress": {
+        "title": "Work In Progress",
+        "message": "Mark work done once you finish."
+      },
+      "work_done": {
+        "title": "Work Done",
+        "message": "Waiting for {{name}} to confirm it is finished."
+      },
+      "completed": {
+        "title": "Job Finished",
+        "message": "{{name}} confirmed the job is finished."
+      },
+      "cancelled": {
+        "title": "Booking Cancelled",
+        "message": "{{name}} cancelled this booking."
+      }
+    },
+    "statusChangedTitle": "Job Updated",
+    "statusChangedMessage": "The customer already updated this job. Showing the latest status.",
+    "locationRequiredTitle": "Turn On Location",
+    "locationRequiredMessage": "Location must be on to start the trip — the customer tracks you on the way."
+  },
+  "workerReviews": {
+    "title": "Ratings & Reviews",
+    "ratingsCount_one": "{{count}} rating",
+    "ratingsCount_other": "{{count}} ratings",
+    "noRatings": "No ratings yet",
+    "whatCustomersSay": "What customers say",
+    "noReviewsTitle": "No reviews yet",
+    "noReviewsMessage": "Ratings and feedback from finished jobs will show here.",
+    "loadFailed": "Could not load reviews right now.",
+    "statRating": "Rating",
+    "statRatedJobs": "Rated jobs",
+    "statExperience": "Experience",
+    "experienceValue_one": "{{count}} yr",
+    "experienceValue_other": "{{count}} yrs",
+    "new": "New",
+    "workPhotos": "Work photos"
+  },
+  "problemDetail": {
+    "title": "Problem Details",
+    "viewPhoto": "View photo",
+    "noPhotos": "No photos added",
+    "quotation": "Quotation",
+    "location": "Location",
+    "description": "Description",
+    "noDescription": "No description given.",
+    "viewDetails": "View photos & details",
+    "openJob": "Open Job",
+    "viewProblem": "Photos & details"
   }
 }

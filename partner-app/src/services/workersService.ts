@@ -35,6 +35,9 @@ export interface WorkerProfile {
   pincode: string;
   portfolioPhotoUrls: string[];
   verificationStatus: string;
+  /** Average customer rating (1 decimal), or null before the first rating. */
+  ratingAverage: number | null;
+  ratingCount: number;
 }
 
 export const workersService = {

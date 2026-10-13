@@ -128,7 +128,7 @@ function SelectModal({ visible, onClose, title, options, value, onSelect, search
           />
         </View>
 
-        <FlatList
+        <FlatList showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}
           data={filtered}
           keyExtractor={(item) => item}
           keyboardShouldPersistTaps="handled"

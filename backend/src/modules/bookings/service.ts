@@ -1,29 +1,80 @@
+import { randomInt } from 'crypto';
 import { AppError } from '@/common/errors/AppError';
 import { WorkersService } from '@/modules/workers/service';
+import { WorkerProfile } from '@/modules/workers/interfaces';
 import { NotificationsService } from '@/modules/notifications/service';
+import { NotificationType } from '@/modules/notifications/interfaces';
 import { BookingsRepository } from './repository';
-import { CreateQuickBookingDto } from './dto';
-import { BookingRequestWithAcceptedWorker, PendingOffer } from './interfaces';
-import { bookingOfferBody, bookingOfferTitle, jobTakenBody, jobTakenTitle } from './pushTemplates';
+import { CompleteBookingDto, CreateQuickBookingDto, UpdateWorkerLocationDto } from './dto';
+import {
+  BookingLifecycleListener,
+  BookingRequestStatus,
+  BookingTransition,
+  CreateAssignedBookingParams,
+  CustomerBooking,
+  MAX_PIN_ATTEMPTS,
+  PendingOffer,
+  RatedJob,
+  WorkerJob,
+} from './interfaces';
+import { bookingOfferBody, bookingOfferTitle, jobTakenBody, jobTakenTitle, TripEvent, tripTemplate } from './pushTemplates';
 
 const BOOKING_OFFER_CHANNEL = 'booking-offers';
+const HISTORY_LIMIT = 50;
+
+/** A fresh, single-use 4-digit arrival PIN (cryptographically random). */
+function generateArrivalPin(): string {
+  return String(randomInt(0, 10000)).padStart(4, '0');
+}
 
 /**
- * Quick Book — first real (non-placeholder) slice of broadcast booking, per explicit
- * request: a user picks one or more skills, every verified worker within radius who has
- * *all* of them gets a big, high-priority push; whoever accepts first wins and everyone
- * else's offer/notification is closed out. No PIN verification, cancellation, or full
- * status pipeline yet (Pending Module 4's remainder). Depends on `WorkersService` (never
- * touches `worker_profiles` directly) and `NotificationsService` (never touches
- * `push_tokens` directly) — same module-boundary shape `admin`/`notifications` already
- * established, see `.cloud/architecture.md`'s Backend Module Boundaries.
+ * Quick Book — a Rapido-style trip. A user picks skills; every verified worker within range
+ * who has all of them gets a big actionable push and the first to accept wins. Then:
+ *   accepted → on_the_way (worker taps Start Trip; their live location is shared)
+ *   → arrived → in_progress (worker enters the customer's 4-digit PIN) → work_done
+ *   → completed (customer confirms, rating the worker 1–5 with optional feedback)
+ * The customer can cancel until the PIN is verified. Each step notifies the other person
+ * (saved in their notification list + pushed, in their own language). Depends on
+ * WorkersService and NotificationsService, never their tables — same module-boundary shape as
+ * `admin`/`problems`.
  */
 export class BookingsService {
+  private lifecycleListener: BookingLifecycleListener | null = null;
+
   constructor(
     private readonly repository: BookingsRepository,
     private readonly workersService: WorkersService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  /** The problems module, told when a trip started from one of its posts ends. */
+  setLifecycleListener(listener: BookingLifecycleListener): void {
+    this.lifecycleListener = listener;
+  }
+
+  // --- For other modules ---
+
+  /**
+   * Starts an already-accepted trip for a Your Problems post a worker just won, so problem
+   * jobs get the same map, live tracking, arrival PIN, work done and rating as Quick Book.
+   * The caller (problems) notifies the customer itself. Returns the new booking's id.
+   */
+  async createForAcceptedProblem(params: Omit<CreateAssignedBookingParams, 'arrivalPin'>): Promise<string> {
+    const request = await this.repository.createAssigned({ ...params, arrivalPin: generateArrivalPin() });
+    return request.id;
+  }
+
+  /** Finished trips this worker was rated or reviewed on — for their public reviews. */
+  async listRatedJobsForWorker(workerId: string, limit: number): Promise<RatedJob[]> {
+    return this.repository.findRatedForWorker(workerId, limit);
+  }
+
+  /** Current status of each given booking — lets problem lists show a linked trip's progress. */
+  async getStatuses(ids: string[]): Promise<Map<string, BookingRequestStatus>> {
+    return this.repository.findStatuses(ids);
+  }
+
+  // --- Customer side ---
 
   async createQuickBooking(
     accountId: string,
@@ -34,6 +85,7 @@ export class BookingsService {
       skillCategories: dto.skillCategories,
       latitude: dto.latitude,
       longitude: dto.longitude,
+      locationAddress: dto.locationAddress || null,
       radiusKm: dto.radiusKm,
     });
 
@@ -78,14 +130,50 @@ export class BookingsService {
     return { bookingRequestId: request.id, matchedWorkerCount: matches.length };
   }
 
-  /** Polled by the requester (user-app) while waiting for a worker to accept. */
-  async getRequestStatus(accountId: string, bookingRequestId: string): Promise<BookingRequestWithAcceptedWorker> {
+  /** Polled by user-app's tracking screen: status, worker, live location and (while travelling) the PIN. */
+  async getRequestStatus(accountId: string, bookingRequestId: string): Promise<CustomerBooking> {
+    await this.repository.expireStaleBroadcasts();
     const request = await this.repository.findByIdForAccount(bookingRequestId, accountId);
     if (!request) {
       throw AppError.notFound('Booking request not found.', 'BOOKING_REQUEST_NOT_FOUND');
     }
     return request;
   }
+
+  async listMyBookings(accountId: string): Promise<CustomerBooking[]> {
+    await this.repository.expireStaleBroadcasts();
+    return this.repository.findForCustomer(accountId, HISTORY_LIMIT);
+  }
+
+  async cancelBooking(accountId: string, bookingRequestId: string): Promise<void> {
+    const result = await this.repository.cancel(bookingRequestId, accountId);
+    if (!result) {
+      throw await this.transitionError(bookingRequestId, 'This booking can no longer be cancelled.');
+    }
+    await this.notify(result, 'cancelled', 'booking_cancelled');
+    // A problem's trip cancelled by the customer reopens the problem for other workers.
+    if (result.request.problemPostId && this.lifecycleListener) {
+      await this.lifecycleListener.onProblemTripCancelled(result.request.problemPostId);
+    }
+  }
+
+  /** Customer confirms the work is finished, optionally rating the worker (once). */
+  async completeBooking(accountId: string, bookingRequestId: string, dto: CompleteBookingDto = {}): Promise<void> {
+    const rating = dto.rating ?? null;
+    const result = await this.repository.complete(bookingRequestId, accountId, rating, dto.review || null);
+    if (!result) {
+      throw await this.transitionError(bookingRequestId, 'This booking cannot be marked finished right now.');
+    }
+    if (rating !== null && result.request.acceptedWorkerId) {
+      await this.workersService.recordRating(result.request.acceptedWorkerId, rating);
+    }
+    await this.notify(result, 'completed', 'booking_completed');
+    if (result.request.problemPostId && this.lifecycleListener) {
+      await this.lifecycleListener.onProblemTripCompleted(result.request.problemPostId, rating, dto.review || null);
+    }
+  }
+
+  // --- Worker side ---
 
   /** Feeds partner-app's Bookings tab — every offer this worker can still accept. */
   async getMyOffers(workerAccountId: string): Promise<PendingOffer[]> {
@@ -96,24 +184,39 @@ export class BookingsService {
     return this.repository.findPendingOffersForWorker(profile.id);
   }
 
-  async acceptOffer(workerAccountId: string, bookingRequestId: string): Promise<void> {
+  /** Jobs this worker accepted — active first, then history. */
+  async listMyJobs(workerAccountId: string): Promise<WorkerJob[]> {
     const profile = await this.workersService.getMyProfile(workerAccountId);
     if (!profile) {
-      throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
+      return [];
     }
+    return this.repository.findJobsForWorker(profile.id, HISTORY_LIMIT);
+  }
 
-    const result = await this.repository.acceptOffer(bookingRequestId, profile.id);
+  async getMyJob(workerAccountId: string, bookingRequestId: string): Promise<WorkerJob> {
+    const worker = await this.requireWorker(workerAccountId);
+    const job = await this.repository.findJobForWorker(bookingRequestId, worker.id);
+    if (!job) {
+      throw AppError.notFound('Job not found.', 'BOOKING_REQUEST_NOT_FOUND');
+    }
+    return job;
+  }
+
+  async acceptOffer(workerAccountId: string, bookingRequestId: string): Promise<void> {
+    const profile = await this.requireWorker(workerAccountId);
+
+    const result = await this.repository.acceptOffer(bookingRequestId, profile.id, generateArrivalPin());
     if (!result.won) {
       throw AppError.conflict('This job has already been taken by another worker.', 'BOOKING_ALREADY_TAKEN');
     }
 
-    // Best-effort — replaces the original notification on every losing worker's device with
-    // a "taken" message. Same `identifier`/data-only mechanism as the offer push itself: the
-    // client re-schedules a local notification under the same identifier (bookingRequestId),
-    // which replaces the one already showing, this time with no Accept/Reject actions. Never
-    // blocks the winning worker's own accept, which has already succeeded by this point.
-    await Promise.all(
-      result.losingWorkers.map((loser) =>
+    // Best-effort, in parallel: tell the customer, and replace the original notification on
+    // every losing worker's device with a "taken" message (same identifier/data-only
+    // mechanism as the offer push itself, so it overwrites rather than stacks). Never blocks
+    // the winning worker's own accept, which has already succeeded by this point.
+    await Promise.all([
+      this.notify({ request: result.request, notify: result.customer }, 'accepted', 'booking_accepted'),
+      ...result.losingWorkers.map((loser) =>
         this.notificationsService.sendRawPush(
           loser.accountId,
           jobTakenTitle(loser.preferredLanguage),
@@ -126,20 +229,101 @@ export class BookingsService {
           },
         ),
       ),
-    );
+    ]);
   }
 
-  /** A worker dismissing an offer they don't want — server-side, this worker's own offer
-   * stops appearing in `getMyOffers()`; every other worker's offer for the same request is
-   * unaffected (declining is a purely local choice, not a signal that changes eligibility
-   * for anyone else). Idempotent-ish: silently no-ops if the offer is already gone (taken,
-   * or already declined) rather than throwing — a stale notification's decline button
-   * shouldn't be able to surface an error to the worker. */
+  /** A worker dismissing an offer they don't want — only their own offer; silently no-ops if gone. */
   async declineOffer(workerAccountId: string, bookingRequestId: string): Promise<void> {
-    const profile = await this.workersService.getMyProfile(workerAccountId);
+    const profile = await this.requireWorker(workerAccountId);
+    await this.repository.declineOffer(bookingRequestId, profile.id);
+  }
+
+  async startTrip(workerAccountId: string, bookingRequestId: string): Promise<void> {
+    const worker = await this.requireWorker(workerAccountId);
+    const result = await this.repository.startTrip(bookingRequestId, worker.id);
+    if (!result) {
+      throw await this.transitionError(bookingRequestId, 'This trip cannot be started right now.');
+    }
+    await this.notify(result, 'on_the_way', 'booking_on_the_way');
+  }
+
+  /**
+   * The travelling worker's latest position (called every few seconds by partner-app's
+   * background location task). 409 once the trip is over, so the task knows to stop.
+   */
+  async updateWorkerLocation(workerAccountId: string, bookingRequestId: string, dto: UpdateWorkerLocationDto): Promise<void> {
+    const worker = await this.requireWorker(workerAccountId);
+    const updated = await this.repository.updateWorkerLocation(bookingRequestId, worker.id, dto.latitude, dto.longitude);
+    if (!updated) {
+      throw AppError.conflict('This trip is no longer active.', 'BOOKING_TRIP_NOT_ACTIVE');
+    }
+  }
+
+  async markArrived(workerAccountId: string, bookingRequestId: string): Promise<void> {
+    const worker = await this.requireWorker(workerAccountId);
+    const result = await this.repository.markArrived(bookingRequestId, worker.id);
+    if (!result) {
+      throw await this.transitionError(bookingRequestId, 'Arrival cannot be marked right now.');
+    }
+    await this.notify(result, 'arrived', 'booking_arrived');
+  }
+
+  /** The worker enters the PIN the customer tells them in person; correct → work starts. */
+  async verifyPin(workerAccountId: string, bookingRequestId: string, pin: string): Promise<void> {
+    const worker = await this.requireWorker(workerAccountId);
+    const result = await this.repository.verifyPin(bookingRequestId, worker.id, pin);
+    if (result.outcome === 'not_found') {
+      throw await this.transitionError(bookingRequestId, 'This job is not waiting for a PIN.');
+    }
+    if (result.outcome === 'locked') {
+      throw AppError.conflict(
+        `Too many wrong PINs (${MAX_PIN_ATTEMPTS}). Ask the customer to cancel and book again.`,
+        'BOOKING_PIN_LOCKED',
+      );
+    }
+    if (result.outcome === 'wrong') {
+      throw AppError.badRequest('That PIN is not correct.', 'BOOKING_PIN_INVALID', { attemptsLeft: result.attemptsLeft });
+    }
+    // No push on PIN success — the customer is standing right there.
+  }
+
+  async markWorkDone(workerAccountId: string, bookingRequestId: string): Promise<void> {
+    const worker = await this.requireWorker(workerAccountId);
+    const result = await this.repository.markWorkDone(bookingRequestId, worker.id);
+    if (!result) {
+      throw await this.transitionError(bookingRequestId, 'This job cannot be marked done right now.');
+    }
+    await this.notify(result, 'work_done', 'booking_work_done');
+  }
+
+  // --- Helpers ---
+
+  private async requireWorker(accountId: string): Promise<WorkerProfile> {
+    const profile = await this.workersService.getMyProfile(accountId);
     if (!profile) {
       throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
     }
-    await this.repository.declineOffer(bookingRequestId, profile.id);
+    return profile;
+  }
+
+  private async transitionError(bookingRequestId: string, message: string): Promise<AppError> {
+    if (!(await this.repository.exists(bookingRequestId))) {
+      return AppError.notFound('Booking request not found.', 'BOOKING_REQUEST_NOT_FOUND');
+    }
+    return AppError.conflict(message, 'BOOKING_INVALID_STATE');
+  }
+
+  /**
+   * Saved in the recipient's notification list and pushed, best-effort. `bookingId` (not
+   * `bookingRequestId`) in the data on purpose: partner-app's push handlers treat a
+   * `bookingRequestId` as a new job offer to pop up.
+   */
+  private async notify(transition: BookingTransition, event: TripEvent, type: NotificationType): Promise<void> {
+    if (!transition.notify) return;
+    const text = tripTemplate(event, transition.notify.preferredLanguage);
+    await this.notificationsService.notify(transition.notify.accountId, type, text.title, text.body, {
+      data: { kind: type, bookingId: transition.request.id },
+      channelId: 'default',
+    });
   }
 }

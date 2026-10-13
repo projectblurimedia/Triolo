@@ -50,3 +50,39 @@ export function jobTakenTitle(language: PreferredLanguage): string {
 export function jobTakenBody(language: PreferredLanguage): string {
   return language === 'te' ? 'ఈ పనిని మరొక వర్కర్ ఇప్పటికే అంగీకరించారు.' : 'This job was already accepted by another worker.';
 }
+
+/** Quick Book trip steps — each goes to the other person, in their own language. */
+export type TripEvent = 'accepted' | 'on_the_way' | 'arrived' | 'work_done' | 'completed' | 'cancelled';
+
+const TRIP_TEMPLATES: Record<TripEvent, Record<PreferredLanguage, { title: string; body: string }>> = {
+  // → customer
+  accepted: {
+    en: { title: 'Worker Found', body: 'A worker accepted your Quick Book request. Open the app to see them.' },
+    te: { title: 'వర్కర్ దొరికారు', body: 'ఒక వర్కర్ మీ క్విక్ బుక్ అభ్యర్థనను అంగీకరించారు. వారిని చూడటానికి యాప్ తెరవండి.' },
+  },
+  on_the_way: {
+    en: { title: 'Worker On The Way', body: 'Your worker has started. Track them live in the app.' },
+    te: { title: 'వర్కర్ బయలుదేరారు', body: 'మీ వర్కర్ బయలుదేరారు. యాప్‌లో లైవ్‌గా చూడండి.' },
+  },
+  arrived: {
+    en: { title: 'Worker Has Arrived', body: 'Share your PIN from the app with the worker to start the work.' },
+    te: { title: 'వర్కర్ వచ్చేశారు', body: 'పని మొదలుపెట్టడానికి యాప్‌లోని మీ PINని వర్కర్‌కు చెప్పండి.' },
+  },
+  work_done: {
+    en: { title: 'Work Done', body: 'The worker marked the job as done. Please check, then confirm and rate.' },
+    te: { title: 'పని పూర్తయింది', body: 'వర్కర్ పని పూర్తయిందని తెలిపారు. దయచేసి చూసి, నిర్ధారించి రేటింగ్ ఇవ్వండి.' },
+  },
+  // → worker
+  completed: {
+    en: { title: 'Job Finished', body: 'The customer confirmed the job is finished. Great work!' },
+    te: { title: 'పని ముగిసింది', body: 'పని పూర్తయిందని కస్టమర్ నిర్ధారించారు. చాలా బాగా చేశారు!' },
+  },
+  cancelled: {
+    en: { title: 'Booking Cancelled', body: 'The customer cancelled this booking.' },
+    te: { title: 'బుకింగ్ రద్దయింది', body: 'కస్టమర్ ఈ బుకింగ్‌ను రద్దు చేశారు.' },
+  },
+};
+
+export function tripTemplate(event: TripEvent, language: PreferredLanguage): { title: string; body: string } {
+  return TRIP_TEMPLATES[event][language] ?? TRIP_TEMPLATES[event].en;
+}

@@ -1,7 +1,7 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
-import { attemptAccept, attemptDecline, updateOfferNotification } from '@/utils/bookingOfferOutcome';
-import { ACCEPT_ACTION, BOOKING_OFFER_CATEGORY, BOOKING_OFFER_CHANNEL, DECLINE_ACTION } from '@/constants/bookingNotifications';
+import { attemptDecline, updateOfferNotification } from '@/utils/bookingOfferOutcome';
+import { BOOKING_OFFER_CATEGORY, BOOKING_OFFER_CHANNEL, DECLINE_ACTION } from '@/constants/bookingNotifications';
 
 export const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
 
@@ -49,9 +49,10 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
     // Rewrites the notification with the real outcome — accepted, lost the race, or
     // declined — since there's no mounted UI here to show a toast from; the notification
     // itself IS the only feedback surface available in this headless case.
-    if (payload.actionIdentifier === ACCEPT_ACTION) {
-      await updateOfferNotification(bookingRequestId, await attemptAccept(bookingRequestId));
-    } else if (payload.actionIdentifier === DECLINE_ACTION) {
+    // Accept is not handled here: its button opens the app, which accepts with visible
+    // progress (usePushNotifications.ts → IncomingJobModal). Accepting here as well would
+    // send a second accept that fails as "already taken".
+    if (payload.actionIdentifier === DECLINE_ACTION) {
       await updateOfferNotification(bookingRequestId, await attemptDecline(bookingRequestId));
     }
     return;

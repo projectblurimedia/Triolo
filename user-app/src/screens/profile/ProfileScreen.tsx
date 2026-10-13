@@ -10,6 +10,7 @@ import { BusinessProfileCard } from '@/components/BusinessProfileCard';
 import { WorkerProfileModal } from '@/components/WorkerProfileModal';
 import { BusinessProfileModal } from '@/components/BusinessProfileModal';
 import { ProfileStatsRow } from '@/components/ProfileStatsRow';
+import { ProfileActivity } from '@/components/ProfileActivity';
 import { SHOP_GRADIENT } from '@/components/BusinessProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
@@ -87,16 +88,23 @@ export function ProfileScreen() {
           </LinearGradient>
         ) : null}
 
+        {account ? <ProfileActivity /> : null}
+
         {workerProfile ? (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.workerSection')}</Text>
             <ProfileStatsRow
               stats={[
-                { icon: 'star', value: t('profile.ratingValue'), label: t('profile.ratingCount'), tint: colors.primary },
                 {
-                  icon: 'briefcase',
-                  value: t('profile.servicesDoneValue'),
-                  label: t('profile.servicesDoneLabel'),
+                  icon: 'star',
+                  value: workerProfile.ratingAverage != null ? workerProfile.ratingAverage.toFixed(1) : t('workerReviews.new'),
+                  label: t('workerReviews.statRating'),
+                  tint: colors.primary,
+                },
+                {
+                  icon: 'circle-check',
+                  value: String(workerProfile.ratingCount),
+                  label: t('workerReviews.statRatedJobs'),
                   tint: colors.primary,
                 },
               ]}

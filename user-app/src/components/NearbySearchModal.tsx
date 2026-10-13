@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
-import * as Location from 'expo-location';
+import { ensureLocation, useLocationStore } from '@/state/locationStore';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AutoScrollText } from './AutoScrollText';
@@ -28,6 +28,7 @@ type LocationState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'denied' }
+  | { status: 'disabled' }
   | { status: 'error' }
   | { status: 'ready'; latitude: number; longitude: number };
 
@@ -145,17 +146,18 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     const requestId = ++locationRequestIdRef.current;
     setLocation({ status: 'loading' });
     try {
-      const permission = await withTimeout(Location.requestForegroundPermissionsAsync(), LOCATION_TIMEOUT_MS);
+      // The app-wide location check: location must actually be ON (it pops the system
+      // "turn on location" dialog if not) — a remembered position is never used once it's off.
+      const coords = await withTimeout(ensureLocation(), LOCATION_TIMEOUT_MS);
       if (requestId !== locationRequestIdRef.current) return;
-      if (!permission.granted) {
-        setLocation({ status: 'denied' });
+      if (!coords) {
+        cachedLocation = null;
+        const storeStatus = useLocationStore.getState().status;
+        setLocation({ status: storeStatus === 'disabled' ? 'disabled' : storeStatus === 'denied' ? 'denied' : 'error' });
         return;
       }
-      const position = await withTimeout(Location.getCurrentPositionAsync({}), LOCATION_TIMEOUT_MS);
-      if (requestId !== locationRequestIdRef.current) return;
-      const next = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-      cachedLocation = next;
-      setLocation({ status: 'ready', ...next });
+      cachedLocation = coords;
+      setLocation({ status: 'ready', ...coords });
     } catch {
       if (requestId !== locationRequestIdRef.current) return;
       setLocation({ status: 'error' });
@@ -193,9 +195,9 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     setResults({ status: 'idle' });
     setSelectedResult(null);
     setOpenGeneration((generation) => generation + 1);
-    if (locationRef.current.status !== 'ready') {
-      detectLocation();
-    }
+    // Re-checked on every open (fast — the shared store reuses a recent fix), so a search
+    // never runs on an old position after location was switched off.
+    detectLocation();
   }, [visible, detectLocation]);
 
   const runSearch = useCallback(
@@ -332,17 +334,19 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
       );
     }
 
-    if (location.status === 'denied' || location.status === 'error') {
+    if (location.status === 'denied' || location.status === 'error' || location.status === 'disabled') {
+      const titleKey = location.status === 'disabled' ? 'location.disabledTitle' : location.status === 'denied' ? 'nearbySearch.locationDeniedTitle' : 'nearbySearch.locationErrorTitle';
+      const messageKey = location.status === 'disabled' ? 'location.disabledMessage' : location.status === 'denied' ? 'nearbySearch.locationDeniedMessage' : 'nearbySearch.locationErrorMessage';
       return (
         <View style={styles.body}>
           <View style={[styles.emptyIcon, { backgroundColor: `${colors.error}1A` }]}>
             <FontAwesome6 name="location-crosshairs" size={22} color={colors.error} solid />
           </View>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            {t(location.status === 'denied' ? 'nearbySearch.locationDeniedTitle' : 'nearbySearch.locationErrorTitle')}
+            {t(titleKey)}
           </Text>
           <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>
-            {t(location.status === 'denied' ? 'nearbySearch.locationDeniedMessage' : 'nearbySearch.locationErrorMessage')}
+            {t(messageKey)}
           </Text>
           <Pressable style={[styles.retryButton, { backgroundColor: accentColor }]} onPress={detectLocation}>
             <Text style={styles.retryButtonText}>{t('common.retry')}</Text>

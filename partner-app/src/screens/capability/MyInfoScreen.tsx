@@ -47,7 +47,7 @@ function WorkerInfo({ navigation }: { navigation: MyInfoNavigation }) {
       {isLoading || !profile ? (
         <LoadingView />
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
           <HeroCard icon="screwdriver-wrench" name={account?.fullName ?? t('workerProfile.title')} tagline={t('mainTabs.Profile.workerTitle')} />
           <View style={styles.statusRow}>
             <VerificationBadge status={profile.verificationStatus} />
@@ -106,7 +106,7 @@ function BusinessInfo({ navigation }: { navigation: MyInfoNavigation }) {
       {isLoading || !profile ? (
         <LoadingView />
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
           <HeroCard icon="store" name={profile.shopName} tagline={t('mainTabs.Profile.businessTitle')} />
           <View style={styles.statusRow}>
             <VerificationBadge status={profile.verificationStatus} />

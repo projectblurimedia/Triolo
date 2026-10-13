@@ -18,6 +18,10 @@ export interface ProblemPost {
   /** Your 1–5 star rating of the worker, given when you marked it finished. */
   workerRating: number | null;
   workerReview: string | null;
+  /** The live trip this job runs as once a worker accepts (map, PIN, rating); null for older jobs. */
+  bookingRequestId: string | null;
+  /** That trip’s status, e.g. 'on_the_way' — shown instead of the plain accepted label. */
+  bookingStatus: string | null;
   createdAt: string;
   /** Set once a worker accepts — who took the job and how to reach them. */
   acceptedWorkerFullName: string | null;

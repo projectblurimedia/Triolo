@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { pushTokenService } from '@/services/pushTokenService';
 import { useAuthStore } from '@/state/authStore';
+import { openBookingTracker } from '@/state/bookingTrackerStore';
 
 // Without this, a push arriving while the app is already open/foregrounded shows no banner
 // at all in current expo-notifications versions. No user-facing notification type targets a
@@ -68,4 +69,16 @@ export function usePushNotifications() {
       cancelled = true;
     };
   }, [accessToken]);
+
+  // Tapping a Quick Book trip notification ("Worker has arrived", …) opens that booking's live
+  // tracking screen. useLastNotificationResponse also catches the tap that cold-launched the
+  // app, which a listener attached after startup would miss.
+  const lastResponse = Notifications.useLastNotificationResponse();
+  useEffect(() => {
+    if (!lastResponse || lastResponse.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+    const data = lastResponse.notification.request.content.data as { bookingId?: string } | undefined;
+    if (data?.bookingId && useAuthStore.getState().accessToken) {
+      openBookingTracker(data.bookingId);
+    }
+  }, [lastResponse]);
 }

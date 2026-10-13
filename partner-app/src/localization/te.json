@@ -127,7 +127,16 @@
     "takenToastMessage": "మరొక వర్కర్ ఈ జాబ్‌ని ముందుగా అంగీకరించారు.",
     "newJobTitle": "కొత్త జాబ్ రిక్వెస్ట్",
     "offerGoneTitle": "జాబ్ అందుబాటులో లేదు",
-    "offerGoneMessage": "ఈ జాబ్ ఇప్పటికే తీసుకోబడింది, తిరస్కరించబడింది, లేదా ఇక అందుబాటులో లేదు."
+    "offerGoneMessage": "ఈ జాబ్ ఇప్పటికే తీసుకోబడింది, తిరస్కరించబడింది, లేదా ఇక అందుబాటులో లేదు.",
+    "tabRequests": "అభ్యర్థనలు",
+    "tabActive": "యాక్టివ్",
+    "tabHistory": "చరిత్ర",
+    "typeQuickBook": "క్విక్ బుక్",
+    "typeProblem": "సమస్య",
+    "emptyActiveTitle": "యాక్టివ్ పనులు లేవు",
+    "emptyActiveMessage": "మీరు అంగీకరించిన పనులు పూర్తయ్యే వరకు ఇక్కడ కనిపిస్తాయి.",
+    "emptyHistoryTitle": "ఇంకా గత పనులు లేవు",
+    "emptyHistoryMessage": "పూర్తయిన మరియు రద్దైన పనులు, కస్టమర్ రేటింగ్‌లతో ఇక్కడ కనిపిస్తాయి."
   },
   "location": {
     "useCurrent": "నా ప్రస్తుత లొకేషన్ వాడండి",
@@ -259,7 +268,13 @@
     "PROBLEM_ALREADY_TAKEN": "ఈ సమస్యను మరో వర్కర్ ముందుగా అంగీకరించారు.",
     "PROBLEM_INVALID_STATE": "ఈ పని మారింది. రిఫ్రెష్ చేయడానికి కిందకు లాగండి.",
     "PROBLEM_POST_NOT_FOUND": "ఈ సమస్య ఇప్పుడు అందుబాటులో లేదు.",
-    "WORKER_NOT_VERIFIED": "మీ వర్కర్ ప్రొఫైల్ ఇంకా వెరిఫై కాలేదు."
+    "WORKER_NOT_VERIFIED": "మీ వర్కర్ ప్రొఫైల్ ఇంకా వెరిఫై కాలేదు.",
+    "BOOKING_ALREADY_TAKEN": "ఈ పనిని ఇప్పటికే మరో వర్కర్ తీసుకున్నారు.",
+    "BOOKING_REQUEST_NOT_FOUND": "ఈ బుకింగ్ కనబడలేదు.",
+    "BOOKING_INVALID_STATE": "ఈ బుకింగ్ స్థితి ఇప్పటికే మారింది. దయచేసి రిఫ్రెష్ చేయండి.",
+    "BOOKING_TRIP_NOT_ACTIVE": "ఈ ప్రయాణం ఇక యాక్టివ్‌గా లేదు.",
+    "BOOKING_PIN_INVALID": "ఆ PIN సరైనది కాదు.",
+    "BOOKING_PIN_LOCKED": "చాలా సార్లు తప్పు PIN ఇచ్చారు. కస్టమర్‌ను రద్దు చేసి మళ్లీ బుక్ చేయమని చెప్పండి."
   },
   "problems": {
     "myJobsTitle": "నా పనులు",
@@ -291,5 +306,110 @@
     "workersOnlyTitle": "వర్కర్ల కోసం",
     "workersOnlyMessage": "మీ వర్కర్ ప్రొఫైల్ వెరిఫై అయ్యాక, మీ దగ్గరలో కస్టమర్లు పోస్ట్ చేసిన సమస్యలు ఇక్కడ కనిపిస్తాయి.",
     "loadFailedTitle": "పనులను లోడ్ చేయలేకపోయాం"
+  },
+  "liveMap": {
+    "unavailable": "ప్రస్తుతం మ్యాప్ అందుబాటులో లేదు",
+    "loading": "మ్యాప్ లోడ్ అవుతోంది…",
+    "recenter": "మధ్యకు తీసుకురండి"
+  },
+  "job": {
+    "title": "పని",
+    "trackingTitle": "మీ లొకేషన్ షేర్ అవుతోంది",
+    "trackingBody": "మీరు దారిలో ఉన్నట్లు కస్టమర్ చూడగలరు.",
+    "tripStartedTitle": "ప్రయాణం ప్రారంభమైంది",
+    "tripStartedMessage": "ఇప్పుడు కస్టమర్ మిమ్మల్ని లైవ్‌గా ట్రాక్ చేయగలరు.",
+    "locationOffTitle": "లొకేషన్ షేర్ కాలేదు",
+    "locationOffMessage": "కస్టమర్ ట్రాక్ చేయడానికి లొకేషన్ అనుమతించండి. ప్రయాణం మాత్రం ప్రారంభమైంది.",
+    "arrivedTitle": "చేరుకున్నట్లు గుర్తించబడింది",
+    "arrivedMessage": "కస్టమర్ నుండి 4 అంకెల PIN అడగండి.",
+    "pinVerifiedTitle": "PIN నిర్ధారించబడింది",
+    "pinVerifiedMessage": "మీరు ఇప్పుడు పని ప్రారంభించవచ్చు.",
+    "pinWrong_one": "తప్పు PIN. ఇంకా {{count}} ప్రయత్నం మిగిలి ఉంది.",
+    "pinWrong_other": "తప్పు PIN. ఇంకా {{count}} ప్రయత్నాలు మిగిలి ఉన్నాయి.",
+    "workDoneTitle": "పూర్తయిందని గుర్తించబడింది",
+    "workDoneMessage": "కస్టమర్ నిర్ధారించి మీ పనికి రేటింగ్ ఇస్తారు.",
+    "distanceAway": "{{distance}} దూరంలో",
+    "customer": "కస్టమర్",
+    "callCustomer": "కాల్",
+    "pinTitle": "కస్టమర్ PIN",
+    "pinHint": "కస్టమర్ యాప్‌లో చూపిన 4 అంకెల PIN అడగండి.",
+    "verifyPin": "నిర్ధారించండి",
+    "customerFeedback": "కస్టమర్ అభిప్రాయం",
+    "noRating": "కస్టమర్ రేటింగ్ ఇవ్వలేదు.",
+    "directions": "దారి చూపు",
+    "startTrip": "ప్రయాణం ప్రారంభించండి",
+    "arrived": "నేను చేరుకున్నాను",
+    "markWorkDone": "పని పూర్తయింది",
+    "waitingForCustomer": "పని పూర్తయిందని కస్టమర్ నిర్ధారించే వరకు వేచి ఉంది.",
+    "loadFailed": "ఈ పనిని లోడ్ చేయలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
+    "confirmDoneTitle": "పని పూర్తయిందని గుర్తించాలా?",
+    "confirmDoneMessage": "పని పూర్తిగా ముగిసిన తర్వాత మాత్రమే ఇది చేయండి. తర్వాత కస్టమర్ నిర్ధారించి రేటింగ్ ఇస్తారు.",
+    "status": {
+      "broadcasting": {
+        "title": "వేచి ఉంది",
+        "message": "ఈ పని ఇంకా ఆఫర్‌లో ఉంది."
+      },
+      "accepted": {
+        "title": "పని అంగీకరించబడింది",
+        "message": "{{name}} వద్దకు వెళ్లడానికి సిద్ధమైనప్పుడు ప్రయాణం ప్రారంభించండి."
+      },
+      "on_the_way": {
+        "title": "దారిలో ఉన్నారు",
+        "message": "{{name}} మీ లైవ్ లొకేషన్ చూడగలరు."
+      },
+      "arrived": {
+        "title": "మీరు చేరుకున్నారు",
+        "message": "పని ప్రారంభించడానికి {{name}} నుండి 4 అంకెల PIN అడగండి."
+      },
+      "in_progress": {
+        "title": "పని జరుగుతోంది",
+        "message": "పని ముగిసిన తర్వాత పని పూర్తయిందని గుర్తించండి."
+      },
+      "work_done": {
+        "title": "పని పూర్తయింది",
+        "message": "{{name}} పూర్తయిందని నిర్ధారించే వరకు వేచి ఉంది."
+      },
+      "completed": {
+        "title": "పని ముగిసింది",
+        "message": "{{name}} పని పూర్తయిందని నిర్ధారించారు."
+      },
+      "cancelled": {
+        "title": "బుకింగ్ రద్దు చేయబడింది",
+        "message": "{{name}} ఈ బుకింగ్‌ను రద్దు చేశారు."
+      }
+    },
+    "statusChangedTitle": "పని అప్‌డేట్ అయింది",
+    "statusChangedMessage": "కస్టమర్ ఇప్పటికే ఈ పనిని అప్‌డేట్ చేశారు. తాజా స్థితి చూపిస్తున్నాం.",
+    "locationRequiredTitle": "లొకేషన్ ఆన్ చేయండి",
+    "locationRequiredMessage": "ప్రయాణం ప్రారంభించడానికి లొకేషన్ ఆన్‌లో ఉండాలి — దారిలో కస్టమర్ మిమ్మల్ని ట్రాక్ చేస్తారు."
+  },
+  "workerReviews": {
+    "title": "రేటింగ్‌లు & సమీక్షలు",
+    "ratingsCount_one": "{{count}} రేటింగ్",
+    "ratingsCount_other": "{{count}} రేటింగ్‌లు",
+    "noRatings": "ఇంకా రేటింగ్‌లు లేవు",
+    "whatCustomersSay": "కస్టమర్లు ఏమంటున్నారు",
+    "noReviewsTitle": "ఇంకా సమీక్షలు లేవు",
+    "noReviewsMessage": "పూర్తయిన పనుల రేటింగ్‌లు, అభిప్రాయాలు ఇక్కడ కనిపిస్తాయి.",
+    "loadFailed": "ప్రస్తుతం సమీక్షలను లోడ్ చేయలేకపోయాం.",
+    "statRating": "రేటింగ్",
+    "statRatedJobs": "రేటెడ్ పనులు",
+    "statExperience": "అనుభవం",
+    "experienceValue_one": "{{count}} సం.",
+    "experienceValue_other": "{{count}} సం.",
+    "new": "కొత్త",
+    "workPhotos": "పని ఫోటోలు"
+  },
+  "problemDetail": {
+    "title": "సమస్య వివరాలు",
+    "viewPhoto": "ఫోటో చూడండి",
+    "noPhotos": "ఫోటోలు జోడించలేదు",
+    "quotation": "కొటేషన్",
+    "location": "స్థలం",
+    "description": "వివరణ",
+    "noDescription": "వివరణ ఇవ్వలేదు.",
+    "viewDetails": "ఫోటోలు & వివరాలు చూడండి",
+    "openJob": "పనిని తెరవండి",
+    "viewProblem": "ఫోటోలు & వివరాలు"
   }
 }

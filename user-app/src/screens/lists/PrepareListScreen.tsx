@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   doneCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
   doneLine: { ...typography.body, fontFamily: fonts.medium },
   doneButton: { marginTop: 14, borderRadius: 14, overflow: 'hidden' },
-  doneButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+  doneButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48 },
   doneButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
   editRow: {
     flexDirection: 'row',

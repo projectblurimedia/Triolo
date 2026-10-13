@@ -23,11 +23,30 @@ export interface ProblemPost {
   /** The customer's 1–5 star rating of the worker, given when confirming finished. */
   workerRating: number | null;
   workerReview: string | null;
+  /**
+   * The trip started when a worker accepted (map, live tracking, PIN, work done, rating —
+   * the same flow as Quick Book). Null while open, and for jobs accepted before trips existed.
+   */
+  bookingRequestId: string | null;
   createdAt: Date;
 }
 
+/** A post plus its linked trip's live status (e.g. 'on_the_way'), for the job lists. */
+export interface WithTripStatus {
+  bookingStatus: string | null;
+}
+
+/** A finished job's rating/feedback, for the worker's public reviews. */
+export interface RatedJob {
+  rating: number | null;
+  review: string | null;
+  customerFullName: string;
+  skillCategories: string[];
+  completedAt: Date;
+}
+
 /** The customer's own view — once accepted, who took the job and how to reach them. */
-export interface OwnProblemPost extends ProblemPost {
+export interface OwnProblemPost extends ProblemPost, WithTripStatus {
   acceptedWorkerFullName: string | null;
   acceptedWorkerMobileNumber: string | null;
 }
@@ -45,7 +64,7 @@ export interface NearbyProblem {
 }
 
 /** A job this worker has accepted — now includes the customer's contact details. */
-export interface AssignedProblem extends ProblemPost {
+export interface AssignedProblem extends ProblemPost, WithTripStatus {
   customerFullName: string;
   customerMobileNumber: string;
 }

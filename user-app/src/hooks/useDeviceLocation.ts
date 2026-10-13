@@ -10,16 +10,17 @@ export type DeviceLocationState =
   | { status: 'error' }
   | { status: 'ready'; latitude: number; longitude: number };
 
-// One AppState listener for the whole app, however many screens use this hook: when the
-// app comes back to the foreground without a location (e.g. the user just turned location on
-// in Settings), quietly try again.
+// One AppState listener for the whole app, however many screens use this hook: whenever the
+// app comes back to the foreground, quietly re-check (location may have been turned on or off).
 let foregroundListenerAttached = false;
 function attachForegroundListener() {
   if (foregroundListenerAttached) return;
   foregroundListenerAttached = true;
   AppState.addEventListener('change', (status) => {
     const { status: locationStatus, refresh } = useLocationStore.getState();
-    if (status === 'active' && locationStatus !== 'ready' && locationStatus !== 'loading') {
+    // Always re-check on return (not only when there was no fix): location may have just been
+    // switched OFF, and screens must then stop using the old position.
+    if (status === 'active' && locationStatus !== 'loading') {
       refresh();
     }
   });

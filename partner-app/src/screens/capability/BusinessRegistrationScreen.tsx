@@ -205,7 +205,7 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
           {t(isEditMode ? 'businessProfile.editSubtitle' : 'businessProfile.subtitle')}
         </Text>

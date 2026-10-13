@@ -58,6 +58,15 @@ export class WorkersService {
     return this.repository.findByAccountId(accountId);
   }
 
+  /** Public profile fields (rating included) — never the account's contact details. */
+  async getPublicProfile(id: string): Promise<WorkerProfile | null> {
+    const profile = await this.repository.findById(id);
+    if (!profile) return null;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dropped on purpose (contact details)
+    const { accountFullName: _name, accountMobileNumber: _mobile, accountEmail: _email, ...rest } = profile;
+    return rest;
+  }
+
   async updateProfile(
     accountId: string,
     dto: UpdateWorkerProfileDto,

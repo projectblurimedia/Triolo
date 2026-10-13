@@ -8,13 +8,14 @@ import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ProblemFormModal } from './ProblemFormModal';
-import { FinishProblemModal } from './FinishProblemModal';
+import { FinishJobModal } from './FinishJobModal';
 import { STAR_COLOR } from './RatingStars';
 import { ToastHost } from './ToastHost';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { ProblemPost, ProblemStatus } from '@/services/problemsService';
 import { useCompleteProblem, useDeleteProblem, useMyProblems } from '@/hooks/useProblems';
 import { showToast } from '@/state/toastStore';
+import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 
 interface YourProblemsModalProps {
@@ -117,6 +118,16 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
         </View>
       );
     }
+    // Accepted since problems became trips: everything (live map, PIN, finish + rating)
+    // happens in the same tracker as Quick Book.
+    if (item.bookingRequestId && (item.status === 'accepted' || item.status === 'work_done')) {
+      const tripId = item.bookingRequestId;
+      return (
+        <View style={styles.finishWrap}>
+          <Button label={t('yourProblems.trackJob')} onPress={() => openBookingTracker(tripId)} />
+        </View>
+      );
+    }
     if (item.status === 'accepted' || item.status === 'work_done') {
       return (
         <View style={styles.finishWrap}>
@@ -178,7 +189,10 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
               </Text>
               <View style={[styles.statusPill, { backgroundColor: `${statusColor}1A` }]}>
                 <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                <Text style={[styles.statusText, { color: statusColor }]}>{t(`yourProblems.status.${item.status}`)}</Text>
+                <Text style={[styles.statusText, { color: statusColor }]}>{item.bookingStatus && item.status !== 'completed'
+                    ? t(`tracking.status.${item.bookingStatus}.title`)
+                    : t(`yourProblems.status.${item.status}`)}
+                </Text>
               </View>
             </View>
             <Text style={[styles.quotation, { color: colors.primary }]}>₹{item.quotationAmount.toLocaleString('en-IN')}</Text>
@@ -316,7 +330,7 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
         onCancel={() => setDeletingProblem(null)}
       />
 
-      <FinishProblemModal
+      <FinishJobModal
         visible={finishingProblem !== null}
         workerName={finishingProblem?.acceptedWorkerFullName ?? null}
         loading={completeProblem.isPending}

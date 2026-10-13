@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { problemsService } from '@/services/problemsService';
+import { MY_JOBS_QUERY_KEY } from './useJobs';
 
 export const NEARBY_PROBLEMS_QUERY_KEY = ['problems', 'nearby'];
 export const ASSIGNED_PROBLEMS_QUERY_KEY = ['problems', 'assigned'];
@@ -31,6 +32,8 @@ function useInvalidateProblems() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: NEARBY_PROBLEMS_QUERY_KEY }),
       queryClient.invalidateQueries({ queryKey: ASSIGNED_PROBLEMS_QUERY_KEY }),
+      // An accepted problem is also a job now (it runs as a trip).
+      queryClient.invalidateQueries({ queryKey: MY_JOBS_QUERY_KEY }),
     ]);
 }
 

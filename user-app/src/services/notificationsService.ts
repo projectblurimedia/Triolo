@@ -1,6 +1,16 @@
 import { apiClient } from './apiClient';
 
-export type NotificationType = 'profile_view' | 'problem_accepted' | 'problem_work_done' | 'problem_completed';
+export type NotificationType =
+  | 'profile_view'
+  | 'problem_accepted'
+  | 'problem_work_done'
+  | 'problem_completed'
+  | 'booking_accepted'
+  | 'booking_on_the_way'
+  | 'booking_arrived'
+  | 'booking_work_done'
+  | 'booking_completed'
+  | 'booking_cancelled';
 
 export interface AppNotification {
   id: string;

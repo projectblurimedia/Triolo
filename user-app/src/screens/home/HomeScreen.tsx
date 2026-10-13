@@ -20,6 +20,9 @@ import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocatio
 import { SERVICES_RADIUS_KM, useNearbyWorkers } from '@/hooks/useNearbyWorkers';
 import { useNearbyBusinesses } from '@/hooks/useNearbyBusinesses';
 import { useMyProblems } from '@/hooks/useProblems';
+import { useMyBookings } from '@/hooks/useBookings';
+import { ACTIVE_BOOKING_STATUSES } from '@/services/bookingsService';
+import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { WorkerNearbyResult, workersService } from '@/services/workersService';
 import { BusinessNearbyResult, businessesService } from '@/services/businessesService';
 import { NearbySearchMode } from '@/utils/nearbyResult';
@@ -79,6 +82,9 @@ export function HomeScreen() {
   });
   const shops = useNearbyBusinesses(coords?.latitude ?? null, coords?.longitude ?? null);
   const problems = useMyProblems();
+  const bookings = useMyBookings();
+  // The newest Quick Book booking still in progress — shown as a live card that reopens tracking.
+  const liveBooking = (bookings.data ?? []).find((booking) => ACTIVE_BOOKING_STATUSES.includes(booking.status));
 
   const activeProblems = useMemo(
     () => (problems.data ?? []).filter((problem) => ACTIVE_STATUSES.includes(problem.status)),
@@ -97,6 +103,7 @@ export function HomeScreen() {
     workers.refetch();
     shops.refetch();
     problems.refetch();
+    bookings.refetch();
   };
 
   const openWorker = (worker: WorkerNearbyResult) => {
@@ -221,6 +228,25 @@ export function HomeScreen() {
             </Pressable>
           ))}
         </View>
+
+        {liveBooking ? (
+          <Pressable
+            style={[styles.problemsCard, styles.liveCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}
+            onPress={() => openBookingTracker(liveBooking.id)}
+          >
+            <View style={[styles.problemsIcon, { backgroundColor: colors.primary }]}>
+              <FontAwesome6 name="bolt" size={17} color="#FFFFFF" solid />
+            </View>
+            <View style={styles.problemsInfo}>
+              <Text style={[styles.problemsTitle, { color: colors.text }]}>{t(`tracking.status.${liveBooking.status}.title`)}</Text>
+              <Text style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
+                {liveBooking.worker?.fullName ? `${liveBooking.worker.fullName} · ` : ''}
+                {liveBooking.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}
+              </Text>
+            </View>
+            <Text style={[styles.liveTrack, { color: colors.primary }]}>{t('home.trackBooking')}</Text>
+          </Pressable>
+        ) : null}
 
         {latestActive ? (
           <Pressable
@@ -370,6 +396,8 @@ const styles = StyleSheet.create({
   },
   actionLabel: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 15 },
   actionHint: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', fontSize: 11, marginTop: 2 },
+  liveCard: { borderWidth: 1.5 },
+  liveTrack: { ...typography.caption, fontFamily: fonts.semiBold },
   problemsCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14, marginTop: 14 },
   problemsIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   problemsInfo: { flex: 1 },

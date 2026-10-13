@@ -34,6 +34,12 @@ const TYPE_ICONS: Record<NotificationType, React.ComponentProps<typeof FontAweso
   problem_accepted: 'user-check',
   problem_work_done: 'clipboard-check',
   problem_completed: 'circle-check',
+  booking_accepted: 'user-check',
+  booking_on_the_way: 'motorcycle',
+  booking_arrived: 'location-dot',
+  booking_work_done: 'clipboard-check',
+  booking_completed: 'circle-check',
+  booking_cancelled: 'ban',
 };
 
 function formatRelativeTime(iso: string, justNowLabel: string): string {

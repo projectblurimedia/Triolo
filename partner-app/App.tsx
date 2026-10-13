@@ -14,6 +14,7 @@ import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
 import { IncomingJobModal } from '@/components/IncomingJobModal';
+import { JobTrackingModal } from '@/components/JobTrackingModal';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -156,6 +157,8 @@ export default function App() {
             full-screen takeover card can pop up over whatever screen the worker is
             currently on — see the component's own doc comment. */}
         <IncomingJobModal />
+        {/* The worker's live Quick Book job screen — opened from anywhere via jobFocusStore. */}
+        <JobTrackingModal />
         <ToastHost />
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}

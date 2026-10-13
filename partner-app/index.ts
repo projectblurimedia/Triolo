@@ -2,6 +2,9 @@
 // component mounted at all) for a Quick Book push or Accept/Reject action tap while the app
 // is fully closed. See backgroundNotificationTask.ts's own doc comment.
 import './backgroundNotificationTask';
+// Same reason: delivers the worker's live location while a Quick Book trip is on the way, even
+// when the app is minimised. See src/services/tripTracking.ts.
+import '@/services/tripTracking';
 
 import { registerRootComponent } from 'expo';
 

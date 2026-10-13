@@ -6,6 +6,7 @@ import { pushTokenService } from '@/services/pushTokenService';
 import { attemptAccept, attemptDecline, updateOfferNotification } from '@/utils/bookingOfferOutcome';
 import { useAuthStore } from '@/state/authStore';
 import { usePendingOfferStore } from '@/state/pendingOfferStore';
+import { openJob } from '@/state/jobFocusStore';
 import { navigateToBookings } from '@/navigation/navigationRef';
 import { showToast } from '@/state/toastStore';
 import { ACCEPT_ACTION, BOOKING_OFFER_CATEGORY, BOOKING_OFFER_CHANNEL, DECLINE_ACTION } from '@/constants/bookingNotifications';
@@ -49,6 +50,8 @@ async function handleOfferAction(actionIdentifier: string, bookingRequestId: str
     const outcome = await attemptAccept(bookingRequestId);
     await updateOfferNotification(bookingRequestId, outcome);
     if (outcome === 'accepted') {
+      // The job screen is the first thing the worker sees once they open the app.
+      openJob(bookingRequestId);
       showToast({ variant: 'success', title: labels.accepted, message: labels.acceptedMessage });
     } else if (outcome === 'already_taken') {
       showToast({ variant: 'info', title: labels.taken, message: labels.takenMessage });
@@ -64,6 +67,31 @@ async function handleOfferAction(actionIdentifier: string, bookingRequestId: str
       showToast({ variant: 'error', title: labels.error });
     }
   }
+}
+
+// The live response listener and `useLastNotificationResponse` can both report the same tap
+// (e.g. the one that launched the app) — each tap is acted on once.
+const handledTaps = new Set<string>();
+
+/**
+ * A tap on an offer notification that brings the app to the foreground: the body (show the
+ * offer) or the Accept button (show the offer and accept it straight away). Returns false
+ * for anything else (Reject is handled silently elsewhere).
+ */
+function openOfferFromTap(response: Notifications.NotificationResponse, bookingRequestId: string): boolean {
+  const isAccept = response.actionIdentifier === ACCEPT_ACTION;
+  if (!isAccept && response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+    return false;
+  }
+  const key = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+  if (handledTaps.has(key)) return true;
+  handledTaps.add(key);
+  if (isAccept) {
+    Notifications.dismissNotificationAsync(response.notification.request.identifier).catch(() => {});
+  }
+  usePendingOfferStore.getState().setFocusedOffer(bookingRequestId, isAccept);
+  if (!isAccept) navigateToBookings();
+  return true;
 }
 
 /**
@@ -115,8 +143,12 @@ export function usePushNotifications() {
         // the foreground). Persisted by expo-notifications across restarts/headless runs
         // (SharedPreferences-backed on Android), so registering it once here is enough —
         // backgroundNotificationTask.ts doesn't need to re-register it before using it.
+        // Accept opens the app (`opensAppToForeground: true`): handled silently in the
+        // background, the tap gave no visible response for several seconds. Now the app comes
+        // up at once with Accept already spinning, then goes straight to the job screen.
+        // Reject stays silent — there is nothing to show after declining.
         await Notifications.setNotificationCategoryAsync(BOOKING_OFFER_CATEGORY, [
-          { identifier: ACCEPT_ACTION, buttonTitle: t('bookings.accept'), options: { opensAppToForeground: false } },
+          { identifier: ACCEPT_ACTION, buttonTitle: t('bookings.accept'), options: { opensAppToForeground: true } },
           { identifier: DECLINE_ACTION, buttonTitle: t('bookings.decline'), options: { opensAppToForeground: false } },
         ]);
 
@@ -160,11 +192,7 @@ export function usePushNotifications() {
         return;
       }
 
-      if (response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-        // The notification body itself was tapped (this does foreground the app) — open
-        // straight to that specific job instead of just the general Bookings list.
-        usePendingOfferStore.getState().setFocusedOffer(bookingRequestId);
-        navigateToBookings();
+      if (openOfferFromTap(response, bookingRequestId)) {
         return;
       }
 
@@ -214,14 +242,15 @@ export function usePushNotifications() {
     if (Platform.OS !== 'android' || !lastResponse) {
       return;
     }
-    if (lastResponse.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+    const data = lastResponse.notification.request.content.data as { bookingRequestId?: string; bookingId?: string } | undefined;
+    if (data?.bookingRequestId) {
+      openOfferFromTap(lastResponse, data.bookingRequestId);
       return;
     }
-    const data = lastResponse.notification.request.content.data as { bookingRequestId?: string } | undefined;
-    if (!data?.bookingRequestId) {
-      return;
+    // A trip update for a job already accepted ("Booking cancelled", "Job finished") — open
+    // that job's screen.
+    if (data?.bookingId && lastResponse.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+      openJob(data.bookingId);
     }
-    usePendingOfferStore.getState().setFocusedOffer(data.bookingRequestId);
-    navigateToBookings();
   }, [lastResponse]);
 }

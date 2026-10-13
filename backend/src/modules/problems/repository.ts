@@ -8,6 +8,7 @@ import {
   OwnProblemPost,
   ProblemPost,
   ProblemTransitionResult,
+  RatedJob,
   UpdateProblemPostParams,
 } from './interfaces';
 
@@ -29,6 +30,7 @@ function mapProblemPost(row: QueryResultRow): ProblemPost {
     completedAt: row.completed_at ?? null,
     workerRating: row.worker_rating ?? null,
     workerReview: row.worker_review ?? null,
+    bookingRequestId: row.booking_request_id ?? null,
     createdAt: row.created_at,
   };
 }
@@ -128,6 +130,7 @@ export class ProblemsRepository {
       ...mapProblemPost(row),
       acceptedWorkerFullName: row.accepted_worker_full_name ?? null,
       acceptedWorkerMobileNumber: row.accepted_worker_mobile_number ?? null,
+      bookingStatus: null,
     }));
   }
 
@@ -184,6 +187,7 @@ export class ProblemsRepository {
       ...mapProblemPost(row),
       customerFullName: row.customer_full_name,
       customerMobileNumber: row.customer_mobile_number,
+      bookingStatus: null,
     }));
   }
 
@@ -206,12 +210,64 @@ export class ProblemsRepository {
     return mapTransition(result.rows[0]);
   }
 
+  async setBookingRequest(id: string, bookingRequestId: string): Promise<void> {
+    await this.pool.query(`UPDATE problem_posts SET booking_request_id = $2 WHERE id = $1`, [id, bookingRequestId]);
+  }
+
+  /**
+   * Back to open for other workers — after the customer cancels the trip, or if starting
+   * the trip failed right after accepting. Only from 'accepted'.
+   */
+  async reopen(id: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE problem_posts
+       SET status = 'open', accepted_worker_id = NULL, accepted_at = NULL, booking_request_id = NULL
+       WHERE id = $1 AND status = 'accepted'`,
+      [id],
+    );
+  }
+
+  /** The linked trip finished: copy its rating/feedback so the post reads as done everywhere. */
+  async completeFromTrip(id: string, rating: number | null, review: string | null): Promise<void> {
+    await this.pool.query(
+      `UPDATE problem_posts
+       SET status = 'completed', completed_at = now(), work_done_at = COALESCE(work_done_at, now()),
+           worker_rating = $2, worker_review = $3
+       WHERE id = $1 AND status IN ('accepted', 'work_done')`,
+      [id, rating, review],
+    );
+  }
+
+  /**
+   * Rated jobs for one worker's public reviews. Trip-linked posts are left out: their rating
+   * lives on (and is listed from) the trip, so counting both would show it twice.
+   */
+  async findRatedForWorker(workerId: string, limit: number): Promise<RatedJob[]> {
+    const result = await this.pool.query(
+      `SELECT p.worker_rating, p.worker_review, p.skill_categories, p.completed_at, a.full_name AS customer_full_name
+       FROM problem_posts p
+       JOIN accounts a ON a.id = p.account_id
+       WHERE p.accepted_worker_id = $1 AND p.status = 'completed' AND p.booking_request_id IS NULL
+         AND (p.worker_rating IS NOT NULL OR p.worker_review IS NOT NULL)
+       ORDER BY p.completed_at DESC
+       LIMIT $2`,
+      [workerId, limit],
+    );
+    return result.rows.map((row) => ({
+      rating: row.worker_rating ?? null,
+      review: row.worker_review ?? null,
+      customerFullName: row.customer_full_name,
+      skillCategories: parsePgArray(row.skill_categories),
+      completedAt: row.completed_at,
+    }));
+  }
+
   /** Only the accepted worker, only from 'accepted'. Returns the customer to notify. */
   async markWorkDone(id: string, workerId: string): Promise<ProblemTransitionResult | null> {
     const result = await this.pool.query(
       `WITH updated AS (
          UPDATE problem_posts SET status = 'work_done', work_done_at = now()
-         WHERE id = $1 AND accepted_worker_id = $2 AND status = 'accepted'
+         WHERE id = $1 AND accepted_worker_id = $2 AND status = 'accepted' AND booking_request_id IS NULL
          RETURNING *
        )
        SELECT u.*, a.id AS notify_account_id, a.preferred_language AS notify_language
@@ -235,7 +291,7 @@ export class ProblemsRepository {
     const result = await this.pool.query(
       `WITH updated AS (
          UPDATE problem_posts SET status = 'completed', completed_at = now(), worker_rating = $3, worker_review = $4
-         WHERE id = $1 AND account_id = $2 AND status IN ('accepted', 'work_done')
+         WHERE id = $1 AND account_id = $2 AND status IN ('accepted', 'work_done') AND booking_request_id IS NULL
          RETURNING *
        )
        SELECT u.*, wa.id AS notify_account_id, wa.preferred_language AS notify_language

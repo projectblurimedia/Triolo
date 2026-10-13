@@ -12,6 +12,7 @@ import { EarningsScreen } from '@/screens/main/EarningsScreen';
 import { ProfileScreen } from '@/screens/main/ProfileScreen';
 import { useNotifications } from '@/hooks/useNotifications';
 import { MainTabParamList } from './types';
+import { ScreenBlurTarget } from './ScreenBlurTarget';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -51,6 +52,8 @@ export function MainTabNavigator() {
     <>
       <Tab.Navigator
         tabBar={(props) => <CustomTabBar {...props} />}
+        // Each tab screen is a blur target so the glass tab bar really blurs it on Android 12+.
+        screenLayout={({ route, children }) => <ScreenBlurTarget routeKey={route.key}>{children}</ScreenBlurTarget>}
         screenOptions={({ route }) => {
           const name = route.name as keyof MainTabParamList;
           return {

@@ -4,6 +4,63 @@ All notable changes to this project are documented here. Format: date, module, s
 
 ## Unreleased
 
+- **Profile activity, cleaner reviews, sticky header polish (OTA, both apps).**
+  - **user-app Profile → My Activity** (new `ProfileActivity`): Quick Books, problems posted, finished, in progress, cancelled / no worker, and workers rated, plus "View all bookings" into My Bookings. Counted from the same lists My Bookings uses; a problem that runs as a trip is counted once. The worker capability's stats row now shows the real rating and rated-job count instead of placeholder numbers (the Business row is still a placeholder — shops have no ratings yet).
+  - **Ratings & reviews redesigned flat and clean** (shared `WorkerProfileGlass`, both apps): one bordered summary card (big average, stars, count | gold breakdown bars) and one card listing reviews as divided rows (tinted initials, name, stars, date, text, skills). No shadows, gradients or accent strips.
+  - **Worker profile sticky header:** bordered back button, larger avatar/name/stars, slimmer bar.
+
+- **Location is required for every location task; Quick Book requests expire; search, profile and label polish.**
+  - **Root cause of "searching for a worker with location off":**
+    - The Home card was an old Quick Book request still `broadcasting`. Nothing ever ended a broadcast nobody accepted, so it stayed "finding a worker" (and stayed offered to workers) forever.
+    - Quick Book also only checked the permission, then used `getLastKnownPositionAsync`, which Android still answers with location switched off.
+  - **Fixes:**
+    - Requests now expire after `BROADCAST_TTL_MINUTES = 3` (migration `0020`: status `expired`, `expired_at`), applied lazily before customer reads. The offer and accept queries ignore stale requests too. The tracker shows "No Worker Found" with **Try Again**.
+    - user-app's shared `locationStore` now drops the old fix as soon as location is off, re-checks every time the app is foregrounded, and exposes `ensureLocation()` (turn-on dialog / Settings, then a fresh position). Book Nearby, Try Again, posting a problem and Nearby Workers/Shops all go through it. Posting a problem with a typed address now attaches the customer's current position, since workers only see problems with coordinates.
+    - partner-app's Start Trip requires location on (`utils/ensureLocationOn.ts`).
+  - **Worker search matches names** (`GET /workers/nearby` `query` now includes the account's full name). Searching "Mani" found nothing before, because only skills, area and city were matched.
+  - **user-app:**
+    - Home search's box and All/Workers/Shops chips moved out of the header into a floating frosted-glass panel (new reusable `GlassPanel`, the tab bar's tuning, real blur on Android 12+ via `BlurTargetView`) with results scrolling under it.
+    - The worker profile gets a sticky glass header (back, avatar, name, rating) that fades in once the hero scrolls away.
+    - "Track Job" became "Track Your Worker"; the finished header became "Problem Solved!".
+  - **Both apps:** reviews redesigned — gradient average badge, gold breakdown bars on a soft gradient card, review cards with a brand accent edge, star row and quote mark, and stronger soft shadows. partner-app Profile's bottom padding now clears the floating tab bar.
+  - 158 backend tests; name search and expiry live-checked. OTA to both apps.
+
+- **Your Problems jobs now run like Quick Book, problems open into a detail page, and workers get a glassy profile with ratings and reviews.**
+  - **Problem jobs are trips:** accepting a problem (`POST /problems/:id/accept`) now also creates an already-accepted booking (migration `0019`: `problem_posts.booking_request_id`, `booking_requests.problem_post_id`/`quotation_amount`). From there it's the same map, live tracking, arrival PIN, work done and rating as Quick Book. The customer's "Worker Found" notification opens the tracker. Finishing the trip completes the problem with the rating; cancelling it reopens the problem for other workers. Bookings reports back through a `BookingLifecycleListener` set in the routes files (setter injection breaks the problems ↔ bookings construction cycle). The old work-done/complete endpoints now apply only to jobs accepted before this change.
+  - **New `reviews` module:** `GET /reviews/workers/:workerId` and `GET /reviews/me` merge rated jobs from bookings and pre-trip problems. They return the average, count, a 1–5 star breakdown and the newest 30 reviews, with the customer shown as first name plus last initial.
+  - **partner-app:**
+    - Problems Near You cards open a new `ProblemDetailModal` (swipeable photo gallery; tap for the full-screen `PhotoViewer`, swipe one by one with a counter; quotation, skills, distance, address, description, and Accept, which hands off straight to the job screen).
+    - Problem jobs open the job screen, which shows the quotation and a "Photos & details" button.
+    - The Bookings tab lists each problem job once, labelled with its ₹ amount.
+    - The Profile tab shows the new glass `WorkerProfileHero` (rating / rated jobs / experience tiles) and `WorkerReviewsSection` (big average, gold star bars, review cards).
+  - **user-app:**
+    - Tapping a worker anywhere opens the redesigned profile: full-width glass hero, work photos with the full-screen viewer, address, and ratings & reviews.
+    - Your Problems shows the live trip status and a Track Job button.
+    - My Bookings shows each problem job once, and the tracker shows the quotation.
+  - Backend: 157 tests. Live-verified with a 23-check run against production (accept → trip → PIN → work done → rating → problem completed → review visible to both apps; cancel → problem reopens and shows nearby again); test data removed afterwards. Shipped OTA to both apps (no native changes).
+
+- **Quick Book polish (OTA, both apps).**
+  - **Accepting opens the job screen first:** partner-app's `IncomingJobModal` loads the job while Accept is still spinning, opens `JobTrackingModal` on top, then closes itself 350ms later. Closing one native modal and opening another in the same instant could leave the wrong one showing on Android.
+  - **The job screen opens only on accept.** A short-lived "auto-open unfinished jobs on launch" rule was removed: leftover test jobs opened it without the worker accepting anything.
+  - **The notification's Accept button now opens the app.** It was silent (`opensAppToForeground: false`), handled by the background task, and gave no feedback for several seconds. Now the app comes up at once showing the offer with Accept spinning (`pendingOfferStore.autoAccept`). It accepts by itself and hands off to the job screen, or shows "no longer available" if someone else won. The background task no longer accepts, so there's no duplicate "already taken" call. Reject stays silent. Taps are de-duplicated between the live listener and `useLastNotificationResponse`.
+  - **PIN stays above the keyboard:** the edge-to-edge modal doesn't resize for the keyboard on Android, so while the keyboard is up the map hides and the screen pads by the keyboard height. The PIN no longer grabs focus automatically.
+  - **Scrollbars hidden** on every partner-app scroll view and list (user-app already hid them).
+  - **user-app Book Nearby → tracker is seamless:** the tracker's query is seeded with the just-created request, so it opens straight onto the radar with no spinner flash, and it opens on top before Quick Book closes underneath.
+
+- **Quick Book fixes after first device test.**
+  - **Work Done can't be skipped any more:** the customer could confirm finished while the job was still in progress, which skipped the Work Done step in their timeline. When the worker then tapped Mark Work Done, the job was already completed and they got "Something went wrong". `POST /bookings/:id/complete` now requires `work_done`, and user-app shows Mark as Finished only then (the in-progress message says so).
+  - **Stale actions don't error:** partner-app's job screen treats `BOOKING_INVALID_STATE`/`BOOKING_TRIP_NOT_ACTIVE` as "the customer already updated this job" — it refreshes and shows an info toast instead.
+  - **PIN entry** is now four centred digit boxes over a hidden input (the single big-font input clipped the tops of the digits on Android).
+  - **Buttons no longer change height while loading:** user-app's `Button`, both apps' `ConfirmModal`, `LogoutConfirmModal` and Prepare List's Done button are a fixed 48px, so the spinner no longer gets cut off in two-button rows.
+  - **Partner app tab bar is now the same real-blur glass bar as user-app:** ported `CustomTabBar`, `ScreenBlurTarget` and `blurTargetStore`, and added `expo-blur`. That's a native module, so partner-app went to **1.2.0** and a new APK; user-app's fixes shipped OTA to 1.1.0.
+
+- **Quick Book is now a full Rapido-style trip, with ratings and one booking history in each app.** Status flow `broadcasting → accepted → on_the_way → arrived → in_progress → work_done → completed` (customer can cancel until the PIN is verified). Migration `0018`, 13 new/changed `/bookings` endpoints (see `docs/api.md`), 146 backend tests, live-verified end to end (27 checks).
+  - **Free map, no Google billing:** `components/LiveMap.tsx` (both apps) is a `react-native-webview` showing MapLibre GL JS with OpenFreeMap tiles — customer pin + worker pin, auto-fit, re-centre, and a fallback card if the map can't load. Directions open the Google Maps app through a plain free link (no API key).
+  - **Worker (partner-app):** accepting opens the new job screen (`JobTrackingModal`, mounted at the root): map, customer name/call/address, **Start Trip** (starts live location sharing and opens directions), **I've Arrived**, a PIN box, **Mark Work Done**, then the customer's rating and feedback. Location keeps sending while the app is minimised through an Android foreground service ("Sharing your location" notification). It needs only the normal "while using" permission, not background location, and stops by itself once the trip ends.
+  - **Customer (user-app):** after Book Nearby the new `BookingTrackingModal` takes over: radar while searching, then a live map with the worker moving, a status banner, a progress timeline, the worker card (rating, call), and the **4-digit arrival PIN**. The PIN is shown only to the customer and is shared out loud on arrival; it is single use and locks after 5 wrong tries. **Mark as Finished** asks for a 1–5 star rating plus optional feedback, which feed the worker's average. Every step is also a saved notification and a push in English or Telugu.
+  - **One place for all bookings:** user-app's Services menu → **My Bookings** (was Coming Soon) lists Quick Book bookings and Your Problems jobs together, with Active/History tabs, and Home shows a live "Track" card. partner-app's **Bookings** tab now has **Requests / Active / History**: Quick Book and problem jobs together, with dates, ₹ amounts for problems, and the customer's stars and feedback.
+  - **Needs new APKs for both apps (version 1.1.0):** WebView is a native module and the foreground-service location permissions are native config. The version bump moves both apps to a new OTA runtime, so APKs already installed keep their current JS and can't receive code they would crash on.
+
 - **Notifications (both apps):** the time now sits on the title's line, right-aligned (blue while unread, with the unread dot beside it), instead of on its own line at the bottom; rows are two lines (title · time / one-line subtitle) with the icon vertically centred.
 
 - **Notifications (both apps):** while a row is sliding or open, its right corners go square so it meets the (square-left) delete panel flush — `SwipeableRow` now reports `onRevealChange`, which only turns false once the close animation has fully finished, so corners never round early. Subtitle is one line with an ellipsis (tap opens the full text). **Fixed the list looking like it was constantly reloading:** the pull-to-refresh spinner was bound to React Query's `isRefetching`, which is true during every 15s background poll — it's now driven only by a user pull.

@@ -8,6 +8,8 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { VerificationBadge } from '@/components/VerificationBadge';
+import { WorkerProfileHero, WorkerReviewsSection } from '@/components/WorkerProfileGlass';
+import { useMyReviews } from '@/hooks/useReviews';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
@@ -32,11 +34,24 @@ export function ProfileScreen({ navigation }: Props) {
 
   const workerProfile = useMyWorkerProfile();
   const businessProfile = useMyBusinessProfile();
+  const worker = workerProfile.data;
+  const reviews = useMyReviews(!!worker);
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <ScrollView contentContainerStyle={styles.body}>
-        {account ? (
+      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
+        {account && worker ? (
+          // A worker sees their profile the way customers do: rating, jobs, experience, reviews.
+          <WorkerProfileHero
+            name={account.fullName}
+            skills={worker.skillCategories.filter((key) => key !== 'other').map((key) => t(`workerProfile.skills.${key}`))}
+            ratingAverage={worker.ratingAverage}
+            ratingCount={worker.ratingCount}
+            experienceYears={worker.experienceYears}
+            subtitle={account.mobileNumber}
+            badge={<VerificationBadge status={worker.verificationStatus} />}
+          />
+        ) : account ? (
           <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroCard}>
             <View style={styles.avatar}>
               <Text style={styles.avatarInitials}>{getInitials(account.fullName)}</Text>
@@ -83,6 +98,8 @@ export function ProfileScreen({ navigation }: Props) {
           onAdd={() => navigation.navigate('BusinessRegistration')}
           colors={colors}
         />
+
+        {worker ? <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} /> : null}
       </ScrollView>
     </ScreenContainer>
   );
@@ -146,7 +163,8 @@ const styles = StyleSheet.create({
   // above heroCard roughly double the gap on its left/right (ScreenContainer's own 20px
   // isn't horizontal-only — it's uniform on all sides, so the imbalance was purely this
   // extra vertical-only padding layered on top of it).
-  body: { paddingBottom: 40 },
+  // Clears the floating CustomTabBar so the last review isn't hidden under it.
+  body: { paddingBottom: 140 },
   heroCard: {
     borderRadius: 22,
     padding: 22,

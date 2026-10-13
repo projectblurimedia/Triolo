@@ -17,11 +17,14 @@ export interface ApiErrorBody {
 export class ApiError extends Error {
   readonly statusCode: number;
   readonly code?: string;
+  /** The API's `error.details` (e.g. `{ attemptsLeft }` for a wrong arrival PIN). */
+  readonly details?: unknown;
 
-  constructor(statusCode: number, message: string, code?: string) {
+  constructor(statusCode: number, message: string, code?: string, details?: unknown) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -92,7 +95,7 @@ function toApiError(err: unknown): ApiError {
     const axiosErr = err as AxiosError<ApiErrorBody>;
     if (axiosErr.response) {
       const body = axiosErr.response.data;
-      return new ApiError(axiosErr.response.status, body?.message ?? 'Request failed', body?.error?.code);
+      return new ApiError(axiosErr.response.status, body?.message ?? 'Request failed', body?.error?.code, body?.error?.details);
     }
     // Request never got a response at all — timeout, connection refused, DNS failure.
     return new ApiError(0, axiosErr.message || 'Network request failed');
@@ -216,6 +219,7 @@ export const apiClient = {
   get: <T>(path: string, auth = false) => request<T>(path, 'get', undefined, auth),
   post: <T>(path: string, body?: unknown, auth = false) => request<T>(path, 'post', body, auth),
   patch: <T>(path: string, body?: unknown, auth = false) => request<T>(path, 'patch', body, auth),
+  put: <T>(path: string, body?: unknown, auth = false) => request<T>(path, 'put', body, auth),
   delete: <T>(path: string, auth = false) => request<T>(path, 'delete', undefined, auth),
   postForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'post'),
   patchForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'patch'),

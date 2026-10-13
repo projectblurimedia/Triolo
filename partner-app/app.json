@@ -2,7 +2,7 @@
   "expo": {
     "name": "Triolo Partner",
     "slug": "triolo-partner",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -47,7 +47,8 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Triolo Partner uses your location to set your service or shop location."
+          "locationWhenInUsePermission": "Triolo Partner uses your location to set your service or shop location and to share your live location with a customer while you travel to a job.",
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

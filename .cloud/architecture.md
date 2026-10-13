@@ -58,6 +58,10 @@ Delivery is **two channels, not one** — `partner-app`'s `useNotifications()` h
 
 **`bookings/` (implemented: Quick Book, first-accept-wins) depends on both `workers` and `notifications` — the first module to reach into two others at once.** `BookingsService.createQuickBooking()` calls `WorkersService.findMatchingForBroadcast()` (new — never touches `worker_profiles` directly, same shape as every other cross-module call in this codebase) to find eligible workers, then `NotificationsService.sendRawPush()` (new — a push-only sibling to `notifyProfileViewed()`'s in-app+push pattern, for events like a broadcast offer that shouldn't accumulate as permanent in-app notification rows) to reach each one. `bookings` owns its own tables (`booking_requests`, `booking_offers`) and its own repository — `workers`/`notifications` never reach back into `bookings`, so the dependency arrow only ever points one way, same rule as every other module pairing here. See `.cloud/project-context.md`'s "Quick Book" entry for the full request/accept/push flow, and the Notification Architecture section below for the big-notification/tag-replacement mechanics.
 
+**`problems/` ↔ `bookings/` is the one two-way link, and it's done without a cycle.** An accepted problem runs as a trip, so `ProblemsService` depends on `BookingsService` (`createForAcceptedProblem`, `getStatuses`). Bookings must also tell problems when that trip completes or is cancelled, and a constructor dependency both ways can't be built. Instead `BookingsService` exposes `setLifecycleListener(listener: BookingLifecycleListener)`, an interface defined in `bookings/interfaces.ts` that `ProblemsService` implements. Each routes file that builds a `BookingsService` registers the matching `ProblemsService` as its listener. Bookings only knows "a listener", never the problems module itself, and each side still writes only its own table (`booking_requests.problem_post_id` / `problem_posts.booking_request_id`).
+
+**`reviews/` owns no tables** — like `admin`, it only reads through other services (`WorkersService.getPublicProfile`, `BookingsService.listRatedJobsForWorker`, `ProblemsService.listRatedJobsForWorker`) and merges the results.
+
 ## Frontend Structure (user-app/)
 
 Feature-based, mirroring backend modules:
@@ -297,7 +301,17 @@ Role-based: `user`, `worker`, `business_owner`, `business_staff`, `admin` (+ fut
 
 Area-based for MVP: users select village/town, workers/businesses define service areas — **however, full GPS coordinates are now captured at registration and for Worker/Business capability locations** (see Account Model above), a deliberate, confirmed override of the original "no live GPS in MVP" decision. Search itself is still area/village-town-based for now; the coordinates are captured and stored so radius-based search can build on them later without another migration. Search service is isolated behind an interface so that swap can happen without touching booking/order business logic.
 
+## Maps & Live Tracking (Quick Book trips)
+
+- **Map rendering is free and keyless**: `components/LiveMap.tsx` (duplicated in both apps) is a `react-native-webview` page running MapLibre GL JS 4.7.1 (jsdelivr) on OpenFreeMap's `liberty` style. Pins are pushed in through `injectJavaScript(window.__setPoints(...))` — the WebView is never reloaded per update. If WebGL or the tile load fails it shows a fallback card instead. Don't swap in Google's Maps SDK without a business decision, because it needs a billing account.
+- **Directions** hand off to the Google Maps app through a plain `https://www.google.com/maps/dir/?api=1&destination=lat,lng` link (`utils/tripLinks.ts`), which is free.
+- **Worker location** comes from an Android foreground service (`partner-app/src/services/tripTracking.ts`, `expo-location` `startLocationUpdatesAsync`). Only foreground permission is needed because a foreground-service notification is shown; the service is started from a user tap (Start Trip) while the app is open and stops on `BOOKING_TRIP_NOT_ACTIVE`. Points go to `PUT /bookings/:id/location`. The customer polls instead of using a socket, because Vercel's serverless functions can't hold one open.
+- **Trip screens are root-mounted modals driven by tiny zustand stores** (`bookingTrackerStore` in user-app, `jobFocusStore` in partner-app — the same shape as `pendingOfferStore`), so a push tap, an accept, a list row or Home can all open them over any screen. Each renders its own `<ToastHost />`, since the root one draws under native Modals.
+
 ## Verification (PIN) Architecture
+
+**Implemented for Quick Book** (`booking_requests.arrival_pin`): generated on accept, returned only to the customer, verified once on arrival (5-attempt lock). It's stored readable rather than hashed so the customer can re-open it in-app; it's never sent to the worker or in any push. Business orders will need the same thing when built.
+
 
 ```
 Booking/Order created → backend generates unique single-use PIN → stored securely

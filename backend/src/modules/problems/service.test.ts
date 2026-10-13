@@ -4,6 +4,7 @@ import { ProblemPost, ProblemTransitionResult } from './interfaces';
 import { WorkersService } from '@/modules/workers/service';
 import { WorkerProfile } from '@/modules/workers/interfaces';
 import { NotificationsService } from '@/modules/notifications/service';
+import { BookingsService } from '@/modules/bookings/service';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 
 jest.mock('@/common/services/cloudinaryService', () => ({
@@ -27,12 +28,17 @@ function createMockRepository(): MockRepository {
     accept: jest.fn(),
     markWorkDone: jest.fn(),
     complete: jest.fn(),
+    setBookingRequest: jest.fn(),
+    reopen: jest.fn(),
+    completeFromTrip: jest.fn(),
+    findRatedForWorker: jest.fn(),
   } as unknown as MockRepository;
 }
 
 let repository: MockRepository;
 let workersService: jest.Mocked<WorkersService>;
 let notificationsService: jest.Mocked<NotificationsService>;
+let bookingsService: jest.Mocked<BookingsService>;
 let service: ProblemsService;
 
 beforeEach(() => {
@@ -40,7 +46,11 @@ beforeEach(() => {
   repository = createMockRepository();
   workersService = { getMyProfile: jest.fn(), recordRating: jest.fn() } as unknown as jest.Mocked<WorkersService>;
   notificationsService = { notify: jest.fn() } as unknown as jest.Mocked<NotificationsService>;
-  service = new ProblemsService(repository as unknown as ProblemsRepository, workersService, notificationsService);
+  bookingsService = {
+    createForAcceptedProblem: jest.fn().mockResolvedValue('trip-1'),
+    getStatuses: jest.fn().mockResolvedValue(new Map()),
+  } as unknown as jest.Mocked<BookingsService>;
+  service = new ProblemsService(repository as unknown as ProblemsRepository, workersService, notificationsService, bookingsService);
 });
 
 function buildFile(): Express.Multer.File {
@@ -65,6 +75,7 @@ function buildPost(overrides: Partial<ProblemPost> = {}): ProblemPost {
     completedAt: null,
     workerRating: null,
     workerReview: null,
+    bookingRequestId: null,
     createdAt: new Date(),
     ...overrides,
   };
@@ -247,20 +258,25 @@ describe('listNearbyForWorker', () => {
 });
 
 describe('acceptProblem', () => {
-  it('accepts and pushes the customer', async () => {
+  it('accepts, starts the trip, links it, and pushes the customer with the trip id', async () => {
     workersService.getMyProfile.mockResolvedValue(buildWorker());
-    repository.accept.mockResolvedValue(buildTransition('account-1', { status: 'accepted' }));
+    repository.accept.mockResolvedValue(buildTransition('account-1', { status: 'accepted', latitude: 16.71, longitude: 81.1 }));
 
     const post = await service.acceptProblem('worker-account-1', 'post-1');
 
     expect(repository.accept).toHaveBeenCalledWith('post-1', 'worker-1', 'worker-account-1');
+    expect(bookingsService.createForAcceptedProblem).toHaveBeenCalledWith(
+      expect.objectContaining({ customerAccountId: 'account-1', workerId: 'worker-1', problemPostId: 'post-1', quotationAmount: 500 }),
+    );
+    expect(repository.setBookingRequest).toHaveBeenCalledWith('post-1', 'trip-1');
     expect(post.status).toBe('accepted');
+    expect(post.bookingRequestId).toBe('trip-1');
     expect(notificationsService.notify).toHaveBeenCalledWith(
       'account-1',
       expect.any(String),
       'Worker Found',
       expect.any(String),
-      expect.objectContaining({ data: { kind: 'problem_accepted', problemId: 'post-1' } }),
+      expect.objectContaining({ data: { kind: 'problem_accepted', problemId: 'post-1', bookingId: 'trip-1' } }),
     );
   });
 
@@ -371,5 +387,40 @@ describe('listAssignedToWorker / listMyPosts', () => {
     await service.listMyPosts('account-1');
 
     expect(repository.findForAccount).toHaveBeenCalledWith('account-1', 50);
+  });
+});
+
+describe('problem jobs as trips', () => {
+  it('reopens the post if starting the trip fails, and rethrows', async () => {
+    workersService.getMyProfile.mockResolvedValue(buildWorker());
+    repository.accept.mockResolvedValue(buildTransition('account-1', { status: 'accepted', latitude: 16.71, longitude: 81.1 }));
+    bookingsService.createForAcceptedProblem.mockRejectedValue(new Error('db down'));
+
+    await expect(service.acceptProblem('worker-account-1', 'post-1')).rejects.toThrow('db down');
+    expect(repository.reopen).toHaveBeenCalledWith('post-1');
+    expect(notificationsService.notify).not.toHaveBeenCalled();
+  });
+
+  it('completes the post with the trip rating when the trip finishes', async () => {
+    await service.onProblemTripCompleted('post-1', 5, 'Great');
+    expect(repository.completeFromTrip).toHaveBeenCalledWith('post-1', 5, 'Great');
+  });
+
+  it('reopens the post when the customer cancels the trip', async () => {
+    await service.onProblemTripCancelled('post-1');
+    expect(repository.reopen).toHaveBeenCalledWith('post-1');
+  });
+
+  it('adds each linked trip status to the customer list', async () => {
+    repository.findForAccount.mockResolvedValue([
+      { ...buildPost({ id: 'a', bookingRequestId: 'trip-1', status: 'accepted' }), bookingStatus: null },
+      { ...buildPost({ id: 'b' }), bookingStatus: null },
+    ]);
+    bookingsService.getStatuses.mockResolvedValue(new Map([['trip-1', 'on_the_way']]));
+
+    const posts = await service.listMyPosts('account-1');
+
+    expect(bookingsService.getStatuses).toHaveBeenCalledWith(['trip-1']);
+    expect(posts.map((post) => post.bookingStatus)).toEqual(['on_the_way', null]);
   });
 });

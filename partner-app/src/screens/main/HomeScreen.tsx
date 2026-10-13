@@ -6,6 +6,11 @@ import { ScreenContainer } from '@/components/ScreenContainer';
 import { Button } from '@/components/Button';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { ProblemDetailModal } from '@/components/ProblemDetailModal';
+import { useQueryClient } from '@tanstack/react-query';
+import { openJob } from '@/state/jobFocusStore';
+import { jobQueryKey } from '@/hooks/useJobs';
+import { jobsService } from '@/services/jobsService';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { showToast } from '@/state/toastStore';
@@ -18,6 +23,8 @@ import { formatDistance } from '@/utils/formatDistance';
 
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const FINISHED_PREVIEW_LIMIT = 5;
+// Lets the job screen finish fading in on top before the detail screen closes underneath it.
+const MODAL_HANDOFF_MS = 350;
 
 /**
  * Worker Home — the receiving side of user-app's "Your Problems":
@@ -40,6 +47,8 @@ export function HomeScreen() {
   const markWorkDone = useMarkWorkDone();
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [confirmDoneFor, setConfirmDoneFor] = useState<AssignedProblem | null>(null);
+  const [detailProblem, setDetailProblem] = useState<NearbyProblem | null>(null);
+  const queryClient = useQueryClient();
 
   const skillLabel = (keys: string[]) => keys.map((key) => t(`workerProfile.skills.${key}`)).join(', ');
   const activeJobs = (assigned.data ?? []).filter((job) => job.status !== 'completed');
@@ -48,7 +57,19 @@ export function HomeScreen() {
   const handleAccept = (problem: NearbyProblem) => {
     setAcceptingId(problem.id);
     acceptProblem.mutate(problem.id, {
-      onSuccess: () => showToast({ variant: 'success', title: t('problems.acceptedTitle'), message: t('problems.acceptedMessage') }),
+      onSuccess: async (accepted) => {
+        showToast({ variant: 'success', title: t('problems.acceptedTitle'), message: t('problems.acceptedMessage') });
+        const tripId = accepted.bookingRequestId;
+        if (!tripId) {
+          setDetailProblem(null);
+          return;
+        }
+        // Straight into the job screen (map, customer, Start Trip): load it first so it
+        // opens filled in, open it on top, then close the detail screen underneath.
+        await queryClient.prefetchQuery({ queryKey: jobQueryKey(tripId), queryFn: () => jobsService.get(tripId) }).catch(() => {});
+        openJob(tripId);
+        setTimeout(() => setDetailProblem(null), MODAL_HANDOFF_MS);
+      },
       onError: (err) => {
         const alreadyTaken = err instanceof ApiError && err.code === 'PROBLEM_ALREADY_TAKEN';
         showToast(
@@ -74,11 +95,13 @@ export function HomeScreen() {
     Linking.openURL(`tel:${mobileNumber}`).catch(() => {});
   };
 
-  const renderPhotos = (photoUrls: string[]) =>
+  const renderPhotos = (photoUrls: string[], onPress?: () => void) =>
     photoUrls.length > 0 ? (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>
+      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} horizontal contentContainerStyle={styles.photoRow}>
         {photoUrls.map((url) => (
-          <Image key={url} source={{ uri: url }} style={styles.photo} />
+          <Pressable key={url} onPress={onPress} disabled={!onPress}>
+            <Image source={{ uri: url }} style={styles.photo} />
+          </Pressable>
         ))}
       </ScrollView>
     ) : null;
@@ -101,16 +124,23 @@ export function HomeScreen() {
   );
 
   const renderActiveJob = (job: AssignedProblem) => {
-    const isWorkDone = job.status === 'work_done';
+    const tripId = job.bookingRequestId;
+    // Jobs accepted since problems became trips are worked from the job screen (map, PIN,
+    // work done); older ones keep their original Mark Work Done button below.
+    const isWorkDone = tripId ? job.bookingStatus === 'work_done' : job.status === 'work_done';
+    const statusLabel = tripId && job.bookingStatus ? t(`job.status.${job.bookingStatus}.title`) : t(`problems.status.${job.status}`);
     return (
-      <View key={job.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: brandColors.success }]}>
+      <Pressable
+        key={job.id}
+        disabled={!tripId}
+        onPress={() => tripId && openJob(tripId)}
+        style={[styles.card, { backgroundColor: colors.surface, borderColor: brandColors.success }]}
+      >
         <View style={styles.cardHeader}>
           <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
             {skillLabel(job.skillCategories)}
           </Text>
-          {isWorkDone
-            ? renderStatusPill(t('problems.status.work_done'), brandColors.warning)
-            : renderStatusPill(t('problems.status.accepted'), brandColors.success)}
+          {renderStatusPill(statusLabel, isWorkDone ? brandColors.warning : brandColors.success)}
         </View>
         <Text style={[styles.quotation, { color: colors.primary }]}>₹{job.quotationAmount.toLocaleString('en-IN')}</Text>
 
@@ -134,18 +164,24 @@ export function HomeScreen() {
         {renderPhotos(job.photoUrls)}
 
         <View style={styles.cardAction}>
-          {isWorkDone ? (
+          {tripId ? (
+            <Button label={t('problemDetail.openJob')} onPress={() => openJob(tripId)} />
+          ) : isWorkDone ? (
             <Text style={[styles.waitingText, { color: colors.textMuted }]}>{t('problems.waitingForCustomer')}</Text>
           ) : (
             <Button label={t('problems.markWorkDone')} onPress={() => setConfirmDoneFor(job)} gradient={DONE_GRADIENT} />
           )}
         </View>
-      </View>
+      </Pressable>
     );
   };
 
   const renderNearbyProblem = (problem: NearbyProblem) => (
-    <View key={problem.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <Pressable
+      key={problem.id}
+      onPress={() => setDetailProblem(problem)}
+      style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.92 : 1 }]}
+    >
       <View style={styles.cardHeader}>
         <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
           {skillLabel(problem.skillCategories)}
@@ -159,8 +195,16 @@ export function HomeScreen() {
       </View>
       <Text style={[styles.quotation, { color: colors.primary }]}>₹{problem.quotationAmount.toLocaleString('en-IN')}</Text>
       {renderMeta('location-dot', problem.locationAddress)}
-      {problem.description ? <Text style={[styles.description, { color: colors.text }]}>{problem.description}</Text> : null}
-      {renderPhotos(problem.photoUrls)}
+      {problem.description ? (
+        <Text style={[styles.description, { color: colors.text }]} numberOfLines={2}>
+          {problem.description}
+        </Text>
+      ) : null}
+      {renderPhotos(problem.photoUrls, () => setDetailProblem(problem))}
+      <View style={styles.viewDetails}>
+        <Text style={[styles.viewDetailsText, { color: colors.primary }]}>{t('problemDetail.viewDetails')}</Text>
+        <FontAwesome6 name="chevron-right" size={11} color={colors.primary} solid />
+      </View>
       <View style={styles.cardAction}>
         <Button
           label={t('problems.accept')}
@@ -169,7 +213,7 @@ export function HomeScreen() {
           disabled={acceptingId !== null && acceptingId !== problem.id}
         />
       </View>
-    </View>
+    </Pressable>
   );
 
   const renderFinishedJob = (job: AssignedProblem) => (
@@ -259,7 +303,7 @@ export function HomeScreen() {
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <ScrollView
+      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.body}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
@@ -277,6 +321,13 @@ export function HomeScreen() {
           renderEmpty('screwdriver-wrench', t('problems.workersOnlyTitle'), t('problems.workersOnlyMessage'))
         )}
       </ScrollView>
+
+      <ProblemDetailModal
+        problem={detailProblem}
+        onClose={() => setDetailProblem(null)}
+        onAccept={detailProblem ? () => handleAccept(detailProblem) : undefined}
+        accepting={detailProblem !== null && acceptingId === detailProblem.id}
+      />
 
       <ConfirmModal
         visible={confirmDoneFor !== null}
@@ -314,6 +365,8 @@ const styles = StyleSheet.create({
   photoRow: { gap: 8, marginTop: 12 },
   photo: { width: 84, height: 84, borderRadius: 10 },
   cardAction: { marginTop: 14 },
+  viewDetails: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
+  viewDetailsText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
   customerRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, marginTop: 10 },
   customerInfo: { flex: 1 },
   customerLabel: { ...typography.caption, fontSize: 11 },

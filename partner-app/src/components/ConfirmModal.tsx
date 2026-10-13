@@ -80,9 +80,9 @@ const styles = StyleSheet.create({
   title: { ...typography.subheading, fontFamily: fonts.semiBold, marginBottom: 8, textAlign: 'center' },
   message: { ...typography.body, textAlign: 'center', marginBottom: 20 },
   buttonRow: { flexDirection: 'row', gap: 12, width: '100%' },
-  cancelButton: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 14, alignItems: 'center' },
+  cancelButton: { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   cancelText: { ...typography.body, fontFamily: fonts.medium },
   confirmButton: { flex: 1, borderRadius: 12, overflow: 'hidden' },
-  confirmGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 8 },
+  confirmGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, gap: 8 },
   confirmText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
 });

@@ -54,12 +54,12 @@ export const useLocationStore = create<LocationState>((set, get) => ({
           if (!permission.canAskAgain) {
             // The OS won't show the prompt again — the only way forward is Settings.
             if (userInitiated) await Linking.openSettings();
-            set({ status: 'denied', canAskAgain: false });
+            set({ status: 'denied', canAskAgain: false, latitude: null, longitude: null });
             return;
           }
           permission = await Location.requestForegroundPermissionsAsync();
           if (!permission.granted) {
-            set({ status: 'denied', canAskAgain: permission.canAskAgain });
+            set({ status: 'denied', canAskAgain: permission.canAskAgain, latitude: null, longitude: null });
             return;
           }
         }
@@ -74,7 +74,9 @@ export const useLocationStore = create<LocationState>((set, get) => ({
             }
           }
           if (!(await Location.hasServicesEnabledAsync())) {
-            if (!hadFix) set({ status: 'disabled' });
+            // Location switched off: drop any earlier fix too, so nothing keeps working from a
+            // stale position — every location-based screen shows "turn on location" instead.
+            set({ status: 'disabled', latitude: null, longitude: null });
             return;
           }
         }
@@ -92,3 +94,18 @@ export const useLocationStore = create<LocationState>((set, get) => ({
     return inFlight;
   },
 }));
+
+/**
+ * For any action that needs the customer's real location (Book Nearby, posting a problem,
+ * booking again): makes sure location is on — popping the system "turn on location" dialog
+ * or opening Settings if needed — and returns a fresh position, or null if location is
+ * still off/denied (the caller then shows why and stops).
+ */
+export async function ensureLocation(): Promise<{ latitude: number; longitude: number } | null> {
+  const store = useLocationStore.getState();
+  // An automatic check already running can't show the dialog — wait for it, then ask properly.
+  if (inFlight) await inFlight;
+  await store.refresh({ userInitiated: true });
+  const { status, latitude, longitude } = useLocationStore.getState();
+  return status === 'ready' && latitude != null && longitude != null ? { latitude, longitude } : null;
+}

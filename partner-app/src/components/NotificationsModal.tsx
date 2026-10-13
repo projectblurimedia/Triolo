@@ -34,6 +34,12 @@ const TYPE_ICONS: Record<NotificationType, React.ComponentProps<typeof FontAweso
   problem_accepted: 'user-check',
   problem_work_done: 'clipboard-check',
   problem_completed: 'circle-check',
+  booking_accepted: 'user-check',
+  booking_on_the_way: 'motorcycle',
+  booking_arrived: 'location-dot',
+  booking_work_done: 'clipboard-check',
+  booking_completed: 'circle-check',
+  booking_cancelled: 'ban',
 };
 
 function formatRelativeTime(iso: string, justNowLabel: string): string {
@@ -268,7 +274,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   const headerSubtitle = detail || selectionMode ? null : t('notifications.subtitle');
 
   const renderDetail = (item: AppNotification) => (
-    <ScrollView contentContainerStyle={styles.detailBody}>
+    <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.detailBody}>
       <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.detailIcon}>
           <FontAwesome6 name={TYPE_ICONS[item.type] ?? 'bell'} size={24} color="#FFFFFF" solid />
@@ -333,7 +339,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         {!selectionMode ? (
           <Text style={[styles.hint, { color: colors.textMuted }]}>{t('notifications.gestureHint')}</Text>
         ) : null}
-        <FlatList
+        <FlatList showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}
           data={items}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}

@@ -89,7 +89,7 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
           <LoadingIndicator color={colors.primary} />
         </View>
       ) : (
-        <ScrollView
+        <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.body}
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />

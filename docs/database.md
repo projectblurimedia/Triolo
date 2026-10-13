@@ -131,7 +131,7 @@ Migration `0009_create_notifications.sql`. One composite index, `(account_id, cr
 
 Migration `0010_create_push_tokens.sql`. Owned by the `notifications` module, not `auth`/`accounts` — deliberately kept as its own table rather than a column on `accounts`, so nothing outside this module ever needs to reach into it. Registered via `PATCH /api/v1/notifications/push-token`; consumed by `NotificationsService.notifyProfileViewed()`, which looks the token up right before sending a push and silently skips the push (the in-app row above is unaffected) if none is registered.
 
-### booking_requests (Bookings module — implemented, Quick Book slice only)
+### booking_requests (Bookings module — implemented: Quick Book, broadcast through rating)
 | column | type | notes |
 |---|---|---|
 | id | uuid PK | |
@@ -139,12 +139,21 @@ Migration `0010_create_push_tokens.sql`. Owned by the `notifications` module, no
 | skill_categories | `worker_skill_category[]` | every skill required — a matching worker must have **all** of these, not just one |
 | latitude / longitude | double precision | the requester's location at broadcast time |
 | radius_km | numeric | how far the broadcast reached — currently always `50` (a testing-only default, also the max the API allows) |
-| status | enum `booking_request_status` (`broadcasting`, `accepted`) | no `cancelled`/`expired` yet — out of scope for this first slice |
+| location_address | text, nullable | reverse-geocoded label for the customer's location, shown to the worker (migration `0018`) |
+| status | enum `booking_request_status` (`broadcasting`, `accepted`, `on_the_way`, `arrived`, `in_progress`, `work_done`, `completed`, `cancelled`, `expired`) | full trip flow added in migration `0018`; `expired` (+ `expired_at`, migration `0020`) = no worker accepted within 3 minutes — transitions in `docs/api.md`'s Bookings Module |
 | accepted_worker_id | uuid FK → worker_profiles.id, ON DELETE SET NULL, nullable | set atomically the moment a worker wins the accept race |
 | accepted_at | timestamptz, nullable | |
+| arrival_pin | text, nullable | 4-digit PIN set on accept, returned only to the customer; cleared once verified (single use) |
+| pin_attempts | integer, default 0 | wrong PIN tries — locked at 5, counted under a `SELECT … FOR UPDATE` row lock |
+| worker_latitude / worker_longitude / worker_location_at | double precision / timestamptz, nullable | the worker's last reported position during the trip (`PUT /bookings/:id/location`); only exposed to the customer while `accepted`/`on_the_way`/`arrived` |
+| started_at / arrived_at / pin_verified_at / work_done_at / completed_at / cancelled_at | timestamptz, nullable | one timestamp per step — drives the customer's progress timeline |
+| worker_rating | smallint, nullable, `CHECK (1..5)` | the customer's rating, set once on completion; also added to `worker_profiles.rating_sum/rating_count` via `WorkersService.recordRating()` |
+| worker_review | text, nullable | optional feedback (≤300 chars at the API) |
 | created_at | timestamptz | |
 
-### booking_offers (Bookings module — implemented, Quick Book slice only)
+Migration `0018_quick_book_trip_flow.sql` also added index `(accepted_worker_id, created_at DESC)` (a worker's job history, `GET /bookings/jobs/mine`) and `notification_type` values `booking_accepted`, `booking_on_the_way`, `booking_arrived`, `booking_work_done`, `booking_completed`, `booking_cancelled`.
+
+### booking_offers (Bookings module — implemented)
 | column | type | notes |
 |---|---|---|
 | id | uuid PK | |
@@ -157,7 +166,7 @@ Migration `0010_create_push_tokens.sql`. Owned by the `notifications` module, no
 
 Migration `0011_create_booking_requests.sql`. Two indexes: `(account_id, created_at DESC)` on `booking_requests` (a requester's own history, not yet surfaced in any UI), `(worker_id, status)` on `booking_offers` (a worker's pending-offers list, `GET /api/v1/bookings/offers/mine`). **First-accept-wins is enforced entirely by `booking_requests`' own row lock**, not application logic: `BookingsRepository.acceptOffer()` runs `UPDATE booking_requests SET status='accepted', ... WHERE id=$1 AND status='broadcasting'` inside a transaction — a second, concurrent call for the same request blocks on Postgres's row lock until the first commits, then affects 0 rows since `status` no longer matches, so exactly one worker can ever win. The same transaction flips every other still-`pending` offer for that request to `lost` and returns the losing workers' account ids/languages so the service layer can push a "job taken" notification to each (see `docs/api.md`'s Bookings Module section, and `.cloud/architecture.md`'s Notification Architecture).
 
-### problem_posts (Problems module — implemented, save-only)
+### problem_posts (Problems module — implemented; accepted jobs run as trips)
 | column | type | notes |
 |---|---|---|
 | id | uuid PK | |
@@ -173,15 +182,16 @@ Migration `0011_create_booking_requests.sql`. Two indexes: `(account_id, created
 | accepted_at / work_done_at / completed_at | timestamptz, nullable | when each transition happened |
 | worker_rating | smallint, nullable, `CHECK (1..5)` | the customer's star rating of the worker, set once when confirming finished (migration `0016`) |
 | worker_review | text, nullable | optional short review with that rating |
+| booking_request_id | uuid FK → booking_requests.id, ON DELETE SET NULL, nullable | the trip this job runs as once accepted (migration `0019`); cleared when the customer cancels the trip and the post reopens |
 | created_at | timestamptz | |
+
+Migration `0019_problem_jobs_as_trips_and_reviews.sql` also added `booking_requests.problem_post_id` (FK → problem_posts, ON DELETE SET NULL) and `booking_requests.quotation_amount`, plus partial indexes on `(accepted_worker_id, completed_at DESC) WHERE status = 'completed'` on both tables for the reviews queries.
 
 Migrations `0013_create_problem_posts.sql`, `0014_problem_posts_location_address.sql`, `0015_problem_posts_job_flow.sql`. Indexes: `(status, created_at DESC)` and `(accepted_worker_id, created_at DESC)` (both 0015) for the worker-side nearby/assigned queries, plus `(account_id, created_at DESC)` for `GET /problems/mine`, and a GIN index on `skill_categories` for the future "show open posts to matching workers" query.
 
 ## Planned Tables (subsequent modules — outline only, refine when implemented)
 
 - **business_staff**: business_profile_id FK, account_id FK, permissions jsonb.
-- **Booking status pipeline beyond Quick Book's first-accept-wins slice**: PIN verification, cancellation, full status progression (pipeline per product-specification §2) still need their own tables/columns on `booking_requests` (or a successor) — not built yet.
-- **booking_pins**: booking_id FK, pin_hash, single_use, verified_at nullable, attempt_count.
 - **orders**: user_id FK, business_profile_id FK, status enum (pipeline per product-specification §3), fulfillment_type enum(pickup, delivery).
 - **order_items**: order_id FK, item_name, quantity, availability_status enum(available, partial, out_of_stock).
 - **order_pins**: order_id FK, pin_type enum(pickup, delivery), pin_hash, verified_at nullable.

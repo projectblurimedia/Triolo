@@ -31,7 +31,9 @@ export function Button({ label, onPress, loading, disabled, gradient }: ButtonPr
 
 const styles = StyleSheet.create({
   button: {
-    paddingVertical: 14,
+    // Fixed height so the button is the same size showing its label or the spinner —
+    // padding-sized, it changed height while loading and got clipped in button rows.
+    height: 48,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
