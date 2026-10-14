@@ -77,7 +77,10 @@ export function ProblemDetailModal({ problem, onClose, onAccept, accepting }: Pr
         {photos.length > 1 ? (
           <View style={styles.galleryDots}>
             {photos.map((url, index) => (
-              <View key={`${index}-${url}`} style={[styles.galleryDot, index === galleryIndex ? styles.galleryDotActive : null]} />
+              <View
+                key={`${index}-${url}`}
+                style={[styles.galleryDot, index === galleryIndex ? styles.galleryDotActive : null]}
+              />
             ))}
           </View>
         ) : null}
@@ -104,7 +107,12 @@ export function ProblemDetailModal({ problem, onClose, onAccept, accepting }: Pr
   return (
     <Modal visible={problem !== null} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <LinearGradient
+          colors={headerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.header, { paddingTop: insets.top + 14 }]}
+        >
           <Pressable style={styles.backButton} onPress={close} hitSlop={8} accessibilityLabel={t('common.close')}>
             <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
           </Pressable>
@@ -119,7 +127,10 @@ export function ProblemDetailModal({ problem, onClose, onAccept, accepting }: Pr
         </LinearGradient>
 
         {problem ? (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: onAccept ? 120 : insets.bottom + 24 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: onAccept ? 120 : insets.bottom + 24 }}
+          >
             {renderGallery()}
 
             <View style={styles.body}>
@@ -140,14 +151,19 @@ export function ProblemDetailModal({ problem, onClose, onAccept, accepting }: Pr
 
               <View style={styles.tags}>
                 {skills.map((label) => (
-                  <View key={label} style={[styles.tag, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}33` }]}>
+                  <View
+                    key={label}
+                    style={[styles.tag, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}33` }]}
+                  >
                     <Text style={[styles.tagText, { color: colors.primary }]}>{label}</Text>
                   </View>
                 ))}
               </View>
 
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                {problem.locationAddress ? renderInfoRow('location-dot', t('problemDetail.location'), problem.locationAddress) : null}
+                {problem.locationAddress
+                  ? renderInfoRow('location-dot', t('problemDetail.location'), problem.locationAddress)
+                  : null}
                 {renderInfoRow(
                   'align-left',
                   t('problemDetail.description'),
@@ -159,7 +175,12 @@ export function ProblemDetailModal({ problem, onClose, onAccept, accepting }: Pr
         ) : null}
 
         {problem && onAccept ? (
-          <View style={[styles.footer, { paddingBottom: insets.bottom + 16, backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.footer,
+              { paddingBottom: insets.bottom + 16, backgroundColor: colors.background, borderColor: colors.border },
+            ]}
+          >
             <Button label={t('problems.accept')} onPress={onAccept} loading={accepting} />
           </View>
         ) : null}
@@ -175,7 +196,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingBottom: 16 },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 18 },
   headerSubtitle: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
   galleryBadge: {
@@ -200,7 +230,14 @@ const styles = StyleSheet.create({
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   priceLabel: { ...typography.caption },
   price: { fontFamily: fonts.semiBold, fontSize: 28, lineHeight: 36 },
-  distancePill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7 },
+  distancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
   distanceText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 13 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },

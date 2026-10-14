@@ -39,7 +39,7 @@ export function ConfirmModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
-      <Pressable style={styles.overlay} onPress={onCancel}>
+      <Pressable style={styles.overlay} onPress={loading ? undefined : onCancel}>
         <Pressable style={[styles.card, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
           <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.iconCircle}>
             <FontAwesome6 name={icon} size={26} color={colors.white} solid />
@@ -57,7 +57,13 @@ export function ConfirmModal({
             </Pressable>
             <Pressable style={styles.confirmButton} onPress={onConfirm} disabled={loading}>
               <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.confirmGradient}>
-                {loading ? <LoadingIndicator size={18} dotSize={3.5} /> : <Text style={styles.confirmText}>{confirmLabel}</Text>}
+                {loading ? (
+                  <LoadingIndicator size={18} dotSize={3.5} />
+                ) : (
+                  <Text style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    {confirmLabel}
+                  </Text>
+                )}
               </LinearGradient>
             </Pressable>
           </View>

@@ -18,10 +18,8 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | business_staff | staff | Staff membership + permissions, linked to a business_profile |
 | booking_requests | bookings | Implemented — Quick Book's broadcast request (skills, location, radius, status); see its own section below |
 | booking_offers | bookings | Implemented — one row per invited worker per request; first-accept-wins is enforced here |
-| booking_pins | bookings | Not yet built — PIN verification is still planned, see Planned Tables |
-| orders | orders | Business shopping-list order lifecycle |
-| order_items | orders | Line items with availability status |
-| order_pins | orders | Pickup/delivery PINs per order |
+| (arrival PIN) | bookings | Implemented as `booking_requests.arrival_pin` / `pin_attempts` (migration `0018`); shop orders keep theirs on `shop_orders.pin` |
+| shop_orders / shop_order_items | orders | Implemented — a list sent to a shop and its items (packed with a price, or unavailable); see their section below |
 | notifications | notifications | Implemented — `profile_view` event only so far, delivered in-app (polled) and via push when configured; see its own section below |
 | push_tokens | notifications | Implemented — one device token per account, feeds the push side of `notifications` above |
 | ratings_reviews | ratings/reviews | Polymorphic: worker or business target |
@@ -189,12 +187,33 @@ Migration `0019_problem_jobs_as_trips_and_reviews.sql` also added `booking_reque
 
 Migrations `0013_create_problem_posts.sql`, `0014_problem_posts_location_address.sql`, `0015_problem_posts_job_flow.sql`. Indexes: `(status, created_at DESC)` and `(accepted_worker_id, created_at DESC)` (both 0015) for the worker-side nearby/assigned queries, plus `(account_id, created_at DESC)` for `GET /problems/mine`, and a GIN index on `skill_categories` for the future "show open posts to matching workers" query.
 
+### shop_orders / shop_order_items (Orders module — implemented)
+Migration `0021_shop_orders_favorites_shop_ratings.sql`. A list the customer sends to one shop; the flow and rules are in `docs/api.md`'s Orders Module.
+
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| account_id | uuid FK → accounts.id, ON DELETE CASCADE | the customer |
+| business_id | uuid FK → business_profiles.id, ON DELETE CASCADE | the shop |
+| fulfillment | enum `shop_order_fulfillment` (`pickup`, `delivery`) | delivery only if the shop offers it |
+| status | enum `shop_order_status` (`placed`, `accepted`, `preparing`, `packed`, `ready_for_pickup`, `out_for_delivery`, `completed`, `cancelled`, `declined`, `expired`) | every change is a guarded `UPDATE … WHERE status = …`; `placed` orders expire after 30 min (lazily) |
+| latitude / longitude / location_address | double precision / text | where the customer is (delivery address) |
+| distance_meters | double precision | customer ↔ shop, at order time |
+| delivery_charge | numeric(10,2) | shop's price per km × distance, fixed at order time |
+| items_total / total_amount | numeric(10,2), nullable | the bill, set when packed |
+| note | text, nullable | the customer's note |
+| pin / pin_attempts | text, nullable / integer | pickup/delivery PIN, set at handover, cleared once verified; locked at 5 |
+| cancelled_by / cancel_reason | text, nullable | `customer` or `shop` |
+| shop_rating / shop_review / rated_at | smallint 1–5 / text / timestamptz, nullable | the customer's rating, once |
+| accepted_at, packed_at, ready_at, completed_at, cancelled_at, declined_at, expired_at, created_at, updated_at | timestamptz | |
+
+`shop_order_items`: `id`, `order_id` (FK, cascade), `position`, `name`, `quantity` (text, kept as spoken/typed), `unit`, `status` enum `shop_order_item_status` (`pending`, `packed`, `unavailable`), `price` numeric(10,2) (packed items only); `UNIQUE (order_id, position)`. Indexes: `(account_id, created_at DESC)`, `(business_id, created_at DESC)`, partial `(created_at) WHERE status = 'placed'` for expiry.
+
+The same migration added `business_profiles.rating_sum/rating_count` (shop ratings, same pattern as workers), the `favorites` table (`account_id`, `target_type` enum `favorite_target_type` (`worker`, `business`), `target_id`, `created_at`; PK on all three) and the `order_*` notification types.
+
 ## Planned Tables (subsequent modules — outline only, refine when implemented)
 
 - **business_staff**: business_profile_id FK, account_id FK, permissions jsonb.
-- **orders**: user_id FK, business_profile_id FK, status enum (pipeline per product-specification §3), fulfillment_type enum(pickup, delivery).
-- **order_items**: order_id FK, item_name, quantity, availability_status enum(available, partial, out_of_stock).
-- **order_pins**: order_id FK, pin_type enum(pickup, delivery), pin_hash, verified_at nullable.
 - **verification_requests**: account_id FK, submitted_documents jsonb, status enum(pending, approved, rejected, resubmission_requested), reviewed_by (admin account_id), reason.
 - **audit_logs**: admin_account_id FK, action, target_type, target_id, reason, created_at (append-only, no update path).
 

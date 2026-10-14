@@ -13,7 +13,9 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
+import { PortalHost } from '@/components/Portal';
 import { BookingTrackingModal } from '@/components/BookingTrackingModal';
+import { OrderTrackingModal } from '@/components/OrderTrackingModal';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -147,10 +149,13 @@ export default function App() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <RootNavigator />
+        {/* Menus render here (same window as the tab screens, so their glass can blur them). */}
+        <PortalHost />
         {isLoggingOut ? <LogoutOverlay /> : null}
         {showUpdateOverlay ? <UpdateOverlay progress={downloadProgress} /> : null}
         {/* Quick Book's live tracking screen — opened from anywhere via bookingTrackerStore. */}
         <BookingTrackingModal />
+        <OrderTrackingModal />
         <ToastHost />
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}

@@ -23,4 +23,8 @@ export const reviewsService = {
   getForWorker: (workerId: string) => apiClient.get<WorkerReviewsSummary>(`/reviews/workers/${workerId}`, true),
   /** The signed-in worker's own ratings and feedback. */
   getMine: () => apiClient.get<WorkerReviewsSummary>('/reviews/me', true),
+  /** A shop's ratings and feedback from its completed orders (same shape as a worker's). */
+  getForBusiness: (businessId: string) => apiClient.get<WorkerReviewsSummary>(`/reviews/businesses/${businessId}`, true),
+  /** The signed-in owner's own shop reviews. */
+  getMyShop: () => apiClient.get<WorkerReviewsSummary>('/reviews/my-shop', true),
 };

@@ -10,18 +10,24 @@ import { BusinessProfileCard } from '@/components/BusinessProfileCard';
 import { WorkerProfileModal } from '@/components/WorkerProfileModal';
 import { BusinessProfileModal } from '@/components/BusinessProfileModal';
 import { ProfileStatsRow } from '@/components/ProfileStatsRow';
-import { ProfileActivity } from '@/components/ProfileActivity';
+import { ProfileActivity, ProfileOrders } from '@/components/ProfileActivity';
 import { SHOP_GRADIENT } from '@/components/BusinessProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 
-// Real drop shadow, matching the convention already established by ToastHost — every
-// card on this screen shares it instead of the earlier flat 1px-bordered look.
-const CARD_SHADOW = Platform.select({
-  ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 16 },
-  android: { elevation: 6 },
+// A deeper three-stop blue for the profile card, so it reads richer than the flat header.
+const HERO_GRADIENT = ['#0A3FAE', '#0055D3', '#2B83FF'] as const;
+// Brand-tinted glow under the profile card.
+const HERO_SHADOW = Platform.select({
+  ios: { shadowColor: '#0055D3', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.28, shadowRadius: 18 },
+  android: { elevation: 5 },
+});
+// A light lift for plain cards — just enough to separate them from the background.
+const SOFT_SHADOW = Platform.select({
+  ios: { shadowColor: '#0B2A5B', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 8 },
+  android: { elevation: 1.5 },
 });
 
 // Rating/completed-work counts are placeholder content until the ratings/reviews and
@@ -56,39 +62,70 @@ export function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         {account ? (
           <LinearGradient
-            colors={headerGradient}
+            colors={HERO_GRADIENT}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[styles.hero, CARD_SHADOW]}
+            style={[styles.hero, HERO_SHADOW]}
           >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
+            {/* Soft light circles give the card depth. */}
+            <View style={[styles.bubble, styles.bubbleLarge]} />
+            <View style={[styles.bubble, styles.bubbleSmall]} />
+
+            <View style={styles.heroTop}>
+              <View style={styles.avatarRing}>
+                <LinearGradient
+                  colors={['#FFFFFF', '#DCE8FF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.avatar}
+                >
+                  <Text style={styles.avatarText}>{initial}</Text>
+                </LinearGradient>
+              </View>
+              <View style={styles.heroIdentity}>
+                <Text style={styles.heroName} numberOfLines={1}>
+                  {account.fullName}
+                </Text>
+                {account.status === 'active' ? (
+                  <View style={styles.statusPill}>
+                    <View style={styles.statusDot} />
+                    <Text style={styles.statusText}>{t('profile.activeStatus')}</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
-            <Text style={styles.heroName} numberOfLines={1}>
-              {account.fullName}
-            </Text>
-            <View style={styles.heroMetaRow}>
-              <FontAwesome6 name="phone" size={11} color="rgba(255, 255, 255, 0.85)" solid />
-              <Text style={styles.heroMeta}>{account.mobileNumber}</Text>
-            </View>
-            {account.email ? (
-              <View style={styles.heroMetaRow}>
-                <FontAwesome6 name="envelope" size={11} color="rgba(255, 255, 255, 0.85)" solid />
-                <Text style={styles.heroMeta} numberOfLines={1}>
-                  {account.email}
+
+            <View style={styles.heroDivider} />
+
+            <View style={styles.heroChips}>
+              <View style={styles.heroChip}>
+                <View style={styles.heroChipIcon}>
+                  <FontAwesome6 name="phone" size={11} color={headerGradient[0]} solid />
+                </View>
+                <Text style={styles.heroChipText} numberOfLines={1}>
+                  {account.mobileNumber}
                 </Text>
               </View>
-            ) : null}
-            {account.status === 'active' ? (
-              <View style={styles.statusPill}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusText}>{t('profile.activeStatus')}</Text>
-              </View>
-            ) : null}
+              {account.email ? (
+                <View style={[styles.heroChip, styles.heroChipWide]}>
+                  <View style={styles.heroChipIcon}>
+                    <FontAwesome6 name="envelope" size={11} color={headerGradient[0]} solid />
+                  </View>
+                  <Text style={styles.heroChipText} numberOfLines={1}>
+                    {account.email}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           </LinearGradient>
         ) : null}
 
-        {account ? <ProfileActivity /> : null}
+        {account ? (
+          <>
+            <ProfileActivity />
+            <ProfileOrders />
+          </>
+        ) : null}
 
         {workerProfile ? (
           <View style={styles.section}>
@@ -118,11 +155,17 @@ export function ProfileScreen() {
             <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.businessSection')}</Text>
             <ProfileStatsRow
               stats={[
-                { icon: 'star', value: t('profile.ratingValue'), label: t('profile.ratingCount'), tint: SHOP_GRADIENT[0] },
+                {
+                  icon: 'star',
+                  value:
+                    businessProfile.ratingAverage != null ? businessProfile.ratingAverage.toFixed(1) : t('workerReviews.new'),
+                  label: t('workerReviews.statRating'),
+                  tint: SHOP_GRADIENT[0],
+                },
                 {
                   icon: 'bag-shopping',
-                  value: t('profile.ordersDoneValue'),
-                  label: t('profile.ordersDoneLabel'),
+                  value: String(businessProfile.ratingCount),
+                  label: t('profile.ratedOrders'),
                   tint: SHOP_GRADIENT[0],
                 },
               ]}
@@ -132,7 +175,7 @@ export function ProfileScreen() {
         ) : null}
 
         {hasNoCapability ? (
-          <View style={[styles.emptyCard, CARD_SHADOW, { backgroundColor: colors.surface }]}>
+          <View style={[styles.emptyCard, SOFT_SHADOW, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}1A` }]}>
               <FontAwesome6 name="circle-info" size={18} color={colors.primary} solid />
             </View>
@@ -153,48 +196,59 @@ export function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 20,
+  hero: { borderRadius: 24, padding: 18, marginBottom: 20, overflow: 'hidden' },
+  bubble: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255, 255, 255, 0.08)' },
+  bubbleLarge: { width: 180, height: 180, top: -70, right: -50 },
+  bubbleSmall: { width: 110, height: 110, bottom: -50, left: -30 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  avatarRing: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    padding: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarText: {
-    ...typography.heading,
-    fontFamily: fonts.semiBold,
-    color: '#FFFFFF',
-    fontSize: typography.heading.fontSize + 6,
-  },
-  heroName: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  heroMeta: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)' },
+  avatar: { flex: 1, borderRadius: 32, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontFamily: fonts.semiBold, fontSize: 26, lineHeight: 32, color: '#0055D3' },
+  heroIdentity: { flex: 1, gap: 6 },
+  heroName: { ...typography.subheading, fontFamily: fonts.semiBold, fontSize: 19, lineHeight: 25, color: '#FFFFFF' },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     gap: 6,
-    marginTop: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
   },
-  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4ADE80' },
-  statusText: { ...typography.caption, fontFamily: fonts.medium, color: '#FFFFFF' },
+  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ADE80' },
+  statusText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11, color: '#FFFFFF' },
+  heroDivider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255, 255, 255, 0.3)', marginVertical: 14 },
+  heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  heroChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 4,
+    paddingRight: 12,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.24)',
+    maxWidth: '100%',
+  },
+  heroChipWide: { flexShrink: 1 },
+  heroChipIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  heroChipText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12, color: '#FFFFFF', flexShrink: 1 },
   section: { marginBottom: 4 },
   sectionTitle: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 10, marginLeft: 4 },
   emptyCard: {
     borderRadius: 18,
+    borderWidth: 1,
     padding: 20,
     alignItems: 'center',
     marginTop: 4,

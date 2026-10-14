@@ -39,6 +39,9 @@ export interface BusinessProfile {
   deliveryAvailable: boolean;
   deliveryPricePerKm: number | null;
   verificationStatus: string;
+  /** Average customer rating of the shop (1 decimal), or null before the first rating. */
+  ratingAverage: number | null;
+  ratingCount: number;
 }
 
 export interface BusinessNearbyResult extends BusinessProfile {
@@ -51,7 +54,13 @@ export interface NearbySearchParams {
   radiusKm?: number;
   query?: string;
   limit?: number;
+  shopCategory?: string | null;
+  /** Only shops that deliver. */
+  deliveryOnly?: boolean;
+  sort?: NearbyShopSort;
 }
+
+export type NearbyShopSort = 'distance' | 'rating';
 
 export const businessesService = {
   getMyProfile: () => apiClient.get<BusinessProfile | null>('/businesses/me/profile', true),
@@ -63,6 +72,9 @@ export const businessesService = {
     if (params.radiusKm != null) search.set('radiusKm', String(params.radiusKm));
     if (params.query) search.set('query', params.query);
     if (params.limit != null) search.set('limit', String(params.limit));
+    if (params.shopCategory) search.set('shopCategory', params.shopCategory);
+    if (params.deliveryOnly) search.set('delivery', 'true');
+    if (params.sort) search.set('sort', params.sort);
     return apiClient.get<BusinessNearbyResult[]>(`/businesses/nearby?${search.toString()}`, true);
   },
 

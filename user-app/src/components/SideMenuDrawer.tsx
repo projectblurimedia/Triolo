@@ -1,9 +1,11 @@
 import React, { PropsWithChildren, useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, BackHandler, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { GlassBackdropLayer, GlassFill } from './Glass';
+import { Portal } from './Portal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.85;
@@ -74,23 +76,42 @@ export function SideMenuDrawer({
     });
   }, [visible, rendered]);
 
+  // No native Modal, so the hardware back button is handled here.
+  useEffect(() => {
+    if (!visible) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [visible, onClose]);
+
+  if (!rendered) return null;
+
   return (
-    <Modal visible={rendered} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.container}>
+    // Rendered in the app's own window (not a native Modal), so the glass panel can really
+    // blur the tab screen behind it on Android — see Portal.tsx.
+    <Portal>
+      <View style={StyleSheet.absoluteFill}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
-          <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: backdropOpacity }]} />
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
+            <GlassBackdropLayer />
+          </Animated.View>
         </Pressable>
 
-        <Animated.View style={[styles.drawer, { backgroundColor: colors.surface, transform: [{ translateX }] }]}>
+        <Animated.View style={[styles.drawer, { transform: [{ translateX }] }]}>
+          <GlassFill />
           <LinearGradient
             colors={gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[styles.header, { paddingTop: insets.top + 14 }]}
+            style={styles.header}
           >
-            <View style={styles.headerRow}>
+            <View style={[styles.headerRow, { paddingTop: insets.top + 14 }]}>
               <View style={styles.headerLeft}>
-                <FontAwesome6 name={icon} size={26} color={colors.white} solid />
+                <View style={styles.headerIcon}>
+                  <FontAwesome6 name={icon} size={22} color={colors.white} solid />
+                </View>
                 <View style={styles.headerText}>
                   <Text style={styles.headerTitle} numberOfLines={1}>
                     {title}
@@ -104,18 +125,17 @@ export function SideMenuDrawer({
                 <FontAwesome6 name="xmark" size={18} color={colors.white} solid />
               </Pressable>
             </View>
+            <View style={styles.accent} />
           </LinearGradient>
 
           <ScrollView contentContainerStyle={styles.scrollContent}>{children}</ScrollView>
         </Animated.View>
       </View>
-    </Modal>
+    </Portal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.5)' },
   drawer: {
     position: 'absolute',
     top: 0,
@@ -125,17 +145,37 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderBottomLeftRadius: 20,
     overflow: 'hidden',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: -4, height: 0 }, shadowOpacity: 0.2, shadowRadius: 20 },
-      android: { elevation: 20 },
-    }),
+    // iOS shadow only: Android elevation shows through translucent glass as a grey box.
+    shadowColor: '#000',
+    shadowOffset: { width: -4, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
   },
-  header: { paddingBottom: 20, paddingHorizontal: 20 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  header: { paddingHorizontal: 16 },
+  // Same measurements as GradientHeader (46px row, 16px bottom padding, 3px accent line), so the
+  // drawer's header lines up exactly with the screen header beside it.
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 46, paddingBottom: 16, boxSizing: 'content-box' },
+  headerIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.32)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  accent: { height: 3, marginHorizontal: -16, backgroundColor: 'rgba(255, 255, 255, 0.28)' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 },
   headerText: { marginLeft: 12, flex: 1 },
-  headerTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF', lineHeight: 20 },
-  headerSubtitle: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', lineHeight: 14, marginTop: 2 },
+  headerTitle: {
+    ...typography.heading,
+    fontFamily: fonts.semiBold,
+    fontSize: typography.heading.fontSize - 2,
+    color: '#FFFFFF',
+    lineHeight: 24,
+  },
+  headerSubtitle: { ...typography.caption, color: 'rgba(255, 255, 255, 0.82)', lineHeight: 14, marginTop: 1.5 },
   closeButton: {
     width: ICON_BUTTON_SIZE,
     height: ICON_BUTTON_SIZE,

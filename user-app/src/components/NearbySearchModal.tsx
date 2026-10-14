@@ -266,8 +266,8 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
       ? worker.skillCategories.filter((key) => key !== 'other')
       : (business as BusinessNearbyResult).shopCategories.filter((key) => key !== 'other');
     const customTags = worker
-      ? worker.otherSkillDescription?.split(', ').filter(Boolean) ?? []
-      : (business as BusinessNearbyResult).otherCategoryDescription?.split(', ').filter(Boolean) ?? [];
+      ? (worker.otherSkillDescription?.split(', ').filter(Boolean) ?? [])
+      : ((business as BusinessNearbyResult).otherCategoryDescription?.split(', ').filter(Boolean) ?? []);
 
     return (
       <Pressable
@@ -335,19 +335,25 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     }
 
     if (location.status === 'denied' || location.status === 'error' || location.status === 'disabled') {
-      const titleKey = location.status === 'disabled' ? 'location.disabledTitle' : location.status === 'denied' ? 'nearbySearch.locationDeniedTitle' : 'nearbySearch.locationErrorTitle';
-      const messageKey = location.status === 'disabled' ? 'location.disabledMessage' : location.status === 'denied' ? 'nearbySearch.locationDeniedMessage' : 'nearbySearch.locationErrorMessage';
+      const titleKey =
+        location.status === 'disabled'
+          ? 'location.disabledTitle'
+          : location.status === 'denied'
+            ? 'nearbySearch.locationDeniedTitle'
+            : 'nearbySearch.locationErrorTitle';
+      const messageKey =
+        location.status === 'disabled'
+          ? 'location.disabledMessage'
+          : location.status === 'denied'
+            ? 'nearbySearch.locationDeniedMessage'
+            : 'nearbySearch.locationErrorMessage';
       return (
         <View style={styles.body}>
           <View style={[styles.emptyIcon, { backgroundColor: `${colors.error}1A` }]}>
             <FontAwesome6 name="location-crosshairs" size={22} color={colors.error} solid />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            {t(titleKey)}
-          </Text>
-          <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>
-            {t(messageKey)}
-          </Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t(titleKey)}</Text>
+          <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t(messageKey)}</Text>
           <Pressable style={[styles.retryButton, { backgroundColor: accentColor }]} onPress={detectLocation}>
             <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
           </Pressable>
@@ -396,9 +402,7 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
           <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('nearbySearch.resultsErrorMessage')}</Text>
           <Pressable
             style={[styles.retryButton, { backgroundColor: accentColor }]}
-            onPress={() =>
-              location.status === 'ready' && runSearch(location.latitude, location.longitude, query, radiusKm)
-            }
+            onPress={() => location.status === 'ready' && runSearch(location.latitude, location.longitude, query, radiusKm)}
           >
             <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
           </Pressable>
@@ -464,18 +468,14 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
               <TextInput
                 value={query}
                 onChangeText={setQuery}
-                accessibilityLabel={t(
-                  isWorker ? 'nearbySearch.searchWorkersPlaceholder' : 'nearbySearch.searchShopsPlaceholder',
-                )}
+                accessibilityLabel={t(isWorker ? 'nearbySearch.searchWorkersPlaceholder' : 'nearbySearch.searchShopsPlaceholder')}
                 style={[styles.searchInput, { color: colors.text }]}
                 returnKeyType="search"
               />
               {query.length === 0 && searchFieldWidth > 0 ? (
                 <View style={styles.searchPlaceholderOverlay} pointerEvents="none">
                   <AutoScrollText
-                    text={t(
-                      isWorker ? 'nearbySearch.searchWorkersPlaceholder' : 'nearbySearch.searchShopsPlaceholder',
-                    )}
+                    text={t(isWorker ? 'nearbySearch.searchWorkersPlaceholder' : 'nearbySearch.searchShopsPlaceholder')}
                     containerWidth={searchFieldWidth}
                     style={[styles.searchPlaceholderText, { color: colors.textMuted }]}
                   />
@@ -504,7 +504,13 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
         {renderBody()}
       </View>
 
-      <Modal visible={unitPickerVisible} transparent animationType="fade" onRequestClose={() => setUnitPickerVisible(false)} statusBarTranslucent>
+      <Modal
+        visible={unitPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setUnitPickerVisible(false)}
+        statusBarTranslucent
+      >
         <Pressable style={styles.unitOverlay} onPress={() => setUnitPickerVisible(false)}>
           <Pressable style={[styles.unitCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
             <Text style={[styles.unitCardTitle, { color: colors.text }]}>{t('nearbySearch.rangeLabel')}</Text>

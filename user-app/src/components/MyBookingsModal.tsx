@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import { ACTIVE_BOOKING_STATUSES, CustomerBooking } from '@/services/bookingsSer
 import { ProblemPost } from '@/services/problemsService';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { PullToRefresh } from './PullToRefresh';
 
 interface MyBookingsModalProps {
   visible: boolean;
@@ -176,41 +177,48 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
               </Text>
             </View>
           </View>
-          <View style={styles.tabRow}>
-            {tabs.map((option) => {
-              const active = tab === option.key;
-              return (
-                <Pressable key={option.key} onPress={() => setTab(option.key)} style={[styles.tab, active ? styles.tabActive : null]}>
-                  <Text style={[styles.tabText, { color: active ? headerGradient[0] : '#FFFFFF' }]}>{option.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
         </LinearGradient>
+
+        {/* Active / History sit below the header — headers carry only a title and subtitle. */}
+        <View style={[styles.segment, { backgroundColor: `${colors.primary}10` }]}>
+          {tabs.map((option) => {
+            const active = tab === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                onPress={() => setTab(option.key)}
+                style={[styles.segmentItem, active ? { backgroundColor: colors.surface } : null]}
+              >
+                <Text style={[styles.segmentText, { color: active ? colors.primary : colors.textMuted }]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         {loading ? (
           <View style={styles.center}>
             <LoadingIndicator size={40} dotSize={6} color={colors.primary} />
           </View>
         ) : (
-          <FlatList
-            data={shown}
-            keyExtractor={(entry) => `${entry.kind}-${entry.id}`}
-            renderItem={renderEntry}
-            contentContainerStyle={styles.list}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}14` }]}>
-                  <FontAwesome6 name="calendar-check" size={22} color={colors.primary} solid />
+          <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
+            <FlatList
+              data={shown}
+              keyExtractor={(entry) => `${entry.kind}-${entry.id}`}
+              renderItem={renderEntry}
+              contentContainerStyle={styles.list}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}14` }]}>
+                    <FontAwesome6 name="calendar-check" size={22} color={colors.primary} solid />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                    {t(tab === 'active' ? 'myBookings.emptyActiveTitle' : 'myBookings.emptyHistoryTitle')}
+                  </Text>
+                  <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('myBookings.emptyMessage')}</Text>
                 </View>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                  {t(tab === 'active' ? 'myBookings.emptyActiveTitle' : 'myBookings.emptyHistoryTitle')}
-                </Text>
-                <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('myBookings.emptyMessage')}</Text>
-              </View>
-            }
-          />
+              }
+            />
+          </PullToRefresh>
         )}
         <ToastHost />
       </View>
@@ -237,12 +245,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  tabRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  tab: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.4)' },
-  tabActive: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
-  tabText: { ...typography.caption, fontFamily: fonts.semiBold },
+  segment: { flexDirection: 'row', borderRadius: 14, padding: 4, margin: 16, marginBottom: 6 },
+  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11 },
+  segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: 16, paddingBottom: 40, flexGrow: 1 },
+  list: { padding: 16, paddingTop: 10, paddingBottom: 40, flexGrow: 1 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },
   icon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1, gap: 3 },

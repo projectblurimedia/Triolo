@@ -3,6 +3,7 @@ import { Pressable, Text, View, StyleSheet } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Avatar, miniCardStyles } from './WorkerMiniCard';
+import { RatingStars } from './RatingStars';
 import { BusinessNearbyResult } from '@/services/businessesService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
@@ -17,10 +18,7 @@ export function ShopMiniCard({ shop, onPress }: { shop: BusinessNearbyResult; on
     .join(', ');
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={[miniCardStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-    >
+    <Pressable onPress={onPress} style={[miniCardStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Avatar photoUrl={shop.shopPhotoUrls[0]} name={shop.shopName} size={56} />
       <Text style={[miniCardStyles.name, { color: colors.text }]} numberOfLines={1}>
         {shop.shopName}
@@ -28,6 +26,7 @@ export function ShopMiniCard({ shop, onPress }: { shop: BusinessNearbyResult; on
       <Text style={[miniCardStyles.sub, { color: colors.textMuted }]} numberOfLines={1}>
         {categories}
       </Text>
+      <RatingStars average={shop.ratingAverage} count={shop.ratingCount} />
       {shop.deliveryAvailable ? (
         <View style={[styles.deliveryPill, { backgroundColor: `${brandColors.success}1A` }]}>
           <FontAwesome6 name="truck" size={9} color={brandColors.success} solid />

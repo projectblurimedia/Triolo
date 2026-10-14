@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as Notifications from 'expo-notifications';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
@@ -12,6 +12,9 @@ import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from 
 import { useMyJobs } from '@/hooks/useJobs';
 import { useAssignedProblems } from '@/hooks/useProblems';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
+import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { ShopOrdersList } from '@/components/ShopOrdersList';
+import { useShopOrders } from '@/hooks/useShopOrders';
 import { PendingOffer } from '@/services/bookingOffersService';
 import { ACTIVE_JOB_STATUSES, WorkerJob } from '@/services/jobsService';
 import { AssignedProblem } from '@/services/problemsService';
@@ -20,6 +23,7 @@ import { showToast } from '@/state/toastStore';
 import { openJob } from '@/state/jobFocusStore';
 import { ApiError } from '@/services/apiClient';
 import { formatDistance } from '@/utils/formatDistance';
+import { PullToRefresh } from '@/components/PullToRefresh';
 
 type Tab = 'requests' | 'active' | 'history';
 type HistoryEntry =
@@ -57,6 +61,19 @@ export function BookingsScreen() {
   const problems = useAssignedProblems(workerProfile.data?.verificationStatus === 'verified');
   const acceptMutation = useAcceptBookingOffer();
   const declineMutation = useDeclineBookingOffer();
+  const businessProfile = useMyBusinessProfile();
+  const isWorker = workerProfile.data?.verificationStatus === 'verified';
+  const isShop = businessProfile.data?.verificationStatus === 'verified';
+  // A partner with both capabilities switches between their worker jobs and their shop orders.
+  // Opened from a shop order (Home's shop card, an order notification) it starts on orders.
+  const route = useRoute<RouteProp<MainTabParamList, 'Bookings'>>();
+  const [mode, setMode] = useState<'jobs' | 'orders'>(route.params?.mode ?? 'jobs');
+  useEffect(() => {
+    if (route.params?.mode) setMode(route.params.mode);
+  }, [route.params?.mode, route.params?.linkedAt]);
+  const shopOrders = useShopOrders(isShop);
+  const newOrderCount = (shopOrders.data ?? []).filter((order) => order.status === 'placed').length;
+  const showOrders = isShop && (!isWorker || mode === 'orders');
 
   const entries = useMemo<HistoryEntry[]>(() => {
     const fromJobs: HistoryEntry[] = (jobs.data ?? []).map((job) => ({
@@ -67,13 +84,15 @@ export function BookingsScreen() {
       job,
     }));
     // A problem accepted since problems became trips is already listed as its trip (job).
-    const fromProblems: HistoryEntry[] = (problems.data ?? []).filter((problem) => !problem.bookingRequestId).map((problem) => ({
-      kind: 'problem',
-      id: problem.id,
-      createdAt: problem.createdAt,
-      active: problem.status !== 'completed',
-      problem,
-    }));
+    const fromProblems: HistoryEntry[] = (problems.data ?? [])
+      .filter((problem) => !problem.bookingRequestId)
+      .map((problem) => ({
+        kind: 'problem',
+        id: problem.id,
+        createdAt: problem.createdAt,
+        active: problem.status !== 'completed',
+        problem,
+      }));
     return [...fromJobs, ...fromProblems].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [jobs.data, problems.data]);
 
@@ -145,7 +164,10 @@ export function BookingsScreen() {
         </View>
         <View style={styles.actionRow}>
           <Pressable
-            style={({ pressed }) => [styles.declineButton, { borderColor: colors.border, opacity: pressed || declining ? 0.8 : 1 }]}
+            style={({ pressed }) => [
+              styles.declineButton,
+              { borderColor: colors.border, opacity: pressed || declining ? 0.8 : 1 },
+            ]}
             disabled={busy}
             onPress={() => handleDecline(item)}
           >
@@ -156,7 +178,10 @@ export function BookingsScreen() {
             )}
           </Pressable>
           <Pressable
-            style={({ pressed }) => [styles.acceptButton, { backgroundColor: colors.primary, opacity: pressed || accepting ? 0.8 : 1 }]}
+            style={({ pressed }) => [
+              styles.acceptButton,
+              { backgroundColor: colors.primary, opacity: pressed || accepting ? 0.8 : 1 },
+            ]}
             disabled={busy}
             onPress={() => handleAccept(item)}
           >
@@ -183,7 +208,9 @@ export function BookingsScreen() {
 
   const renderEntry = ({ item }: { item: HistoryEntry }) => {
     const isJob = item.kind === 'job';
-    const skills = (isJob ? item.job.skillCategories : item.problem.skillCategories).map((key) => t(`workerProfile.skills.${key}`)).join(', ');
+    const skills = (isJob ? item.job.skillCategories : item.problem.skillCategories)
+      .map((key) => t(`workerProfile.skills.${key}`))
+      .join(', ');
     const status = isJob ? item.job.status : item.problem.status;
     const statusLabel = isJob ? t(`job.status.${status}.title`) : t(`problems.status.${status}`);
     const customer = isJob ? item.job.customerFullName : item.problem.customerFullName;
@@ -250,10 +277,49 @@ export function BookingsScreen() {
   ];
 
   const loading = tab === 'requests' ? offersLoading : jobs.isLoading;
-  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />;
+
+  const modeSwitch =
+    isShop && isWorker ? (
+      <View style={[styles.modeSwitch, { borderColor: colors.border }]}>
+        {(['jobs', 'orders'] as const).map((value) => (
+          <Pressable
+            key={value}
+            onPress={() => setMode(value)}
+            style={[styles.modeOption, mode === value ? { backgroundColor: colors.primary } : null]}
+          >
+            <FontAwesome6
+              name={value === 'jobs' ? 'screwdriver-wrench' : 'store'}
+              size={12}
+              color={mode === value ? '#FFFFFF' : colors.textMuted}
+              solid
+            />
+            <Text style={[styles.modeText, { color: mode === value ? '#FFFFFF' : colors.textMuted }]}>
+              {t(value === 'jobs' ? 'bookings.serviceJobs' : 'bookings.shopOrders')}
+            </Text>
+            {value === 'orders' && newOrderCount > 0 ? (
+              <View style={[styles.modeBadge, { backgroundColor: mode === value ? '#FFFFFF' : brandColors.error }]}>
+                <Text style={[styles.modeBadgeText, { color: mode === value ? brandColors.error : '#FFFFFF' }]}>
+                  {newOrderCount > 9 ? '9+' : newOrderCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        ))}
+      </View>
+    ) : null;
+
+  if (showOrders) {
+    return (
+      <ScreenContainer edges={['left', 'right']}>
+        {modeSwitch}
+        <ShopOrdersList />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer edges={['left', 'right']}>
+      {modeSwitch}
       <View style={[styles.segment, { backgroundColor: `${colors.primary}10` }]}>
         {tabs.map((option) => {
           const active = tab === option.key;
@@ -265,7 +331,9 @@ export function BookingsScreen() {
             >
               <Text style={[styles.segmentText, { color: active ? colors.primary : colors.textMuted }]}>{option.label}</Text>
               {option.count > 0 ? (
-                <View style={[styles.countBadge, { backgroundColor: option.key === 'requests' ? brandColors.error : colors.primary }]}>
+                <View
+                  style={[styles.countBadge, { backgroundColor: option.key === 'requests' ? brandColors.error : colors.primary }]}
+                >
                   <Text style={styles.countText}>{option.count > 9 ? '9+' : option.count}</Text>
                 </View>
               ) : null}
@@ -279,35 +347,62 @@ export function BookingsScreen() {
           <LoadingIndicator color={colors.primary} />
         </View>
       ) : tab === 'requests' ? (
-        <FlatList showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}
-          data={offers ?? []}
-          keyExtractor={(item) => item.offerId}
-          contentContainerStyle={styles.listContent}
-          renderItem={renderOffer}
-          refreshControl={refreshControl}
-          ListEmptyComponent={renderEmpty('bell', t('bookings.emptyTitle'), t('bookings.emptyMessage'))}
-        />
+        <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
+          <FlatList
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            data={offers ?? []}
+            keyExtractor={(item) => item.offerId}
+            contentContainerStyle={styles.listContent}
+            renderItem={renderOffer}
+            ListEmptyComponent={renderEmpty('bell', t('bookings.emptyTitle'), t('bookings.emptyMessage'))}
+          />
+        </PullToRefresh>
       ) : (
-        <FlatList showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}
-          data={tab === 'active' ? activeEntries : historyEntries}
-          keyExtractor={(item) => `${item.kind}-${item.id}`}
-          contentContainerStyle={styles.listContent}
-          renderItem={renderEntry}
-          refreshControl={refreshControl}
-          ListEmptyComponent={
-            tab === 'active'
-              ? renderEmpty('person-digging', t('bookings.emptyActiveTitle'), t('bookings.emptyActiveMessage'))
-              : renderEmpty('clock-rotate-left', t('bookings.emptyHistoryTitle'), t('bookings.emptyHistoryMessage'))
-          }
-        />
+        <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
+          <FlatList
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            data={tab === 'active' ? activeEntries : historyEntries}
+            keyExtractor={(item) => `${item.kind}-${item.id}`}
+            contentContainerStyle={styles.listContent}
+            renderItem={renderEntry}
+            ListEmptyComponent={
+              tab === 'active'
+                ? renderEmpty('person-digging', t('bookings.emptyActiveTitle'), t('bookings.emptyActiveMessage'))
+                : renderEmpty('clock-rotate-left', t('bookings.emptyHistoryTitle'), t('bookings.emptyHistoryMessage'))
+            }
+          />
+        </PullToRefresh>
       )}
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  modeSwitch: { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 3, marginBottom: 14, gap: 4 },
+  modeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 11,
+  },
+  modeText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
+  modeBadge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+  modeBadgeText: { fontSize: 10, fontFamily: fonts.semiBold },
   segment: { flexDirection: 'row', borderRadius: 14, padding: 4, marginBottom: 14 },
-  segmentItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 11 },
+  segmentItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
   segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
   countBadge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   countText: { color: '#FFFFFF', fontSize: 10, fontFamily: fonts.semiBold },
@@ -318,15 +413,37 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: 120, flexGrow: 1 },
   card: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },
   cardHeaderRow: { flexDirection: 'row' },
-  distancePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  distancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
   distanceText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   tag: { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
   tagText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11 },
   actionRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  declineButton: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, paddingVertical: 12 },
+  declineButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 12,
+  },
   declineButtonText: { ...typography.body, fontFamily: fonts.medium },
-  acceptButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 12 },
+  acceptButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
   acceptButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
   entryCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   entryIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },

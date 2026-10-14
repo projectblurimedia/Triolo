@@ -50,7 +50,8 @@ export class BusinessesController {
     if (!parsed.success) {
       throw AppError.badRequest('Invalid query parameters', 'VALIDATION_ERROR', parsed.error.flatten());
     }
-    const results = await this.service.searchNearby(req.account.accountId, parsed.data);
+    const { delivery, ...filter } = parsed.data;
+    const results = await this.service.searchNearby(req.account.accountId, { ...filter, deliveryOnly: delivery });
     return ok(res, results);
   });
 

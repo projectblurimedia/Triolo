@@ -16,12 +16,17 @@ export const ANDROID_REAL_BLUR = Platform.OS === 'android' && typeof Platform.Ve
 
 interface BlurTargetState {
   targets: Record<string, RefObject<View | null>>;
+  /** The tab on screen right now (set by CustomTabBar) — lets root overlays like ToastHost blur it too. */
+  activeKey: string | null;
+  setActiveKey: (routeKey: string | null) => void;
   register: (routeKey: string, ref: RefObject<View | null>) => void;
   unregister: (routeKey: string) => void;
 }
 
 export const useBlurTargetStore = create<BlurTargetState>((set) => ({
   targets: {},
+  activeKey: null,
+  setActiveKey: (activeKey) => set({ activeKey }),
   register: (routeKey, ref) => set((state) => ({ targets: { ...state.targets, [routeKey]: ref } })),
   unregister: (routeKey) =>
     set((state) => {

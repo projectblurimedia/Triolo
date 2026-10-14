@@ -7,6 +7,7 @@ import { attemptAccept, attemptDecline, updateOfferNotification } from '@/utils/
 import { useAuthStore } from '@/state/authStore';
 import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { openJob } from '@/state/jobFocusStore';
+import { openShopOrder } from '@/state/shopOrderFocusStore';
 import { navigateToBookings } from '@/navigation/navigationRef';
 import { showToast } from '@/state/toastStore';
 import { ACCEPT_ACTION, BOOKING_OFFER_CATEGORY, BOOKING_OFFER_CHANNEL, DECLINE_ACTION } from '@/constants/bookingNotifications';
@@ -90,7 +91,27 @@ function openOfferFromTap(response: Notifications.NotificationResponse, bookingR
     Notifications.dismissNotificationAsync(response.notification.request.identifier).catch(() => {});
   }
   usePendingOfferStore.getState().setFocusedOffer(bookingRequestId, isAccept);
-  if (!isAccept) navigateToBookings();
+  if (!isAccept) navigateToBookings('jobs');
+  return true;
+}
+
+/**
+ * A body tap on a shop-order or trip-update notification: opens that order (on the Bookings
+ * tab's Shop Orders side) or that job. Returns false when the tap isn't one of those.
+ */
+function openUpdateFromTap(response: Notifications.NotificationResponse): boolean {
+  if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return false;
+  const data = response.notification.request.content.data as { orderId?: string; bookingId?: string } | undefined;
+  if (!data?.orderId && !data?.bookingId) return false;
+  const key = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+  if (handledTaps.has(key)) return true;
+  handledTaps.add(key);
+  if (data.orderId) {
+    navigateToBookings('orders');
+    openShopOrder(data.orderId);
+  } else if (data.bookingId) {
+    openJob(data.bookingId);
+  }
   return true;
 }
 
@@ -186,6 +207,9 @@ export function usePushNotifications() {
     }
 
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (openUpdateFromTap(response)) {
+        return;
+      }
       const data = response.notification.request.content.data as { bookingRequestId?: string } | undefined;
       const bookingRequestId = data?.bookingRequestId;
       if (!bookingRequestId) {
@@ -242,15 +266,13 @@ export function usePushNotifications() {
     if (Platform.OS !== 'android' || !lastResponse) {
       return;
     }
-    const data = lastResponse.notification.request.content.data as { bookingRequestId?: string; bookingId?: string } | undefined;
-    if (data?.bookingRequestId) {
-      openOfferFromTap(lastResponse, data.bookingRequestId);
+    // A shop order (new list to pack, customer cancelled) or a trip update for an accepted job.
+    if (openUpdateFromTap(lastResponse)) {
       return;
     }
-    // A trip update for a job already accepted ("Booking cancelled", "Job finished") — open
-    // that job's screen.
-    if (data?.bookingId && lastResponse.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-      openJob(data.bookingId);
+    const data = lastResponse.notification.request.content.data as { bookingRequestId?: string } | undefined;
+    if (data?.bookingRequestId) {
+      openOfferFromTap(lastResponse, data.bookingRequestId);
     }
   }, [lastResponse]);
 }

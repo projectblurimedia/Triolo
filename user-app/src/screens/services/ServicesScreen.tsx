@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,7 @@ import { formatDistanceValue } from '@/utils/nearbyResult';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { MainTabParamList } from '@/navigation/types';
+import { PullToRefresh } from '@/components/PullToRefresh';
 
 const TOP_RATED_LIMIT = 10;
 /**
@@ -206,7 +207,9 @@ export function ServicesScreen() {
       return renderState(
         'user-slash',
         t('services.emptyTitle'),
-        category ? t('services.emptyCategoryMessage', { category: t(`workerProfile.skills.${category}`) }) : t('services.emptyMessage'),
+        category
+          ? t('services.emptyCategoryMessage', { category: t(`workerProfile.skills.${category}`) })
+          : t('services.emptyMessage'),
       );
     }
 
@@ -230,7 +233,9 @@ export function ServicesScreen() {
           if (inCategory.length === 0) return null;
           return (
             <View key={skill.key}>
-              {renderSectionHeader(`${t(`workerProfile.skills.${skill.key}`)} · ${inCategory.length}`, () => setCategory(skill.key))}
+              {renderSectionHeader(`${t(`workerProfile.skills.${skill.key}`)} · ${inCategory.length}`, () =>
+                setCategory(skill.key),
+              )}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
                 {inCategory.map(renderCompactCard)}
               </ScrollView>
@@ -284,30 +289,26 @@ export function ServicesScreen() {
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <ScrollView
-        contentContainerStyle={styles.body}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={activeQuery.isRefetching} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-      >
-        {workerProfile ? <WorkerProfileCard profile={workerProfile} onEdit={() => setEditVisible(true)} /> : null}
+      <PullToRefresh refreshing={activeQuery.isRefetching} onRefresh={onRefresh}>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          {workerProfile ? <WorkerProfileCard profile={workerProfile} onEdit={() => setEditVisible(true)} /> : null}
 
-        <View style={styles.titleRow}>
-          <Text style={[styles.pageTitle, { color: colors.text }]}>{t('services.findWorkersTitle')}</Text>
-          <View style={[styles.sortToggle, { backgroundColor: `${colors.primary}10` }]}>
-            {renderSortOption('distance', t('services.sortNearest'), 'location-arrow')}
-            {renderSortOption('rating', t('services.sortTopRated'), 'star')}
+          <View style={styles.titleRow}>
+            <Text style={[styles.pageTitle, { color: colors.text }]}>{t('services.findWorkersTitle')}</Text>
+            <View style={[styles.sortToggle, { backgroundColor: `${colors.primary}10` }]}>
+              {renderSortOption('distance', t('services.sortNearest'), 'location-arrow')}
+              {renderSortOption('rating', t('services.sortTopRated'), 'star')}
+            </View>
           </View>
-        </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {renderChip(null, t('services.allCategories'), 'border-all')}
-          {SKILL_CATEGORIES.map((skill) => renderChip(skill.key, t(`workerProfile.skills.${skill.key}`), skill.icon))}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            {renderChip(null, t('services.allCategories'), 'border-all')}
+            {SKILL_CATEGORIES.map((skill) => renderChip(skill.key, t(`workerProfile.skills.${skill.key}`), skill.icon))}
+          </ScrollView>
+
+          {renderBody()}
         </ScrollView>
-
-        {renderBody()}
-      </ScrollView>
+      </PullToRefresh>
 
       <NearbyResultDetailModal
         visible={selectedWorker !== null}
@@ -348,7 +349,15 @@ const styles = StyleSheet.create({
   distancePill: { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 },
   loading: { paddingVertical: 48, alignItems: 'center' },
   loadingText: { marginTop: 12 },
-  stateCard: { marginTop: 20, borderRadius: 16, borderWidth: 1, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', gap: 8 },
+  stateCard: {
+    marginTop: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
   stateTitle: { ...typography.body, fontFamily: fonts.semiBold, textAlign: 'center' },
   stateMessage: { ...typography.caption, textAlign: 'center', lineHeight: 18 },
   stateAction: { alignSelf: 'stretch', marginTop: 8 },

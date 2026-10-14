@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import { useLogout } from '@/hooks/useAuthMutations';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { MainStackParamList } from '@/navigation/types';
+import { PullToRefresh } from '@/components/PullToRefresh';
 
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
@@ -56,9 +57,7 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
       unregisteredSubtitle: t('chooseCapability.workerUnregisteredSubtitle'),
       profile: workerProfile.data,
       onPress: () =>
-        workerProfile.data
-          ? navigation.navigate('MyInfo', { capability: 'worker' })
-          : navigation.navigate('WorkerRegistration'),
+        workerProfile.data ? navigation.navigate('MyInfo', { capability: 'worker' }) : navigation.navigate('WorkerRegistration'),
     },
     {
       key: 'business' as const,
@@ -81,7 +80,9 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
         title={t('common.appName')}
         subtitle={t('chooseCapability.tagline')}
         leadingIcon="shapes"
-        actions={[{ icon: 'right-from-bracket', accessibilityLabel: t('common.logout'), onPress: () => setShowLogoutConfirm(true) }]}
+        actions={[
+          { icon: 'right-from-bracket', accessibilityLabel: t('common.logout'), onPress: () => setShowLogoutConfirm(true) },
+        ]}
       />
 
       {isLoading ? (
@@ -89,20 +90,23 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
           <LoadingIndicator color={colors.primary} />
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.body}
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />
-          }
-        >
-          {account ? (
-            <Text style={[styles.greeting, { color: colors.text }]}>{t('chooseCapability.greeting', { name: account.fullName })}</Text>
-          ) : null}
+        <PullToRefresh refreshing={isRefreshing} onRefresh={handleRefresh}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.body}
+          >
+            {account ? (
+              <Text style={[styles.greeting, { color: colors.text }]}>
+                {t('chooseCapability.greeting', { name: account.fullName })}
+              </Text>
+            ) : null}
 
-          {cards.map((card) => (
-            <CapabilityCard key={card.key} card={card} colors={colors} />
-          ))}
-        </ScrollView>
+            {cards.map((card) => (
+              <CapabilityCard key={card.key} card={card} colors={colors} />
+            ))}
+          </ScrollView>
+        </PullToRefresh>
       )}
 
       <ConfirmModal

@@ -13,8 +13,10 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
+import { PortalHost } from '@/components/Portal';
 import { IncomingJobModal } from '@/components/IncomingJobModal';
 import { JobTrackingModal } from '@/components/JobTrackingModal';
+import { ShopOrderModal } from '@/components/ShopOrderModal';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -151,6 +153,8 @@ export default function App() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <RootNavigator />
+        {/* Menus render here (same window as the tab screens, so their glass can blur them). */}
+        <PortalHost />
         {isLoggingOut ? <LogoutOverlay /> : null}
         {showUpdateOverlay ? <UpdateOverlay progress={downloadProgress} /> : null}
         {/* Mounted at the root (not inside BookingsScreen) so a Quick Book offer's big,
@@ -159,6 +163,7 @@ export default function App() {
         <IncomingJobModal />
         {/* The worker's live Quick Book job screen — opened from anywhere via jobFocusStore. */}
         <JobTrackingModal />
+        <ShopOrderModal />
         <ToastHost />
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}

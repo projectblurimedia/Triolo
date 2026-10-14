@@ -105,6 +105,27 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
     - Reviews redesigned in the shared `WorkerProfileGlass`.
     - Customer labels: "Track Your Worker", "Problem Solved!".
   - Six stale broadcasts in production were expired by this change. Note: production also still holds 6 old `accepted` test bookings that never started.
+- **Bazaar shop orders + favorites + shop ratings** (explicit request: send a prepared list to a shop, step-by-step like Quick Book, packed/not-packed per item, bill with unavailable items separately, delivery filter, ratings, Bazaar tab and menus working).
+  - **Backend:**
+    - `orders` module (migration `0021`, tables `shop_orders`/`shop_order_items`) implements product-spec §3 as written. The customer can cancel only while `placed`. Unanswered lists expire after `ORDER_TTL_MINUTES = 30` (lazy). The PIN is generated at ready/out-for-delivery and shown only to the customer.
+    - Decisions taken without asking (all reversible): the customer picks one shop (no broadcast); the shop enters a price per packed item and the backend totals it; delivery charge = the shop's `deliveryPricePerKm` × distance, fixed at order time; payment stays outside the app; no live map for shop delivery; the customer does not approve the bill (spec: no customer cancellation after review starts).
+    - `orders` depends on `BusinessesService` and `NotificationsService` only. `reviews` now also reads `OrdersService`. New `favorites` module (`favorites` table, reads profiles through the workers/businesses services). Shop ratings: `business_profiles.rating_sum/rating_count` via `BusinessesService.recordRating()`.
+    - `GET /businesses/nearby`: `shopCategory`, `delivery=true`, `sort=rating`.
+  - **Apps:**
+    - user-app: `SendListModal`, `OrderTrackingModal` (root, `orderTrackerStore`), `MyOrdersModal`, `FavoritesModal`, Bazaar tab rebuilt.
+    - partner-app: `ShopOrderModal` (root, `shopOrderFocusStore`), `ShopOrdersList` in Bookings (with a Jobs/Orders switch for dual partners), Home summary, Profile shop reviews.
+    - Both: `PhotoViewer`/`WorkerProfileGlass` (hero `topRight`, reviews `title`), `reviewsService`/`useReviews` (shop reviews) stay in sync between the apps.
+  - 171 backend tests; 32-check live run passed, data removed. OTA only. Not yet tried on a device.
+  - **Follow-up (explicit request):**
+    - **Saved lists.** `listStore` v2 holds `lists` plus one `draft`; the old single `items` list migrates to the first saved list. Prepare List is "My Lists" plus an editor. `SendListModal` takes `listId` and lets the customer switch lists.
+    - **"New item" bug:** manual rows used to be created with that literal name. They now start empty, and unnamed rows are dropped on save.
+    - **Mandatory rating:** rating is the order's last step, shown inline, with stars required. `isOrderOpen()` keeps a completed, unrated order under Active and on Home. No backend change; the API still accepts a rating once per order.
+    - **partner-app:** `ShopHomeSection` on Home, with a My Shop / Worker Jobs switch for dual partners. Bookings route param `{ mode, linkedAt }`, and `navigateToBookings(mode)`. The live notification-response listener now handles `orderId`/`bookingId` body taps; before, only the cold-launch tap did.
+    - Confirm label shortened to "Send Bill", and ConfirmModal labels are kept to one line.
+  - **Follow-up (explicit request):**
+    - **`ToastHost` (both apps, identical copies) is glass** with a countdown bar and PanResponder swipe-to-dismiss (up, left or right). Only the root instance (`<ToastHost screenBlur />` in `App.tsx`) blurs on Android, using `blurTargetStore.activeKey`, which `CustomTabBar` sets. The modal-mounted copies use the frosted fill.
+    - **Next round:** glass on every overlay (`Glass.tsx`), custom `PullToRefresh` replacing every `RefreshControl`, axis-locked toast swipe, and partner "Worker Jobs" renamed to Service Jobs / My Services. See `.cloud/architecture.md` "Glass overlays and pull-to-refresh".
+    - **user-app Profile:** a `ProfileOrders` card (in `ProfileActivity.tsx`, which shares the `StatsCard` layout) and bottom spacing on both cards. The shop stats use the real `ratingAverage`/`ratingCount`; the placeholder keys were removed.
 
 ## Pending Modules (build order, current plan)
 
@@ -112,7 +133,7 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
 2. ~~Workers, Businesses (profile-creation slice)~~ — done (capability profiles + image upload; search/booking/order-flow pieces below are still pending)
 3. ~~Partner app (capability registration + login + read-only my-info)~~ — done; edit/delete on `MyInfoScreen` still pending, see "Completed Modules" above
 4. Worker module remainder (~~nearby search~~, ~~Quick Book broadcast booking~~, ~~full booking status pipeline + PIN verification + live tracking~~, ~~ratings~~ — done, see "Completed Modules" above; worker availability/online toggle and favorites still pending)
-5. Business module remainder (~~nearby search~~ — done, see "Completed Modules" above; staff, shopping list, order flow, PIN verification still pending)
+5. Business module remainder (~~nearby search~~, ~~shopping list + order flow + PIN verification + shop ratings~~ — done, see "Completed Modules" above; staff accounts and open/closed hours still pending)
 6. ~~Notifications (in-app `profile_view` event, polled by partner-app; push/FCM delivery)~~ — done, see "Completed Modules" above; other event types beyond `profile_view` still pending
 7. ~~Admin module — list/verify Worker/Business profiles~~ — done (see "Completed Modules" above); the rest of Admin's planned scope (user/worker/business management, complaints, warnings, suspension/blocking, announcements, audit logs) is still pending
 8. ~~Public web sign-up forms for workers/shops (no app install)~~ — done, as its own site `registration-web/`, separate from the Admin website `admin-web/` (see "Completed Modules" above)

@@ -34,7 +34,17 @@ export function initialsOf(name: string): string {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
-export function Stars({ value, size, color = STAR_GOLD, emptyColor }: { value: number; size: number; color?: string; emptyColor: string }) {
+export function Stars({
+  value,
+  size,
+  color = STAR_GOLD,
+  emptyColor,
+}: {
+  value: number;
+  size: number;
+  color?: string;
+  emptyColor: string;
+}) {
   return (
     <View style={styles.starsRow}>
       {[1, 2, 3, 4, 5].map((star) => {
@@ -68,6 +78,8 @@ interface WorkerProfileHeroProps {
   topInset?: number;
   /** Rendered in the hero's top row, e.g. a back button. */
   topLeft?: ReactNode;
+  /** Rendered at the right of that top row, e.g. a favorite heart. */
+  topRight?: ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -81,6 +93,7 @@ export function WorkerProfileHero({
   badge,
   topInset = 0,
   topLeft,
+  topRight,
   style,
 }: WorkerProfileHeroProps) {
   const { t } = useTranslation();
@@ -93,16 +106,30 @@ export function WorkerProfileHero({
       gold: true,
     },
     { icon: 'circle-check', value: String(ratingCount), label: t('workerReviews.statRatedJobs') },
-    { icon: 'briefcase', value: t('workerReviews.experienceValue', { count: experienceYears }), label: t('workerReviews.statExperience') },
+    {
+      icon: 'briefcase',
+      value: t('workerReviews.experienceValue', { count: experienceYears }),
+      label: t('workerReviews.statExperience'),
+    },
   ];
 
   return (
-    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: topInset + 16 }, style]}>
+    <LinearGradient
+      colors={headerGradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.hero, { paddingTop: topInset + 16 }, style]}
+    >
       {/* Soft light blobs behind the content — what makes the frosted tiles read as glass. */}
       <View style={[styles.blob, styles.blobOne]} />
       <View style={[styles.blob, styles.blobTwo]} />
 
-      {topLeft ? <View style={styles.heroTopRow}>{topLeft}</View> : null}
+      {topLeft || topRight ? (
+        <View style={styles.heroTopRow}>
+          {topLeft ?? <View />}
+          {topRight ?? null}
+        </View>
+      ) : null}
 
       <View style={styles.avatarRing}>
         <LinearGradient colors={['#FFFFFF', '#DCEBFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
@@ -147,9 +174,11 @@ interface WorkerReviewsSectionProps {
   summary: WorkerReviewsSummary | undefined;
   loading: boolean;
   error: boolean;
+  /** Heading override, e.g. for a shop's reviews. */
+  title?: string;
 }
 
-export function WorkerReviewsSection({ summary, loading, error }: WorkerReviewsSectionProps) {
+export function WorkerReviewsSection({ summary, loading, error, title }: WorkerReviewsSectionProps) {
   const { t } = useTranslation();
   const { colors, isDark } = useThemeColors();
   // Flat and clean: one surface colour, a hairline border, no shadows.
@@ -173,14 +202,18 @@ export function WorkerReviewsSection({ summary, loading, error }: WorkerReviewsS
 
   return (
     <View style={styles.sectionGap}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('workerReviews.title')}</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title ?? t('workerReviews.title')}</Text>
 
       <View style={[styles.card, styles.summaryCard, cardStyle]}>
         <View style={styles.summaryLeft}>
-          <Text style={[styles.bigAverage, { color: colors.text }]}>{summary.ratingAverage != null ? average.toFixed(1) : '–'}</Text>
+          <Text style={[styles.bigAverage, { color: colors.text }]}>
+            {summary.ratingAverage != null ? average.toFixed(1) : '–'}
+          </Text>
           <Stars value={average} size={13} emptyColor={colors.border} />
           <Text style={[styles.ratingCount, { color: colors.textMuted }]}>
-            {summary.ratingCount > 0 ? t('workerReviews.ratingsCount', { count: summary.ratingCount }) : t('workerReviews.noRatings')}
+            {summary.ratingCount > 0
+              ? t('workerReviews.ratingsCount', { count: summary.ratingCount })
+              : t('workerReviews.noRatings')}
           </Text>
         </View>
         <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
@@ -207,7 +240,10 @@ export function WorkerReviewsSection({ summary, loading, error }: WorkerReviewsS
             {summary.reviews.map((review, index) => (
               <View
                 key={`${review.completedAt}-${index}`}
-                style={[styles.reviewRow, index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null]}
+                style={[
+                  styles.reviewRow,
+                  index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null,
+                ]}
               >
                 <View style={styles.reviewHeader}>
                   <View style={[styles.reviewAvatar, { backgroundColor: `${colors.primary}14` }]}>
@@ -251,7 +287,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   starsRow: { flexDirection: 'row', gap: 3 },
   hero: { borderRadius: 26, paddingHorizontal: 18, paddingBottom: 18, alignItems: 'center', overflow: 'hidden' },
-  heroTopRow: { alignSelf: 'stretch', flexDirection: 'row', marginBottom: 4 },
+  heroTopRow: { alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   blob: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.14)' },
   blobOne: { width: 220, height: 220, top: -90, right: -70 },
   blobTwo: { width: 160, height: 160, bottom: -70, left: -50, backgroundColor: 'rgba(255,255,255,0.10)' },
@@ -261,7 +297,14 @@ const styles = StyleSheet.create({
   heroName: { fontFamily: fonts.semiBold, fontSize: 21, lineHeight: 28, color: '#FFFFFF', marginTop: 12 },
   heroSubtitle: { ...typography.caption, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
   heroSkills: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 10 },
-  glassChip: { backgroundColor: GLASS_FILL, borderColor: GLASS_BORDER, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+  glassChip: {
+    backgroundColor: GLASS_FILL,
+    borderColor: GLASS_BORDER,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
   glassChipText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12, color: '#FFFFFF' },
   heroBadge: { marginTop: 10 },
   tiles: { flexDirection: 'row', gap: 8, marginTop: 16, alignSelf: 'stretch' },

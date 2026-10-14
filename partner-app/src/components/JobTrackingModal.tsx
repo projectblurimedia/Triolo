@@ -1,5 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Dimensions,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -227,12 +239,19 @@ export function JobTrackingModal() {
 
   const jobPoint = job ? { latitude: job.latitude, longitude: job.longitude } : null;
   const workerPoint =
-    myPosition ?? (job?.workerLatitude != null && job.workerLongitude != null ? { latitude: job.workerLatitude, longitude: job.workerLongitude } : null);
+    myPosition ??
+    (job?.workerLatitude != null && job.workerLongitude != null
+      ? { latitude: job.workerLatitude, longitude: job.workerLongitude }
+      : null);
   const distance = workerPoint && jobPoint ? distanceBetween(workerPoint, jobPoint) : (job?.distanceMeters ?? null);
 
   const renderBanner = (j: WorkerJob) => {
     const tone =
-      j.status === 'cancelled' ? brandColors.error : j.status === 'completed' || j.status === 'work_done' ? brandColors.success : colors.primary;
+      j.status === 'cancelled'
+        ? brandColors.error
+        : j.status === 'completed' || j.status === 'work_done'
+          ? brandColors.success
+          : colors.primary;
     return (
       <View style={[styles.banner, { backgroundColor: `${tone}12`, borderColor: `${tone}33` }]}>
         <View style={[styles.bannerIcon, { backgroundColor: tone }]}>
@@ -317,7 +336,10 @@ export function JobTrackingModal() {
           const isNext = index === pin.length;
           const borderColor = pinError ? brandColors.error : digit || isNext ? colors.primary : colors.border;
           return (
-            <View key={index} style={[styles.pinBox, { borderColor, backgroundColor: digit ? `${colors.primary}0D` : colors.background }]}>
+            <View
+              key={index}
+              style={[styles.pinBox, { borderColor, backgroundColor: digit ? `${colors.primary}0D` : colors.background }]}
+            >
               <Text style={[styles.pinDigit, { color: colors.text }]}>{digit ?? ''}</Text>
             </View>
           );
@@ -337,7 +359,12 @@ export function JobTrackingModal() {
       </Pressable>
       {pinError ? <Text style={[styles.pinError, { color: brandColors.error }]}>{pinError}</Text> : null}
       <View style={styles.fullWidth}>
-        <Button label={t('job.verifyPin')} onPress={() => handleVerifyPin(j)} loading={verifyPin.isPending} disabled={pin.length !== 4} />
+        <Button
+          label={t('job.verifyPin')}
+          onPress={() => handleVerifyPin(j)}
+          loading={verifyPin.isPending}
+          disabled={pin.length !== 4}
+        />
       </View>
     </View>
   );
@@ -349,7 +376,13 @@ export function JobTrackingModal() {
         {j.workerRating ? (
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((star) => (
-              <FontAwesome6 key={star} name="star" size={18} color={star <= (j.workerRating ?? 0) ? STAR_COLOR : colors.border} solid />
+              <FontAwesome6
+                key={star}
+                name="star"
+                size={18}
+                color={star <= (j.workerRating ?? 0) ? STAR_COLOR : colors.border}
+                solid
+              />
             ))}
           </View>
         ) : (
@@ -374,7 +407,12 @@ export function JobTrackingModal() {
             {j.status === 'accepted' ? (
               <Button label={t('job.startTrip')} onPress={() => handleStartTrip(j)} loading={startTrip.isPending} />
             ) : (
-              <Button label={t('job.arrived')} onPress={() => handleArrive(j)} loading={arrive.isPending} gradient={DONE_GRADIENT} />
+              <Button
+                label={t('job.arrived')}
+                onPress={() => handleArrive(j)}
+                loading={arrive.isPending}
+                gradient={DONE_GRADIENT}
+              />
             )}
           </View>
         </View>
@@ -412,7 +450,12 @@ export function JobTrackingModal() {
         {MAP_STATUSES.includes(job.status) && keyboardHeight === 0 ? (
           <LiveMap customer={jobPoint} worker={workerPoint} height={MAP_HEIGHT} />
         ) : null}
-        <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.panel, { paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.panel, { paddingBottom: insets.bottom + 24 }]}
+          keyboardShouldPersistTaps="handled"
+        >
           {renderBanner(job)}
           {renderActions(job)}
           {renderProblem(job)}
@@ -425,42 +468,52 @@ export function JobTrackingModal() {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: colors.background, paddingBottom: Platform.OS === 'android' ? keyboardHeight : 0 }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: insets.top + 14 }]}>
-          <View style={styles.headerRow}>
-            <Pressable style={styles.backButton} onPress={close} accessibilityLabel={t('common.close')} hitSlop={8}>
-              <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
-            </Pressable>
-            <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {status ? t(`job.status.${status}.title`) : t('job.title')}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {job ? job.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ') : ''}
-              </Text>
+      <View style={StyleSheet.absoluteFill}>
+        <KeyboardAvoidingView
+          style={[
+            styles.container,
+            { backgroundColor: colors.background, paddingBottom: Platform.OS === 'android' ? keyboardHeight : 0 },
+          ]}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <LinearGradient
+            colors={headerGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.header, { paddingTop: insets.top + 14 }]}
+          >
+            <View style={styles.headerRow}>
+              <Pressable style={styles.backButton} onPress={close} accessibilityLabel={t('common.close')} hitSlop={8}>
+                <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
+              </Pressable>
+              <View style={styles.titleGroup}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  {status ? t(`job.status.${status}.title`) : t('job.title')}
+                </Text>
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  {job ? job.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ') : ''}
+                </Text>
+              </View>
             </View>
-          </View>
-        </LinearGradient>
-        {renderBody()}
-        <ToastHost />
-      </KeyboardAvoidingView>
+          </LinearGradient>
+          {renderBody()}
+          <ToastHost />
+        </KeyboardAvoidingView>
 
-      <ProblemDetailModal problem={showProblem ? (linkedProblem ?? null) : null} onClose={() => setShowProblem(false)} />
+        <ProblemDetailModal problem={showProblem ? (linkedProblem ?? null) : null} onClose={() => setShowProblem(false)} />
 
-      <ConfirmModal
-        visible={confirmDone}
-        icon="circle-check"
-        gradient={DONE_GRADIENT}
-        title={t('job.confirmDoneTitle')}
-        message={t('job.confirmDoneMessage')}
-        confirmLabel={t('job.markWorkDone')}
-        loading={workDone.isPending}
-        onConfirm={() => job && handleWorkDone(job)}
-        onCancel={() => setConfirmDone(false)}
-      />
+        <ConfirmModal
+          visible={confirmDone}
+          icon="circle-check"
+          gradient={DONE_GRADIENT}
+          title={t('job.confirmDoneTitle')}
+          message={t('job.confirmDoneMessage')}
+          confirmLabel={t('job.markWorkDone')}
+          loading={workDone.isPending}
+          onConfirm={() => job && handleWorkDone(job)}
+          onCancel={() => setConfirmDone(false)}
+        />
+      </View>
     </Modal>
   );
 }
@@ -501,7 +554,15 @@ const styles = StyleSheet.create({
   roundButton: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
   problemCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   quotation: { fontFamily: fonts.semiBold, fontSize: 22, lineHeight: 30 },
-  problemButton: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 42, borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 14 },
+  problemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+  },
   addressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
   addressText: { ...typography.body, fontSize: 13, flex: 1 },
   actionRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },

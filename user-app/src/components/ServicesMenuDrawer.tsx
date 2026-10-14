@@ -3,7 +3,7 @@ import { StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
-import { ComingSoonModal } from './ComingSoonModal';
+import { FavoritesModal } from './FavoritesModal';
 import { QuickBookModal } from './QuickBookModal';
 import { YourProblemsModal } from './YourProblemsModal';
 import { MyBookingsModal } from './MyBookingsModal';
@@ -34,7 +34,7 @@ const ITEMS: {
   { key: 'quickBook', icon: 'bolt', gradient: BLUE_GRADIENT },
   { key: 'yourProblems', icon: 'clipboard-list', gradient: PURPLE_GRADIENT },
   { key: 'myBookings', icon: 'calendar-check', gradient: GREEN_GRADIENT },
-  { key: 'favoriteWorkers', icon: 'star', gradient: PINK_GRADIENT },
+  { key: 'favoriteWorkers', icon: 'heart', gradient: PINK_GRADIENT },
 ];
 
 /**
@@ -45,17 +45,12 @@ const ITEMS: {
  * can pick it up — the broadcast-style discovery already planned in
  * .cloud/architecture.md's Search Architecture section) are the two things a user actually
  * comes to this tab to do; "My Bookings"/"Favorite Workers" round out the tab's own
- * management surface. None of these screens exist yet (Worker module remainder — Pending
- * Module 4), so every item opens a full-screen `ComingSoonModal` (same chrome as
- * `NearbySearchModal`) instead of a transient toast, per explicit feedback that tapping a
- * menu item should feel like opening a real screen.
+ * management surface. Every item opens its own full-screen screen.
  */
 export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const [activeItem, setActiveItem] = useState<ServicesMenuItemKey | null>(null);
-
-  const activeConfig = ITEMS.find((item) => item.key === activeItem);
 
   return (
     <>
@@ -114,24 +109,11 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
         />
       </SideMenuDrawer>
 
-      {/* Quick Book, Your Problems and My Bookings are real (see each modal's own doc comment) —
-          every other item still opens the shared ComingSoonModal placeholder. */}
       <QuickBookModal visible={activeItem === 'quickBook'} onClose={() => setActiveItem(null)} />
       <YourProblemsModal visible={activeItem === 'yourProblems'} onClose={() => setActiveItem(null)} />
       <MyBookingsModal visible={activeItem === 'myBookings'} onClose={() => setActiveItem(null)} />
 
-      {activeConfig && activeItem === 'favoriteWorkers' ? (
-        <ComingSoonModal
-          visible={activeItem !== null}
-          onClose={() => setActiveItem(null)}
-          gradient={activeConfig.gradient}
-          icon={activeConfig.icon}
-          title={t(`servicesMenu.${activeConfig.key}Title`)}
-          subtitle={t(`servicesMenu.${activeConfig.key}Subtitle`)}
-          comingSoonTitle={t('servicesMenu.comingSoonTitle')}
-          message={t(`servicesMenu.${activeConfig.key}ComingSoonMessage`)}
-        />
-      ) : null}
+      <FavoritesModal visible={activeItem === 'favoriteWorkers'} onClose={() => setActiveItem(null)} type="worker" />
     </>
   );
 }

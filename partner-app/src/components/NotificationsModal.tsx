@@ -40,6 +40,14 @@ const TYPE_ICONS: Record<NotificationType, React.ComponentProps<typeof FontAweso
   booking_work_done: 'clipboard-check',
   booking_completed: 'circle-check',
   booking_cancelled: 'ban',
+  order_placed: 'basket-shopping',
+  order_accepted: 'store',
+  order_declined: 'circle-xmark',
+  order_packed: 'receipt',
+  order_ready: 'bag-shopping',
+  order_out_for_delivery: 'truck-fast',
+  order_completed: 'circle-check',
+  order_cancelled: 'ban',
 };
 
 function formatRelativeTime(iso: string, justNowLabel: string): string {
@@ -177,7 +185,6 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
 
   const renderItem = ({ item }: { item: AppNotification }) => {
     const selected = selectedIds.has(item.id);
-    const squareRight = revealedRowIds.has(item.id);
     return (
       <SwipeableRow
         isOpen={openRowId === item.id}
@@ -198,7 +205,6 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
               backgroundColor: selected ? selectedBackground : colors.surface,
               borderColor: selected ? colors.primary : item.isRead ? colors.border : `${colors.primary}66`,
             },
-            squareRight ? styles.cardSquareRight : null,
           ]}
           onPress={() => handleRowPress(item)}
           onLongPress={() => handleRowLongPress(item)}
@@ -228,40 +234,67 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     );
   };
 
-  const renderHeaderActions = () => {
-    if (detail) return null;
-    if (selectionMode) {
-      return (
-        <Pressable
-          style={styles.headerPill}
-          onPress={() => setSelectedIds(allSelected ? new Set() : new Set(items.map((item) => item.id)))}
-        >
-          <Text style={styles.headerPillText}>{t(allSelected ? 'notifications.deselectAll' : 'notifications.selectAll')}</Text>
-        </Pressable>
-      );
-    }
+  // Actions sit in a toolbar under the header (the header carries only the title): an unread
+  // summary on the left, labelled pills with icons on the right.
+  const renderToolbar = () => {
+    if (detail || items.length === 0) return null;
+    const pill = (
+      key: string,
+      icon: React.ComponentProps<typeof FontAwesome6>['name'],
+      label: string,
+      onPress: () => void,
+      filled = false,
+      disabled = false,
+    ) => (
+      <Pressable
+        key={key}
+        onPress={onPress}
+        disabled={disabled}
+        style={({ pressed }) => [
+          styles.toolPill,
+          {
+            backgroundColor: filled ? colors.primary : `${colors.primary}12`,
+            borderColor: filled ? colors.primary : `${colors.primary}40`,
+            opacity: disabled ? 0.6 : pressed ? 0.75 : 1,
+          },
+        ]}
+      >
+        <FontAwesome6 name={icon} size={12} color={filled ? '#FFFFFF' : colors.primary} solid />
+        <Text style={[styles.toolPillText, { color: filled ? '#FFFFFF' : colors.primary }]} numberOfLines={1}>
+          {label}
+        </Text>
+      </Pressable>
+    );
     return (
-      <View style={styles.headerActions}>
-        {unreadCount > 0 ? (
-          <Pressable style={styles.headerPill} onPress={() => markAllRead.mutate()} disabled={markAllRead.isPending}>
-            <Text style={styles.headerPillText} numberOfLines={1}>
-              {t('notifications.markAllRead')}
+      <View style={[styles.toolbar, { borderBottomColor: colors.border }]}>
+        {selectionMode ? (
+          <View />
+        ) : (
+          <View style={styles.toolSummaryRow}>
+            <View style={[styles.toolDot, { backgroundColor: unreadCount > 0 ? colors.primary : colors.success }]} />
+            <Text style={[styles.toolSummary, { color: colors.text }]} numberOfLines={1}>
+              {unreadCount > 0 ? t('notifications.unreadCount', { count: unreadCount }) : t('notifications.allCaughtUp')}
             </Text>
-          </Pressable>
-        ) : null}
-        {items.length > 0 ? (
-          <Pressable
-            style={styles.headerIconButton}
-            onPress={() => {
-              setOpenRowId(null);
-              setSelectionMode(true);
-            }}
-            accessibilityLabel={t('notifications.select')}
-            hitSlop={6}
-          >
-            <FontAwesome6 name="list-check" size={15} color="#FFFFFF" solid />
-          </Pressable>
-        ) : null}
+          </View>
+        )}
+        <View style={styles.toolActions}>
+          {selectionMode
+            ? pill(
+                'all',
+                allSelected ? 'square-minus' : 'square-check',
+                t(allSelected ? 'notifications.deselectAll' : 'notifications.selectAll'),
+                () => setSelectedIds(allSelected ? new Set() : new Set(items.map((item) => item.id))),
+              )
+            : [
+                unreadCount > 0
+                  ? pill('read', 'check-double', t('notifications.markAllRead'), () => markAllRead.mutate(), true, markAllRead.isPending)
+                  : null,
+                pill('select', 'list-check', t('notifications.select'), () => {
+                  setOpenRowId(null);
+                  setSelectionMode(true);
+                }),
+              ]}
+        </View>
       </View>
     );
   };
@@ -274,7 +307,11 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   const headerSubtitle = detail || selectionMode ? null : t('notifications.subtitle');
 
   const renderDetail = (item: AppNotification) => (
-    <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.detailBody}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.detailBody}
+    >
       <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.detailIcon}>
           <FontAwesome6 name={TYPE_ICONS[item.type] ?? 'bell'} size={24} color="#FFFFFF" solid />
@@ -336,10 +373,10 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     }
     return (
       <>
-        {!selectionMode ? (
-          <Text style={[styles.hint, { color: colors.textMuted }]}>{t('notifications.gestureHint')}</Text>
-        ) : null}
-        <FlatList showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}
+        {!selectionMode ? <Text style={[styles.hint, { color: colors.textMuted }]}>{t('notifications.gestureHint')}</Text> : null}
+        <FlatList
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
           data={items}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
@@ -383,20 +420,32 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                 </Text>
               ) : null}
             </View>
-            {renderHeaderActions()}
           </View>
         </LinearGradient>
+
+
+        {renderToolbar()}
 
         {renderBody()}
 
         {selectionMode && !detail ? (
-          <View style={[styles.selectionBar, { paddingBottom: insets.bottom + 16, backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+          <View
+            style={[
+              styles.selectionBar,
+              { paddingBottom: insets.bottom + 16, backgroundColor: colors.surface, borderTopColor: colors.border },
+            ]}
+          >
             <Pressable
               style={[styles.deleteSelected, { opacity: selectedIds.size === 0 ? 0.5 : 1 }]}
               onPress={() => setConfirmBulk(true)}
               disabled={selectedIds.size === 0}
             >
-              <LinearGradient colors={DELETE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.deleteSelectedInner}>
+              <LinearGradient
+                colors={DELETE_GRADIENT}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.deleteSelectedInner}
+              >
                 <FontAwesome6 name="trash" size={15} color="#FFFFFF" solid />
                 <Text style={styles.deleteSelectedText}>{t('notifications.deleteSelected', { count: selectedIds.size })}</Text>
               </LinearGradient>
@@ -444,26 +493,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.32)',
-  },
-  headerPillText: { ...typography.caption, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  headerIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.32)',
+  toolbar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  toolSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  toolDot: { width: 8, height: 8, borderRadius: 4 },
+  toolSummary: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14, flexShrink: 1 },
+  toolActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  toolPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 17,
+    borderWidth: 1,
+  },
+  toolPillText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
   centerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginBottom: 8, textAlign: 'center' },
@@ -475,7 +527,15 @@ const styles = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14 },
   // alignSelf: center — the row itself is top-aligned (multi-line text), the checkbox is centred.
   cardSquareRight: { borderTopRightRadius: 0, borderBottomRightRadius: 0 },
-  checkbox: { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
   icon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

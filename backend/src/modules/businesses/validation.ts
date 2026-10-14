@@ -41,6 +41,13 @@ export const nearbySearchQuerySchema = z.object({
   radiusKm: z.coerce.number().min(0.1).max(50).default(10),
   query: z.string().trim().max(100).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
+  shopCategory: z.enum(BUSINESS_SHOP_CATEGORIES as [string, ...string[]]).optional(),
+  // Query strings are text: only the literal 'true' turns the delivery filter on.
+  delivery: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true'),
+  sort: z.enum(['distance', 'rating']).default('distance'),
 });
 
 export const updateBusinessProfileSchema = z

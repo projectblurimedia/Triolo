@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { pushTokenService } from '@/services/pushTokenService';
 import { useAuthStore } from '@/state/authStore';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
+import { openOrderTracker } from '@/state/orderTrackerStore';
 
 // Without this, a push arriving while the app is already open/foregrounded shows no banner
 // at all in current expo-notifications versions. No user-facing notification type targets a
@@ -76,9 +77,10 @@ export function usePushNotifications() {
   const lastResponse = Notifications.useLastNotificationResponse();
   useEffect(() => {
     if (!lastResponse || lastResponse.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
-    const data = lastResponse.notification.request.content.data as { bookingId?: string } | undefined;
-    if (data?.bookingId && useAuthStore.getState().accessToken) {
-      openBookingTracker(data.bookingId);
-    }
+    const data = lastResponse.notification.request.content.data as { bookingId?: string; orderId?: string } | undefined;
+    if (!useAuthStore.getState().accessToken) return;
+    if (data?.bookingId) openBookingTracker(data.bookingId);
+    // A shop order update (accepted, bill ready, ready for pickup…) opens that order.
+    else if (data?.orderId) openOrderTracker(data.orderId);
   }, [lastResponse]);
 }

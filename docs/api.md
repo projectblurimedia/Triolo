@@ -136,8 +136,8 @@ Permanently remove the caller's business profile.
 ### GET /businesses/nearby
 Search for verified businesses near a given point, ordered nearest-first — mirrors `GET /workers/nearby` exactly, shop-shaped instead of skill-shaped. Excludes the caller's own business profile, if any.
 - Auth: Bearer access token
-- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against shop name, shop category, `otherCategoryDescription`, city, and area), `limit?: number` (default 20, max 50)
-- 200: `{ success: true, data: Array<BusinessProfile & { distanceMeters: number }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned
+- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against shop name, shop category, `otherCategoryDescription`, city, and area), `limit?: number` (default 20, max 50), `shopCategory?: string` (only shops in this category), `delivery?: "true"` (only shops that deliver), `sort?: "distance" | "rating"` (default `distance`; `rating` = best average first, unrated last)
+- 200: `{ success: true, data: Array<BusinessProfile & { distanceMeters: number }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned. Every `BusinessProfile` carries `ratingAverage: number | null` and `ratingCount` (customers rating completed orders, migration `0021`)
 - 400: `VALIDATION_ERROR` — missing/invalid `latitude`/`longitude`, or an out-of-range `radiusKm`/`limit`
 
 ### POST /businesses/:id/view
@@ -418,6 +418,53 @@ The signed-in worker's own ratings and reviews.
 - Auth: Bearer access token; caller must have a worker profile
 - 200: `{ success: true, data: WorkerReviewsSummary }`
 - 404: `WORKER_PROFILE_NOT_FOUND`
+
+### GET /reviews/businesses/:businessId · GET /reviews/my-shop
+A shop's ratings and feedback (any signed-in user / the shop's owner), from its completed, rated orders. Same `WorkerReviewsSummary` shape as workers (`skillCategories` is always `[]`).
+- 404: `SHOP_NOT_FOUND` / `BUSINESS_PROFILE_NOT_FOUND`
+
+## Orders Module
+
+Bazaar shop orders — the customer sends a prepared list (Prepare List) to one nearby shop; the shop packs it item by item and sends the bill. Follows `docs/product-specification.md` §3:
+
+```
+placed → accepted (review started) → preparing → packed (bill sent) → ready_for_pickup | out_for_delivery → completed
+placed → declined (shop) | expired (no answer in 30 min) | cancelled (customer — only while placed)
+any step before completed → cancelled (shop)
+```
+
+- **Items**: each list item is `pending` until the shop marks it `packed` (with a price, rupees) or `unavailable`. Packing needs every item decided, a price on every packed item, and at least one packed item. The bill is `itemsTotal` (sum of packed prices) + `deliveryCharge` (delivery orders only) = `totalAmount`; unavailable items stay on the order so the customer sees them separately.
+- **Delivery charge**: fixed when ordering — the shop's `deliveryPricePerKm` × distance (whole rupees). Delivery can only be chosen if the shop offers it.
+- **PIN**: 4 digits, generated when the order is ready for pickup / out for delivery, shown only to the customer (`pin`), entered by the shop to complete; single use, locked after 5 wrong attempts. Never sent to the shop or in a push.
+- **Contact**: the shop's phone is shown to the customer only once the shop accepts.
+- **Notifications** (saved + pushed, recipient's language, `data: { kind, orderId }`): `order_placed` → shop owner; `order_accepted` / `order_declined` / `order_packed` (with the packed count and total) / `order_ready` / `order_out_for_delivery` / `order_completed` / `order_cancelled` → the other side.
+- **Rating**: the customer rates the shop once after completion (`POST /orders/:id/rate`), added to `business_profiles.rating_sum/rating_count`.
+- **Payment** is outside the app (cash/UPI at handover).
+
+Common errors: `404 ORDER_NOT_FOUND` (also for a malformed id), `409 ORDER_INVALID_STATE` (not in a status that allows the step), `404 BUSINESS_PROFILE_NOT_FOUND` (shop steps without a shop).
+
+`CustomerOrder`: `{ id, businessId, fulfillment: "pickup"|"delivery", status, latitude, longitude, locationAddress, distanceMeters, deliveryCharge, itemsTotal, totalAmount, note, cancelledBy, cancelReason, shopRating, shopReview, acceptedAt, packedAt, readyAt, completedAt, cancelledAt, declinedAt, expiredAt, createdAt, items: Array<{ id, position, name, quantity, unit, status: "pending"|"packed"|"unavailable", price }>, shop: { name, photoUrl, ratingAverage, ratingCount, latitude, longitude, address, mobileNumber|null }, pin: string|null }`. `ShopSideOrder` is the same order fields plus `customerFullName`, `customerMobileNumber`, `pinAttemptsLeft` (no `pin`, no `shop`).
+
+### Customer
+- `POST /orders` — body `{ businessId, fulfillment, items: Array<{ name, quantity?, unit? }> (1–100), latitude, longitude, locationAddress?, note? }` → 201 `CustomerOrder`. 404 `SHOP_NOT_FOUND` (unknown/unverified), 400 `ORDER_OWN_SHOP`, 400 `ORDER_DELIVERY_UNAVAILABLE`.
+- `GET /orders/mine` → newest first (max 50). `GET /orders/:id` → `CustomerOrder`.
+- `POST /orders/:id/cancel` — only while `placed`.
+- `POST /orders/:id/rate` — body `{ rating: 1..5, review? }`, once, only when `completed`.
+
+### Shop (the caller's own business profile)
+- `GET /orders/shop/mine` — active first, then history (`[]` without a shop). `GET /orders/shop/:id` → `ShopSideOrder`.
+- `POST /orders/:id/accept` · `POST /orders/:id/decline` (body `{ reason? }`) — only while `placed` (and not expired).
+- `PUT /orders/:id/items` — body `{ items: Array<{ id, status, price? }> }`; while `accepted`/`preparing` (moves to `preparing`) → `ShopSideOrder`.
+- `POST /orders/:id/packed` — sends the bill. 400 `ORDER_ITEMS_PENDING` / `ORDER_PRICE_MISSING` / `ORDER_NOTHING_PACKED`.
+- `POST /orders/:id/ready` — `packed` → `ready_for_pickup` or `out_for_delivery` (by fulfillment), PIN generated.
+- `POST /orders/:id/verify-pin` — body `{ pin }` → `completed`. 400 `ORDER_PIN_INVALID` (`details.attemptsLeft`), 409 `ORDER_PIN_LOCKED`.
+- `POST /orders/:id/shop-cancel` — body `{ reason? }`, any step before `completed`.
+
+## Favorites Module
+
+A customer's saved workers and shops (Services/Bazaar menus → Favorites, and the heart on a profile).
+- `GET /favorites` → `{ workers: Array<WorkerProfile & { accountFullName }>, businesses: BusinessProfile[] }` — newest saved first, verified profiles only.
+- `PUT /favorites/:type/:id` · `DELETE /favorites/:type/:id` — `type` is `worker` or `business`; idempotent. 400 `VALIDATION_ERROR` for a bad type/id.
 
 ---
 

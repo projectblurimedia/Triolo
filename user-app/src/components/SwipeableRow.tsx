@@ -4,7 +4,9 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { colors as brandColors, fonts, typography } from '@/theme';
 
 // Narrower than the original full-height panel (92), per feedback.
-const ACTION_WIDTH = 72;
+const ACTION_WIDTH = 80;
+// Gap between the card and the delete pill once it's open.
+const ACTION_GAP = 10;
 const OPEN_THRESHOLD = ACTION_WIDTH / 2;
 
 interface SwipeableRowProps {
@@ -25,8 +27,9 @@ interface SwipeableRowProps {
 }
 
 /**
- * Swipe left to reveal a narrow red delete panel attached to the row's right edge (square
- * left edge, right corners matching the row) — built on React Native's own
+ * Swipe left and the card slides left while a rounded red Delete pill slides in from the right
+ * and fades in beside it. At rest nothing red sits behind the card, so no red ever shows at its
+ * rounded edges. Built on React Native's own
  * PanResponder (no gesture library is in either app's native build, so this ships OTA).
  * It only claims clearly horizontal drags, so vertical list scrolling and the row's own
  * tap / long-press still work normally.
@@ -101,14 +104,30 @@ export function SwipeableRow({
     [],
   );
 
+  // The pill rides in from the right edge as the card moves, and is only visible once it moves.
+  const actionX = translateX.interpolate({
+    inputRange: [-ACTION_WIDTH, 0],
+    outputRange: [0, ACTION_WIDTH],
+    extrapolate: 'clamp',
+  });
+  const actionOpacity = translateX.interpolate({ inputRange: [-ACTION_WIDTH * 0.6, -4, 0], outputRange: [1, 0, 0], extrapolate: 'clamp' });
+
   return (
-    <View style={[styles.container, { borderRadius }]}>
-      <View style={[styles.actionArea, { borderTopRightRadius: borderRadius, borderBottomRightRadius: borderRadius }]}>
-        <Pressable style={styles.deleteButton} onPress={onDelete} accessibilityRole="button" accessibilityLabel={deleteLabel}>
+    <View style={styles.container}>
+      <Animated.View
+        style={[styles.actionArea, { opacity: actionOpacity, transform: [{ translateX: actionX }] }]}
+        pointerEvents={isOpen ? 'auto' : 'none'}
+      >
+        <Pressable
+          style={[styles.deleteButton, { borderRadius }]}
+          onPress={onDelete}
+          accessibilityRole="button"
+          accessibilityLabel={deleteLabel}
+        >
           <FontAwesome6 name="trash" size={16} color="#FFFFFF" solid />
           <Text style={styles.deleteText}>{deleteLabel}</Text>
         </Pressable>
-      </View>
+      </Animated.View>
       <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
         {children}
       </Animated.View>
@@ -117,17 +136,15 @@ export function SwipeableRow({
 }
 
 const styles = StyleSheet.create({
-  container: { overflow: 'hidden', marginBottom: 12 },
-  // Only the strip the row slides away from is red — nothing red sits behind the rest of the
-  // row (e.g. a selected row). Square left edge; right corners set inline to match the row.
+  container: { marginBottom: 12 },
   actionArea: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     right: 0,
     width: ACTION_WIDTH,
-    backgroundColor: brandColors.error,
+    paddingLeft: ACTION_GAP,
   },
-  deleteButton: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  deleteButton: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: brandColors.error },
   deleteText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, color: '#FFFFFF' },
 });

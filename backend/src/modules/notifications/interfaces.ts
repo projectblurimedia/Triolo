@@ -8,7 +8,15 @@ export type NotificationType =
   | 'booking_arrived'
   | 'booking_work_done'
   | 'booking_completed'
-  | 'booking_cancelled';
+  | 'booking_cancelled'
+  | 'order_placed'
+  | 'order_accepted'
+  | 'order_declined'
+  | 'order_packed'
+  | 'order_ready'
+  | 'order_out_for_delivery'
+  | 'order_completed'
+  | 'order_cancelled';
 
 export const MAX_BULK_DELETE = 100;
 

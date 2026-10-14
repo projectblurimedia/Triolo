@@ -4,6 +4,59 @@ All notable changes to this project are documented here. Format: date, module, s
 
 ## Unreleased
 
+- **Stronger glass, clearer Cancel Booking, header cleanup.** Popup/menu/drawer glass and toasts blur twice as hard (Android radius 40 → 80px via the reduction factor; iOS regular material instead of thin) with a slightly stronger tint, so the screen behind no longer reads through. The tab bar is unchanged. Cancel Booking (while searching and during a trip) is a soft red pill with an icon instead of a bare text link. My Bookings' Active/History tabs moved out of the header to a segment below it; headers carry only a back button, title and subtitle.
+
+- **Glass is inside the overlay, not around it.** The area around a popup, menu or drawer is only dimmed again, with no blur. The confirmation cards, pickers, menu sheets and drawer panels themselves are frosted glass like the tab bar: the screen behind shows through blurred and tinted. New `GlassFill` layer in `Glass.tsx`; `GlassCard` and the drawer panels use it.
+
+- **Glass overlays everywhere, custom pull-to-refresh, smoother toast swipe, clearer partner naming.**
+  - **Glass overlays (both apps):** new `components/Glass.tsx` (`GlassBackdrop`, `GlassBackdropLayer`, `GlassCard`, `BlurScope`, `useGlass`). Confirmation cards, the theme and language pickers, the logout confirm, the profile/settings menu sheets, the rating card, the distance-unit picker and both side drawers now sit on a blurred, dimmed backdrop as translucent glass with a hairline rim.
+  - **Blur source:** overlays blur the tab on screen, or the full-screen page they were opened from. Full-screen modals that open overlays wrap their content in `BlurScope`. Older Android falls back to a dim plus a near-solid card.
+  - **Pull-to-refresh (both apps):** new `components/PullToRefresh.tsx` replaces every `RefreshControl` (11 screens and lists).
+    - Pulling at the top moves the whole list down with rubber-band resistance. A glass bubble follows, and its arrow turns and its ring lights up at the release point.
+    - Releasing holds the list open with the brand spinner, then a tick, then it glides back.
+    - It only appears after a pull, so background polling never shows it.
+  - **Toast swipe:** each drag locks to one direction (sideways or up) from its first move and is measured from where it was claimed. Other views can't steal it. Throws glide out at the finger's speed. Slow drags no longer jump or vanish.
+  - **partner-app naming:** "Worker Jobs" → **Service Jobs** (Bookings switch) and **My Services** (Home switch).
+
+- **Glass toasts you can swipe away; shop orders on Profile.**
+  - **Toasts (both apps)** use the tab bar's frosted glass. The root toast really blurs the tab screen on Android 12+, because `blurTargetStore` now records the active tab. They also show a countdown bar along the bottom and a close button. Swipe up, left or right to throw one away; a short drag snaps back and the countdown carries on. A tap still closes it.
+  - **user-app Profile** gained a **Your shop orders** card: lists sent, completed, in progress, didn't happen, rated, amount spent, and **View All Orders**. The activity cards now have space below them. The shop section shows the shop's real rating and rated-order count instead of placeholder numbers.
+
+- **Saved lists, rating as the last order step, shop Home for partners.**
+  - **Prepare List (user-app) holds several saved lists.** "My Lists" shows each list (name, item count, preview) with Edit, Delete and Send to a Shop, plus New List. The editor (voice or typed rows, optional list name) ends with **Save List**. An existing single list is carried over as the first saved list (store version 2).
+  - **"New item" on bills fixed.** "Add Item Manually" used to insert the literal text "New item", which reached shops as an item name. New rows start empty with an "Item name" placeholder, and unnamed rows are dropped on save.
+  - **Send to a Shop** has a list picker when there is more than one list.
+  - **Rating is the order's last step.** A completed order shows the rating card inline (stars required, review optional) and a "Rated" step in the timeline. Until rated it stays under Active in My Orders and on Home as "Rate your order". One rating per order (the separate "Rate the Shop" button is gone).
+  - **partner-app Home shows the shop.** Shop card (photo, categories, rating, delivery), today's numbers (new, in progress, earned today), new and in-progress orders, and **All Shop Orders**. A partner with both profiles gets a **My Shop / Worker Jobs** switch, which starts on the shop when an order is waiting.
+  - **Shop orders open on the Shop Orders side.** Bookings takes a `mode` param; Home's button and order notification taps open it on orders. Order notification taps while the app is in the background now open the order too (only the cold-launch tap did before). The Shop Orders switch shows a count of new orders.
+  - **Shorter confirm button:** "Packing Done — Send Bill" is now "Send Bill", and confirm buttons in both apps never wrap.
+
+- **Shop order screen (partner-app) clearer; back buttons bordered everywhere.**
+  - **Checklist:** each item is a real checkbox (tap the row). Ticked = packed, with a compact ₹ price box right beside the number. Unticked items go to the customer as not available when the bill is sent.
+  - **Buttons:** the separate Save button is gone; ticks and prices are kept quietly if the shop closes the screen. One **Packing Done** button asks for confirmation ("N packed · M not packed · Total ₹X") before sending the bill.
+  - **Customer details** now sit at the top, under the status.
+  - **Back buttons:** every header back button in both apps has the 1px border (it was missing on six recently added screens).
+
+- **Bazaar shop orders: send a prepared list to a nearby shop, item-by-item packing with a bill, pickup/delivery with PIN, shop ratings; Bazaar tab and menus live; favorites.**
+  - **Backend:**
+    - New `orders` module (migration `0021`), following product-spec §3: `placed → accepted → preparing → packed → ready_for_pickup | out_for_delivery → completed`, plus declined, expired after 30 min, and cancelled (customer only while `placed`; shop any time before completion).
+    - The shop marks every item packed with a price or unavailable. The bill (packed items + delivery charge) goes to the customer with unavailable items listed separately. The 4-digit PIN is shown only to the customer and entered by the shop at handover (5-attempt lock).
+    - Each step is saved and pushed to the other side in their language (`order_*` notification types). Shop ratings live on `business_profiles` and come back through the reviews module (`/reviews/businesses/:id`, `/reviews/my-shop`).
+    - `GET /businesses/nearby` gained `shopCategory`, `delivery=true` and `sort=rating`. New `favorites` module (`GET/PUT/DELETE /favorites`).
+    - 171 tests. Live-verified with a 32-check run against production: filters, full order with partial packing and a bill of ₹370.50, PIN, rating, reviews, cancel rule, pickup-only delivery refusal, favorites. Test data removed.
+  - **user-app:**
+    - Prepare List gained **Send to a Shop** (`SendListModal`: list preview, shop picker with Delivery/category filters and Nearest/Top Rated, pickup or delivery with the charge up front, note; location required).
+    - New root `OrderTrackingModal`: status, timeline, shop call once accepted, PIN at handover, the bill with not-available items separately, cancel while placed, rate the shop.
+    - **Bazaar tab** rebuilt like Services: send-list banner, category chips with counts, Delivery filter, Nearest/Top Rated, Top Rated row, rows per category.
+    - Shop profiles show rating, reviews, a ♥ and **Order from this shop**; worker profiles got the ♥ too.
+    - Bazaar menu: Quick Order / My Orders / Favorite Shops, all live. Services menu: Favorite Workers live.
+    - Home shows a live order card; order notifications open the order.
+  - **partner-app:**
+    - New root `ShopOrderModal`: Accept/Decline, a ✓/✗ checklist with price inputs and live counters and total, then Send Bill → Ready for Pickup / Out for Delivery (with directions) → PIN.
+    - New `ShopOrdersList` (New/Active/History) in the Bookings tab, with a Worker Jobs / Shop Orders switch when a partner is both.
+    - Home shows a shop orders summary. Profile shows the shop's ratings and reviews. Order notifications open the order.
+  - Shipped OTA to both apps (no native changes).
+
 - **Profile activity, cleaner reviews, sticky header polish (OTA, both apps).**
   - **user-app Profile → My Activity** (new `ProfileActivity`): Quick Books, problems posted, finished, in progress, cancelled / no worker, and workers rated, plus "View all bookings" into My Bookings. Counted from the same lists My Bookings uses; a problem that runs as a trip is counted once. The worker capability's stats row now shows the real rating and rated-job count instead of placeholder numbers (the Business row is still a placeholder — shops have no ratings yet).
   - **Ratings & reviews redesigned flat and clean** (shared `WorkerProfileGlass`, both apps): one bordered summary card (big average, stars, count | gold breakdown bars) and one card listing reviews as divided rows (tinted initials, name, stars, date, text, skills). No shadows, gradients or accent strips.

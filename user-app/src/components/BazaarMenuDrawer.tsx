@@ -3,7 +3,9 @@ import { StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
-import { ComingSoonModal } from './ComingSoonModal';
+import { SendListModal } from './SendListModal';
+import { MyOrdersModal } from './MyOrdersModal';
+import { FavoritesModal } from './FavoritesModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 interface BazaarMenuDrawerProps {
@@ -28,23 +30,18 @@ const ITEMS: {
 }[] = [
   { key: 'quickOrder', icon: 'bag-shopping', gradient: BLUE_GRADIENT },
   { key: 'myOrders', icon: 'receipt', gradient: GREEN_GRADIENT },
-  { key: 'favoriteShops', icon: 'star', gradient: PINK_GRADIENT },
+  { key: 'favoriteShops', icon: 'heart', gradient: PINK_GRADIENT },
 ];
 
 /**
  * Bazaar tab's menu — same drawer redesign as `ServicesMenuDrawer` (replacing the earlier
- * `SideDockMenu` icon dock), with shop-domain equivalents: "Quick Order" mirrors "Quick
- * Book", "My Orders"/"Favorite Shops" mirror "My Bookings"/"Favorite Workers". None of
- * these screens exist yet (Business module remainder — Pending Module 5), so every item
- * opens a full-screen `ComingSoonModal` (same chrome as `NearbySearchModal`) instead of a
- * transient toast.
+ * `SideDockMenu` icon dock), with shop-domain equivalents: Quick Order (send the prepared list
+ * to a nearby shop), My Orders and Favorite Shops.
  */
 export function BazaarMenuDrawer({ visible, onClose }: BazaarMenuDrawerProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const [activeItem, setActiveItem] = useState<BazaarMenuItemKey | null>(null);
-
-  const activeConfig = ITEMS.find((item) => item.key === activeItem);
 
   return (
     <>
@@ -93,18 +90,10 @@ export function BazaarMenuDrawer({ visible, onClose }: BazaarMenuDrawerProps) {
         />
       </SideMenuDrawer>
 
-      {activeConfig ? (
-        <ComingSoonModal
-          visible={activeItem !== null}
-          onClose={() => setActiveItem(null)}
-          gradient={activeConfig.gradient}
-          icon={activeConfig.icon}
-          title={t(`bazaarMenu.${activeConfig.key}Title`)}
-          subtitle={t(`bazaarMenu.${activeConfig.key}Subtitle`)}
-          comingSoonTitle={t('bazaarMenu.comingSoonTitle')}
-          message={t(`bazaarMenu.${activeConfig.key}ComingSoonMessage`)}
-        />
-      ) : null}
+      {/* Quick Order sends the prepared list to a nearby shop (Prepare List → shop packs it). */}
+      <SendListModal visible={activeItem === 'quickOrder'} onClose={() => setActiveItem(null)} />
+      <MyOrdersModal visible={activeItem === 'myOrders'} onClose={() => setActiveItem(null)} />
+      <FavoritesModal visible={activeItem === 'favoriteShops'} onClose={() => setActiveItem(null)} type="business" />
     </>
   );
 }

@@ -24,7 +24,11 @@ import { initialsOf, Stars, WorkerProfileHero, WorkerReviewsSection } from './Wo
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BusinessNearbyResult } from '@/services/businessesService';
 import { WorkerNearbyResult } from '@/services/workersService';
-import { useWorkerReviews } from '@/hooks/useReviews';
+import { useBusinessReviews, useWorkerReviews } from '@/hooks/useReviews';
+import { useFavoriteToggle } from '@/hooks/useFavorites';
+import { Button } from './Button';
+import { RatingStars } from './RatingStars';
+import { SendListModal } from './SendListModal';
 import { formatAddress } from '@/utils/formatAddress';
 import { formatDistanceValue, isWorkerResult, NearbyResult, NearbySearchMode } from '@/utils/nearbyResult';
 
@@ -62,6 +66,10 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
   }, [visible, result, scrollY]);
   const worker = result && isWorkerResult(mode, result) ? result : null;
   const reviews = useWorkerReviews(visible && worker ? worker.id : null);
+  const shopId = result && !worker ? result.id : null;
+  const shopReviews = useBusinessReviews(visible ? shopId : null);
+  const favorite = useFavoriteToggle(worker ? 'worker' : 'business', result?.id ?? null);
+  const [orderVisible, setOrderVisible] = useState(false);
 
   if (!result) {
     return null;
@@ -86,6 +94,28 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
   const backButton = (
     <Pressable style={styles.backButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
       <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
+    </Pressable>
+  );
+
+  // Save to (or remove from) the customer's favorites — light variant sits on the blue header.
+  const heartButton = (light: boolean) => (
+    <Pressable
+      style={
+        light
+          ? styles.backButton
+          : [styles.stickyBack, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}40` }]
+      }
+      onPress={favorite.toggle}
+      disabled={favorite.pending}
+      hitSlop={8}
+      accessibilityLabel={t(favorite.saved ? 'favorites.remove' : 'favorites.save')}
+    >
+      <FontAwesome6
+        name="heart"
+        size={light ? 17 : 16}
+        color={favorite.saved ? '#F43F5E' : light ? '#FFFFFF' : colors.primary}
+        solid={favorite.saved}
+      />
     </Pressable>
   );
 
@@ -169,6 +199,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
                 )}
               </View>
             </View>
+            {heartButton(false)}
           </View>
         </GlassPanel>
       </Animated.View>
@@ -202,6 +233,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
           badge={<VerificationBadge status={w.verificationStatus} />}
           topInset={insets.top}
           topLeft={backButton}
+          topRight={heartButton(true)}
           style={styles.heroFlush}
         />
         <View style={styles.body}>
@@ -248,9 +280,13 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
               {distance}
             </Text>
           </View>
+          {heartButton(true)}
         </View>
       </LinearGradient>
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 110 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {photos.length > 0 ? (
           renderGallery()
         ) : (
@@ -262,6 +298,9 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
         )}
         <View style={styles.badgeRow}>
           <VerificationBadge status={b.verificationStatus} />
+        </View>
+        <View style={styles.badgeRow}>
+          <RatingStars average={b.ratingAverage} count={b.ratingCount} variant="full" />
         </View>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('nearbySearch.detailCategoriesLabel')}</Text>
@@ -278,7 +317,18 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           {renderInfoRow('location-dot', formatAddress(b))}
         </View>
+        <WorkerReviewsSection summary={shopReviews.data} loading={shopReviews.isLoading} error={shopReviews.isError} />
       </ScrollView>
+      {/* Send the prepared list to this shop. */}
+      <View
+        style={[
+          styles.orderBar,
+          { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: colors.border },
+        ]}
+      >
+        <Button label={t('sendList.orderFromShop')} onPress={() => setOrderVisible(true)} />
+      </View>
+      <SendListModal visible={orderVisible} onClose={() => setOrderVisible(false)} shop={b} />
     </>
   );
 
@@ -301,6 +351,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
   sticky: { position: 'absolute', top: 0, left: 0, right: 0 },
+  orderBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   // Roomy bar under the status bar: back, avatar, name and rating.
   stickyGlass: { paddingBottom: 16, paddingHorizontal: 16 },
   stickyBorder: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 1 },

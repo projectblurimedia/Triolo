@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { useGlass } from './Glass';
 
 interface DrawerMenuItemProps {
   icon: React.ComponentProps<typeof FontAwesome6>['name'];
@@ -15,9 +16,10 @@ interface DrawerMenuItemProps {
 /** A single row inside a `SideMenuDrawer` body — gradient icon square, title/subtitle, chevron. Same row shape `HomeMenuModal` established for its own items. */
 export function DrawerMenuItem({ icon, gradient, title, subtitle, onPress }: DrawerMenuItemProps) {
   const { colors } = useThemeColors();
+  const glass = useGlass();
 
   return (
-    <Pressable style={[styles.item, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={onPress}>
+    <Pressable style={[styles.item, { backgroundColor: glass.control, borderColor: glass.border }]} onPress={onPress}>
       <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.itemIcon}>
         <FontAwesome6 name={icon} size={18} color={colors.white} solid />
       </LinearGradient>

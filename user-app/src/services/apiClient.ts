@@ -216,6 +216,7 @@ export const apiClient = {
   get: <T>(path: string, auth = false) => request<T>(path, 'get', undefined, auth),
   post: <T>(path: string, body?: unknown, auth = false) => request<T>(path, 'post', body, auth),
   patch: <T>(path: string, body?: unknown, auth = false) => request<T>(path, 'patch', body, auth),
+  put: <T>(path: string, body?: unknown, auth = false) => request<T>(path, 'put', body, auth),
   delete: <T>(path: string, auth = false) => request<T>(path, 'delete', undefined, auth),
   postForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'post'),
   patchForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'patch'),

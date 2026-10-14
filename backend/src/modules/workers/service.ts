@@ -54,6 +54,10 @@ export class WorkersService {
     });
   }
 
+  async getVerifiedProfiles(ids: string[]): Promise<(WorkerProfile & { accountFullName: string })[]> {
+    return this.repository.findVerifiedByIds(ids);
+  }
+
   async getMyProfile(accountId: string): Promise<WorkerProfile | null> {
     return this.repository.findByAccountId(accountId);
   }

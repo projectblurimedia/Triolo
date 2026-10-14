@@ -9,7 +9,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { WorkerProfileHero, WorkerReviewsSection } from '@/components/WorkerProfileGlass';
-import { useMyReviews } from '@/hooks/useReviews';
+import { useMyReviews, useMyShopReviews } from '@/hooks/useReviews';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
@@ -36,6 +36,8 @@ export function ProfileScreen({ navigation }: Props) {
   const businessProfile = useMyBusinessProfile();
   const worker = workerProfile.data;
   const reviews = useMyReviews(!!worker);
+  const shop = businessProfile.data;
+  const shopReviews = useMyShopReviews(!!shop);
 
   return (
     <ScreenContainer edges={['left', 'right']}>
@@ -100,6 +102,14 @@ export function ProfileScreen({ navigation }: Props) {
         />
 
         {worker ? <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} /> : null}
+        {shop ? (
+          <WorkerReviewsSection
+            summary={shopReviews.data}
+            loading={shopReviews.isLoading}
+            error={shopReviews.isError}
+            title={t('shopOrders.shopReviewsTitle', { shop: shop.shopName })}
+          />
+        ) : null}
       </ScrollView>
     </ScreenContainer>
   );
@@ -188,7 +198,14 @@ const styles = StyleSheet.create({
   heroName: { ...typography.heading, fontFamily: fonts.semiBold, fontSize: 19, color: '#FFFFFF', marginBottom: 8 },
   heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 3 },
   heroMeta: { ...typography.caption, color: 'rgba(255,255,255,0.9)' },
-  sectionLabel: { ...typography.caption, fontFamily: fonts.semiBold, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.4 },
+  sectionLabel: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    marginTop: 4,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

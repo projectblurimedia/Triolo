@@ -38,6 +38,9 @@ export interface BusinessProfile {
   deliveryAvailable: boolean;
   deliveryPricePerKm: number | null;
   verificationStatus: ProfileVerificationStatus;
+  /** Average customer rating of the shop (1 decimal), or null before the first rating. */
+  ratingAverage: number | null;
+  ratingCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -68,6 +71,11 @@ export interface NearbySearchFilter {
   radiusKm: number;
   query?: string;
   limit: number;
+  /** Only shops in this category. */
+  shopCategory?: string;
+  /** Only shops that offer door delivery. */
+  deliveryOnly?: boolean;
+  sort?: 'distance' | 'rating';
 }
 
 /** Public (non-admin) nearby-search result — a verified profile plus its computed distance from the searcher. */

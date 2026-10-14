@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,9 @@ import { SERVICES_RADIUS_KM, useNearbyWorkers } from '@/hooks/useNearbyWorkers';
 import { useNearbyBusinesses } from '@/hooks/useNearbyBusinesses';
 import { useMyProblems } from '@/hooks/useProblems';
 import { useMyBookings } from '@/hooks/useBookings';
+import { useMyOrders } from '@/hooks/useOrders';
+import { openOrderTracker } from '@/state/orderTrackerStore';
+import { isOrderOpen, orderStatusTitleKey } from '@/services/ordersService';
 import { ACTIVE_BOOKING_STATUSES } from '@/services/bookingsService';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { WorkerNearbyResult, workersService } from '@/services/workersService';
@@ -29,11 +32,16 @@ import { NearbySearchMode } from '@/utils/nearbyResult';
 import { MainTabParamList } from '@/navigation/types';
 import { useAuthStore } from '@/state/authStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { PullToRefresh } from '@/components/PullToRefresh';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
 // Each quick action keeps its own colour, matching the Services menu drawer's palette.
-const QUICK_ACTIONS: { key: 'quickBook' | 'postProblem' | 'nearbyShops' | 'prepareList'; icon: IconName; gradient: readonly [string, string] }[] = [
+const QUICK_ACTIONS: {
+  key: 'quickBook' | 'postProblem' | 'nearbyShops' | 'prepareList';
+  icon: IconName;
+  gradient: readonly [string, string];
+}[] = [
   { key: 'quickBook', icon: 'bolt', gradient: headerGradient },
   { key: 'postProblem', icon: 'clipboard-list', gradient: ['#7C3AED', '#A78BFA'] },
   { key: 'nearbyShops', icon: 'store', gradient: ['#16A34A', '#4ADE80'] },
@@ -83,6 +91,8 @@ export function HomeScreen() {
   const shops = useNearbyBusinesses(coords?.latitude ?? null, coords?.longitude ?? null);
   const problems = useMyProblems();
   const bookings = useMyBookings();
+  const orders = useMyOrders();
+  const liveOrder = (orders.data ?? []).find(isOrderOpen);
   // The newest Quick Book booking still in progress — shown as a live card that reopens tracking.
   const liveBooking = (bookings.data ?? []).find((booking) => ACTIVE_BOOKING_STATUSES.includes(booking.status));
 
@@ -104,6 +114,7 @@ export function HomeScreen() {
     shops.refetch();
     problems.refetch();
     bookings.refetch();
+    orders.refetch();
   };
 
   const openWorker = (worker: WorkerNearbyResult) => {
@@ -179,147 +190,177 @@ export function HomeScreen() {
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <ScrollView
-        contentContainerStyle={styles.body}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={workers.isRefetching || shops.isRefetching} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-      >
-        <Text style={[styles.greeting, { color: colors.text }]}>{t('home.greeting', { name: firstName })}</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('home.subtitle')}</Text>
+      <PullToRefresh refreshing={workers.isRefetching || shops.isRefetching} onRefresh={onRefresh}>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <Text style={[styles.greeting, { color: colors.text }]}>{t('home.greeting', { name: firstName })}</Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('home.subtitle')}</Text>
 
-        <Pressable
-          style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={() => setHomeSearchVisible(true)}
-          accessibilityRole="search"
-        >
-          <FontAwesome6 name="magnifying-glass" size={15} color={colors.textMuted} solid />
-          <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
-            {t('home.searchPlaceholder')}
-          </Text>
-        </Pressable>
-
-        {renderSummary()}
-
-        {renderSectionHeader(t('home.quickActions'))}
-        <View style={styles.actionsGrid}>
-          {QUICK_ACTIONS.map((action) => (
-            <Pressable
-              key={action.key}
-              style={({ pressed }) => [styles.actionTile, { opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }]}
-              onPress={() => handleQuickAction(action.key)}
-              accessibilityRole="button"
-              accessibilityLabel={t(`home.action.${action.key}`)}
-            >
-              <LinearGradient colors={action.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
-                {/* A large faded copy of the icon as a decorative watermark. */}
-                <FontAwesome6 name={action.icon} size={72} color="rgba(255,255,255,0.16)" solid style={styles.actionWatermark} />
-                <View style={styles.actionIcon}>
-                  <FontAwesome6 name={action.icon} size={17} color="#FFFFFF" solid />
-                </View>
-                <Text style={styles.actionLabel} numberOfLines={1}>
-                  {t(`home.action.${action.key}`)}
-                </Text>
-                <Text style={styles.actionHint} numberOfLines={1}>
-                  {t(`home.actionHint.${action.key}`)}
-                </Text>
-              </LinearGradient>
-            </Pressable>
-          ))}
-        </View>
-
-        {liveBooking ? (
           <Pressable
-            style={[styles.problemsCard, styles.liveCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}
-            onPress={() => openBookingTracker(liveBooking.id)}
+            style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setHomeSearchVisible(true)}
+            accessibilityRole="search"
           >
-            <View style={[styles.problemsIcon, { backgroundColor: colors.primary }]}>
-              <FontAwesome6 name="bolt" size={17} color="#FFFFFF" solid />
-            </View>
-            <View style={styles.problemsInfo}>
-              <Text style={[styles.problemsTitle, { color: colors.text }]}>{t(`tracking.status.${liveBooking.status}.title`)}</Text>
-              <Text style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
-                {liveBooking.worker?.fullName ? `${liveBooking.worker.fullName} · ` : ''}
-                {liveBooking.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}
-              </Text>
-            </View>
-            <Text style={[styles.liveTrack, { color: colors.primary }]}>{t('home.trackBooking')}</Text>
+            <FontAwesome6 name="magnifying-glass" size={15} color={colors.textMuted} solid />
+            <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
+              {t('home.searchPlaceholder')}
+            </Text>
           </Pressable>
-        ) : null}
 
-        {latestActive ? (
-          <Pressable
-            style={[styles.problemsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => setProblemsVisible(true)}
-          >
-            <View style={[styles.problemsIcon, { backgroundColor: '#7C3AED1A' }]}>
-              <FontAwesome6 name="clipboard-list" size={18} color="#7C3AED" solid />
-            </View>
-            <View style={styles.problemsInfo}>
-              <Text style={[styles.problemsTitle, { color: colors.text }]}>
-                {t('home.activeProblems', { count: activeProblems.length })}
-              </Text>
-              <Text style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
-                {latestActive.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')} ·{' '}
-                {t(`yourProblems.status.${latestActive.status}`)}
-              </Text>
-            </View>
-            <FontAwesome6 name="chevron-right" size={13} color={colors.textMuted} solid />
-          </Pressable>
-        ) : null}
+          {renderSummary()}
 
-        {renderSectionHeader(t('home.browseServices'), () => navigation.navigate('Services', undefined))}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
-          {SKILL_CATEGORIES.map((skill) => (
-            <Pressable
-              key={skill.key}
-              style={[styles.categoryTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={() => navigation.navigate('Services', { category: skill.key, linkedAt: Date.now() })}
-            >
-              <View style={[styles.categoryIcon, { backgroundColor: `${colors.primary}14` }]}>
-                <FontAwesome6 name={skill.icon} size={18} color={colors.primary} solid />
-              </View>
-              <Text style={[styles.categoryLabel, { color: colors.text }]} numberOfLines={1}>
-                {t(`workerProfile.skills.${skill.key}`)}
-              </Text>
-              <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
-                {t('home.nearbyCount', { count: countsByCategory[skill.key] ?? 0 })}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {(workers.data ?? []).length > 0 ? (
-          <>
-            {renderSectionHeader(t('home.topWorkers'), () => navigation.navigate('Services', undefined))}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
-              {(workers.data ?? []).slice(0, CAROUSEL_LIMIT).map((worker) => (
-                <WorkerMiniCard key={worker.id} worker={worker} onPress={() => openWorker(worker)} />
-              ))}
-            </ScrollView>
-          </>
-        ) : null}
-
-        {(shops.data ?? []).length > 0 ? (
-          <>
-            {renderSectionHeader(t('home.marketplace'), () => navigation.navigate('Bazaar'))}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
-              {(shops.data ?? []).slice(0, CAROUSEL_LIMIT).map((shop) => (
-                <ShopMiniCard key={shop.id} shop={shop} onPress={() => openShop(shop)} />
-              ))}
-            </ScrollView>
-          </>
-        ) : null}
-
-        {coords && !workers.isLoading && !shops.isLoading && !(workers.data ?? []).length && !(shops.data ?? []).length ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <FontAwesome6 name="map-location-dot" size={22} color={colors.textMuted} solid />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('home.emptyNearbyTitle')}</Text>
-            <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('home.emptyNearbyMessage')}</Text>
+          {renderSectionHeader(t('home.quickActions'))}
+          <View style={styles.actionsGrid}>
+            {QUICK_ACTIONS.map((action) => (
+              <Pressable
+                key={action.key}
+                style={({ pressed }) => [
+                  styles.actionTile,
+                  { opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+                ]}
+                onPress={() => handleQuickAction(action.key)}
+                accessibilityRole="button"
+                accessibilityLabel={t(`home.action.${action.key}`)}
+              >
+                <LinearGradient
+                  colors={action.gradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.actionGradient}
+                >
+                  {/* A large faded copy of the icon as a decorative watermark. */}
+                  <FontAwesome6
+                    name={action.icon}
+                    size={72}
+                    color="rgba(255,255,255,0.16)"
+                    solid
+                    style={styles.actionWatermark}
+                  />
+                  <View style={styles.actionIcon}>
+                    <FontAwesome6 name={action.icon} size={17} color="#FFFFFF" solid />
+                  </View>
+                  <Text style={styles.actionLabel} numberOfLines={1}>
+                    {t(`home.action.${action.key}`)}
+                  </Text>
+                  <Text style={styles.actionHint} numberOfLines={1}>
+                    {t(`home.actionHint.${action.key}`)}
+                  </Text>
+                </LinearGradient>
+              </Pressable>
+            ))}
           </View>
-        ) : null}
-      </ScrollView>
+
+          {liveBooking ? (
+            <Pressable
+              style={[styles.problemsCard, styles.liveCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}
+              onPress={() => openBookingTracker(liveBooking.id)}
+            >
+              <View style={[styles.problemsIcon, { backgroundColor: colors.primary }]}>
+                <FontAwesome6 name="bolt" size={17} color="#FFFFFF" solid />
+              </View>
+              <View style={styles.problemsInfo}>
+                <Text style={[styles.problemsTitle, { color: colors.text }]}>
+                  {t(`tracking.status.${liveBooking.status}.title`)}
+                </Text>
+                <Text style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
+                  {liveBooking.worker?.fullName ? `${liveBooking.worker.fullName} · ` : ''}
+                  {liveBooking.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}
+                </Text>
+              </View>
+              <Text style={[styles.liveTrack, { color: colors.primary }]}>{t('home.trackBooking')}</Text>
+            </Pressable>
+          ) : null}
+
+          {liveOrder ? (
+            <Pressable
+              style={[styles.problemsCard, styles.liveCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}
+              onPress={() => openOrderTracker(liveOrder.id)}
+            >
+              <View style={[styles.problemsIcon, { backgroundColor: colors.primary }]}>
+                <FontAwesome6 name="basket-shopping" size={17} color="#FFFFFF" solid />
+              </View>
+              <View style={styles.problemsInfo}>
+                <Text style={[styles.problemsTitle, { color: colors.text }]}>{t(orderStatusTitleKey(liveOrder))}</Text>
+                <Text style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
+                  {liveOrder.shop.name} · {t('orders.itemsCount', { count: liveOrder.items.length })}
+                </Text>
+              </View>
+              <Text style={[styles.liveTrack, { color: colors.primary }]}>{t('home.trackBooking')}</Text>
+            </Pressable>
+          ) : null}
+
+          {latestActive ? (
+            <Pressable
+              style={[styles.problemsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => setProblemsVisible(true)}
+            >
+              <View style={[styles.problemsIcon, { backgroundColor: '#7C3AED1A' }]}>
+                <FontAwesome6 name="clipboard-list" size={18} color="#7C3AED" solid />
+              </View>
+              <View style={styles.problemsInfo}>
+                <Text style={[styles.problemsTitle, { color: colors.text }]}>
+                  {t('home.activeProblems', { count: activeProblems.length })}
+                </Text>
+                <Text style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
+                  {latestActive.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')} ·{' '}
+                  {t(`yourProblems.status.${latestActive.status}`)}
+                </Text>
+              </View>
+              <FontAwesome6 name="chevron-right" size={13} color={colors.textMuted} solid />
+            </Pressable>
+          ) : null}
+
+          {renderSectionHeader(t('home.browseServices'), () => navigation.navigate('Services', undefined))}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+            {SKILL_CATEGORIES.map((skill) => (
+              <Pressable
+                key={skill.key}
+                style={[styles.categoryTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onPress={() => navigation.navigate('Services', { category: skill.key, linkedAt: Date.now() })}
+              >
+                <View style={[styles.categoryIcon, { backgroundColor: `${colors.primary}14` }]}>
+                  <FontAwesome6 name={skill.icon} size={18} color={colors.primary} solid />
+                </View>
+                <Text style={[styles.categoryLabel, { color: colors.text }]} numberOfLines={1}>
+                  {t(`workerProfile.skills.${skill.key}`)}
+                </Text>
+                <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
+                  {t('home.nearbyCount', { count: countsByCategory[skill.key] ?? 0 })}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          {(workers.data ?? []).length > 0 ? (
+            <>
+              {renderSectionHeader(t('home.topWorkers'), () => navigation.navigate('Services', undefined))}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+                {(workers.data ?? []).slice(0, CAROUSEL_LIMIT).map((worker) => (
+                  <WorkerMiniCard key={worker.id} worker={worker} onPress={() => openWorker(worker)} />
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
+
+          {(shops.data ?? []).length > 0 ? (
+            <>
+              {renderSectionHeader(t('home.marketplace'), () => navigation.navigate('Bazaar'))}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+                {(shops.data ?? []).slice(0, CAROUSEL_LIMIT).map((shop) => (
+                  <ShopMiniCard key={shop.id} shop={shop} onPress={() => openShop(shop)} />
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
+
+          {coords && !workers.isLoading && !shops.isLoading && !(workers.data ?? []).length && !(shops.data ?? []).length ? (
+            <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <FontAwesome6 name="map-location-dot" size={22} color={colors.textMuted} solid />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('home.emptyNearbyTitle')}</Text>
+              <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('home.emptyNearbyMessage')}</Text>
+            </View>
+          ) : null}
+        </ScrollView>
+      </PullToRefresh>
 
       <QuickBookModal visible={quickBookVisible} onClose={() => setQuickBookVisible(false)} />
       <ProblemFormModal visible={problemFormVisible} onClose={() => setProblemFormVisible(false)} />
@@ -398,7 +439,15 @@ const styles = StyleSheet.create({
   actionHint: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', fontSize: 11, marginTop: 2 },
   liveCard: { borderWidth: 1.5 },
   liveTrack: { ...typography.caption, fontFamily: fonts.semiBold },
-  problemsCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14, marginTop: 14 },
+  problemsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 14,
+  },
   problemsIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   problemsInfo: { flex: 1 },
   problemsTitle: { ...typography.body, fontFamily: fonts.semiBold },
@@ -408,7 +457,15 @@ const styles = StyleSheet.create({
   categoryIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   categoryLabel: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
   categoryCount: { ...typography.caption, fontSize: 10 },
-  emptyCard: { marginTop: 22, borderRadius: 16, borderWidth: 1, paddingVertical: 26, paddingHorizontal: 20, alignItems: 'center', gap: 8 },
+  emptyCard: {
+    marginTop: 22,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 26,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
   emptyTitle: { ...typography.body, fontFamily: fonts.semiBold, textAlign: 'center' },
   emptyMessage: { ...typography.caption, textAlign: 'center', lineHeight: 18 },
 });

@@ -113,9 +113,7 @@ const ACTIVE_GRADIENTS: Record<string, readonly [string, string]> = {
  */
 export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   const { colors, isDark } = useThemeColors();
-  const progressAnims = useRef(
-    state.routes.map((_, index) => new Animated.Value(index === state.index ? 1 : 0)),
-  ).current;
+  const progressAnims = useRef(state.routes.map((_, index) => new Animated.Value(index === state.index ? 1 : 0))).current;
   // A single shared bounce value for whichever tab is becoming active — reset low and
   // sprung back past 1 on every change, so the selected tab's backdrop circle and dot
   // visibly "pop" a little larger before settling, not just fade/scale linearly to their
@@ -154,6 +152,10 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   const glass = isDark ? GLASS_DARK : GLASS_LIGHT;
   const activeRouteKey = state.routes[state.index]?.key;
   const blurTarget = useBlurTargetStore((store) => (activeRouteKey ? store.targets[activeRouteKey] : undefined));
+  const setActiveKey = useBlurTargetStore((store) => store.setActiveKey);
+  useEffect(() => {
+    setActiveKey(activeRouteKey ?? null);
+  }, [activeRouteKey, setActiveKey]);
   const androidBlurring = ANDROID_REAL_BLUR && !!blurTarget;
 
   // Android has no elevation shadow (see the comment above GLASS_LIGHT), so the shell only
@@ -196,81 +198,81 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
         </View>
 
         <View style={styles.bar}>
-        {state.routes.map((route, index) => {
-          const isFocused = state.index === index;
-          const progress = progressAnims[index];
-          const gradient = ACTIVE_GRADIENTS[route.name] ?? headerGradient;
-          const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
+          {state.routes.map((route, index) => {
+            const isFocused = state.index === index;
+            const progress = progressAnims[index];
+            const gradient = ACTIVE_GRADIENTS[route.name] ?? headerGradient;
+            const onPress = () => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            };
 
-          const bgScale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
-          const iconScale = progress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
-          const iconLift = progress.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
-          const mutedOpacity = Animated.subtract(1, progress);
+            const bgScale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
+            const iconScale = progress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+            const iconLift = progress.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
+            const mutedOpacity = Animated.subtract(1, progress);
 
-          return (
-            <Pressable
-              key={route.key}
-              style={styles.tabButton}
-              onPress={onPress}
-              accessibilityLabel={route.name}
-              android_ripple={{ color: 'transparent' }}
-            >
-              <View style={styles.tabContent}>
-                {/* `iconArea`'s own layout box (its size, used to center it inside
+            return (
+              <Pressable
+                key={route.key}
+                style={styles.tabButton}
+                onPress={onPress}
+                accessibilityLabel={route.name}
+                android_ripple={{ color: 'transparent' }}
+              >
+                <View style={styles.tabContent}>
+                  {/* `iconArea`'s own layout box (its size, used to center it inside
                     `tabButton`) is untouched by `transform` — so every tab's icon sits at
                     the bar's true vertical center at rest, and only the selected tab's
                     rendered pixels shift up via `iconLift`, revealing its dot below. */}
-                <Animated.View style={[styles.iconArea, { transform: [{ translateY: iconLift }] }]}>
+                  <Animated.View style={[styles.iconArea, { transform: [{ translateY: iconLift }] }]}>
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[
+                        styles.iconBg,
+                        {
+                          // A small brand-tinted bubble — no rim/border, per explicit feedback.
+                          backgroundColor: isDark ? `${gradient[1]}3D` : `${gradient[0]}24`,
+                          opacity: progress,
+                          transform: [{ scale: bgScale }, { scale: popScale }],
+                        },
+                      ]}
+                    />
+                    <View style={styles.iconStack}>
+                      <Animated.View style={{ opacity: mutedOpacity, transform: [{ scale: iconScale }] }}>
+                        <FontAwesome6 name={ICONS[route.name]} size={20} color={colors.textMuted} solid />
+                      </Animated.View>
+                      <Animated.View
+                        style={[
+                          StyleSheet.absoluteFill,
+                          styles.iconOverlayCenter,
+                          { opacity: progress, transform: [{ scale: iconScale }] },
+                        ]}
+                      >
+                        <FontAwesome6 name={ICONS[route.name]} size={20} color={gradient[0]} solid />
+                      </Animated.View>
+                    </View>
+                  </Animated.View>
+
+                  {/* Absolutely positioned against `tabContent`'s own (untransformed)
+                    box — anchored just below the icon's resting position, not its lifted
+                    one, so the gap between icon and dot visibly opens up on selection. */}
                   <Animated.View
                     pointerEvents="none"
                     style={[
-                      styles.iconBg,
-                      {
-                        // A small brand-tinted bubble — no rim/border, per explicit feedback.
-                        backgroundColor: isDark ? `${gradient[1]}3D` : `${gradient[0]}24`,
-                        opacity: progress,
-                        transform: [{ scale: bgScale }, { scale: popScale }],
-                      },
+                      styles.dotShadowWrap,
+                      Platform.OS === 'ios' ? { shadowColor: gradient[0] } : null,
+                      { opacity: progress, transform: [{ scale: popScale }] },
                     ]}
-                  />
-                  <View style={styles.iconStack}>
-                    <Animated.View style={{ opacity: mutedOpacity, transform: [{ scale: iconScale }] }}>
-                      <FontAwesome6 name={ICONS[route.name]} size={20} color={colors.textMuted} solid />
-                    </Animated.View>
-                    <Animated.View
-                      style={[
-                        StyleSheet.absoluteFill,
-                        styles.iconOverlayCenter,
-                        { opacity: progress, transform: [{ scale: iconScale }] },
-                      ]}
-                    >
-                      <FontAwesome6 name={ICONS[route.name]} size={20} color={gradient[0]} solid />
-                    </Animated.View>
-                  </View>
-                </Animated.View>
-
-                {/* Absolutely positioned against `tabContent`'s own (untransformed)
-                    box — anchored just below the icon's resting position, not its lifted
-                    one, so the gap between icon and dot visibly opens up on selection. */}
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.dotShadowWrap,
-                    Platform.OS === 'ios' ? { shadowColor: gradient[0] } : null,
-                    { opacity: progress, transform: [{ scale: popScale }] },
-                  ]}
-                >
-                  <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dot} />
-                </Animated.View>
-              </View>
-            </Pressable>
-          );
-        })}
+                  >
+                    <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dot} />
+                  </Animated.View>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
     </View>

@@ -9,6 +9,10 @@ import { BookingsRepository } from '@/modules/bookings/repository';
 import { BookingsService } from '@/modules/bookings/service';
 import { ProblemsRepository } from '@/modules/problems/repository';
 import { ProblemsService } from '@/modules/problems/service';
+import { BusinessesRepository } from '@/modules/businesses/repository';
+import { BusinessesService } from '@/modules/businesses/service';
+import { OrdersRepository } from '@/modules/orders/repository';
+import { OrdersService } from '@/modules/orders/service';
 import { ReviewsController } from './controller';
 import { ReviewsService } from './service';
 
@@ -18,9 +22,15 @@ const notificationsService = new NotificationsService(new NotificationsRepositor
 const workersService = new WorkersService(new WorkersRepository(pool), notificationsService);
 const bookingsService = new BookingsService(new BookingsRepository(pool), workersService, notificationsService);
 const problemsService = new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService, bookingsService);
-const controller = new ReviewsController(new ReviewsService(workersService, bookingsService, problemsService));
+const businessesService = new BusinessesService(new BusinessesRepository(pool), notificationsService);
+const ordersService = new OrdersService(new OrdersRepository(pool), businessesService, notificationsService);
+const controller = new ReviewsController(
+  new ReviewsService(workersService, bookingsService, problemsService, businessesService, ordersService),
+);
 
 export const reviewsRouter = Router();
 
 reviewsRouter.get('/me', authenticate, controller.getForMe);
 reviewsRouter.get('/workers/:workerId', authenticate, controller.getForWorker);
+reviewsRouter.get('/my-shop', authenticate, controller.getForMyShop);
+reviewsRouter.get('/businesses/:businessId', authenticate, controller.getForBusiness);

@@ -51,6 +51,8 @@ function buildProfile(overrides: Partial<BusinessProfile> = {}): BusinessProfile
     deliveryAvailable: false,
     deliveryPricePerKm: null,
     verificationStatus: 'pending_verification',
+    ratingAverage: null,
+    ratingCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

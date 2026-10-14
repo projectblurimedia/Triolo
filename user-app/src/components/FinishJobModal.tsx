@@ -15,6 +15,11 @@ interface FinishJobModalProps {
   loading: boolean;
   onConfirm: (rating: number, review: string) => void;
   onCancel: () => void;
+  /** Overrides for reuse beyond worker jobs (e.g. rating a shop after an order). */
+  title?: string;
+  message?: string;
+  rateLabel?: string;
+  confirmLabel?: string;
 }
 
 /**
@@ -22,7 +27,17 @@ interface FinishJobModalProps {
  * rates the worker 1–5 stars (required — ratings are what the Services tab's Top Rated
  * sorting runs on) with an optional short review. Same centered-card shell as ConfirmModal.
  */
-export function FinishJobModal({ visible, workerName, loading, onConfirm, onCancel }: FinishJobModalProps) {
+export function FinishJobModal({
+  visible,
+  workerName,
+  loading,
+  onConfirm,
+  onCancel,
+  title,
+  message,
+  rateLabel,
+  confirmLabel,
+}: FinishJobModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const [rating, setRating] = useState(0);
@@ -38,15 +53,15 @@ export function FinishJobModal({ visible, workerName, loading, onConfirm, onCanc
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={loading ? undefined : onCancel}>
-        <Pressable style={[styles.card, { backgroundColor: colors.surface }]} onPress={() => {}}>
+        <Pressable style={[styles.card, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
           <LinearGradient colors={FINISH_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.iconCircle}>
             <FontAwesome6 name="circle-check" size={26} color="#FFFFFF" solid />
           </LinearGradient>
-          <Text style={[styles.title, { color: colors.text }]}>{t('yourProblems.finishConfirmTitle')}</Text>
-          <Text style={[styles.message, { color: colors.textMuted }]}>{t('yourProblems.finishConfirmMessage')}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{title ?? t('yourProblems.finishConfirmTitle')}</Text>
+          <Text style={[styles.message, { color: colors.textMuted }]}>{message ?? t('yourProblems.finishConfirmMessage')}</Text>
 
           <Text style={[styles.rateLabel, { color: colors.text }]}>
-            {workerName ? t('yourProblems.rateWorkerNamed', { name: workerName }) : t('yourProblems.rateWorker')}
+            {rateLabel ?? (workerName ? t('yourProblems.rateWorkerNamed', { name: workerName }) : t('yourProblems.rateWorker'))}
           </Text>
           <View style={styles.stars}>
             {[1, 2, 3, 4, 5].map((star) => (
@@ -78,7 +93,7 @@ export function FinishJobModal({ visible, workerName, loading, onConfirm, onCanc
             </Pressable>
             <View style={styles.confirmWrap}>
               <Button
-                label={t('yourProblems.markFinished')}
+                label={confirmLabel ?? t('yourProblems.markFinished')}
                 onPress={() => onConfirm(rating, review.trim())}
                 loading={loading}
                 disabled={rating === 0}
@@ -93,14 +108,23 @@ export function FinishJobModal({ visible, workerName, loading, onConfirm, onCanc
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', padding: 24 },
   card: { borderRadius: 20, padding: 22, alignItems: 'center' },
   iconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   title: { ...typography.subheading, fontFamily: fonts.semiBold, marginTop: 14, textAlign: 'center' },
   message: { ...typography.caption, textAlign: 'center', marginTop: 6, lineHeight: 18 },
   rateLabel: { ...typography.body, fontFamily: fonts.medium, marginTop: 18 },
   stars: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  review: { alignSelf: 'stretch', borderWidth: 1, borderRadius: 10, padding: 12, minHeight: 70, marginTop: 16, ...typography.body, fontSize: 13 },
+  review: {
+    alignSelf: 'stretch',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    minHeight: 70,
+    marginTop: 16,
+    ...typography.body,
+    fontSize: 13,
+  },
   actions: { flexDirection: 'row', alignSelf: 'stretch', gap: 10, marginTop: 18, alignItems: 'center' },
   cancelButton: { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   cancelText: { ...typography.body, fontFamily: fonts.medium },

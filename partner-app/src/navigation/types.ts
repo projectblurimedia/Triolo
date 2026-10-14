@@ -41,7 +41,9 @@ export type MainStackParamList = {
  */
 export type MainTabParamList = {
   Home: undefined;
-  Bookings: undefined;
+  // `mode` opens a dual (worker + shop) partner's Bookings on that side; `linkedAt` makes a
+  // repeat navigation with the same mode still apply after the user switched sides by hand.
+  Bookings: { mode?: 'jobs' | 'orders'; linkedAt?: number } | undefined;
   Earnings: undefined;
   Profile: undefined;
 };

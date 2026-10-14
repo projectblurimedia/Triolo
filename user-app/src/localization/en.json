@@ -323,9 +323,31 @@
     "quantityPlaceholder": "Qty",
     "unitPlaceholder": "Unit",
     "addItemManually": "Add Item Manually",
-    "newItemName": "New item",
-    "done": "Done",
-    "editList": "Edit List"
+    "sendToShop": "Send to a Shop",
+    "myListsHeading": "My Lists ({{count}})",
+    "newList": "New List",
+    "newListTitle": "New List",
+    "editingTitle": "Edit List",
+    "listNamePlaceholder": "List name (e.g. Monthly groceries)",
+    "saveList": "Save List",
+    "savedTitle": "List saved",
+    "emptyDraftTitle": "Add at least one item",
+    "emptyDraftMessage": "Give each item a name before saving the list.",
+    "backToLists": "Back to My Lists",
+    "discardTitle": "Discard changes?",
+    "discardMessage": "Your changes to this list will not be saved.",
+    "discard": "Discard",
+    "deleteListTitle": "Delete this list?",
+    "deleteListMessage": "\"{{name}}\" will be removed from this phone. Orders already sent are not affected.",
+    "deleteList": "Delete",
+    "edit": "Edit",
+    "itemsCount_one": "{{count}} item",
+    "itemsCount_other": "{{count}} items",
+    "updatedOn": "Updated {{date}}",
+    "more": "+{{count}} more",
+    "noListsTitle": "No lists yet",
+    "noListsMessage": "Tap New List, speak or type your items, and save. Send any list to a nearby shop when you are ready.",
+    "defaultListName": "List"
   },
   "bazaar": {
     "comingSoon": "Shop ordering is coming soon.",
@@ -334,7 +356,17 @@
     "myBusiness": "My Business",
     "menu": "Menu",
     "deliveryAvailableYes": "Delivery available",
-    "deliveryAvailableNo": "No delivery"
+    "deliveryAvailableNo": "No delivery",
+    "shopsNearYou": "Shops near you",
+    "topRatedTitle": "Top Rated Shops",
+    "sendListTitle": "Send your list to a shop",
+    "sendListReady_one": "{{count}} saved list — pick it and a nearby shop packs it",
+    "sendListReady_other": "{{count}} saved lists — pick one and a nearby shop packs it",
+    "sendListEmpty": "Prepare a list, then a nearby shop packs it for you",
+    "locationMessage": "Turn on location to see shops near you.",
+    "emptyTitle": "No shops found",
+    "emptyMessage": "No verified shops near you yet.",
+    "emptyDeliveryMessage": "No shops near you deliver right now. Turn off the Delivery filter to see all shops."
   },
   "bazaarMenu": {
     "title": "Bazaar",
@@ -360,10 +392,6 @@
     "businessSection": "Your Business Profile",
     "noCapabilitiesTitle": "Nothing registered yet",
     "noCapabilitiesMessage": "Want to work or sell on Triolo? Register as a Worker or Business using the Triolo Partner app or website.",
-    "ratingValue": "4.8",
-    "ratingCount": "126 reviews",
-    "ordersDoneValue": "94",
-    "ordersDoneLabel": "Orders Fulfilled",
     "logoutConfirmTitle": "Confirm Logout",
     "logoutConfirmMessage": "Are you sure you want to logout from your account?",
     "activity": {
@@ -375,7 +403,19 @@
       "notDone": "Cancelled / no worker",
       "rated": "Workers rated",
       "viewAll": "View all bookings"
-    }
+    },
+    "ratedOrders": "Rated orders",
+    "orders": {
+      "title": "Your shop orders",
+      "sent": "Lists sent",
+      "completed": "Completed",
+      "inProgress": "In progress",
+      "notDone": "Didn't happen",
+      "rated": "Rated",
+      "spent": "Spent",
+      "viewAll": "View All Orders"
+    },
+    "menuSubtitle": "Language, theme and account"
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -400,7 +440,7 @@
     "WORKER_PROFILE_EXISTS": "You already have a worker profile.",
     "BUSINESS_PROFILE_EXISTS": "You already have a business profile.",
     "WORKER_PROFILE_NOT_FOUND": "We couldn't find your worker profile.",
-    "BUSINESS_PROFILE_NOT_FOUND": "We couldn't find your business profile.",
+    "BUSINESS_PROFILE_NOT_FOUND": "Shop profile not found.",
     "CLOUDINARY_NOT_CONFIGURED": "Image uploads aren't available right now. Please try again later.",
     "FILE_UPLOAD_ERROR": "One of your photos couldn't be uploaded. Please try a smaller photo.",
     "INVALID_FILE_TYPE": "Please choose a JPEG, PNG, or WEBP image.",
@@ -419,7 +459,17 @@
     "BOOKING_INVALID_STATE": "This booking has already moved on. Please refresh.",
     "BOOKING_TRIP_NOT_ACTIVE": "This trip is no longer active.",
     "BOOKING_PIN_INVALID": "That PIN is not correct.",
-    "BOOKING_PIN_LOCKED": "Too many wrong PIN attempts. Ask the customer to cancel and book again."
+    "BOOKING_PIN_LOCKED": "Too many wrong PIN attempts. Ask the customer to cancel and book again.",
+    "SHOP_NOT_FOUND": "This shop is not available.",
+    "ORDER_NOT_FOUND": "This order could not be found.",
+    "ORDER_INVALID_STATE": "This order has already moved on. Please refresh.",
+    "ORDER_OWN_SHOP": "You cannot order from your own shop.",
+    "ORDER_DELIVERY_UNAVAILABLE": "This shop does not deliver. Choose pickup.",
+    "ORDER_ITEMS_PENDING": "Mark every item packed or not available first.",
+    "ORDER_PRICE_MISSING": "Enter a price for every packed item.",
+    "ORDER_NOTHING_PACKED": "Nothing is packed. Cancel the order instead.",
+    "ORDER_PIN_INVALID": "That PIN is not correct.",
+    "ORDER_PIN_LOCKED": "Too many wrong PIN attempts. Contact the customer."
   },
   "problemForm": {
     "photosLabel": "Photos of the problem (up to 5)",
@@ -502,7 +552,10 @@
     "deletedToast": "Notification deleted",
     "deletedToast_other": "{{count}} notifications deleted",
     "detailTitle": "Notification",
-    "gestureHint": "Swipe left to delete · Long-press to select"
+    "gestureHint": "Swipe left to delete · Long-press to select",
+    "unreadCount_one": "{{count}} unread",
+    "unreadCount_other": "{{count}} unread",
+    "allCaughtUp": "All caught up"
   },
   "homeSearch": {
     "placeholder": "Search workers, shops, services…",
@@ -618,5 +671,144 @@
     "experienceValue_other": "{{count}} yrs",
     "new": "New",
     "workPhotos": "Work photos"
+  },
+  "sendList": {
+    "title": "Send List to a Shop",
+    "subtitle": "The shop packs it and sends you the bill",
+    "yourList_one": "{{count}} item",
+    "yourList_other": "{{count}} items",
+    "more_one": "+ {{count}} more item",
+    "more_other": "+ {{count}} more items",
+    "chooseShop": "Choose a shop",
+    "deliveryFilter": "Delivery",
+    "delivers": "Delivers",
+    "pickupOnly": "Pickup only",
+    "noShops": "No shops match these filters.",
+    "sendTo": "Send to {{shop}}",
+    "pickup": "Pickup",
+    "pickupSub": "Collect at the shop",
+    "delivery": "Delivery",
+    "deliverySub": "To your door · about {{amount}}",
+    "noDelivery": "Not offered by this shop",
+    "notePlaceholder": "Note for the shop (optional)",
+    "send_one": "Send {{count}} item",
+    "send_other": "Send {{count}} items",
+    "sentTitle": "List sent",
+    "sentMessage": "{{shop}} will accept and start packing.",
+    "emptyTitle": "Your list is empty",
+    "emptyMessage": "Save a list in the Prepare List tab first.",
+    "orderFromShop": "Order from this shop",
+    "chooseList": "Choose a list"
+  },
+  "orders": {
+    "title": "Your Order",
+    "status": {
+      "placed": {
+        "title": "List Sent",
+        "message": "Waiting for {{shop}} to accept your list."
+      },
+      "accepted": {
+        "title": "Shop Accepted",
+        "message": "{{shop}} is checking your list."
+      },
+      "preparing": {
+        "title": "Packing Your Order",
+        "message": "{{shop}} is packing your items."
+      },
+      "packed": {
+        "title": "Bill Ready",
+        "message": "{{shop}} packed your order. Check the bill below."
+      },
+      "ready_for_pickup": {
+        "title": "Ready for Pickup",
+        "message": "Collect it at {{shop}} and show your PIN."
+      },
+      "out_for_delivery": {
+        "title": "Out for Delivery",
+        "message": "{{shop}} is bringing your order. Share your PIN when it arrives."
+      },
+      "completed": {
+        "title": "Order Completed",
+        "message": "Thanks for shopping at {{shop}}!"
+      },
+      "cancelled": {
+        "title": "Order Cancelled",
+        "message": "This order was cancelled."
+      },
+      "declined": {
+        "title": "Shop Declined",
+        "message": "{{shop}} could not take this list. Try another shop."
+      },
+      "expired": {
+        "title": "No Reply from Shop",
+        "message": "{{shop}} did not answer in time. Try another shop."
+      }
+    },
+    "step": {
+      "placed": "List sent",
+      "accepted": "Shop accepted",
+      "packed": "Packed — bill ready",
+      "ready_for_pickup": "Ready for pickup",
+      "out_for_delivery": "Out for delivery",
+      "completed": "Completed",
+      "rated": "Rated"
+    },
+    "progress": "Progress",
+    "reason": "Reason: {{reason}}",
+    "pinLabelPickup": "Your Pickup PIN",
+    "pinLabelDelivery": "Your Delivery PIN",
+    "pinHintPickup": "Tell this PIN to the shop when you collect your order.",
+    "pinHintDelivery": "Tell this PIN to the delivery person only when the order reaches you.",
+    "deliveryTo": "Delivery to {{address}}",
+    "yourLocation": "your location",
+    "pickupAtShop": "Pickup at the shop",
+    "directions": "Directions",
+    "yourList_one": "Your list · {{count}} item",
+    "yourList_other": "Your list · {{count}} items",
+    "deliveryChargeNote": "Delivery charge {{amount}} will be added to the bill.",
+    "bill": "Bill",
+    "itemsTotal": "Items total",
+    "deliveryCharge": "Delivery charge",
+    "total": "Total",
+    "payAtHandover": "Pay the shop when you receive your order.",
+    "notAvailable_one": "Not available · {{count}} item",
+    "notAvailable_other": "Not available · {{count}} items",
+    "itemsCount_one": "{{count}} item",
+    "itemsCount_other": "{{count}} items",
+    "cancel": "Cancel Order",
+    "cancelConfirmTitle": "Cancel This Order?",
+    "cancelConfirmMessage": "The shop has not started on it yet, so you can still cancel.",
+    "cancelledToast": "Order cancelled",
+    "rateTitle": "Rate this order",
+    "rateLabel": "Rate {{shop}}",
+    "submitRating": "Submit Rating",
+    "ratedToast": "Thanks for rating!",
+    "yourRating": "Your Rating",
+    "loadFailed": "Could not load this order. Please try again.",
+    "rateStepMessage": "One last step — rate this order to finish it.",
+    "rateNowTitle": "Rate your order",
+    "pickStarsTitle": "Tap the stars to rate",
+    "reviewPlaceholder": "Anything to share? (optional)"
+  },
+  "myOrders": {
+    "title": "My Orders",
+    "subtitle": "Lists you sent to shops",
+    "active": "Active",
+    "history": "History",
+    "emptyActive": "No active orders",
+    "emptyHistory": "No past orders yet",
+    "emptyMessage": "Prepare a list and send it to a nearby shop to pack."
+  },
+  "favorites": {
+    "workersTitle": "Favorite Workers",
+    "shopsTitle": "Favorite Shops",
+    "subtitle": "Saved for quick access",
+    "emptyTitle": "Nothing saved yet",
+    "emptyWorkers": "Tap the heart on a worker’s profile to save them here.",
+    "emptyShops": "Tap the heart on a shop’s profile to save it here.",
+    "save": "Save to favorites",
+    "remove": "Remove from favorites",
+    "savedToast": "Saved to favorites",
+    "removedToast": "Removed from favorites"
   }
 }

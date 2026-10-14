@@ -171,6 +171,18 @@ export class WorkersRepository {
     );
   }
 
+  /** Verified workers by id with their display name, for a customer's favorites list. */
+  async findVerifiedByIds(ids: string[]): Promise<(WorkerProfile & { accountFullName: string })[]> {
+    if (ids.length === 0) return [];
+    const result = await this.pool.query(
+      `SELECT w.*, a.full_name AS account_full_name
+       FROM worker_profiles w JOIN accounts a ON a.id = w.account_id
+       WHERE w.id = ANY($1::uuid[]) AND w.verification_status = 'verified'`,
+      [ids],
+    );
+    return result.rows.map((row) => ({ ...mapWorkerProfile(row), accountFullName: row.account_full_name }));
+  }
+
   async findById(id: string): Promise<WorkerProfileWithAccount | null> {
     const result = await this.pool.query(
       `SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email

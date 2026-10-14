@@ -25,8 +25,10 @@ function mapBusinessProfile(row: QueryResultRow): BusinessProfile {
     pincode: row.pincode,
     shopPhotoUrls: row.shop_photo_urls ?? [],
     deliveryAvailable: row.delivery_available,
-    deliveryPricePerKm: row.delivery_price_per_km,
+    deliveryPricePerKm: row.delivery_price_per_km != null ? Number(row.delivery_price_per_km) : null,
     verificationStatus: row.verification_status,
+    ratingAverage: row.rating_count > 0 ? Math.round((row.rating_sum / row.rating_count) * 10) / 10 : null,
+    ratingCount: row.rating_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -168,6 +170,24 @@ export class BusinessesRepository {
     return { items: rows.rows.map(mapBusinessProfileWithAccount), total, page: filter.page, limit: filter.limit };
   }
 
+  /** Adds one 1–5 star rating to the shop's running total (see migration 0021). */
+  async recordRating(id: string, stars: number): Promise<void> {
+    await this.pool.query(
+      `UPDATE business_profiles SET rating_sum = rating_sum + $2, rating_count = rating_count + 1 WHERE id = $1`,
+      [id, stars],
+    );
+  }
+
+  /** Verified shops by id, for a customer's favorites list. */
+  async findVerifiedByIds(ids: string[]): Promise<BusinessProfile[]> {
+    if (ids.length === 0) return [];
+    const result = await this.pool.query(
+      `SELECT * FROM business_profiles WHERE id = ANY($1::uuid[]) AND verification_status = 'verified'`,
+      [ids],
+    );
+    return result.rows.map(mapBusinessProfile);
+  }
+
   async findById(id: string): Promise<BusinessProfileWithAccount | null> {
     const result = await this.pool.query(
       `SELECT b.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
@@ -191,6 +211,12 @@ export class BusinessesRepository {
   // see that method's own doc comment for the acos() domain-clamp rationale.
   async findNearby(excludeAccountId: string, filter: NearbySearchFilter): Promise<BusinessNearbyResult[]> {
     const like = filter.query ? `%${filter.query}%` : null;
+    // 'rating': best average first (unrated shops last), more ratings then distance breaking ties.
+    const orderBy =
+      filter.sort === 'rating'
+        ? `CASE WHEN sub.rating_count > 0 THEN sub.rating_sum::float / sub.rating_count END DESC NULLS LAST,
+           sub.rating_count DESC, sub.distance_meters ASC`
+        : 'sub.distance_meters ASC';
     const result = await this.pool.query(
       `SELECT * FROM (
          SELECT b.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email,
@@ -205,9 +231,20 @@ export class BusinessesRepository {
        ) sub
        WHERE sub.distance_meters <= $4
          AND ($5::text IS NULL OR sub.shop_name ILIKE $5 OR sub.other_category_description ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.shop_categories, ',') ILIKE $5)
-       ORDER BY sub.distance_meters ASC
+         AND ($7::business_shop_category IS NULL OR $7::business_shop_category = ANY(sub.shop_categories))
+         AND ($8::boolean IS NOT TRUE OR sub.delivery_available)
+       ORDER BY ${orderBy}
        LIMIT $6`,
-      [filter.latitude, filter.longitude, excludeAccountId, filter.radiusKm * 1000, like, filter.limit],
+      [
+        filter.latitude,
+        filter.longitude,
+        excludeAccountId,
+        filter.radiusKm * 1000,
+        like,
+        filter.limit,
+        filter.shopCategory ?? null,
+        filter.deliveryOnly ?? false,
+      ],
     );
     return result.rows.map((row) => ({ ...mapBusinessProfile(row), distanceMeters: Number(row.distance_meters) }));
   }

@@ -17,12 +17,19 @@ import { ToastHost } from './ToastHost';
 import { useBooking, useCancelBooking, useCompleteBooking } from '@/hooks/useBookings';
 import { openBookingTracker, useBookingTrackerStore } from '@/state/bookingTrackerStore';
 import { ensureLocation } from '@/state/locationStore';
-import { BookingRequestStatus, bookingsService, CANCELLABLE_STATUSES, CustomerBooking, TRIP_STATUSES } from '@/services/bookingsService';
+import {
+  BookingRequestStatus,
+  bookingsService,
+  CANCELLABLE_STATUSES,
+  CustomerBooking,
+  TRIP_STATUSES,
+} from '@/services/bookingsService';
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { callPhone, distanceBetween } from '@/utils/tripLinks';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { BlurScope } from './Glass';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -94,7 +101,8 @@ export function BookingTrackingModal() {
     if (!bookingId) return;
     cancelBooking.mutate(bookingId, {
       onSuccess: () => showToast({ variant: 'info', title: t('tracking.cancelledToast') }),
-      onError: (error) => showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) }),
+      onError: (error) =>
+        showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) }),
       onSettled: () => setConfirmCancel(false),
     });
   };
@@ -105,7 +113,8 @@ export function BookingTrackingModal() {
       { id: bookingId, rating, review },
       {
         onSuccess: () => showToast({ variant: 'success', title: t('tracking.finishedToast') }),
-        onError: (error) => showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) }),
+        onError: (error) =>
+          showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) }),
         onSettled: () => setFinishing(false),
       },
     );
@@ -151,7 +160,11 @@ export function BookingTrackingModal() {
 
   const renderStatusBanner = (b: CustomerBooking) => {
     const tone =
-      b.status === 'cancelled' ? brandColors.error : b.status === 'completed' || b.status === 'work_done' ? brandColors.success : colors.primary;
+      b.status === 'cancelled'
+        ? brandColors.error
+        : b.status === 'completed' || b.status === 'work_done'
+          ? brandColors.success
+          : colors.primary;
     return (
       <View style={[styles.banner, { backgroundColor: `${tone}12`, borderColor: `${tone}33` }]}>
         <View style={[styles.bannerIcon, { backgroundColor: tone }]}>
@@ -176,7 +189,10 @@ export function BookingTrackingModal() {
         <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('tracking.pinLabel')}</Text>
         <View style={styles.pinRow}>
           {b.arrivalPin.split('').map((digit, index) => (
-            <View key={index} style={[styles.pinDigit, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}40` }]}>
+            <View
+              key={index}
+              style={[styles.pinDigit, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}40` }]}
+            >
               <Text style={[styles.pinDigitText, { color: colors.primary }]}>{digit}</Text>
             </View>
           ))}
@@ -223,7 +239,9 @@ export function BookingTrackingModal() {
               <View
                 style={[
                   styles.stepDot,
-                  done ? { backgroundColor: brandColors.success, borderColor: brandColors.success } : { borderColor: colors.border },
+                  done
+                    ? { backgroundColor: brandColors.success, borderColor: brandColors.success }
+                    : { borderColor: colors.border },
                 ]}
               >
                 {done ? <FontAwesome6 name="check" size={9} color="#FFFFFF" solid /> : null}
@@ -231,7 +249,9 @@ export function BookingTrackingModal() {
               {!last ? <View style={[styles.stepLine, { backgroundColor: done ? brandColors.success : colors.border }]} /> : null}
             </View>
             <View style={styles.stepText}>
-              <Text style={[styles.stepTitle, { color: done ? colors.text : colors.textMuted }]}>{t(`tracking.step.${step.key}`)}</Text>
+              <Text style={[styles.stepTitle, { color: done ? colors.text : colors.textMuted }]}>
+                {t(`tracking.step.${step.key}`)}
+              </Text>
               {at ? <Text style={[styles.stepTime, { color: colors.textMuted }]}>{formatTime(at)}</Text> : null}
             </View>
           </View>
@@ -265,7 +285,13 @@ export function BookingTrackingModal() {
         <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('tracking.yourRating')}</Text>
         <View style={styles.starsRow}>
           {[1, 2, 3, 4, 5].map((star) => (
-            <FontAwesome6 key={star} name="star" size={18} color={star <= (b.workerRating ?? 0) ? STAR_COLOR : colors.border} solid />
+            <FontAwesome6
+              key={star}
+              name="star"
+              size={18}
+              color={star <= (b.workerRating ?? 0) ? STAR_COLOR : colors.border}
+              solid
+            />
           ))}
         </View>
         {b.workerReview ? <Text style={[styles.review, { color: colors.text }]}>“{b.workerReview}”</Text> : null}
@@ -301,7 +327,15 @@ export function BookingTrackingModal() {
           <Text style={[styles.searchTitle, { color: colors.text }]}>{t('quickBook.searchingTitle')}</Text>
           <Text style={[styles.searchMessage, { color: colors.textMuted }]}>{t('quickBook.searchingMessage')}</Text>
           <Text style={[styles.searchSkills, { color: colors.primary }]}>{skillLabels}</Text>
-          <Pressable style={styles.cancelLink} onPress={() => setConfirmCancel(true)} hitSlop={8}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.cancelLink,
+              { backgroundColor: `${brandColors.error}${pressed ? '24' : '12'}`, borderColor: `${brandColors.error}59` },
+            ]}
+            onPress={() => setConfirmCancel(true)}
+            hitSlop={8}
+          >
+            <FontAwesome6 name="xmark" size={13} color={brandColors.error} solid />
             <Text style={[styles.cancelLinkText, { color: brandColors.error }]}>{t('tracking.cancelBooking')}</Text>
           </Pressable>
         </View>
@@ -344,7 +378,15 @@ export function BookingTrackingModal() {
           {renderLocation(booking)}
           {booking.status !== 'cancelled' ? renderSteps(booking) : null}
           {canCancel ? (
-            <Pressable style={styles.cancelLink} onPress={() => setConfirmCancel(true)} hitSlop={8}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.cancelLink,
+                { backgroundColor: `${brandColors.error}${pressed ? '24' : '12'}`, borderColor: `${brandColors.error}59` },
+              ]}
+              onPress={() => setConfirmCancel(true)}
+              hitSlop={8}
+            >
+              <FontAwesome6 name="xmark" size={13} color={brandColors.error} solid />
               <Text style={[styles.cancelLinkText, { color: brandColors.error }]}>{t('tracking.cancelBooking')}</Text>
             </Pressable>
           ) : null}
@@ -357,50 +399,52 @@ export function BookingTrackingModal() {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient
-          colors={headerGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.header, { paddingTop: insets.top + 14 }]}
-        >
-          <View style={styles.headerRow}>
-            <Pressable style={styles.backButton} onPress={close} accessibilityLabel={t('common.close')} hitSlop={8}>
-              <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
-            </Pressable>
-            <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {title}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {t('tracking.subtitle', { skills: skillLabels })}
-              </Text>
+      <BlurScope style={StyleSheet.absoluteFill}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <LinearGradient
+            colors={headerGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.header, { paddingTop: insets.top + 14 }]}
+          >
+            <View style={styles.headerRow}>
+              <Pressable style={styles.backButton} onPress={close} accessibilityLabel={t('common.close')} hitSlop={8}>
+                <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
+              </Pressable>
+              <View style={styles.titleGroup}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  {title}
+                </Text>
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  {t('tracking.subtitle', { skills: skillLabels })}
+                </Text>
+              </View>
             </View>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
 
-        {renderBody()}
-        <ToastHost />
-      </View>
+          {renderBody()}
+          <ToastHost />
+        </View>
 
-      <ConfirmModal
-        visible={confirmCancel}
-        icon="ban"
-        gradient={CANCEL_GRADIENT}
-        title={t('tracking.cancelConfirmTitle')}
-        message={t('tracking.cancelConfirmMessage')}
-        confirmLabel={t('tracking.cancelBooking')}
-        loading={cancelBooking.isPending}
-        onConfirm={handleCancel}
-        onCancel={() => setConfirmCancel(false)}
-      />
-      <FinishJobModal
-        visible={finishing}
-        workerName={booking?.worker?.fullName ?? null}
-        loading={completeBooking.isPending}
-        onConfirm={handleFinish}
-        onCancel={() => setFinishing(false)}
-      />
+        <ConfirmModal
+          visible={confirmCancel}
+          icon="ban"
+          gradient={CANCEL_GRADIENT}
+          title={t('tracking.cancelConfirmTitle')}
+          message={t('tracking.cancelConfirmMessage')}
+          confirmLabel={t('tracking.cancelBooking')}
+          loading={cancelBooking.isPending}
+          onConfirm={handleCancel}
+          onCancel={() => setConfirmCancel(false)}
+        />
+        <FinishJobModal
+          visible={finishing}
+          workerName={booking?.worker?.fullName ?? null}
+          loading={completeBooking.isPending}
+          onConfirm={handleFinish}
+          onCancel={() => setFinishing(false)}
+        />
+      </BlurScope>
     </Modal>
   );
 }
@@ -458,6 +502,18 @@ const styles = StyleSheet.create({
   stepText: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 14 },
   stepTitle: { ...typography.body, fontSize: 13, fontFamily: fonts.medium },
   stepTime: { ...typography.caption, fontSize: 11 },
-  cancelLink: { alignSelf: 'center', paddingVertical: 10, marginTop: 4 },
+  // A soft red pill, so cancelling is easy to find without competing with the main action.
+  cancelLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    alignSelf: 'center',
+    height: 44,
+    paddingHorizontal: 24,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    marginTop: 14,
+  },
   cancelLinkText: { ...typography.body, fontFamily: fonts.semiBold },
 });

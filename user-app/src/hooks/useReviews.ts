@@ -21,3 +21,21 @@ export function useMyReviews(enabled: boolean) {
     staleTime: STALE_MS,
   });
 }
+
+export function useBusinessReviews(businessId: string | null) {
+  return useQuery({
+    queryKey: ['reviews', 'business', businessId],
+    queryFn: () => reviewsService.getForBusiness(businessId as string),
+    enabled: businessId !== null,
+    staleTime: STALE_MS,
+  });
+}
+
+export function useMyShopReviews(enabled: boolean) {
+  return useQuery({
+    queryKey: ['reviews', 'my-shop'],
+    queryFn: reviewsService.getMyShop,
+    enabled,
+    staleTime: STALE_MS,
+  });
+}

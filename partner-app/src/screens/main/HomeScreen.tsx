@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
@@ -7,6 +7,7 @@ import { Button } from '@/components/Button';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { ProblemDetailModal } from '@/components/ProblemDetailModal';
+import { ShopHomeSection } from '@/components/ShopHomeSection';
 import { useQueryClient } from '@tanstack/react-query';
 import { openJob } from '@/state/jobFocusStore';
 import { jobQueryKey } from '@/hooks/useJobs';
@@ -15,11 +16,14 @@ import { colors as brandColors, fonts, typography, useThemeColors } from '@/them
 import { useAuthStore } from '@/state/authStore';
 import { showToast } from '@/state/toastStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
+import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { useShopOrders } from '@/hooks/useShopOrders';
 import { useAcceptProblem, useAssignedProblems, useMarkWorkDone, useNearbyProblems } from '@/hooks/useProblems';
 import { AssignedProblem, NearbyProblem } from '@/services/problemsService';
 import { ApiError } from '@/services/apiClient';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistance } from '@/utils/formatDistance';
+import { PullToRefresh } from '@/components/PullToRefresh';
 
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const FINISHED_PREVIEW_LIMIT = 5;
@@ -41,6 +45,19 @@ export function HomeScreen() {
   const account = useAuthStore((state) => state.account);
   const workerProfile = useMyWorkerProfile();
   const isVerifiedWorker = workerProfile.data?.verificationStatus === 'verified';
+  const businessProfile = useMyBusinessProfile();
+  const isVerifiedShop = businessProfile.data?.verificationStatus === 'verified';
+  const shopOrders = useShopOrders(isVerifiedShop);
+  const newOrderCount = (shopOrders.data ?? []).filter((order) => order.status === 'placed').length;
+  // A partner with both a worker and a shop profile switches Home between them. Until they
+  // pick, it shows the shop when an order is waiting, otherwise their worker jobs.
+  const [pickedSide, setPickedSide] = useState<'shop' | 'worker' | null>(null);
+  const isDual = isVerifiedWorker && isVerifiedShop;
+  const side: 'shop' | 'worker' = isDual
+    ? (pickedSide ?? (newOrderCount > 0 ? 'shop' : 'worker'))
+    : isVerifiedShop
+      ? 'shop'
+      : 'worker';
   const nearby = useNearbyProblems(isVerifiedWorker);
   const assigned = useAssignedProblems(isVerifiedWorker);
   const acceptProblem = useAcceptProblem();
@@ -66,7 +83,9 @@ export function HomeScreen() {
         }
         // Straight into the job screen (map, customer, Start Trip): load it first so it
         // opens filled in, open it on top, then close the detail screen underneath.
-        await queryClient.prefetchQuery({ queryKey: jobQueryKey(tripId), queryFn: () => jobsService.get(tripId) }).catch(() => {});
+        await queryClient
+          .prefetchQuery({ queryKey: jobQueryKey(tripId), queryFn: () => jobsService.get(tripId) })
+          .catch(() => {});
         openJob(tripId);
         setTimeout(() => setDetailProblem(null), MODAL_HANDOFF_MS);
       },
@@ -85,7 +104,8 @@ export function HomeScreen() {
   const handleConfirmDone = () => {
     if (!confirmDoneFor) return;
     markWorkDone.mutate(confirmDoneFor.id, {
-      onSuccess: () => showToast({ variant: 'success', title: t('problems.workDoneTitle'), message: t('problems.workDoneMessage') }),
+      onSuccess: () =>
+        showToast({ variant: 'success', title: t('problems.workDoneTitle'), message: t('problems.workDoneMessage') }),
       onError: (err) => showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(err, t) }),
       onSettled: () => setConfirmDoneFor(null),
     });
@@ -97,7 +117,12 @@ export function HomeScreen() {
 
   const renderPhotos = (photoUrls: string[], onPress?: () => void) =>
     photoUrls.length > 0 ? (
-      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} horizontal contentContainerStyle={styles.photoRow}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+        horizontal
+        contentContainerStyle={styles.photoRow}
+      >
         {photoUrls.map((url) => (
           <Pressable key={url} onPress={onPress} disabled={!onPress}>
             <Image source={{ uri: url }} style={styles.photo} />
@@ -128,7 +153,8 @@ export function HomeScreen() {
     // Jobs accepted since problems became trips are worked from the job screen (map, PIN,
     // work done); older ones keep their original Mark Work Done button below.
     const isWorkDone = tripId ? job.bookingStatus === 'work_done' : job.status === 'work_done';
-    const statusLabel = tripId && job.bookingStatus ? t(`job.status.${job.bookingStatus}.title`) : t(`problems.status.${job.status}`);
+    const statusLabel =
+      tripId && job.bookingStatus ? t(`job.status.${job.bookingStatus}.title`) : t(`problems.status.${job.status}`);
     return (
       <Pressable
         key={job.id}
@@ -180,7 +206,10 @@ export function HomeScreen() {
     <Pressable
       key={problem.id}
       onPress={() => setDetailProblem(problem)}
-      style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.92 : 1 }]}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.92 : 1 },
+      ]}
     >
       <View style={styles.cardHeader}>
         <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
@@ -292,9 +321,11 @@ export function HomeScreen() {
     );
   };
 
-  const refreshing = nearby.isRefetching || assigned.isRefetching || workerProfile.isRefetching;
+  const refreshing = nearby.isRefetching || assigned.isRefetching || workerProfile.isRefetching || shopOrders.isRefetching;
   const onRefresh = () => {
     workerProfile.refetch();
+    businessProfile.refetch();
+    if (isVerifiedShop) shopOrders.refetch();
     if (isVerifiedWorker) {
       nearby.refetch();
       assigned.refetch();
@@ -303,24 +334,65 @@ export function HomeScreen() {
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.body}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-      >
-        {account ? (
-          <Text style={[styles.greeting, { color: colors.text }]}>{t('mainTabs.Home.greeting', { name: account.fullName })}</Text>
-        ) : null}
+      <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.body}
+        >
+          {account ? (
+            <Text style={[styles.greeting, { color: colors.text }]}>
+              {t('mainTabs.Home.greeting', { name: account.fullName })}
+            </Text>
+          ) : null}
 
-        {workerProfile.isLoading ? (
-          <View style={styles.loading}>
-            <LoadingIndicator size={36} dotSize={5} color={colors.primary} />
-          </View>
-        ) : isVerifiedWorker ? (
-          renderWorkerBody()
-        ) : (
-          renderEmpty('screwdriver-wrench', t('problems.workersOnlyTitle'), t('problems.workersOnlyMessage'))
-        )}
-      </ScrollView>
+          {workerProfile.isLoading ? (
+            <View style={styles.loading}>
+              <LoadingIndicator size={36} dotSize={5} color={colors.primary} />
+            </View>
+          ) : null}
+
+          {isDual ? (
+            <View style={[styles.sideSwitch, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              {(['shop', 'worker'] as const).map((value) => {
+                const active = side === value;
+                return (
+                  <Pressable
+                    key={value}
+                    onPress={() => setPickedSide(value)}
+                    style={[styles.sideOption, active ? { backgroundColor: colors.primary } : null]}
+                  >
+                    <FontAwesome6
+                      name={value === 'shop' ? 'store' : 'screwdriver-wrench'}
+                      size={12}
+                      color={active ? '#FFFFFF' : colors.textMuted}
+                      solid
+                    />
+                    <Text style={[styles.sideText, { color: active ? '#FFFFFF' : colors.textMuted }]}>
+                      {t(value === 'shop' ? 'shopHome.myShop' : 'shopHome.myServices')}
+                    </Text>
+                    {value === 'shop' && newOrderCount > 0 ? (
+                      <View style={[styles.sideBadge, { backgroundColor: active ? '#FFFFFF' : brandColors.error }]}>
+                        <Text style={[styles.sideBadgeText, { color: active ? brandColors.error : '#FFFFFF' }]}>
+                          {newOrderCount > 9 ? '9+' : newOrderCount}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+
+          {workerProfile.isLoading ? null : side === 'shop' && isVerifiedShop && businessProfile.data ? (
+            <ShopHomeSection profile={businessProfile.data} />
+          ) : isVerifiedWorker ? (
+            renderWorkerBody()
+          ) : (
+            renderEmpty('screwdriver-wrench', t('problems.workersOnlyTitle'), t('problems.workersOnlyMessage'))
+          )}
+        </ScrollView>
+      </PullToRefresh>
 
       <ProblemDetailModal
         problem={detailProblem}
@@ -347,14 +419,35 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   // Extra bottom padding clears the floating CustomTabBar.
   body: { paddingBottom: 120 },
-  greeting: { ...typography.heading, fontFamily: fonts.semiBold, fontSize: 19, marginBottom: 6 },
-  sectionTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginTop: 18, marginBottom: 12 },
+  greeting: { ...typography.heading, fontFamily: fonts.semiBold, fontSize: 19, marginBottom: 10 },
+  sideSwitch: { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 3, marginBottom: 14, gap: 4 },
+  sideOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  sideText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
+  sideBadge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+  sideBadgeText: { fontSize: 10, fontFamily: fonts.semiBold },
+  // Same spacing for every section title in this app: 22 above, 12 below.
+  sectionTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginTop: 22, marginBottom: 12 },
   loading: { paddingVertical: 48, alignItems: 'center' },
   card: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 14 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardTitle: { ...typography.body, fontFamily: fonts.semiBold, flex: 1 },
   quotation: { ...typography.heading, fontFamily: fonts.semiBold, fontSize: 22, marginTop: 6 },
-  distancePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  distancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
   distanceText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 13 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
   pillDot: { width: 6, height: 6, borderRadius: 3 },
@@ -374,7 +467,15 @@ const styles = StyleSheet.create({
   customerPhone: { ...typography.caption },
   callButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   waitingText: { ...typography.body, fontFamily: fonts.medium, textAlign: 'center', paddingVertical: 8 },
-  finishedRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
+  finishedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 10,
+  },
   finishedInfo: { flex: 1 },
   finishedTitle: { ...typography.body, fontFamily: fonts.medium, fontSize: 13 },
   emptyCard: { borderRadius: 16, borderWidth: 1, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', gap: 8 },

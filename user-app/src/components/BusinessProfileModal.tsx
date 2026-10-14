@@ -10,11 +10,7 @@ import { ImagePickerField, PickedImage } from './ImagePickerField';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { fonts, typography, useThemeColors } from '@/theme';
-import {
-  useCreateBusinessProfile,
-  useDeleteBusinessProfile,
-  useUpdateBusinessProfile,
-} from '@/hooks/useBusinessMutations';
+import { useCreateBusinessProfile, useDeleteBusinessProfile, useUpdateBusinessProfile } from '@/hooks/useBusinessMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { BusinessProfile } from '@/services/businessesService';
@@ -22,7 +18,7 @@ import { BusinessProfile } from '@/services/businessesService';
 export const SHOP_GRADIENT = ['#F59E0B', '#D97706'] as const;
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
-const SHOP_CATEGORIES = [
+export const SHOP_CATEGORIES = [
   { key: 'grocery', icon: 'basket-shopping' as const },
   { key: 'restaurant', icon: 'utensils' as const },
   { key: 'pharmacy', icon: 'pills' as const },
@@ -199,7 +195,11 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
         {
           onSuccess: () => {
             resetAndClose();
-            showToast({ variant: 'success', title: t('businessProfile.successTitle'), message: t('businessProfile.successMessage') });
+            showToast({
+              variant: 'success',
+              title: t('businessProfile.successTitle'),
+              message: t('businessProfile.successMessage'),
+            });
           },
           onError: handleMutationError,
         },
@@ -325,7 +325,12 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
                   disabled={!otherInputValue.trim()}
                   accessibilityLabel={t('common.done')}
                 >
-                  <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
+                  <LinearGradient
+                    colors={SHOP_GRADIENT}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.otherDoneGradient}
+                  >
                     <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
                   </LinearGradient>
                 </Pressable>

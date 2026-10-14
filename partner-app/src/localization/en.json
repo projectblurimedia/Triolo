@@ -56,7 +56,9 @@
     "title": "My Info"
   },
   "settingsMenu": {
-    "title": "Settings"
+    "title": "Settings",
+    "subtitle": "Language, theme and account",
+    "section": "App Settings"
   },
   "notifications": {
     "title": "Notifications",
@@ -78,7 +80,10 @@
     "deletedToast": "Notification deleted",
     "deletedToast_other": "{{count}} notifications deleted",
     "detailTitle": "Notification",
-    "gestureHint": "Swipe left to delete · Long-press to select"
+    "gestureHint": "Swipe left to delete · Long-press to select",
+    "unreadCount_one": "{{count}} unread",
+    "unreadCount_other": "{{count}} unread",
+    "allCaughtUp": "All caught up"
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -136,7 +141,9 @@
     "emptyActiveTitle": "No Active Jobs",
     "emptyActiveMessage": "Jobs you accept show up here until they are finished.",
     "emptyHistoryTitle": "No Past Jobs Yet",
-    "emptyHistoryMessage": "Finished and cancelled jobs, with customer ratings, will appear here."
+    "emptyHistoryMessage": "Finished and cancelled jobs, with customer ratings, will appear here.",
+    "shopOrders": "Shop Orders",
+    "serviceJobs": "Service Jobs"
   },
   "location": {
     "useCurrent": "Use My Current Location",
@@ -256,7 +263,7 @@
     "WORKER_PROFILE_EXISTS": "You already have a worker profile.",
     "BUSINESS_PROFILE_EXISTS": "You already have a business profile.",
     "WORKER_PROFILE_NOT_FOUND": "We couldn't find your worker profile.",
-    "BUSINESS_PROFILE_NOT_FOUND": "We couldn't find your business profile.",
+    "BUSINESS_PROFILE_NOT_FOUND": "Shop profile not found.",
     "CLOUDINARY_NOT_CONFIGURED": "Image uploads aren't available right now. Please try again later.",
     "FILE_UPLOAD_ERROR": "One of your photos couldn't be uploaded. Please try a smaller photo.",
     "INVALID_FILE_TYPE": "Please choose a JPEG, PNG, or WEBP image.",
@@ -274,7 +281,17 @@
     "BOOKING_INVALID_STATE": "This booking has already moved on. Please refresh.",
     "BOOKING_TRIP_NOT_ACTIVE": "This trip is no longer active.",
     "BOOKING_PIN_INVALID": "That PIN is not correct.",
-    "BOOKING_PIN_LOCKED": "Too many wrong PIN attempts. Ask the customer to cancel and book again."
+    "BOOKING_PIN_LOCKED": "Too many wrong PIN attempts. Ask the customer to cancel and book again.",
+    "SHOP_NOT_FOUND": "This shop is not available.",
+    "ORDER_NOT_FOUND": "This order could not be found.",
+    "ORDER_INVALID_STATE": "This order has already moved on. Please refresh.",
+    "ORDER_OWN_SHOP": "You cannot order from your own shop.",
+    "ORDER_DELIVERY_UNAVAILABLE": "This shop does not deliver. Choose pickup.",
+    "ORDER_ITEMS_PENDING": "Mark every item packed or not available first.",
+    "ORDER_PRICE_MISSING": "Enter a price for every packed item.",
+    "ORDER_NOTHING_PACKED": "Nothing is packed. Cancel the order instead.",
+    "ORDER_PIN_INVALID": "That PIN is not correct.",
+    "ORDER_PIN_LOCKED": "Too many wrong PIN attempts. Contact the customer."
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -411,5 +428,135 @@
     "viewDetails": "View photos & details",
     "openJob": "Open Job",
     "viewProblem": "Photos & details"
+  },
+  "shopOrders": {
+    "title": "Order",
+    "status": {
+      "placed": {
+        "title": "New Order",
+        "message": "{{name}} sent a list. Accept it to start packing."
+      },
+      "accepted": {
+        "title": "Accepted",
+        "message": "Mark each item packed (with its price) or not available."
+      },
+      "preparing": {
+        "title": "Packing",
+        "message": "Finish marking every item, then send the bill."
+      },
+      "packed": {
+        "title": "Bill Sent",
+        "message": "Hand the order over when it is ready."
+      },
+      "ready_for_pickup": {
+        "title": "Ready for Pickup",
+        "message": "Ask {{name}} for the 4-digit PIN when they collect it."
+      },
+      "out_for_delivery": {
+        "title": "Out for Delivery",
+        "message": "Ask {{name}} for the 4-digit PIN on delivery."
+      },
+      "completed": {
+        "title": "Completed",
+        "message": "Order handed over to {{name}}."
+      },
+      "cancelled": {
+        "title": "Cancelled",
+        "message": "This order was cancelled."
+      },
+      "declined": {
+        "title": "Declined",
+        "message": "You declined this list."
+      },
+      "expired": {
+        "title": "Expired",
+        "message": "This list was not accepted in time."
+      }
+    },
+    "tab": {
+      "new": "New",
+      "active": "Active",
+      "history": "History"
+    },
+    "empty": {
+      "new": "No new orders",
+      "active": "No orders in progress",
+      "history": "No past orders yet"
+    },
+    "emptyMessage": "Customers send their shopping lists here. You get a notification for each new one.",
+    "itemsCount_one": "{{count}} item",
+    "itemsCount_other": "{{count}} items",
+    "pickup": "Pickup",
+    "delivery": "Delivery",
+    "customer": "Customer",
+    "customerLocation": "the customer’s location",
+    "deliverTo": "Deliver to {{address}} · {{distance}}",
+    "pickupFromShop": "Customer collects from your shop",
+    "directions": "Directions",
+    "list_one": "List · {{count}} item",
+    "list_other": "List · {{count}} items",
+    "accept": "Accept & Start Packing",
+    "decline": "Decline",
+    "acceptedTitle": "Order accepted",
+    "declineConfirmTitle": "Decline This List?",
+    "declineConfirmMessage": "The customer will be told to try another shop.",
+    "declinedToast": "Order declined",
+    "packedCount": "Packed",
+    "checklistHint": "Tick each item you packed and enter its price. Items left unticked go to the customer as not available.",
+    "price": "Price",
+    "itemsTotal": "Items total",
+    "deliveryCharge": "Delivery charge",
+    "total": "Total",
+    "sendBill": "Send Bill",
+    "priceNeededTitle": "Price missing",
+    "priceNeededMessage": "Enter a price for every packed item.",
+    "nothingPackedTitle": "Nothing packed",
+    "nothingPackedMessage": "If you have none of the items, cancel the order instead.",
+    "billSentTitle": "Bill sent",
+    "billSentMessage": "The customer can see the bill and the items you didn’t have.",
+    "bill": "Bill",
+    "notAvailableList_one": "Not available · {{count}} item",
+    "notAvailableList_other": "Not available · {{count}} items",
+    "readyForPickup": "Ready for Pickup",
+    "outForDelivery": "Out for Delivery",
+    "handedOverTitle": "The customer got their PIN",
+    "pinTitle": "Customer PIN",
+    "pinHintPickup": "Ask the customer for the 4-digit PIN in their app.",
+    "pinHintDelivery": "Ask for the 4-digit PIN when you hand over the order.",
+    "verifyPin": "Verify & Complete",
+    "pinWrong_one": "Wrong PIN. {{count}} attempt left.",
+    "pinWrong_other": "Wrong PIN. {{count}} attempts left.",
+    "completedTitle": "Order completed",
+    "completedMessage": "The customer can now rate your shop.",
+    "customerFeedback": "Customer Feedback",
+    "noRatingYet": "The customer has not rated this order yet.",
+    "cancelOrder": "Cancel Order",
+    "cancelConfirmTitle": "Cancel This Order?",
+    "cancelConfirmMessage": "The customer will be told the order was cancelled.",
+    "cancelledToast": "Order cancelled",
+    "changedTitle": "Order updated",
+    "changedMessage": "This order changed. Showing the latest status.",
+    "loadFailed": "Could not load this order. Please try again.",
+    "shopReviewsTitle": "{{shop}} · Ratings & Reviews",
+    "notPacked": "Not packed",
+    "notPackedCount": "Not packed",
+    "packingDone": "Packing Done",
+    "confirmBillTitle": "Send the bill?",
+    "confirmBillMessage": "{{packed}} packed · {{notPacked}} not packed · Total {{total}}. The customer will see the bill and the items you did not have."
+  },
+  "shopHome": {
+    "myShop": "My Shop",
+    "noRatings": "No ratings yet",
+    "delivers": "Delivers · ₹{{price}}/km",
+    "pickupOnly": "Pickup only",
+    "statNew": "New orders",
+    "statActive": "In progress",
+    "statToday": "Earned today",
+    "newOrders": "New Orders ({{count}})",
+    "inProgress": "In Progress ({{count}})",
+    "noOrdersTitle": "No orders right now",
+    "noOrdersMessage": "New orders from nearby customers show up here — you will also get a notification.",
+    "allOrders": "All Shop Orders",
+    "myServices": "My Services"
   }
 }

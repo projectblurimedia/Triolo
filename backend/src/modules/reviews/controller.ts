@@ -23,4 +23,18 @@ export class ReviewsController {
     }
     return ok(res, await this.service.getForMe(req.account.accountId));
   });
+
+  getForBusiness = asyncHandler(async (req: Request, res: Response) => {
+    if (!UUID_PATTERN.test(req.params.businessId)) {
+      throw AppError.notFound('Shop not found.', 'SHOP_NOT_FOUND');
+    }
+    return ok(res, await this.service.getForBusiness(req.params.businessId));
+  });
+
+  getForMyShop = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    return ok(res, await this.service.getForMyShop(req.account.accountId));
+  });
 }

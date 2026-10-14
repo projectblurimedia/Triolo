@@ -267,11 +267,7 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
             ))}
             <Pressable onPress={() => setShowOtherInput(true)}>
               <View
-                style={[
-                  styles.chip,
-                  styles.addNewChip,
-                  { borderColor: colors.primary, backgroundColor: `${colors.primary}16` },
-                ]}
+                style={[styles.chip, styles.addNewChip, { borderColor: colors.primary, backgroundColor: `${colors.primary}16` }]}
               >
                 <View style={[styles.addNewBadge, { backgroundColor: colors.primary }]}>
                   <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
@@ -304,7 +300,12 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
                   disabled={!otherInputValue.trim()}
                   accessibilityLabel={t('common.done')}
                 >
-                  <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
+                  <LinearGradient
+                    colors={headerGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.otherDoneGradient}
+                  >
                     <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
                   </LinearGradient>
                 </Pressable>

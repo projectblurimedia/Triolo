@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FlatList, Image, Linking, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,8 @@ import { useCompleteProblem, useDeleteProblem, useMyProblems } from '@/hooks/use
 import { showToast } from '@/state/toastStore';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
+import { BlurScope } from './Glass';
+import { PullToRefresh } from './PullToRefresh';
 
 interface YourProblemsModalProps {
   visible: boolean;
@@ -81,12 +83,15 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
 
   const confirmFinished = (rating: number, review: string) => {
     if (!finishingProblem) return;
-    completeProblem.mutate({ postId: finishingProblem.id, rating, review }, {
-      onSuccess: () => showToast({ variant: 'success', title: t('yourProblems.finishedToastTitle') }),
-      onError: (error) =>
-        showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) }),
-      onSettled: () => setFinishingProblem(null),
-    });
+    completeProblem.mutate(
+      { postId: finishingProblem.id, rating, review },
+      {
+        onSuccess: () => showToast({ variant: 'success', title: t('yourProblems.finishedToastTitle') }),
+        onError: (error) =>
+          showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) }),
+        onSettled: () => setFinishingProblem(null),
+      },
+    );
   };
 
   const statusColorFor = (status: ProblemStatus): string => {
@@ -189,7 +194,8 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
               </Text>
               <View style={[styles.statusPill, { backgroundColor: `${statusColor}1A` }]}>
                 <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                <Text style={[styles.statusText, { color: statusColor }]}>{item.bookingStatus && item.status !== 'completed'
+                <Text style={[styles.statusText, { color: statusColor }]}>
+                  {item.bookingStatus && item.status !== 'completed'
                     ? t(`tracking.status.${item.bookingStatus}.title`)
                     : t(`yourProblems.status.${item.status}`)}
                 </Text>
@@ -226,7 +232,13 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
           <View style={styles.yourRating}>
             <Text style={[styles.yourRatingLabel, { color: colors.textMuted }]}>{t('yourProblems.yourRating')}</Text>
             {[1, 2, 3, 4, 5].map((star) => (
-              <FontAwesome6 key={star} name="star" size={12} color={star <= (item.workerRating ?? 0) ? STAR_COLOR : colors.border} solid />
+              <FontAwesome6
+                key={star}
+                name="star"
+                size={12}
+                color={star <= (item.workerRating ?? 0) ? STAR_COLOR : colors.border}
+                solid
+              />
             ))}
           </View>
         ) : null}
@@ -252,9 +264,7 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
       return (
         <View style={styles.centerBody}>
           <Text style={[styles.stateTitle, { color: colors.text }]}>{t('yourProblems.loadFailedTitle')}</Text>
-          <Text style={[styles.stateMessage, { color: colors.textMuted }]}>
-            {getLocalizedErrorMessage(problems.error, t)}
-          </Text>
+          <Text style={[styles.stateMessage, { color: colors.textMuted }]}>{getLocalizedErrorMessage(problems.error, t)}</Text>
           <View style={styles.retryWrap}>
             <Button label={t('common.retry')} onPress={() => problems.refetch()} />
           </View>
@@ -262,81 +272,82 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
       );
     }
     return (
-      <FlatList
-        data={problems.data ?? []}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={problems.isRefetching} onRefresh={() => problems.refetch()} tintColor={colors.primary} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyBody}>
-            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyIcon}>
-              <FontAwesome6 name="clipboard-list" size={28} color="#FFFFFF" solid />
-            </LinearGradient>
-            <Text style={[styles.stateTitle, { color: colors.text }]}>{t('yourProblems.emptyTitle')}</Text>
-            <Text style={[styles.stateMessage, { color: colors.textMuted }]}>{t('yourProblems.emptyMessage')}</Text>
-          </View>
-        }
-      />
+      <PullToRefresh refreshing={problems.isRefetching} onRefresh={() => problems.refetch()}>
+        <FlatList
+          data={problems.data ?? []}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyBody}>
+              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyIcon}>
+                <FontAwesome6 name="clipboard-list" size={28} color="#FFFFFF" solid />
+              </LinearGradient>
+              <Text style={[styles.stateTitle, { color: colors.text }]}>{t('yourProblems.emptyTitle')}</Text>
+              <Text style={[styles.stateMessage, { color: colors.textMuted }]}>{t('yourProblems.emptyMessage')}</Text>
+            </View>
+          }
+        />
+      </PullToRefresh>
     );
   };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient
-          colors={headerGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.header, { paddingTop: insets.top + 14 }]}
-        >
-          <View style={styles.headerRow}>
-            <Pressable style={styles.backButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
-              <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
-            </Pressable>
-            <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {t('yourProblems.title')}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {t('yourProblems.subtitle')}
-              </Text>
+      <BlurScope style={StyleSheet.absoluteFill}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <LinearGradient
+            colors={headerGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.header, { paddingTop: insets.top + 14 }]}
+          >
+            <View style={styles.headerRow}>
+              <Pressable style={styles.backButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
+                <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
+              </Pressable>
+              <View style={styles.titleGroup}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  {t('yourProblems.title')}
+                </Text>
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  {t('yourProblems.subtitle')}
+                </Text>
+              </View>
             </View>
+          </LinearGradient>
+
+          {renderBody()}
+
+          <View style={[styles.addWrap, { borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
+            <Button label={t('yourProblems.addNew')} onPress={openAdd} />
           </View>
-        </LinearGradient>
 
-        {renderBody()}
-
-        <View style={[styles.addWrap, { borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
-          <Button label={t('yourProblems.addNew')} onPress={openAdd} />
+          <ToastHost />
         </View>
 
-        <ToastHost />
-      </View>
+        <ProblemFormModal visible={formVisible} onClose={() => setFormVisible(false)} problem={editingProblem} />
 
-      <ProblemFormModal visible={formVisible} onClose={() => setFormVisible(false)} problem={editingProblem} />
+        <ConfirmModal
+          visible={deletingProblem !== null}
+          icon="trash"
+          gradient={DELETE_GRADIENT}
+          title={t('yourProblems.deleteConfirmTitle')}
+          message={t('yourProblems.deleteConfirmMessage')}
+          confirmLabel={t('common.delete')}
+          loading={deleteProblem.isPending}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeletingProblem(null)}
+        />
 
-      <ConfirmModal
-        visible={deletingProblem !== null}
-        icon="trash"
-        gradient={DELETE_GRADIENT}
-        title={t('yourProblems.deleteConfirmTitle')}
-        message={t('yourProblems.deleteConfirmMessage')}
-        confirmLabel={t('common.delete')}
-        loading={deleteProblem.isPending}
-        onConfirm={confirmDelete}
-        onCancel={() => setDeletingProblem(null)}
-      />
-
-      <FinishJobModal
-        visible={finishingProblem !== null}
-        workerName={finishingProblem?.acceptedWorkerFullName ?? null}
-        loading={completeProblem.isPending}
-        onConfirm={confirmFinished}
-        onCancel={() => setFinishingProblem(null)}
-      />
+        <FinishJobModal
+          visible={finishingProblem !== null}
+          workerName={finishingProblem?.acceptedWorkerFullName ?? null}
+          loading={completeProblem.isPending}
+          onConfirm={confirmFinished}
+          onCancel={() => setFinishingProblem(null)}
+        />
+      </BlurScope>
     </Modal>
   );
 }
@@ -372,7 +383,14 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   metaText: { ...typography.caption, flex: 1 },
   description: { ...typography.body, fontSize: 13, paddingHorizontal: 14, paddingBottom: 12, marginTop: -4 },
-  workerBox: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, marginHorizontal: 14, marginBottom: 12 },
+  workerBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 12,
+    marginHorizontal: 14,
+    marginBottom: 12,
+  },
   workerInfo: { flex: 1 },
   workerLabel: { ...typography.caption, fontSize: 11 },
   workerName: { ...typography.body, fontFamily: fonts.semiBold },

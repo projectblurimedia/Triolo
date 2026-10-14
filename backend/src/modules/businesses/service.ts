@@ -55,6 +55,24 @@ export class BusinessesService {
     });
   }
 
+  /** Public profile (rating included) — never the owner's contact details. */
+  async getPublicProfile(id: string): Promise<BusinessProfile | null> {
+    const profile = await this.repository.findById(id);
+    if (!profile) return null;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dropped on purpose (contact details)
+    const { accountFullName, accountMobileNumber, accountEmail, ...rest } = profile;
+    return rest;
+  }
+
+  async getVerifiedProfiles(ids: string[]): Promise<BusinessProfile[]> {
+    return this.repository.findVerifiedByIds(ids);
+  }
+
+  /** Adds a customer's 1–5 star rating of the shop (called by the orders module). */
+  async recordRating(id: string, stars: number): Promise<void> {
+    await this.repository.recordRating(id, stars);
+  }
+
   async getMyProfile(accountId: string): Promise<BusinessProfile | null> {
     return this.repository.findByAccountId(accountId);
   }
