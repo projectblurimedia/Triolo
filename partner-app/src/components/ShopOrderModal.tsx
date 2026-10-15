@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -93,6 +94,16 @@ export function ShopOrderModal() {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const pinInputRef = useRef<TextInput>(null);
+  // Ticking an item as packed jumps straight to its price box, scrolled above the keyboard.
+  const scrollRef = useRef<ScrollView>(null);
+  const itemYs = useRef<Record<string, number>>({});
+  const [focusPriceId, setFocusPriceId] = useState<string | null>(null);
+  const scrollToItem = (id: string) => {
+    const y = itemYs.current[id];
+    if (y === undefined) return;
+    // After the keyboard has opened and the screen has shrunk above it.
+    setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, y - 90), animated: true }), 250);
+  };
   const [confirm, setConfirm] = useState<'decline' | 'cancel' | null>(null);
   const [confirmBill, setConfirmBill] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -227,7 +238,10 @@ export function ShopOrderModal() {
         <View style={styles.flex}>
           <Text style={[styles.bannerTitle, { color: colors.text }]}>{t(`shopOrders.status.${o.status}.title`)}</Text>
           <Text style={[styles.bannerMessage, { color: colors.textMuted }]}>
-            {t(`shopOrders.status.${o.status}.message`, { name: o.customerFullName })}
+            {o.status === 'cancelled' && o.cancelledBy === 'admin'
+              ? t('shopOrders.adminCancelled')
+              : t(`shopOrders.status.${o.status}.message`, { name: o.customerFullName })}
+            {o.status === 'cancelled' && o.cancelReason ? ` ${t('job.reason', { reason: o.cancelReason })}` : ''}
           </Text>
         </View>
       </View>
@@ -297,6 +311,9 @@ export function ShopOrderModal() {
     return (
       <View
         key={item.id}
+        onLayout={(event) => {
+          itemYs.current[item.id] = event.nativeEvent.layout.y;
+        }}
         style={[
           styles.checkItem,
           {
@@ -307,7 +324,15 @@ export function ShopOrderModal() {
       >
         <Pressable
           style={styles.checkHeader}
-          onPress={() => setItem(item.id, { status: checked ? 'pending' : 'packed' })}
+          onPress={() => {
+            setItem(item.id, { status: checked ? 'pending' : 'packed' });
+            if (checked) {
+              setFocusPriceId(null);
+              Keyboard.dismiss();
+            } else {
+              setFocusPriceId(item.id);
+            }
+          }}
           accessibilityRole="checkbox"
           accessibilityState={{ checked }}
         >
@@ -337,6 +362,9 @@ export function ShopOrderModal() {
                 placeholderTextColor={colors.textMuted}
                 maxLength={9}
                 accessibilityLabel={t('shopOrders.price')}
+                autoFocus={focusPriceId === item.id}
+                onFocus={() => scrollToItem(item.id)}
+                returnKeyType="done"
               />
             </View>
           ) : (
@@ -592,6 +620,7 @@ export function ShopOrderModal() {
     const shopCanCancel = order.status === 'placed' ? false : ACTIVE_SHOP_STATUSES.includes(order.status);
     return (
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -600,9 +629,11 @@ export function ShopOrderModal() {
         {renderCustomer(order)}
         {renderStage(order)}
         {shopCanCancel ? (
-          <Pressable style={styles.cancelLink} onPress={() => setConfirm('cancel')} hitSlop={8}>
-            <Text style={[styles.cancelText, { color: brandColors.error }]}>{t('shopOrders.cancelOrder')}</Text>
-          </Pressable>
+          <CancelButton
+            label={t('shopOrders.cancelOrder')}
+            hint={t('shopOrders.cancelHint')}
+            onPress={() => setConfirm('cancel')}
+          />
         ) : null}
       </ScrollView>
     );
@@ -794,6 +825,4 @@ const styles = StyleSheet.create({
   pinError: { ...typography.caption, fontFamily: fonts.medium, textAlign: 'center' },
   starsRow: { flexDirection: 'row', gap: 4 },
   review: { ...typography.body, fontStyle: 'italic', marginTop: 8 },
-  cancelLink: { alignSelf: 'center', paddingVertical: 8 },
-  cancelText: { ...typography.body, fontFamily: fonts.semiBold },
 });

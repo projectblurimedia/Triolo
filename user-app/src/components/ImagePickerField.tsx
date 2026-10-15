@@ -1,10 +1,11 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { typography, useThemeColors } from '@/theme';
 import { showToast } from '@/state/toastStore';
+import { SmartImage } from './SmartImage';
 
 export interface PickedImage {
   uri: string;
@@ -107,7 +108,7 @@ export function ImagePickerField({ label, images, onChange, maxImages = 6, allow
       <View style={styles.row}>
         {images.map((img) => (
           <View key={img.uri} style={styles.thumbWrap}>
-            <Image source={{ uri: img.uri }} style={styles.thumb} />
+            <SmartImage source={{ uri: img.uri }} style={styles.thumb} />
             <Pressable
               style={styles.removeButton}
               onPress={() => handleRemove(img.uri)}

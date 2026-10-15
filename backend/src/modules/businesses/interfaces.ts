@@ -1,12 +1,5 @@
 export type BusinessShopCategory =
-  | 'grocery'
-  | 'restaurant'
-  | 'pharmacy'
-  | 'electronics'
-  | 'clothing'
-  | 'hardware'
-  | 'salon'
-  | 'other';
+  'grocery' | 'restaurant' | 'pharmacy' | 'electronics' | 'clothing' | 'hardware' | 'salon' | 'other';
 
 export const BUSINESS_SHOP_CATEGORIES: BusinessShopCategory[] = [
   'grocery',
@@ -50,10 +43,14 @@ export interface BusinessProfileWithAccount extends BusinessProfile {
   accountFullName: string;
   accountMobileNumber: string;
   accountEmail: string;
+  /** The account's standing — 'active', 'suspended' or 'blocked'. */
+  accountStatus: string;
 }
 
 export interface AdminListFilter {
   status?: ProfileVerificationStatus;
+  /** Name, mobile number or shop name. */
+  q?: string;
   page: number;
   limit: number;
 }

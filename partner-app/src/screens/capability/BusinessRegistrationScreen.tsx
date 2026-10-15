@@ -15,6 +15,7 @@ import { useCreateBusinessProfile, useDeleteBusinessProfile, useUpdateBusinessPr
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { MainStackParamList } from '@/navigation/types';
+import { CancelButton } from '@/components/CancelButton';
 
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
@@ -64,7 +65,9 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
     if (profile) {
       setShopName(profile.shopName);
       setShopCategories(profile.shopCategories.filter((key) => key !== 'other'));
-      setOtherCategoryEntries(profile.otherCategoryDescription ? profile.otherCategoryDescription.split(', ').filter(Boolean) : []);
+      setOtherCategoryEntries(
+        profile.otherCategoryDescription ? profile.otherCategoryDescription.split(', ').filter(Boolean) : [],
+      );
       setAddress({
         latitude: profile.latitude,
         longitude: profile.longitude,
@@ -74,7 +77,9 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
         state: profile.state,
         pincode: profile.pincode,
       });
-      setPhotos(profile.shopPhotoUrls.map((url) => ({ uri: url, name: url.split('/').pop() ?? 'photo.jpg', type: 'image/jpeg' })));
+      setPhotos(
+        profile.shopPhotoUrls.map((url) => ({ uri: url, name: url.split('/').pop() ?? 'photo.jpg', type: 'image/jpeg' })),
+      );
       setDeliveryAvailable(profile.deliveryAvailable);
       setDeliveryPricePerKm(profile.deliveryPricePerKm != null ? String(profile.deliveryPricePerKm) : '');
     }
@@ -176,7 +181,11 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
         { ...commonPayload, shopPhotos: photos },
         {
           onSuccess: () => {
-            showToast({ variant: 'success', title: t('businessProfile.successTitle'), message: t('businessProfile.successMessage') });
+            showToast({
+              variant: 'success',
+              title: t('businessProfile.successTitle'),
+              message: t('businessProfile.successMessage'),
+            });
             navigation.replace('MyInfo', { capability: 'business' });
           },
           onError: handleMutationError,
@@ -205,7 +214,12 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
-      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
           {t(isEditMode ? 'businessProfile.editSubtitle' : 'businessProfile.subtitle')}
         </Text>
@@ -221,12 +235,16 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
                 {isActive ? (
                   <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
                     <FontAwesome6 name={category.icon} size={12} color="#FFFFFF" solid />
-                    <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t(`businessProfile.categories.${category.key}`)}</Text>
+                    <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>
+                      {t(`businessProfile.categories.${category.key}`)}
+                    </Text>
                   </LinearGradient>
                 ) : (
                   <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
                     <FontAwesome6 name={category.icon} size={12} color={colors.textMuted} solid />
-                    <Text style={[styles.chipLabel, { color: colors.text }]}>{t(`businessProfile.categories.${category.key}`)}</Text>
+                    <Text style={[styles.chipLabel, { color: colors.text }]}>
+                      {t(`businessProfile.categories.${category.key}`)}
+                    </Text>
                   </View>
                 )}
               </Pressable>
@@ -243,11 +261,19 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
             </Pressable>
           ))}
           <Pressable onPress={() => setShowOtherInput(true)}>
-            <View style={[styles.chip, styles.addNewChip, { borderColor: headerGradient[0], backgroundColor: `${headerGradient[0]}16` }]}>
+            <View
+              style={[
+                styles.chip,
+                styles.addNewChip,
+                { borderColor: headerGradient[0], backgroundColor: `${headerGradient[0]}16` },
+              ]}
+            >
               <View style={[styles.addNewBadge, { backgroundColor: headerGradient[0] }]}>
                 <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
               </View>
-              <Text style={[styles.chipLabel, { color: headerGradient[0], fontFamily: fonts.semiBold }]}>{t('common.addNew')}</Text>
+              <Text style={[styles.chipLabel, { color: headerGradient[0], fontFamily: fonts.semiBold }]}>
+                {t('common.addNew')}
+              </Text>
             </View>
           </Pressable>
         </View>
@@ -273,7 +299,12 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
                 disabled={!otherInputValue.trim()}
                 accessibilityLabel={t('common.done')}
               >
-                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
+                <LinearGradient
+                  colors={headerGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.otherDoneGradient}
+                >
                   <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
                 </LinearGradient>
               </Pressable>
@@ -329,10 +360,7 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
         />
 
         {isEditMode ? (
-          <Pressable style={styles.deleteButton} onPress={() => setShowDeleteConfirm(true)}>
-            <FontAwesome6 name="trash" size={14} color={colors.error} solid />
-            <Text style={[styles.deleteText, { color: colors.error }]}>{t('businessProfile.deleteAction')}</Text>
-          </Pressable>
+          <CancelButton icon="trash" label={t('businessProfile.deleteAction')} onPress={() => setShowDeleteConfirm(true)} />
         ) : null}
       </ScrollView>
 
@@ -366,6 +394,4 @@ const styles = StyleSheet.create({
   noMargin: { marginBottom: 0 },
   otherDoneGradient: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   error: { ...typography.caption, marginBottom: 12 },
-  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18, paddingVertical: 10 },
-  deleteText: { ...typography.body, fontFamily: fonts.semiBold },
 });

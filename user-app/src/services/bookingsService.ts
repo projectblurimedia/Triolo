@@ -67,6 +67,9 @@ export interface CustomerBooking {
   workDoneAt: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
+  /** Who cancelled: the customer, or the worker backing out before the PIN. */
+  cancelledBy: 'customer' | 'worker' | 'admin' | null;
+  cancelReason: string | null;
   workerRating: number | null;
   workerReview: string | null;
   /** Set when this booking is a Your Problems job a worker accepted. */

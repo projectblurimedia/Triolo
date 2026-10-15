@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Image,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -20,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VerificationBadge } from './VerificationBadge';
 import { PhotoViewer } from './PhotoViewer';
-import { initialsOf, Stars, WorkerProfileHero, WorkerReviewsSection } from './WorkerProfileGlass';
+import { initialsOf, WorkerProfileFacts, WorkerReviewsSection } from './WorkerProfileGlass';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BusinessNearbyResult } from '@/services/businessesService';
 import { WorkerNearbyResult } from '@/services/workersService';
@@ -31,6 +30,9 @@ import { RatingStars } from './RatingStars';
 import { SendListModal } from './SendListModal';
 import { formatAddress } from '@/utils/formatAddress';
 import { formatDistanceValue, isWorkerResult, NearbyResult, NearbySearchMode } from '@/utils/nearbyResult';
+import { COMPACT_AVATAR_SIZE, GlassProfileLayout, GlassHeroButton } from './GlassHero';
+import { firstName } from '@/utils/firstName';
+import { SmartImage } from './SmartImage';
 
 interface NearbyResultDetailModalProps {
   visible: boolean;
@@ -91,32 +93,16 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
     distance: formatDistanceValue(result.distanceMeters),
   });
 
-  const backButton = (
-    <Pressable style={styles.backButton} onPress={onClose} accessibilityLabel={t('common.cancel')} hitSlop={8}>
-      <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
-    </Pressable>
-  );
-
-  // Save to (or remove from) the customer's favorites — light variant sits on the blue header.
-  const heartButton = (light: boolean) => (
-    <Pressable
-      style={
-        light
-          ? styles.backButton
-          : [styles.stickyBack, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}40` }]
-      }
+  // Save to (or remove from) the customer's favorites.
+  const heartButton = (
+    <GlassHeroButton
+      icon="heart"
       onPress={favorite.toggle}
       disabled={favorite.pending}
-      hitSlop={8}
+      solid={favorite.saved}
+      active={favorite.saved}
       accessibilityLabel={t(favorite.saved ? 'favorites.remove' : 'favorites.save')}
-    >
-      <FontAwesome6
-        name="heart"
-        size={light ? 17 : 16}
-        color={favorite.saved ? '#F43F5E' : light ? '#FFFFFF' : colors.primary}
-        solid={favorite.saved}
-      />
-    </Pressable>
+    />
   );
 
   const renderGallery = () =>
@@ -124,7 +110,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryContent}>
         {photos.map((url, index) => (
           <Pressable key={url} onPress={() => setViewerIndex(index)}>
-            <Image source={{ uri: url }} style={styles.galleryImage} />
+            <SmartImage source={{ uri: url }} style={styles.galleryImage} />
             {index === 0 && photos.length > 1 ? (
               <View style={styles.photoCount}>
                 <FontAwesome6 name="images" size={10} color="#FFFFFF" solid />
@@ -145,148 +131,73 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
     </View>
   );
 
-  // Frosted bar with the worker's avatar, name and rating — fades in once the big hero has
-  // scrolled away, so who you're looking at stays visible (and Back stays reachable).
-  const renderStickyHeader = (w: WorkerNearbyResult) => {
-    const opacity = scrollY.interpolate({
-      inputRange: [STICKY_START, STICKY_END],
-      outputRange: [0, 1],
-      extrapolate: 'clamp',
-    });
-    const translateY = scrollY.interpolate({
-      inputRange: [STICKY_START, STICKY_END],
-      outputRange: [-8, 0],
-      extrapolate: 'clamp',
-    });
-    return (
-      <Animated.View
-        pointerEvents={stickyVisible ? 'auto' : 'none'}
-        style={[styles.sticky, { opacity, transform: [{ translateY }] }]}
+  const renderWorker = (w: WorkerNearbyResult) => (
+    <>
+      <GlassProfileLayout
+        topInset={insets.top}
+        onBack={onClose}
+        backLabel={t('common.cancel')}
+        avatar={
+          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
+            <Text style={styles.compactInitials}>{initialsOf(w.accountFullName)}</Text>
+          </LinearGradient>
+        }
+        title={firstName(w.accountFullName)}
+        subtitle={distance}
+        right={heartButton}
+        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 32 }]}
       >
-        <GlassPanel blurTarget={blurTargetRef} bordered={false} style={[styles.stickyGlass, { paddingTop: insets.top + 14 }]}>
-          <View
-            style={[
-              styles.stickyBorder,
-              {
-                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,85,211,0.10)',
-              },
-            ]}
-          />
-          <View style={styles.stickyRow}>
-            <Pressable
-              style={[styles.stickyBack, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}40` }]}
-              onPress={onClose}
-              hitSlop={8}
-              accessibilityLabel={t('common.cancel')}
-            >
-              <FontAwesome6 name="chevron-left" size={17} color={colors.primary} solid />
-            </Pressable>
-            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.stickyAvatar}>
-              <Text style={styles.stickyAvatarText}>{initialsOf(w.accountFullName)}</Text>
-            </LinearGradient>
-            <View style={styles.flex}>
-              <Text style={[styles.stickyName, { color: colors.text }]} numberOfLines={1}>
-                {w.accountFullName}
-              </Text>
-              <View style={styles.stickyMeta}>
-                {w.ratingAverage != null ? (
-                  <>
-                    <Stars value={w.ratingAverage} size={12} emptyColor={colors.border} />
-                    <Text style={[styles.stickyMetaText, { color: colors.textMuted }]}>{w.ratingAverage.toFixed(1)}</Text>
-                  </>
-                ) : (
-                  <Text style={[styles.stickyMetaText, { color: colors.textMuted }]}>{distance}</Text>
-                )}
-              </View>
-            </View>
-            {heartButton(false)}
-          </View>
-        </GlassPanel>
-      </Animated.View>
-    );
-  };
-
-  const renderWorker = (w: WorkerNearbyResult) => {
-    const content = (
-      <Animated.ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-        scrollEventThrottle={16}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: true,
-          listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-            const shown = event.nativeEvent.contentOffset.y > STICKY_END - 20;
-            if (shown !== stickyVisibleRef.current) {
-              stickyVisibleRef.current = shown;
-              setStickyVisible(shown);
-            }
-          },
-        })}
-      >
-        <WorkerProfileHero
-          name={w.accountFullName}
+        <WorkerProfileFacts
           skills={tagLabels}
           ratingAverage={w.ratingAverage}
           ratingCount={w.ratingCount}
           experienceYears={w.experienceYears}
-          subtitle={distance}
-          badge={<VerificationBadge status={w.verificationStatus} />}
-          topInset={insets.top}
-          topLeft={backButton}
-          topRight={heartButton(true)}
-          style={styles.heroFlush}
+          badge={
+            <View style={styles.nameBlock}>
+              <Text style={[styles.fullName, { color: colors.text }]}>{w.accountFullName}</Text>
+              <VerificationBadge status={w.verificationStatus} />
+            </View>
+          }
         />
-        <View style={styles.body}>
-          {photos.length > 0 ? (
-            <>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('workerReviews.workPhotos')}</Text>
-              {renderGallery()}
-            </>
-          ) : null}
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {renderInfoRow('location-dot', formatAddress(w))}
-          </View>
-          <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} />
+        {photos.length > 0 ? (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('workerReviews.workPhotos')}</Text>
+            {renderGallery()}
+          </>
+        ) : null}
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {renderInfoRow('location-dot', formatAddress(w))}
         </View>
-      </Animated.ScrollView>
-    );
-    // The scroll content is the sticky bar's blur target (real blur on Android 12+).
-    return ANDROID_REAL_BLUR ? (
-      <BlurTargetView ref={blurTargetRef} style={styles.flex}>
-        {content}
-      </BlurTargetView>
-    ) : (
-      <View ref={blurTargetRef} style={styles.flex}>
-        {content}
-      </View>
-    );
-  };
+        <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} />
+      </GlassProfileLayout>
+    </>
+  );
 
   const renderBusiness = (b: BusinessNearbyResult) => (
     <>
-      <LinearGradient
-        colors={headerGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 14 }]}
-      >
-        <View style={styles.headerRow}>
-          {backButton}
-          <View style={styles.titleGroup}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {b.shopName}
-            </Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {distance}
-            </Text>
-          </View>
-          {heartButton(true)}
-        </View>
-      </LinearGradient>
-      <ScrollView
+      <GlassProfileLayout
+        topInset={insets.top}
+        onBack={onClose}
+        backLabel={t('common.cancel')}
+        avatar={
+          b.shopPhotoUrls[0] ? (
+            <SmartImage source={{ uri: b.shopPhotoUrls[0] }} style={styles.compactAvatar} />
+          ) : (
+            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
+              <FontAwesome6 name="store" size={19} color="#FFFFFF" solid />
+            </LinearGradient>
+          )
+        }
+        title={b.shopName}
+        titleLines={2}
+        subtitle={distance}
+        right={heartButton}
         contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 110 }]}
-        showsVerticalScrollIndicator={false}
       >
+        <View style={[styles.card, styles.shopFacts, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <RatingStars average={b.ratingAverage} count={b.ratingCount} variant="full" />
+          <VerificationBadge status={b.verificationStatus} />
+        </View>
         {photos.length > 0 ? (
           renderGallery()
         ) : (
@@ -296,12 +207,6 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
             </LinearGradient>
           </View>
         )}
-        <View style={styles.badgeRow}>
-          <VerificationBadge status={b.verificationStatus} />
-        </View>
-        <View style={styles.badgeRow}>
-          <RatingStars average={b.ratingAverage} count={b.ratingCount} variant="full" />
-        </View>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('nearbySearch.detailCategoriesLabel')}</Text>
           <View style={styles.tagRow}>
@@ -318,7 +223,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
           {renderInfoRow('location-dot', formatAddress(b))}
         </View>
         <WorkerReviewsSection summary={shopReviews.data} loading={shopReviews.isLoading} error={shopReviews.isError} />
-      </ScrollView>
+      </GlassProfileLayout>
       {/* Send the prepared list to this shop. */}
       <View
         style={[
@@ -328,7 +233,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
       >
         <Button label={t('sendList.orderFromShop')} onPress={() => setOrderVisible(true)} />
       </View>
-      <SendListModal visible={orderVisible} onClose={() => setOrderVisible(false)} shop={b} />
+      <SendListModal visible={orderVisible} onClose={() => setOrderVisible(false)} shop={b} onLeave={onClose} />
     </>
   );
 
@@ -336,7 +241,6 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {worker ? renderWorker(worker) : renderBusiness(business as BusinessNearbyResult)}
-        {worker ? renderStickyHeader(worker) : null}
         <PhotoViewer photos={photos} startIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
       </View>
     </Modal>
@@ -370,6 +274,31 @@ const styles = StyleSheet.create({
   stickyName: { fontFamily: fonts.semiBold, fontSize: 17, lineHeight: 23 },
   stickyMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   stickyMetaText: { ...typography.caption, fontSize: 12 },
+  nameBlock: { alignSelf: 'stretch', gap: 8 },
+  fullName: { fontFamily: fonts.semiBold, fontSize: 20, lineHeight: 27 },
+  factsTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', alignSelf: 'stretch', gap: 10 },
+  distancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  distancePillText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
+  compactAvatar: {
+    width: COMPACT_AVATAR_SIZE,
+    height: COMPACT_AVATAR_SIZE,
+    borderRadius: COMPACT_AVATAR_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactInitials: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 17 },
+  shopFacts: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 },
+  shopAvatar: { width: 84, height: 84, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  shopName: { fontFamily: fonts.semiBold, fontSize: 21, lineHeight: 28, marginTop: 12, textAlign: 'center' },
+  shopMeta: { ...typography.caption, marginTop: 2 },
+  shopBadges: { alignItems: 'center', gap: 8, marginTop: 10 },
   heroFlush: {
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,

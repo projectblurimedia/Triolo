@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FlatList, Image, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +19,7 @@ import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { BlurScope } from './Glass';
 import { PullToRefresh } from './PullToRefresh';
+import { SmartImage } from './SmartImage';
 
 interface YourProblemsModalProps {
   visible: boolean;
@@ -178,10 +179,17 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
   const renderItem = ({ item }: { item: ProblemPost }) => {
     const statusColor = statusColorFor(item.status);
     return (
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View
+        style={[
+          styles.card,
+          item.status !== 'completed' && item.status !== 'closed'
+            ? { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` }
+            : { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
         <View style={styles.cardTop}>
           {item.photoUrls[0] ? (
-            <Image source={{ uri: item.photoUrls[0] }} style={styles.thumb} />
+            <SmartImage source={{ uri: item.photoUrls[0] }} style={styles.thumb} />
           ) : (
             <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.thumb}>
               <FontAwesome6 name="screwdriver-wrench" size={22} color="#FFFFFF" solid />

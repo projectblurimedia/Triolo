@@ -14,6 +14,7 @@ import { useCreateWorkerProfile, useDeleteWorkerProfile, useUpdateWorkerProfile 
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { WorkerProfile } from '@/services/workersService';
+import { CancelButton } from './CancelButton';
 
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
@@ -334,10 +335,7 @@ export function WorkerProfileModal({ visible, onClose, profile }: WorkerProfileM
           />
 
           {isEditMode ? (
-            <Pressable style={styles.deleteButton} onPress={() => setShowDeleteConfirm(true)}>
-              <FontAwesome6 name="trash" size={14} color={colors.error} solid />
-              <Text style={[styles.deleteText, { color: colors.error }]}>{t('workerProfile.deleteAction')}</Text>
-            </Pressable>
+            <CancelButton icon="trash" label={t('workerProfile.deleteAction')} onPress={() => setShowDeleteConfirm(true)} />
           ) : null}
         </ScrollView>
       </View>
@@ -400,13 +398,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   error: { ...typography.caption, marginBottom: 12 },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 18,
-    paddingVertical: 10,
-  },
-  deleteText: { ...typography.body, fontFamily: fonts.semiBold },
 });

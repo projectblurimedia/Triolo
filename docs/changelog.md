@@ -4,6 +4,89 @@ All notable changes to this project are documented here. Format: date, module, s
 
 ## Unreleased
 
+- **admin-web: photo viewer and avatars.** Clicking a photo opens a full-page viewer centred on the screen: a ✕ close button (Esc or a click outside also closes), ‹ › arrows and arrow keys when there are several, and an "n / total" counter. Before, it opened inside the card, because a glass card (with `backdrop-filter`) traps `position: fixed` children. It and the confirmation pop-ups now render on the page itself (`Overlay`, a portal). People always show their initials: a problem's photos and a worker's work photos are no longer used as the person's picture. They appear as a separate small thumbnail with a +N count on list rows.
+
+- **Admin sidebar toggle and page icons; smoother Quick Book accept.**
+  - **admin-web:** the header shows the current section's own gradient icon, as in the menu. The menu button folds the sidebar to icons only and back; the choice is remembered (localStorage). In icons-only mode, counts become a red bubble on the icon and labels show on hover. On narrow screens the same button opens the drawer.
+  - **partner-app:** after Accept, the incoming-job screen keeps showing the accepted job until the job screen opens. Before, the offer left the open-offers list mid-hand-off and "no longer available" flashed for a moment. Decline is greyed out and the Android back button does nothing while Accept is working; the Requests list greys Decline the same way.
+
+- **Admin console rebuilt: full control over people, services, shops and job posts** (explicit request).
+  - **Backend (`admin` module, migration `0025`):**
+    - Dashboard stats; search and detail for accounts, workers, shops, bookings (Quick Book and problem trips), shop orders, problem posts and job posts.
+    - Account moderation: suspend for N days, ban, reactivate. Each signs the person out everywhere, stops their unfinished bookings and orders (the other side is told), and closes their open problem posts.
+    - "Delete" (decided with the user): removes the person's worker, shop and job post profiles with photos and bans the account; history is kept.
+    - Admin cancel of any unfinished booking or order (both sides told, with the reason); close open problem posts; hide, show or remove job posts.
+    - Every admin action notifies the affected person in their own language (`admin_notice`).
+    - `authenticate` now also checks the account's standing (cached ~30 s per server instance), so a ban takes effect on the next request, not at token expiry. Login is refused with `ACCOUNT_SUSPENDED` (with `until` and `reason`) or `ACCOUNT_BLOCKED`. Suspended or banned providers disappear from customer search and broadcasts.
+    - 194 tests. A 25-check live run (stats, search, admin-cancelled trip and order with both sides told, problem reopened then closed, job post hidden, suspension refused on the next request and at login, admin protected, delete profiles plus ban) passed; its temporary accounts and data were removed.
+  - **admin-web:** rebuilt in the apps' style.
+    - Glass panels over soft brand colour, the brand gradient, and a sidebar like the apps' drawer (gradient icon squares, live counts on items needing attention).
+    - Glass confirmation popups with a reason box and suspension lengths, plus toasts.
+    - Sections: Dashboard, All Accounts, Services (Workers, Quick Book, Problem Jobs), Business (Shops, Shop Orders), Hire Staff (Job Posts). Every list is searchable and filterable; every detail page shows people, timeline, photos and actions.
+    - Light and dark, works on a phone. Talks to the production API by default (`VITE_API_URL` overrides).
+  - **Both apps:** a suspended or banned account is signed out on its next request, with a toast saying why (and until when). Login shows the same message. Bookings, jobs and orders cancelled by the admin say "Triolo support cancelled this…" with the reason.
+
+- **Instant toast when deleting notifications (both apps).** The "Deleted" toast shows the moment you delete, together with the rows disappearing, instead of after the server replies. If the delete fails, the rows come back and an error toast replaces it.
+
+- **Job requests show who is asking; Find Jobs Now brings back declined ones** (explicit request). `PendingOffer` now carries `customerFullName` and `locationAddress`; the phone number still comes only after accepting. The incoming-request screen and Bookings → Requests cards lead with the customer's name and area. `POST /bookings/offers/search` turns a declined offer back to pending while the request is still open, so a request closed or declined by mistake can be found again. 185 tests; an 11-check live run passed and left no data.
+
+- **Toast swipe fixed, pending colour, faster partner Home, bold delete buttons.**
+  - **Both apps:**
+    - Toasts own the whole gesture from the first touch (the old Pressable kept the touch, so sideways swipes often never registered). A tap closes them. They enter and leave faster. The two apps' `ToastHost` files are identical again.
+    - The Notifications list uses the custom `PullToRefresh` (it still had FlatList's default refresh spinner).
+    - New theme colour `pending` (rose). Unfinished work gets a pending border and tint plus a "Pending" tag: Continue cards, My Jobs, shop orders in progress, active Bookings entries, My Bookings, My Orders, Your Problems.
+    - Delete on the services, shop and job post edit screens uses the same red `CancelButton` style.
+  - **partner-app:** the job post is loaded together with the worker and shop profiles before Home opens, so the side switch appears once with every side.
+
+- **Find Jobs Now, Home shows only your sides, clearer cancel buttons, smoother toasts.**
+  - **Backend:** `POST /bookings/offers/search` picks up every open Quick Book request near the worker that a push may have missed. 185 tests; a 7-check live run passed and left no data.
+  - **partner-app:**
+    - A **Find Jobs Now** card on Home (worker side) and a bar at the top of Bookings → Requests. Found requests open the Requests tab.
+    - Home's switch lists only what the partner has (verified shop, verified services, an existing job post). The menu has a **My Profiles** section to add or edit services, shop and job post.
+    - Billing: ticking an item packed jumps to its price box, scrolled above the keyboard.
+  - **user-app:** in the list editor, the row being typed in (including a newly added one) scrolls above the keyboard.
+  - **Both apps:** one bold red `CancelButton` (with a line saying until when) replaces the faint cancel links on job, booking and order screens. Toasts follow the finger sideways, tilt slightly, throw away more easily and glide out.
+
+- **Worker cancel, customer names on job cards, "Continue where you left off" on Home.**
+  - **Backend:** `POST /bookings/:id/worker-cancel` (migration `0024`: `booking_requests.cancelled_by`, `cancel_reason`). The accepted worker can back out until the PIN is verified; the customer is notified ("Worker Cancelled"), and a problem's trip reopens the problem for other workers. Customer booking cancel, customer order cancel (while placed) and shop order cancel already existed and are unchanged. 182 tests; an 11-check live run passed and left no data.
+  - **partner-app:** Bookings cards and Home's My Jobs cards lead with the customer's name, with the work type below. The job screen has **Cancel This Job** (with a confirmation) until the PIN is entered; the header shows the customer's name. Home opens with **Continue Where You Left Off**: every job or shop order in progress, each one tap from its step screen.
+  - **user-app:** Home's single Track cards became the same **Continue Where You Left Off** list: every active booking (Quick Book or problem trip) and open shop order, including an order waiting for its rating. If the worker cancels, the tracker says so; for a Quick Book it offers **Book Again**.
+
+- **Glass profile header, name layout, one search box, image skeletons.**
+  - **user-app, profile pages:** the header is now the tab bar's real glass (`GlassProfileLayout`: a `GlassPanel` floating over the scroll content, which blurs underneath it as it scrolls), replacing the static colour blobs. It shows the first name with the distance (worker) or the kind of work (job seeker) under it. The full name, with the approval badge, now sits in the body above the rating/pay card.
+  - **user-app, search:** search opened from Services or Bazaar is a single glass search bar, with no box inside a box.
+  - **Both apps:** every remote image (`SmartImage`) shows a shimmering skeleton while it loads, then fades in. A failed image shows a placeholder icon.
+
+- **Profile header names, visible buttons, tab-only search (user-app).** Profile headers show the first name large with the full name under it (shop names may take two lines); a worker's distance moved next to the approval badge. Back and ♥ are brand-gradient circles with a white icon, white rim and soft glow (♥ turns rose when saved). Search opened from Services finds only workers and from Bazaar only shops: no All/Workers/Shops switch, matching suggestions, title and placeholder.
+
+- **Slim profile headers, details below, glass buttons (user-app).** Worker, shop and Hire Staff profile pages now open with a one-row glass header (`CompactProfileHeader`: back, photo, name, one line, ♥) that stays put while the page scrolls; ratings, jobs, experience, skills, approval (`WorkerProfileFacts`), shop rating and the job seeker's pay moved into cards below. The scroll-linked sticky bar is gone. Round buttons on the glass (`GlassHeroButton`) use a frosted fill and a rim in the glass's own colours instead of a blue border.
+
+- **Glass profile pages, tab search, no language row on Profile.**
+  - **user-app:** worker, shop and Hire Staff profile pages open with a frosted-glass hero (new `GlassHero`: soft brand-colour blobs really blurred behind a translucent pane, theme-coloured text, bordered brand-tinted buttons) instead of the big blue gradient. Services and Bazaar each get a search bar that opens the full search screen (`HomeSearchModal` with `initialScope`), on workers or on shops.
+  - **Both apps, Profile:** language left Account details (it is an app setting, in the menu).
+
+- **Create a list from Send List; compact profile cards.**
+  - **user-app:** with no saved lists, Send List now offers **Create a List**. It closes Send List (and the shop page it came from), switches to Prepare List and opens a fresh list (new `navigation/navigationRef.ts`; `PrepareList` takes a `newList` param).
+  - **Both apps, Profile tab:** the profile card is compact (photo/initial, name, Active pill). Phone, email and language moved to an **Account details** card below it. In partner-app this replaces the large worker hero on Profile.
+
+- **Job posts: photo, work-type dropdown, no title field; Hire Staff profile page.**
+  - **Backend:** profile photo on job posts (migration `0023`, `PUT/DELETE /job-seekers/me/photo`, old photos removed from storage). 179 tests; a 26-check live run passed and left no data.
+  - **partner-app:**
+    - The job post form drops the separate title field. "What work do you do?" is a searchable dropdown with icons, and "Add '…' as my work" when it isn't listed.
+    - A profile photo can be added, changed or removed.
+    - The focused field stays above the keyboard.
+    - The Live/Hidden switch now changes on the first tap, and the whole card toggles it.
+  - **user-app:**
+    - Tapping a person in Hire Staff opens a full profile page: photo, work, pay, how they work, experience, skills, about, location, and their phone with a Call Now button.
+    - Cards show the photo.
+    - The Hire Staff quick action has an indigo-to-magenta gradient.
+    - Profile's "My Activity" card is now "Your service bookings", matching "Your shop orders".
+
+- **Job Seekers / Hire Staff: people looking for regular work, and customers who want to hire them.**
+  - **Backend:** new `jobSeekers` module (migration `0022`, table `job_seeker_posts`): one post per account (kind of work, title, expected pay per day or month, full-time / part-time / live-in, experience, skills, about, GPS location), live without admin review, can be hidden or deleted. `GET/PUT/DELETE /job-seekers/me`, `PATCH /job-seekers/me/active`, `GET /job-seekers/search` (nearby, filters, sort by distance or pay; returns name and phone). 176 tests; a 23-check live run against production passed and left no data.
+  - **partner-app:** "Looking for a job?" on the Welcome screen (one-form registration with phone verification), a Job Post card on Choose Capability and Profile, a create/edit screen with a Show / Hide switch and Delete, and a **Job Post** side on Home next to My Shop / My Services.
+  - **user-app:** **Hire Staff** (Services menu, Home menu and a Home quick-action tile): search people nearby by name, work or skill, filter by kind of work and daily / monthly pay, sort nearest or lowest pay, see their phone number and call them.
+
 - **Stronger glass, clearer Cancel Booking, header cleanup.** Popup/menu/drawer glass and toasts blur twice as hard (Android radius 40 → 80px via the reduction factor; iOS regular material instead of thin) with a slightly stronger tint, so the screen behind no longer reads through. The tab bar is unchanged. Cancel Booking (while searching and during a trip) is a soft red pill with an icon instead of a bare text link. My Bookings' Active/History tabs moved out of the header to a segment below it; headers carry only a back button, title and subtitle.
 
 - **Glass is inside the overlay, not around it.** The area around a popup, menu or drawer is only dimmed again, with no blur. The confirmation cards, pickers, menu sheets and drawer panels themselves are frosted glass like the tab bar: the screen behind shows through blurred and tinted. New `GlassFill` layer in `Glass.tsx`; `GlassCard` and the drawer panels use it.

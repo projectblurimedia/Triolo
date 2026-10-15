@@ -23,6 +23,7 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from '@/components/PullToRefresh';
+import { HomeSearchModal } from '@/components/HomeSearchModal';
 
 const SHOP_LIMIT = 50;
 const TOP_RATED_LIMIT = 10;
@@ -41,6 +42,7 @@ export function BazaarScreen() {
   const { colors } = useThemeColors();
   const { data: businessProfile } = useMyBusinessProfile();
   const [editVisible, setEditVisible] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
   const [deliveryOnly, setDeliveryOnly] = useState(false);
   const [sort, setSort] = useState<NearbyShopSort>('distance');
@@ -268,6 +270,17 @@ export function BazaarScreen() {
     <ScreenContainer edges={['left', 'right']}>
       <PullToRefresh refreshing={activeQuery.isRefetching} onRefresh={onRefresh}>
         <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <Pressable
+            style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setSearchVisible(true)}
+            accessibilityRole="search"
+          >
+            <FontAwesome6 name="magnifying-glass" size={15} color={colors.textMuted} solid />
+            <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
+              {t('bazaar.searchPlaceholder')}
+            </Text>
+          </Pressable>
+
           {businessProfile ? <BusinessProfileCard profile={businessProfile} onEdit={() => setEditVisible(true)} /> : null}
 
           <Pressable onPress={() => setSendVisible(true)}>
@@ -348,11 +361,24 @@ export function BazaarScreen() {
       />
       <SendListModal visible={sendVisible} onClose={() => setSendVisible(false)} />
       <BusinessProfileModal visible={editVisible} onClose={() => setEditVisible(false)} profile={businessProfile} />
+      <HomeSearchModal visible={searchVisible} onClose={() => setSearchVisible(false)} initialScope="shops" />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  // Opens the full search screen, like Home's search bar.
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    marginBottom: 14,
+  },
+  searchPlaceholder: { flex: 1, fontSize: 14, fontFamily: fonts.regular },
   // Extra bottom padding clears the floating CustomTabBar.
   body: { paddingBottom: 120 },
   flex: { flex: 1 },

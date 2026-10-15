@@ -171,9 +171,7 @@ describe('BusinessesService.createProfile', () => {
       [],
     );
 
-    expect(repo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ deliveryAvailable: true, deliveryPricePerKm: 10 }),
-    );
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ deliveryAvailable: true, deliveryPricePerKm: 10 }));
   });
 
   it('ignores a submitted delivery price when delivery is not available', async () => {
@@ -197,9 +195,7 @@ describe('BusinessesService.createProfile', () => {
       [],
     );
 
-    expect(repo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ deliveryAvailable: false, deliveryPricePerKm: null }),
-    );
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ deliveryAvailable: false, deliveryPricePerKm: null }));
   });
 });
 
@@ -307,9 +303,7 @@ describe('BusinessesService.updateProfile', () => {
 
   it('deletes dropped photos from Cloudinary when they are no longer kept', async () => {
     const repo = createMockRepository();
-    repo.findByAccountId.mockResolvedValue(
-      buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }),
-    );
+    repo.findByAccountId.mockResolvedValue(buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }));
     repo.update.mockResolvedValue(buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg'] }));
 
     const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
@@ -360,9 +354,7 @@ describe('BusinessesService.deleteProfile', () => {
 
   it('deletes all shop photos from Cloudinary when the profile is deleted', async () => {
     const repo = createMockRepository();
-    repo.findByAccountId.mockResolvedValue(
-      buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }),
-    );
+    repo.findByAccountId.mockResolvedValue(buildProfile({ shopPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }));
     const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await service.deleteProfile('account-1');
@@ -427,9 +419,7 @@ describe('BusinessesService admin-facing methods', () => {
     repo.findAll.mockResolvedValue(result);
     const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
-    await expect(service.adminListProfiles({ status: 'pending_verification', page: 1, limit: 20 })).resolves.toBe(
-      result,
-    );
+    await expect(service.adminListProfiles({ status: 'pending_verification', page: 1, limit: 20 })).resolves.toBe(result);
     expect(repo.findAll).toHaveBeenCalledWith({ status: 'pending_verification', page: 1, limit: 20 });
   });
 
@@ -446,7 +436,12 @@ describe('BusinessesService admin-facing methods', () => {
 
   it('adminGetProfile returns the profile when found', async () => {
     const repo = createMockRepository();
-    const withAccount = { ...buildProfile(), accountFullName: 'Ravi', accountMobileNumber: '9999999999', accountEmail: 'ravi@example.com' };
+    const withAccount = {
+      ...buildProfile(),
+      accountFullName: 'Ravi',
+      accountMobileNumber: '9999999999',
+      accountEmail: 'ravi@example.com',
+    };
     repo.findById.mockResolvedValue(withAccount);
     const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 

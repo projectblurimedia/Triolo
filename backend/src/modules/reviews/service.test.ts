@@ -33,11 +33,23 @@ describe('getForWorker', () => {
   it('merges trip and older problem reviews newest first, with a star breakdown', async () => {
     workers.getPublicProfile.mockResolvedValue({ id: 'worker-1', ratingAverage: 4.3, ratingCount: 3 } as never);
     bookings.listRatedJobsForWorker.mockResolvedValue([
-      { rating: 5, review: 'Great', customerFullName: 'Ravi Kumar', skillCategories: ['plumber'], completedAt: new Date('2026-10-10') },
+      {
+        rating: 5,
+        review: 'Great',
+        customerFullName: 'Ravi Kumar',
+        skillCategories: ['plumber'],
+        completedAt: new Date('2026-10-10'),
+      },
       { rating: 4, review: null, customerFullName: 'Anil', skillCategories: ['plumber'], completedAt: new Date('2026-10-01') },
     ]);
     problems.listRatedJobsForWorker.mockResolvedValue([
-      { rating: 4, review: 'Neat', customerFullName: 'Sita Devi', skillCategories: ['electrician'], completedAt: new Date('2026-10-05') },
+      {
+        rating: 4,
+        review: 'Neat',
+        customerFullName: 'Sita Devi',
+        skillCategories: ['electrician'],
+        completedAt: new Date('2026-10-05'),
+      },
     ]);
 
     const summary = await service.getForWorker('worker-1');

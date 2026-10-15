@@ -39,6 +39,7 @@ function mapWorkerProfileWithAccount(row: QueryResultRow): WorkerProfileWithAcco
     accountFullName: row.account_full_name,
     accountMobileNumber: row.account_mobile_number,
     accountEmail: row.account_email,
+    accountStatus: row.account_status ?? 'active',
   };
 }
 
@@ -143,15 +144,23 @@ export class WorkersRepository {
       params.push(filter.status);
       conditions.push(`w.verification_status = $${params.length}`);
     }
+    if (filter.q) {
+      params.push(`%${filter.q}%`);
+      conditions.push(`(a.full_name ILIKE $${params.length} OR a.mobile_number ILIKE $${params.length})`);
+    }
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const countResult = await this.pool.query(`SELECT COUNT(*) FROM worker_profiles w ${whereClause}`, params);
+    const countResult = await this.pool.query(
+      `SELECT COUNT(*) FROM worker_profiles w JOIN accounts a ON a.id = w.account_id ${whereClause}`,
+      params,
+    );
     const total = Number(countResult.rows[0].count);
 
     const offset = (filter.page - 1) * filter.limit;
     params.push(filter.limit, offset);
     const rows = await this.pool.query(
-      `SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
+      `SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email,
+              a.status AS account_status
        FROM worker_profiles w
        JOIN accounts a ON a.id = w.account_id
        ${whereClause}
@@ -185,7 +194,8 @@ export class WorkersRepository {
 
   async findById(id: string): Promise<WorkerProfileWithAccount | null> {
     const result = await this.pool.query(
-      `SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
+      `SELECT w.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email,
+              a.status AS account_status
        FROM worker_profiles w
        JOIN accounts a ON a.id = w.account_id
        WHERE w.id = $1`,
@@ -224,7 +234,7 @@ export class WorkersRepository {
            )))) AS distance_meters
          FROM worker_profiles w
          JOIN accounts a ON a.id = w.account_id
-         WHERE w.verification_status = 'verified'
+         WHERE w.verification_status = 'verified' AND a.status = 'active'
            AND w.latitude IS NOT NULL AND w.longitude IS NOT NULL
            AND w.account_id != $3
        ) sub
@@ -269,7 +279,7 @@ export class WorkersRepository {
            )))) AS distance_meters
          FROM worker_profiles w
          JOIN accounts a ON a.id = w.account_id
-         WHERE w.verification_status = 'verified'
+         WHERE w.verification_status = 'verified' AND a.status = 'active'
            AND w.latitude IS NOT NULL AND w.longitude IS NOT NULL
            AND w.account_id != $3
            AND w.skill_categories @> $4::worker_skill_category[]
@@ -285,5 +295,23 @@ export class WorkersRepository {
       preferredLanguage: row.preferred_language,
       distanceMeters: Number(row.distance_meters),
     }));
+  }
+
+  /** Profile counts by verification state, for the admin dashboard. */
+  async adminCounts(): Promise<{ total: number; pending: number; verified: number; rejected: number }> {
+    const result = await this.pool.query(
+      `SELECT COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE verification_status = 'pending_verification') AS pending,
+              COUNT(*) FILTER (WHERE verification_status = 'verified') AS verified,
+              COUNT(*) FILTER (WHERE verification_status = 'rejected') AS rejected
+       FROM worker_profiles`,
+    );
+    const row = result.rows[0];
+    return {
+      total: Number(row.total),
+      pending: Number(row.pending),
+      verified: Number(row.verified),
+      rejected: Number(row.rejected),
+    };
   }
 }

@@ -1,6 +1,9 @@
 import axios, { AxiosError, Method } from 'axios';
 import { API_BASE_URL } from '@/constants/config';
 import { useAuthStore } from '@/state/authStore';
+import i18n from '@/localization/i18n';
+import { accountStandingMessage, STANDING_CODES } from '@/localization/accountStanding';
+import { showToast } from '@/state/toastStore';
 
 export interface ApiEnvelope<T> {
   success: boolean;
@@ -103,13 +106,28 @@ function toApiError(err: unknown): ApiError {
   return new ApiError(0, err instanceof Error ? err.message : 'Request failed');
 }
 
-async function request<T>(
-  path: string,
-  method: Method,
-  body: unknown,
-  auth: boolean,
-  _retried = false,
-): Promise<T> {
+let bannedNoticeShownAt = 0;
+
+/**
+ * The admin suspended or banned this account: sign out at once and say why (once, even when
+ * several requests fail together). Returns the error so the caller still throws it.
+ */
+function signOutIfBanned(error: ApiError): ApiError {
+  if (error.statusCode === 403 && error.code && STANDING_CODES.includes(error.code) && useAuthStore.getState().accessToken) {
+    useAuthStore.getState().clearSession();
+    if (Date.now() - bannedNoticeShownAt > 5000) {
+      bannedNoticeShownAt = Date.now();
+      showToast({
+        variant: 'error',
+        title: i18n.t(error.code === 'ACCOUNT_BLOCKED' ? 'errors.bannedTitle' : 'errors.suspendedTitle'),
+        message: accountStandingMessage(error.code, error.details, i18n.t),
+      });
+    }
+  }
+  return error;
+}
+
+async function request<T>(path: string, method: Method, body: unknown, auth: boolean, _retried = false): Promise<T> {
   if (auth && !_retried) {
     await ensureFreshAccessToken();
   }
@@ -131,7 +149,7 @@ async function request<T>(
       }
       useAuthStore.getState().clearSession();
     }
-    throw toApiError(err);
+    throw signOutIfBanned(toApiError(err));
   }
 }
 
@@ -141,12 +159,7 @@ async function request<T>(
  * boundary itself when it sees this exact header value paired with a FormData body (the
  * same pattern CampuSphere's axios-based upload already relies on).
  */
-async function requestForm<T>(
-  path: string,
-  formData: FormData,
-  method: 'post' | 'patch',
-  _retried = false,
-): Promise<T> {
+async function requestForm<T>(path: string, formData: FormData, method: 'post' | 'patch' | 'put', _retried = false): Promise<T> {
   if (!_retried) {
     await ensureFreshAccessToken();
   }
@@ -172,7 +185,7 @@ async function requestForm<T>(
       }
       useAuthStore.getState().clearSession();
     }
-    throw toApiError(err);
+    throw signOutIfBanned(toApiError(err));
   }
 }
 
@@ -223,4 +236,5 @@ export const apiClient = {
   delete: <T>(path: string, auth = false) => request<T>(path, 'delete', undefined, auth),
   postForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'post'),
   patchForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'patch'),
+  putForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'put'),
 };

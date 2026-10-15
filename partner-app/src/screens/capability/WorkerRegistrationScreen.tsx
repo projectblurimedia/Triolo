@@ -15,6 +15,7 @@ import { useCreateWorkerProfile, useDeleteWorkerProfile, useUpdateWorkerProfile 
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { MainStackParamList } from '@/navigation/types';
+import { CancelButton } from '@/components/CancelButton';
 
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
@@ -202,7 +203,12 @@ export function WorkerRegistrationScreen({ navigation, route }: Props) {
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
-      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
           {t(isEditMode ? 'workerProfile.editSubtitle' : 'workerProfile.subtitle')}
         </Text>
@@ -238,7 +244,9 @@ export function WorkerRegistrationScreen({ navigation, route }: Props) {
             </Pressable>
           ))}
           <Pressable onPress={() => setShowOtherInput(true)}>
-            <View style={[styles.chip, styles.addNewChip, { borderColor: colors.primary, backgroundColor: `${colors.primary}16` }]}>
+            <View
+              style={[styles.chip, styles.addNewChip, { borderColor: colors.primary, backgroundColor: `${colors.primary}16` }]}
+            >
               <View style={[styles.addNewBadge, { backgroundColor: colors.primary }]}>
                 <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
               </View>
@@ -268,7 +276,12 @@ export function WorkerRegistrationScreen({ navigation, route }: Props) {
                 disabled={!otherInputValue.trim()}
                 accessibilityLabel={t('common.done')}
               >
-                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
+                <LinearGradient
+                  colors={headerGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.otherDoneGradient}
+                >
                   <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
                 </LinearGradient>
               </Pressable>
@@ -297,10 +310,7 @@ export function WorkerRegistrationScreen({ navigation, route }: Props) {
         />
 
         {isEditMode ? (
-          <Pressable style={styles.deleteButton} onPress={() => setShowDeleteConfirm(true)}>
-            <FontAwesome6 name="trash" size={14} color={colors.error} solid />
-            <Text style={[styles.deleteText, { color: colors.error }]}>{t('workerProfile.deleteAction')}</Text>
-          </Pressable>
+          <CancelButton icon="trash" label={t('workerProfile.deleteAction')} onPress={() => setShowDeleteConfirm(true)} />
         ) : null}
       </ScrollView>
 
@@ -334,6 +344,4 @@ const styles = StyleSheet.create({
   noMargin: { marginBottom: 0 },
   otherDoneGradient: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   error: { ...typography.caption, marginBottom: 12 },
-  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18, paddingVertical: 10 },
-  deleteText: { ...typography.body, fontFamily: fonts.semiBold },
 });

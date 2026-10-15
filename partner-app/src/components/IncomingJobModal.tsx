@@ -26,8 +26,16 @@ const ACCEPT_GRADIENT = ['#16A34A', '#22C55E'] as const;
 // Only the header (including the status-bar area above it) is glass — the same even,
 // cool-white frost + single hairline as user-app's glass tab bar. The rest of the screen
 // stays the plain, bold original design.
-const HEADER_GLASS_LIGHT = { fill: 'rgba(236, 244, 255, 0.85)', hairline: 'rgba(255, 255, 255, 0.9)', underline: 'rgba(15, 35, 80, 0.06)' };
-const HEADER_GLASS_DARK = { fill: 'rgba(18, 22, 30, 0.85)', hairline: 'rgba(255, 255, 255, 0.10)', underline: 'rgba(0, 0, 0, 0.3)' };
+const HEADER_GLASS_LIGHT = {
+  fill: 'rgba(236, 244, 255, 0.85)',
+  hairline: 'rgba(255, 255, 255, 0.9)',
+  underline: 'rgba(15, 35, 80, 0.06)',
+};
+const HEADER_GLASS_DARK = {
+  fill: 'rgba(18, 22, 30, 0.85)',
+  hairline: 'rgba(255, 255, 255, 0.10)',
+  underline: 'rgba(0, 0, 0, 0.3)',
+};
 
 /**
  * The Rapido/Uber-driver-style "incoming job" takeover screen — genuinely full-screen and
@@ -55,7 +63,15 @@ export function IncomingJobModal() {
   const focusedBookingRequestId = usePendingOfferStore((state) => state.focusedBookingRequestId);
   const clearFocusedOffer = usePendingOfferStore((state) => state.clearFocusedOffer);
   const visible = focusedBookingRequestId !== null;
-  const offer = offers?.find((item) => item.bookingRequestId === focusedBookingRequestId) ?? null;
+  const liveOffer = offers?.find((item) => item.bookingRequestId === focusedBookingRequestId) ?? null;
+  // Accepting takes the offer out of the list (it's no longer an open offer, it's this
+  // worker's job) while the job screen is still loading — keep showing the offer the worker
+  // accepted instead of flashing "no longer available" for that moment.
+  const lastOfferRef = useRef(liveOffer);
+  if (liveOffer) lastOfferRef.current = liveOffer;
+  const accepting = acceptMutation.isPending || acceptMutation.isSuccess || handingOff;
+  const offer =
+    liveOffer ?? (accepting && lastOfferRef.current?.bookingRequestId === focusedBookingRequestId ? lastOfferRef.current : null);
 
   // The push opens this screen instantly, but the offer list is only polled every 8s — so a
   // brand-new offer usually isn't in the cached list yet and the worker sat on a spinner for
@@ -135,7 +151,7 @@ export function IncomingJobModal() {
     });
   };
 
-  const notFound = !offer && checkedForId === focusedBookingRequestId && focusedBookingRequestId !== null;
+  const notFound = !offer && !accepting && checkedForId === focusedBookingRequestId && focusedBookingRequestId !== null;
 
   // The worker already tapped Accept on the notification: accept as soon as the offer is
   // loaded (once per offer), showing Accept as spinning the whole time.
@@ -149,12 +165,12 @@ export function IncomingJobModal() {
   }, [autoAccept, offer]);
   const autoAccepting = autoAccept && !notFound && !acceptMutation.isError;
 
-  const busy = acceptMutation.isPending || declineMutation.isPending || handingOff || autoAccepting;
+  const busy = accepting || declineMutation.isPending || autoAccepting;
   const acceptDisabled = busy || !offer || notFound;
   const glass = isDark ? HEADER_GLASS_DARK : HEADER_GLASS_LIGHT;
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={handleDecline} statusBarTranslucent>
+    <Modal visible={visible} animationType="slide" onRequestClose={() => !busy && handleDecline()} statusBarTranslucent>
       {/* The app's global status bar is light-on-blue; this header is light glass, so the
           status bar icons switch to dark while this screen is up (popped again on close). */}
       {visible ? <StatusBar style={isDark ? 'light' : 'dark'} /> : null}
@@ -191,6 +207,24 @@ export function IncomingJobModal() {
             </View>
           ) : (
             <>
+              <View style={[styles.customerAvatar, { backgroundColor: `${colors.primary}1A` }]}>
+                <Text style={[styles.customerInitials, { color: colors.primary }]}>
+                  {offer.customerFullName
+                    ?.split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0]?.toUpperCase())
+                    .join('')}
+                </Text>
+              </View>
+              <Text style={[styles.customerName, { color: colors.text }]} numberOfLines={2}>
+                {offer.customerFullName}
+              </Text>
+              {offer.locationAddress ? (
+                <Text style={[styles.customerArea, { color: colors.textMuted }]} numberOfLines={2}>
+                  {offer.locationAddress}
+                </Text>
+              ) : null}
               <Text style={[styles.distanceHeadline, { color: colors.text }]}>
                 {t('bookings.distanceAway', { distance: formatDistance(offer.distanceMeters) })}
               </Text>
@@ -213,7 +247,12 @@ export function IncomingJobModal() {
           <Pressable
             style={({ pressed }) => [
               styles.declineButton,
-              { borderColor: `${brandColors.error}59`, backgroundColor: `${brandColors.error}0D`, opacity: pressed ? 0.75 : 1 },
+              {
+                borderColor: `${brandColors.error}59`,
+                backgroundColor: `${brandColors.error}0D`,
+                // Greyed out while Accept is working, so it plainly can't be tapped.
+                opacity: accepting || autoAccepting ? 0.35 : pressed ? 0.75 : 1,
+              },
             ]}
             onPress={handleDecline}
             disabled={busy}
@@ -237,7 +276,7 @@ export function IncomingJobModal() {
             accessibilityLabel={t('bookings.accept')}
           >
             <LinearGradient colors={ACCEPT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.acceptButton}>
-              {acceptMutation.isPending || handingOff || autoAccepting ? (
+              {accepting || autoAccepting ? (
                 <LoadingIndicator size={22} dotSize={4.5} />
               ) : (
                 <>
@@ -274,9 +313,29 @@ const styles = StyleSheet.create({
   offerGoneMessage: { ...typography.body, textAlign: 'center', lineHeight: 20 },
   // Deliberately huge — the single most load-bearing number on the whole screen, matching
   // the visual weight a fare figure carries on a ride-hailing driver app's request card.
-  distanceHeadline: { fontSize: 44, fontFamily: fonts.semiBold, textAlign: 'center', marginBottom: 24 },
+  distanceHeadline: { fontSize: 40, fontFamily: fonts.semiBold, textAlign: 'center', marginBottom: 24 },
+  customerAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  customerInitials: { fontFamily: fonts.semiBold, fontSize: 24 },
+  customerName: { fontFamily: fonts.semiBold, fontSize: 22, textAlign: 'center' },
+  customerArea: { ...typography.body, textAlign: 'center', marginTop: 4, marginBottom: 6, paddingHorizontal: 12 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
-  tag: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
   tagText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15 },
   actionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1 },
   declineButton: {

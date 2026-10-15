@@ -58,7 +58,20 @@
   "settingsMenu": {
     "title": "Settings",
     "subtitle": "Language, theme and account",
-    "section": "App Settings"
+    "section": "App Settings",
+    "profilesSection": "My Profiles",
+    "addServices": "Add My Services",
+    "editServices": "My Services",
+    "addServicesHint": "Offer your skills to customers nearby",
+    "addShop": "Add My Shop",
+    "editShop": "My Shop",
+    "addShopHint": "Get orders from customers nearby",
+    "addJobPost": "Create Job Post",
+    "editJobPost": "My Job Post",
+    "addJobPostHint": "Looking for regular work? Post it here",
+    "jobPostLive": "Live",
+    "jobPostHidden": "Hidden",
+    "tapToEdit": "Tap to edit"
   },
   "notifications": {
     "title": "Notifications",
@@ -116,7 +129,11 @@
       "workerQuickFact": "{{count}} years of experience",
       "businessTitle": "Business Profile",
       "addWorker": "Register as a Worker",
-      "addBusiness": "Add your Shop"
+      "addBusiness": "Add your Shop",
+      "activeStatus": "Active Account",
+      "detailsTitle": "Account details",
+      "detailPhone": "Phone number",
+      "detailEmail": "Email"
     }
   },
   "bookings": {
@@ -291,7 +308,14 @@
     "ORDER_PRICE_MISSING": "Enter a price for every packed item.",
     "ORDER_NOTHING_PACKED": "Nothing is packed. Cancel the order instead.",
     "ORDER_PIN_INVALID": "That PIN is not correct.",
-    "ORDER_PIN_LOCKED": "Too many wrong PIN attempts. Contact the customer."
+    "ORDER_PIN_LOCKED": "Too many wrong PIN attempts. Contact the customer.",
+    "JOB_POST_NOT_FOUND": "You have no job post yet.",
+    "ACCOUNT_SUSPENDED": "Your account is suspended.",
+    "ACCOUNT_SUSPENDED_UNTIL": "Your account is suspended until {{date}}.",
+    "ACCOUNT_BLOCKED": "Your account has been banned by Triolo.",
+    "standingReason": "Reason: {{reason}}",
+    "suspendedTitle": "Account Suspended",
+    "bannedTitle": "Account Banned"
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -398,7 +422,17 @@
     "statusChangedTitle": "Job Updated",
     "statusChangedMessage": "The customer already updated this job. Showing the latest status.",
     "locationRequiredTitle": "Turn On Location",
-    "locationRequiredMessage": "Location must be on to start the trip — the customer tracks you on the way."
+    "locationRequiredMessage": "Location must be on to start the trip — the customer tracks you on the way.",
+    "cancelJob": "Cancel This Job",
+    "confirmCancelTitle": "Cancel This Job?",
+    "confirmCancelMessage": "{{name}} will be told you can't come, so they can book another worker.",
+    "confirmCancelProblemMessage": "{{name}} will be told you can't come, and their problem opens again for other workers.",
+    "cancelledToastTitle": "Job Cancelled",
+    "cancelledToastMessage": "The customer has been told.",
+    "cancelledByYou": "You cancelled this job.",
+    "cancelHint": "You can cancel until the customer's PIN is entered.",
+    "adminCancelled": "Triolo support cancelled this job.",
+    "reason": "Reason: {{reason}}"
   },
   "workerReviews": {
     "title": "Ratings & Reviews",
@@ -542,7 +576,9 @@
     "notPackedCount": "Not packed",
     "packingDone": "Packing Done",
     "confirmBillTitle": "Send the bill?",
-    "confirmBillMessage": "{{packed}} packed · {{notPacked}} not packed · Total {{total}}. The customer will see the bill and the items you did not have."
+    "confirmBillMessage": "{{packed}} packed · {{notPacked}} not packed · Total {{total}}. The customer will see the bill and the items you did not have.",
+    "cancelHint": "The customer is told right away.",
+    "adminCancelled": "Triolo support cancelled this order."
   },
   "shopHome": {
     "myShop": "My Shop",
@@ -558,5 +594,108 @@
     "noOrdersMessage": "New orders from nearby customers show up here — you will also get a notification.",
     "allOrders": "All Shop Orders",
     "myServices": "My Services"
+  },
+  "jobPost": {
+    "categories": {
+      "teacher": "Teacher / Tutor",
+      "cook": "Cook",
+      "housekeeper": "Housekeeper",
+      "nanny": "Nanny / Babysitter",
+      "elder_care": "Elder care",
+      "driver": "Driver",
+      "security_guard": "Security guard",
+      "gardener": "Gardener",
+      "office_assistant": "Office assistant",
+      "shop_assistant": "Shop assistant",
+      "other": "Other"
+    },
+    "period": {
+      "daily": "Daily",
+      "monthly": "Monthly"
+    },
+    "per": {
+      "daily": "day",
+      "monthly": "month"
+    },
+    "availability": {
+      "full_time": "Full time",
+      "part_time": "Part time",
+      "live_in": "Live-in (stays at home)"
+    },
+    "years_one": "{{count}} year",
+    "years_other": "{{count}} years",
+    "title": "Job Post",
+    "homeTab": "Job Post",
+    "subtitle": "Tell people nearby what work you do and the pay you expect. They can call you directly.",
+    "lookingTitle": "Looking for a job?",
+    "lookingSubtitle": "Post your work, skills and expected pay — people nearby can call you",
+    "categoryLabel": "What work do you do?",
+    "payLabel": "Expected pay (₹)",
+    "experienceLabel": "Experience (years)",
+    "skillsLabel": "Skills",
+    "skillsPlaceholder": "Add a skill, e.g. Telugu, Biryani",
+    "aboutLabel": "About you (optional)",
+    "aboutPlaceholder": "Languages, timings, anything a family or school should know",
+    "availabilityLabel": "How do you want to work?",
+    "locationLabel": "Your location",
+    "useLocation": "Use my current location",
+    "locationSet": "Location set — tap to update",
+    "addressPlaceholder": "Area, town",
+    "locationOffTitle": "Turn on location",
+    "locationOffMessage": "Your location is needed so people nearby can find you.",
+    "locationFailed": "Could not get your location. Please try again.",
+    "errorCategory": "Choose the kind of work you do.",
+    "errorPay": "Enter your expected pay.",
+    "errorLocation": "Tap \"Use my current location\".",
+    "errorAddress": "Add your area or town.",
+    "post": "Post",
+    "save": "Save Changes",
+    "postedToast": "Your job post is live",
+    "updatedToast": "Job post updated",
+    "statusLive": "Live",
+    "statusHidden": "Hidden",
+    "liveTitle": "Your post is live",
+    "liveMessage": "People nearby can see it and call you.",
+    "hiddenTitle": "Your post is hidden",
+    "hiddenMessage": "Nobody can see it until you turn it back on.",
+    "shownToast": "Your post is visible again",
+    "hiddenToast": "Your post is hidden",
+    "delete": "Delete Post",
+    "deleteConfirmTitle": "Delete your job post?",
+    "deleteConfirmMessage": "People will no longer find you. You can post again any time.",
+    "deletedToast": "Job post deleted",
+    "detailsTitle": "What people see",
+    "edit": "Edit Post",
+    "homeTip": "Families, schools and shops nearby find you under \"Hire Staff\" in the Triolo app and call you on your number. Hide your post any time you are not looking.",
+    "categoryPlaceholder": "Choose your work",
+    "categoryPickerSubtitle": "Pick one, or type yours if it isn't listed",
+    "categorySearch": "Search or type your work",
+    "addCustomWork": "Add \"{{work}}\" as my work",
+    "categoryNotListed": "Not in the list? Type your work above and add it.",
+    "photoLabel": "Profile photo",
+    "photoHint": "A clear photo of your face helps families trust you.",
+    "addPhoto": "Add photo",
+    "changePhoto": "Change",
+    "removePhoto": "Remove",
+    "photoPermission": "Allow photo access to add a profile photo.",
+    "photoFailed": "Post saved, but the photo could not be uploaded. Try again."
+  },
+  "continueSteps": {
+    "title": "Continue Where You Left Off",
+    "continue": "Continue",
+    "seeAll": "See all {{count}}",
+    "itemCount_one": "{{count}} item",
+    "itemCount_other": "{{count}} items",
+    "pending": "Pending"
+  },
+  "findJobs": {
+    "button": "Find Jobs Now",
+    "searching": "Searching nearby…",
+    "hint": "See every job request open near you right now — even one you closed or declined, or whose notification never came.",
+    "foundTitle_one": "{{count}} job request open",
+    "foundTitle_other": "{{count}} job requests open",
+    "foundMessage": "Accept one before another worker does.",
+    "noneTitle": "No job requests right now",
+    "noneMessage": "Problems near you are on Home. We will notify you as soon as a new request comes in."
   }
 }

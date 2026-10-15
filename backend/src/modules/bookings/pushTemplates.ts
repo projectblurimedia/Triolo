@@ -52,7 +52,16 @@ export function jobTakenBody(language: PreferredLanguage): string {
 }
 
 /** Quick Book trip steps — each goes to the other person, in their own language. */
-export type TripEvent = 'accepted' | 'on_the_way' | 'arrived' | 'work_done' | 'completed' | 'cancelled';
+export type TripEvent =
+  | 'accepted'
+  | 'on_the_way'
+  | 'arrived'
+  | 'work_done'
+  | 'completed'
+  | 'cancelled'
+  | 'worker_cancelled'
+  | 'worker_cancelled_problem'
+  | 'admin_cancelled';
 
 const TRIP_TEMPLATES: Record<TripEvent, Record<PreferredLanguage, { title: string; body: string }>> = {
   // → customer
@@ -67,6 +76,22 @@ const TRIP_TEMPLATES: Record<TripEvent, Record<PreferredLanguage, { title: strin
   arrived: {
     en: { title: 'Worker Has Arrived', body: 'Share your PIN from the app with the worker to start the work.' },
     te: { title: 'వర్కర్ వచ్చేశారు', body: 'పని మొదలుపెట్టడానికి యాప్‌లోని మీ PINని వర్కర్‌కు చెప్పండి.' },
+  },
+  // → both sides; the admin's reason is added after the body.
+  admin_cancelled: {
+    en: { title: 'Booking Cancelled by Triolo', body: 'Triolo support cancelled this booking.' },
+    te: { title: 'ట్రియోలో బుకింగ్‌ను రద్దు చేసింది', body: 'ట్రియోలో సపోర్ట్ ఈ బుకింగ్‌ను రద్దు చేసింది.' },
+  },
+  worker_cancelled: {
+    en: { title: 'Worker Cancelled', body: 'Your worker had to cancel this booking. Please book again to find another worker.' },
+    te: {
+      title: 'వర్కర్ రద్దు చేశారు',
+      body: 'మీ వర్కర్ ఈ బుకింగ్‌ను రద్దు చేయాల్సి వచ్చింది. మరొక వర్కర్ కోసం మళ్లీ బుక్ చేయండి.',
+    },
+  },
+  worker_cancelled_problem: {
+    en: { title: 'Worker Cancelled', body: 'Your worker had to cancel. Your problem is open again for other workers nearby.' },
+    te: { title: 'వర్కర్ రద్దు చేశారు', body: 'మీ వర్కర్ రద్దు చేశారు. మీ సమస్య మళ్లీ దగ్గరలోని ఇతర వర్కర్లకు అందుబాటులో ఉంది.' },
   },
   work_done: {
     en: { title: 'Work Done', body: 'The worker marked the job as done. Please check, then confirm and rate.' },

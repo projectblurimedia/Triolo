@@ -148,11 +148,16 @@ describe('NotificationsService.sendRawPush', () => {
       priority: 'max',
     });
 
-    expect(sendPushNotification).toHaveBeenCalledWith('device-token-123', 'New Job Nearby', 'Someone 500m away needs Electrician.', {
-      tag: 'booking-1',
-      channelId: 'booking-offers',
-      priority: 'max',
-    });
+    expect(sendPushNotification).toHaveBeenCalledWith(
+      'device-token-123',
+      'New Job Nearby',
+      'Someone 500m away needs Electrician.',
+      {
+        tag: 'booking-1',
+        channelId: 'booking-offers',
+        priority: 'max',
+      },
+    );
     expect(repo.create).not.toHaveBeenCalled();
   });
 
@@ -182,7 +187,9 @@ describe('NotificationsService.notify', () => {
       title: 'Worker Found',
       body: 'A worker accepted.',
     });
-    expect(sendPushNotification).toHaveBeenCalledWith('device-token', 'Worker Found', 'A worker accepted.', { channelId: 'default' });
+    expect(sendPushNotification).toHaveBeenCalledWith('device-token', 'Worker Found', 'A worker accepted.', {
+      channelId: 'default',
+    });
   });
 
   it('still saves the notification when there is no device token', async () => {

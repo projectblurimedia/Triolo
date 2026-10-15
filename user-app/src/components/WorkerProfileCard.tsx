@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { VerificationBadge } from './VerificationBadge';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { WorkerProfile } from '@/services/workersService';
 import { formatAddress } from '@/utils/formatAddress';
+import { SmartImage } from './SmartImage';
 
 interface WorkerProfileCardProps {
   profile: WorkerProfile;
@@ -24,7 +25,7 @@ export function WorkerProfileCard({ profile, onEdit }: WorkerProfileCardProps) {
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.headerRow}>
         {thumbnail ? (
-          <Image source={{ uri: thumbnail }} style={styles.avatar} />
+          <SmartImage source={{ uri: thumbnail }} style={styles.avatar} />
         ) : (
           <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
             <FontAwesome6 name="screwdriver-wrench" size={20} color="#FFFFFF" solid />

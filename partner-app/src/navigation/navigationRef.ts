@@ -14,14 +14,14 @@ export const navigationRef = createNavigationContainerRef<MainStackParamList>();
  * before RootNavigator ever mounted) or the user isn't past auth/verification (MainTabs
  * doesn't exist yet in that case); safe to just do nothing rather than crash.
  */
-export function navigateToBookings(mode?: 'jobs' | 'orders'): void {
+export function navigateToBookings(mode?: 'jobs' | 'orders', tab?: 'requests' | 'active' | 'history'): void {
   if (!navigationRef.isReady()) {
     return;
   }
   try {
     navigationRef.navigate('MainTabs', {
       screen: 'Bookings',
-      params: mode ? { mode, linkedAt: Date.now() } : undefined,
+      params: mode || tab ? { mode, tab, linkedAt: Date.now() } : undefined,
     });
   } catch {
     // MainTabs isn't the mounted route tree right now (e.g. still on ChooseCapability) —

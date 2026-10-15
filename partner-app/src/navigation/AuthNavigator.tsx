@@ -5,6 +5,7 @@ import { AuthStackParamList } from './types';
 import { WelcomeScreen } from '@/screens/auth/WelcomeScreen';
 import { RegisterWorkerScreen } from '@/screens/auth/RegisterWorkerScreen';
 import { RegisterBusinessScreen } from '@/screens/auth/RegisterBusinessScreen';
+import { RegisterJobSeekerScreen } from '@/screens/auth/RegisterJobSeekerScreen';
 import { LoginScreen } from '@/screens/auth/LoginScreen';
 import { OtpScreen } from '@/screens/auth/OtpScreen';
 import { GradientHeader } from '@/components/GradientHeader';
@@ -26,6 +27,11 @@ export function AuthNavigator() {
         name="RegisterBusiness"
         component={RegisterBusinessScreen}
         options={{ headerShown: true, header: () => <GradientHeader title={t('businessProfile.title')} showBack /> }}
+      />
+      <Stack.Screen
+        name="RegisterJobSeeker"
+        component={RegisterJobSeekerScreen}
+        options={{ headerShown: true, header: () => <GradientHeader title={t('jobPost.title')} showBack /> }}
       />
       <Stack.Screen
         name="Login"

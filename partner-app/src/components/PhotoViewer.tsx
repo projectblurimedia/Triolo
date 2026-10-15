@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, FlatList, Image, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, FlatList, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts } from '@/theme';
+import { SmartImage } from './SmartImage';
 
 interface PhotoViewerProps {
   photos: string[];
@@ -49,7 +50,7 @@ export function PhotoViewer({ photos, startIndex, onClose }: PhotoViewerProps) {
           onMomentumScrollEnd={onScrollEnd}
           renderItem={({ item }) => (
             <View style={{ width, height }}>
-              <Image source={{ uri: item }} style={styles.image} resizeMode="contain" />
+              <SmartImage source={{ uri: item }} style={styles.image} resizeMode="contain" />
             </View>
           )}
         />

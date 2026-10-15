@@ -24,6 +24,7 @@ import { openJob } from '@/state/jobFocusStore';
 import { ApiError } from '@/services/apiClient';
 import { formatDistance } from '@/utils/formatDistance';
 import { PullToRefresh } from '@/components/PullToRefresh';
+import { FindJobsButton } from '@/components/FindJobsButton';
 
 type Tab = 'requests' | 'active' | 'history';
 type HistoryEntry =
@@ -70,7 +71,8 @@ export function BookingsScreen() {
   const [mode, setMode] = useState<'jobs' | 'orders'>(route.params?.mode ?? 'jobs');
   useEffect(() => {
     if (route.params?.mode) setMode(route.params.mode);
-  }, [route.params?.mode, route.params?.linkedAt]);
+    if (route.params?.tab) setTab(route.params.tab);
+  }, [route.params?.mode, route.params?.tab, route.params?.linkedAt]);
   const shopOrders = useShopOrders(isShop);
   const newOrderCount = (shopOrders.data ?? []).filter((order) => order.status === 'placed').length;
   const showOrders = isShop && (!isWorker || mode === 'orders');
@@ -147,6 +149,21 @@ export function BookingsScreen() {
     const busy = accepting || declining;
     return (
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.offerTop}>
+          <View style={[styles.offerAvatar, { backgroundColor: `${colors.primary}1A` }]}>
+            <FontAwesome6 name="user" size={16} color={colors.primary} solid />
+          </View>
+          <View style={styles.entryBody}>
+            <Text style={[styles.offerName, { color: colors.text }]} numberOfLines={1}>
+              {item.customerFullName}
+            </Text>
+            {item.locationAddress ? (
+              <Text style={[styles.entryMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                {item.locationAddress}
+              </Text>
+            ) : null}
+          </View>
+        </View>
         <View style={styles.cardHeaderRow}>
           <View style={[styles.distancePill, { backgroundColor: `${colors.primary}16` }]}>
             <FontAwesome6 name="location-dot" size={12} color={colors.primary} solid />
@@ -166,7 +183,7 @@ export function BookingsScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.declineButton,
-              { borderColor: colors.border, opacity: pressed || declining ? 0.8 : 1 },
+              { borderColor: colors.border, opacity: accepting ? 0.35 : pressed || declining ? 0.8 : 1 },
             ]}
             disabled={busy}
             onPress={() => handleDecline(item)}
@@ -223,7 +240,13 @@ export function BookingsScreen() {
 
     return (
       <Pressable
-        style={[styles.card, styles.entryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[
+          styles.card,
+          styles.entryCard,
+          item.active
+            ? { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` }
+            : { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
         onPress={() => (isJob ? openJob(item.job.id) : navigation.navigate('Home'))}
       >
         <View style={[styles.entryIcon, { backgroundColor: `${accent}1A` }]}>
@@ -232,7 +255,7 @@ export function BookingsScreen() {
         <View style={styles.entryBody}>
           <View style={styles.entryTitleRow}>
             <Text style={[styles.entryTitle, { color: colors.text }]} numberOfLines={1}>
-              {skills}
+              {customer}
             </Text>
             <View style={[styles.statusPill, { backgroundColor: `${tone}1A` }]}>
               <Text style={[styles.statusText, { color: tone }]} numberOfLines={1}>
@@ -241,8 +264,11 @@ export function BookingsScreen() {
             </View>
           </View>
           <Text style={[styles.entryMeta, { color: colors.textMuted }]} numberOfLines={1}>
-            {t(isProblem ? 'bookings.typeProblem' : 'bookings.typeQuickBook')} · {customer} · {formatDate(item.createdAt)}
+            {skills} · {formatDate(item.createdAt)}
             {amount != null ? ` · ₹${amount.toLocaleString('en-IN')}` : ''}
+          </Text>
+          <Text style={[styles.entryType, { color: accent }]} numberOfLines={1}>
+            {t(isProblem ? 'bookings.typeProblem' : 'bookings.typeQuickBook')}
           </Text>
           {rating ? (
             <View style={styles.ratingRow}>
@@ -355,6 +381,7 @@ export function BookingsScreen() {
             keyExtractor={(item) => item.offerId}
             contentContainerStyle={styles.listContent}
             renderItem={renderOffer}
+            ListHeaderComponent={isWorker ? <FindJobsButton variant="bar" /> : null}
             ListEmptyComponent={renderEmpty('bell', t('bookings.emptyTitle'), t('bookings.emptyMessage'))}
           />
         </PullToRefresh>
@@ -413,6 +440,9 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: 120, flexGrow: 1 },
   card: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },
   cardHeaderRow: { flexDirection: 'row' },
+  offerTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  offerAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  offerName: { ...typography.subheading, fontFamily: fonts.semiBold },
   distancePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -453,6 +483,7 @@ const styles = StyleSheet.create({
   statusPill: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, maxWidth: '50%' },
   statusText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10 },
   entryMeta: { ...typography.caption, fontSize: 12 },
+  entryType: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   reviewText: { flex: 1, marginLeft: 6, fontStyle: 'italic' },
 });

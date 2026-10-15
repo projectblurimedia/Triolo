@@ -15,6 +15,8 @@ import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { MainStackParamList } from '@/navigation/types';
 import { PullToRefresh } from '@/components/PullToRefresh';
+import { JobPostCard } from '@/components/JobPostCard';
+import { useMyJobPost } from '@/hooks/useJobPost';
 
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
@@ -36,15 +38,17 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
 
   const workerProfile = useMyWorkerProfile();
   const businessProfile = useMyBusinessProfile();
+  const jobPost = useMyJobPost();
   const isLoading = workerProfile.isLoading || businessProfile.isLoading;
   // Verification happens in admin-web, outside this app entirely — pull-to-refresh lets
   // someone re-check right after an admin approves them, instead of having to fully close
   // and relaunch the app for MainNavigator to notice (see that file's own doc comment for
   // why a relaunch was previously the only way this updated).
-  const isRefreshing = (workerProfile.isRefetching || businessProfile.isRefetching) && !isLoading;
+  const isRefreshing = (workerProfile.isRefetching || businessProfile.isRefetching || jobPost.isRefetching) && !isLoading;
   const handleRefresh = () => {
     workerProfile.refetch();
     businessProfile.refetch();
+    jobPost.refetch();
   };
 
   const cards = [
@@ -105,6 +109,8 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
             {cards.map((card) => (
               <CapabilityCard key={card.key} card={card} colors={colors} />
             ))}
+            {/* Looking for regular work (a home cook, a tutor…) — live without admin review. */}
+            <JobPostCard post={jobPost.data} onPress={() => navigation.navigate('JobPost')} />
           </ScrollView>
         </PullToRefresh>
       )}

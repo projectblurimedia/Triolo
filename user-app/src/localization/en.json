@@ -186,7 +186,8 @@
       "quickBook": "Quick Book",
       "postProblem": "Post a Problem",
       "nearbyShops": "Nearby Shops",
-      "prepareList": "Prepare List"
+      "prepareList": "Prepare List",
+      "hireStaff": "Hire Staff"
     },
     "activeProblems": "{{count}} active problem",
     "activeProblems_other": "{{count}} active problems",
@@ -203,7 +204,8 @@
       "quickBook": "A worker in minutes",
       "postProblem": "Workers come to you",
       "nearbyShops": "Shops around you",
-      "prepareList": "Plan your list by voice"
+      "prepareList": "Plan your list by voice",
+      "hireStaff": "Cooks, tutors, drivers"
     },
     "trackBooking": "Track"
   },
@@ -272,7 +274,8 @@
     "loadFailedTitle": "Couldn't Load Workers",
     "emptyTitle": "No Workers Nearby",
     "emptyMessage": "No verified workers were found near you yet. Pull down to refresh later.",
-    "emptyCategoryMessage": "No {{category}} found near you yet."
+    "emptyCategoryMessage": "No {{category}} found near you yet.",
+    "searchPlaceholder": "Search workers by name or skill"
   },
   "servicesMenu": {
     "title": "Services",
@@ -366,7 +369,8 @@
     "locationMessage": "Turn on location to see shops near you.",
     "emptyTitle": "No shops found",
     "emptyMessage": "No verified shops near you yet.",
-    "emptyDeliveryMessage": "No shops near you deliver right now. Turn off the Delivery filter to see all shops."
+    "emptyDeliveryMessage": "No shops near you deliver right now. Turn off the Delivery filter to see all shops.",
+    "searchPlaceholder": "Search shops by name or category"
   },
   "bazaarMenu": {
     "title": "Bazaar",
@@ -395,7 +399,7 @@
     "logoutConfirmTitle": "Confirm Logout",
     "logoutConfirmMessage": "Are you sure you want to logout from your account?",
     "activity": {
-      "title": "My Activity",
+      "title": "Your service bookings",
       "quickBooks": "Quick Books",
       "problemsPosted": "Problems posted",
       "finished": "Finished",
@@ -415,7 +419,10 @@
       "spent": "Spent",
       "viewAll": "View All Orders"
     },
-    "menuSubtitle": "Language, theme and account"
+    "menuSubtitle": "Language, theme and account",
+    "detailsTitle": "Account details",
+    "detailPhone": "Phone number",
+    "detailEmail": "Email"
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -469,7 +476,13 @@
     "ORDER_PRICE_MISSING": "Enter a price for every packed item.",
     "ORDER_NOTHING_PACKED": "Nothing is packed. Cancel the order instead.",
     "ORDER_PIN_INVALID": "That PIN is not correct.",
-    "ORDER_PIN_LOCKED": "Too many wrong PIN attempts. Contact the customer."
+    "ORDER_PIN_LOCKED": "Too many wrong PIN attempts. Contact the customer.",
+    "ACCOUNT_SUSPENDED": "Your account is suspended.",
+    "ACCOUNT_SUSPENDED_UNTIL": "Your account is suspended until {{date}}.",
+    "ACCOUNT_BLOCKED": "Your account has been banned by Triolo.",
+    "standingReason": "Reason: {{reason}}",
+    "suspendedTitle": "Account Suspended",
+    "bannedTitle": "Account Banned"
   },
   "problemForm": {
     "photosLabel": "Photos of the problem (up to 5)",
@@ -571,7 +584,13 @@
     "noResultsTitle": "No matches nearby",
     "noResultsMessage": "Nothing near you matches \"{{query}}\". Try a different word.",
     "title": "Search",
-    "subtitle": "Workers and shops near you"
+    "subtitle": "Workers and shops near you",
+    "workersTitle": "Search Services",
+    "workersSubtitle": "Workers near you",
+    "workersPlaceholder": "Name or skill, e.g. plumber",
+    "shopsTitle": "Search Shops",
+    "shopsSubtitle": "Shops near you",
+    "shopsPlaceholder": "Shop name or category, e.g. grocery"
   },
   "liveMap": {
     "unavailable": "Map unavailable right now",
@@ -653,7 +672,12 @@
       }
     },
     "quotation": "Quotation: ₹{{amount}}",
-    "bookAgain": "Try Again"
+    "bookAgain": "Try Again",
+    "workerCancelled": "{{name}} had to cancel. Book again to find another worker nearby.",
+    "workerCancelledProblem": "{{name}} had to cancel. Your problem is open again for other workers nearby.",
+    "cancelHint": "You can cancel until you share your PIN.",
+    "adminCancelled": "Triolo support cancelled this booking.",
+    "reason": "Reason: {{reason}}"
   },
   "workerReviews": {
     "title": "Ratings & Reviews",
@@ -696,9 +720,10 @@
     "sentTitle": "List sent",
     "sentMessage": "{{shop}} will accept and start packing.",
     "emptyTitle": "Your list is empty",
-    "emptyMessage": "Save a list in the Prepare List tab first.",
+    "emptyMessage": "You haven't saved a list yet. Make one now — speak or type your items.",
     "orderFromShop": "Order from this shop",
-    "chooseList": "Choose a list"
+    "chooseList": "Choose a list",
+    "createList": "Create a List"
   },
   "orders": {
     "title": "Your Order",
@@ -788,7 +813,9 @@
     "rateStepMessage": "One last step — rate this order to finish it.",
     "rateNowTitle": "Rate your order",
     "pickStarsTitle": "Tap the stars to rate",
-    "reviewPlaceholder": "Anything to share? (optional)"
+    "reviewPlaceholder": "Anything to share? (optional)",
+    "cancelHint": "You can cancel until the shop accepts your list.",
+    "adminCancelled": "Triolo support cancelled this order."
   },
   "myOrders": {
     "title": "My Orders",
@@ -810,5 +837,69 @@
     "remove": "Remove from favorites",
     "savedToast": "Saved to favorites",
     "removedToast": "Removed from favorites"
+  },
+  "hireStaff": {
+    "categories": {
+      "teacher": "Teacher / Tutor",
+      "cook": "Cook",
+      "housekeeper": "Housekeeper",
+      "nanny": "Nanny / Babysitter",
+      "elder_care": "Elder care",
+      "driver": "Driver",
+      "security_guard": "Security guard",
+      "gardener": "Gardener",
+      "office_assistant": "Office assistant",
+      "shop_assistant": "Shop assistant",
+      "other": "Other"
+    },
+    "period": {
+      "daily": "Daily",
+      "monthly": "Monthly"
+    },
+    "per": {
+      "daily": "day",
+      "monthly": "month"
+    },
+    "availability": {
+      "full_time": "Full time",
+      "part_time": "Part time",
+      "live_in": "Live-in (stays at home)"
+    },
+    "years_one": "{{count}} year",
+    "years_other": "{{count}} years",
+    "menuTitle": "Hire Staff",
+    "menuSubtitle": "Cooks, tutors, drivers, maids — call them",
+    "title": "Hire Staff",
+    "subtitle": "People nearby looking for regular work",
+    "searchPlaceholder": "Search by name, work or skill",
+    "all": "All",
+    "anyPay": "Any pay",
+    "sortNearest": "Nearest",
+    "sortPay": "Lowest pay",
+    "call": "Call",
+    "away": "{{distance}} away",
+    "experience_one": "{{count}} yr experience",
+    "experience_other": "{{count}} yrs experience",
+    "emptyTitle": "No one found nearby",
+    "emptyMessage": "Try another kind of work, or check again later as new people post.",
+    "loadFailed": "Could not load people. Pull down to try again.",
+    "viewProfile": "View profile",
+    "callNow": "Call Now",
+    "phoneLabel": "Phone number",
+    "availabilityLabel": "Works",
+    "experienceLabel": "Experience",
+    "fresher": "Fresher",
+    "locationLabel": "Location",
+    "skillsLabel": "Skills",
+    "aboutLabel": "About",
+    "expectedPay": "Expected pay"
+  },
+  "continueSteps": {
+    "title": "Continue Where You Left Off",
+    "continue": "Continue",
+    "rate": "Rate",
+    "seeAll": "See all {{count}}",
+    "searching": "Finding a worker…",
+    "pending": "Pending"
   }
 }

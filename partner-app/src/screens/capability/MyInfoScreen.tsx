@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { MainStackParamList } from '@/navigation/types';
 import { formatAddress } from '@/utils/formatAddress';
+import { SmartImage } from '@/components/SmartImage';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'MyInfo'>;
 type MyInfoNavigation = Props['navigation'];
@@ -217,7 +218,7 @@ function PhotoRow({ urls }: { urls: string[] }) {
   return (
     <View style={styles.photoRow}>
       {urls.map((url) => (
-        <Image key={url} source={{ uri: url }} style={styles.photo} />
+        <SmartImage key={url} source={{ uri: url }} style={styles.photo} />
       ))}
     </View>
   );

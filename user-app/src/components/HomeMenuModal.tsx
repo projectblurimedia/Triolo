@@ -13,6 +13,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
 import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
+import { HireStaffModal } from './HireStaffModal';
 
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
@@ -37,6 +38,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const [nearbySearchMode, setNearbySearchMode] = useState<NearbySearchMode | null>(null);
+  const [hireStaffVisible, setHireStaffVisible] = useState(false);
 
   const handleLogoutConfirm = () => {
     setLogoutConfirmVisible(false);
@@ -65,6 +67,17 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
       onPress: () => {
         onClose();
         setNearbySearchMode('business');
+      },
+    },
+    {
+      key: 'hireStaff',
+      icon: 'user-tie' as const,
+      gradient: ['#0D9488', '#2DD4BF'] as const,
+      title: t('hireStaff.menuTitle'),
+      subtitle: t('hireStaff.menuSubtitle'),
+      onPress: () => {
+        onClose();
+        setHireStaffVisible(true);
       },
     },
   ];
@@ -133,6 +146,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
         onConfirm={handleLogoutConfirm}
         onCancel={() => setLogoutConfirmVisible(false)}
       />
+      <HireStaffModal visible={hireStaffVisible} onClose={() => setHireStaffVisible(false)} />
       <NearbySearchModal
         visible={nearbySearchMode !== null}
         mode={nearbySearchMode ?? 'worker'}

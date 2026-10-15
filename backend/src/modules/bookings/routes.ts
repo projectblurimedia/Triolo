@@ -11,7 +11,14 @@ import { ProblemsService } from '@/modules/problems/service';
 import { BookingsController } from './controller';
 import { BookingsService } from './service';
 import { BookingsRepository } from './repository';
-import { completeBookingSchema, createQuickBookingSchema, updateWorkerLocationSchema, verifyPinSchema } from './validation';
+import {
+  completeBookingSchema,
+  createQuickBookingSchema,
+  updateWorkerLocationSchema,
+  verifyPinSchema,
+  workerCancelSchema,
+  searchOffersSchema,
+} from './validation';
 
 // Own instances, backed by the same shared `pool` — matches how every other module's
 // routes.ts wires up its own dependencies independently (no shared module registry in this
@@ -31,6 +38,7 @@ export const bookingsRouter = Router();
 bookingsRouter.post('/quick', authenticate, validateBody(createQuickBookingSchema), controller.createQuickBooking);
 bookingsRouter.get('/mine', authenticate, controller.listMine);
 bookingsRouter.get('/offers/mine', authenticate, controller.getMyOffers);
+bookingsRouter.post('/offers/search', authenticate, validateBody(searchOffersSchema), controller.searchOffers);
 bookingsRouter.get('/jobs/mine', authenticate, controller.listMyJobs);
 bookingsRouter.get('/jobs/:id', authenticate, controller.getMyJob);
 
@@ -47,3 +55,4 @@ bookingsRouter.put('/:id/location', authenticate, validateBody(updateWorkerLocat
 bookingsRouter.post('/:id/arrive', authenticate, controller.markArrived);
 bookingsRouter.post('/:id/verify-pin', authenticate, validateBody(verifyPinSchema), controller.verifyPin);
 bookingsRouter.post('/:id/work-done', authenticate, controller.markWorkDone);
+bookingsRouter.post('/:id/worker-cancel', authenticate, validateBody(workerCancelSchema), controller.workerCancel);

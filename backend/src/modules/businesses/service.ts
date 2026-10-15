@@ -21,11 +21,7 @@ export class BusinessesService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async createProfile(
-    accountId: string,
-    dto: CreateBusinessProfileDto,
-    files: Express.Multer.File[],
-  ): Promise<BusinessProfile> {
+  async createProfile(accountId: string, dto: CreateBusinessProfileDto, files: Express.Multer.File[]): Promise<BusinessProfile> {
     const existing = await this.repository.findByAccountId(accountId);
     if (existing) {
       throw AppError.conflict('You already have a business profile.', 'BUSINESS_PROFILE_EXISTS');
@@ -77,11 +73,7 @@ export class BusinessesService {
     return this.repository.findByAccountId(accountId);
   }
 
-  async updateProfile(
-    accountId: string,
-    dto: UpdateBusinessProfileDto,
-    files: Express.Multer.File[],
-  ): Promise<BusinessProfile> {
+  async updateProfile(accountId: string, dto: UpdateBusinessProfileDto, files: Express.Multer.File[]): Promise<BusinessProfile> {
     const existing = await this.repository.findByAccountId(accountId);
     if (!existing) {
       throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
@@ -164,5 +156,18 @@ export class BusinessesService {
       throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
     }
     return updated;
+  }
+
+  adminCounts() {
+    return this.repository.adminCounts();
+  }
+
+  /** Admin removal of an account's profile (and its photos). False when there was none. */
+  async adminDeleteForAccount(accountId: string): Promise<boolean> {
+    const existing = await this.repository.findByAccountId(accountId);
+    if (!existing) return false;
+    await deletePhotosFromCloudinary(existing.shopPhotoUrls);
+    await this.repository.remove(accountId);
+    return true;
   }
 }

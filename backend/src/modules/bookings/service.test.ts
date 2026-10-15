@@ -15,8 +15,12 @@ function createMockRepository(): MockRepository {
     findForCustomer: jest.fn(),
     complete: jest.fn(),
     cancel: jest.fn(),
+    cancelByWorker: jest.fn(),
+    adminCancel: jest.fn(),
+    adminActiveIdsForAccount: jest.fn(),
     declineOffer: jest.fn(),
     findPendingOffersForWorker: jest.fn(),
+    addOffersForOpenRequests: jest.fn(),
     findJobForWorker: jest.fn(),
     findJobsForWorker: jest.fn(),
     acceptOffer: jest.fn(),
@@ -67,6 +71,8 @@ function buildRequest(overrides: Partial<BookingRequest> = {}): BookingRequest {
     workDoneAt: null,
     completedAt: null,
     cancelledAt: null,
+    cancelledBy: null,
+    cancelReason: null,
     expiredAt: null,
     workerRating: null,
     workerReview: null,
@@ -90,8 +96,20 @@ describe('createQuickBooking', () => {
   it('creates the request (with address), matches workers, stores offers, and pushes every matched worker', async () => {
     repo.createRequest.mockResolvedValue(buildRequest());
     workers.findMatchingForBroadcast.mockResolvedValue([
-      { workerId: 'worker-1', accountId: 'worker-account-1', accountFullName: 'Rajesh', preferredLanguage: 'en', distanceMeters: 480 },
-      { workerId: 'worker-2', accountId: 'worker-account-2', accountFullName: 'Suresh', preferredLanguage: 'te', distanceMeters: 1200 },
+      {
+        workerId: 'worker-1',
+        accountId: 'worker-account-1',
+        accountFullName: 'Rajesh',
+        preferredLanguage: 'en',
+        distanceMeters: 480,
+      },
+      {
+        workerId: 'worker-2',
+        accountId: 'worker-account-2',
+        accountFullName: 'Suresh',
+        preferredLanguage: 'te',
+        distanceMeters: 1200,
+      },
     ]);
 
     const result = await service.createQuickBooking('account-1', {
@@ -209,7 +227,13 @@ describe('trip steps (worker)', () => {
     await service.startTrip('worker-account-1', 'request-1');
 
     expect(repo.startTrip).toHaveBeenCalledWith('request-1', 'worker-1');
-    expect(notifications.notify).toHaveBeenCalledWith('account-1', 'booking_on_the_way', expect.any(String), expect.any(String), expect.anything());
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'account-1',
+      'booking_on_the_way',
+      expect.any(String),
+      expect.any(String),
+      expect.anything(),
+    );
   });
 
   it('409s starting a trip from the wrong state', async () => {
@@ -238,7 +262,13 @@ describe('trip steps (worker)', () => {
 
     await service.markArrived('worker-account-1', 'request-1');
 
-    expect(notifications.notify).toHaveBeenCalledWith('account-1', 'booking_arrived', 'Worker Has Arrived', expect.any(String), expect.anything());
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'account-1',
+      'booking_arrived',
+      'Worker Has Arrived',
+      expect.any(String),
+      expect.anything(),
+    );
   });
 
   it('accepts the correct PIN without pushing', async () => {
@@ -265,7 +295,9 @@ describe('trip steps (worker)', () => {
     asWorker();
     repo.verifyPin.mockResolvedValue({ outcome: 'locked' });
 
-    await expect(service.verifyPin('worker-account-1', 'request-1', '0000')).rejects.toMatchObject({ code: 'BOOKING_PIN_LOCKED' });
+    await expect(service.verifyPin('worker-account-1', 'request-1', '0000')).rejects.toMatchObject({
+      code: 'BOOKING_PIN_LOCKED',
+    });
   });
 
   it('marks work done and asks the customer to confirm', async () => {
@@ -274,7 +306,13 @@ describe('trip steps (worker)', () => {
 
     await service.markWorkDone('worker-account-1', 'request-1');
 
-    expect(notifications.notify).toHaveBeenCalledWith('account-1', 'booking_work_done', expect.any(String), expect.any(String), expect.anything());
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'account-1',
+      'booking_work_done',
+      expect.any(String),
+      expect.any(String),
+      expect.anything(),
+    );
   });
 
   it('lists the worker’s jobs, or nothing without a worker profile', async () => {
@@ -326,7 +364,13 @@ describe('customer finish / cancel', () => {
 
     await service.cancelBooking('account-1', 'request-1');
 
-    expect(notifications.notify).toHaveBeenCalledWith('worker-account-1', 'booking_cancelled', expect.any(String), expect.any(String), expect.anything());
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'worker-account-1',
+      'booking_cancelled',
+      expect.any(String),
+      expect.any(String),
+      expect.anything(),
+    );
   });
 
   it('cancels a still-searching booking without notifying anyone', async () => {
@@ -342,6 +386,90 @@ describe('customer finish / cancel', () => {
     repo.exists.mockResolvedValue(true);
 
     await expect(service.cancelBooking('account-1', 'request-1')).rejects.toMatchObject({ code: 'BOOKING_INVALID_STATE' });
+  });
+});
+
+describe('find jobs now', () => {
+  const profile = {
+    id: 'worker-1',
+    verificationStatus: 'verified',
+    skillCategories: ['plumber'],
+    latitude: 16.7,
+    longitude: 81.1,
+  };
+
+  it('adds offers from the device position and returns open offers', async () => {
+    workers.getMyProfile.mockResolvedValue(profile as never);
+    repo.findPendingOffersForWorker.mockResolvedValue([{ offerId: 'o-1' }]);
+
+    const offers = await service.searchOpenRequests('worker-account-1', { latitude: 17, longitude: 82 });
+
+    expect(repo.addOffersForOpenRequests).toHaveBeenCalledWith('worker-1', 'worker-account-1', ['plumber'], 17, 82);
+    expect(offers).toEqual([{ offerId: 'o-1' }]);
+  });
+
+  it('falls back to the profile location', async () => {
+    workers.getMyProfile.mockResolvedValue(profile as never);
+    repo.findPendingOffersForWorker.mockResolvedValue([]);
+
+    await service.searchOpenRequests('worker-account-1');
+
+    expect(repo.addOffersForOpenRequests).toHaveBeenCalledWith('worker-1', 'worker-account-1', ['plumber'], 16.7, 81.1);
+  });
+
+  it('finds nothing for an unverified worker', async () => {
+    workers.getMyProfile.mockResolvedValue({ ...profile, verificationStatus: 'pending_verification' } as never);
+
+    expect(await service.searchOpenRequests('worker-account-1')).toEqual([]);
+    expect(repo.addOffersForOpenRequests).not.toHaveBeenCalled();
+  });
+});
+
+describe('worker cancel', () => {
+  it('cancels the worker’s own job with a reason and tells the customer', async () => {
+    asWorker();
+    repo.cancelByWorker.mockResolvedValue(transition('account-1', { status: 'cancelled', cancelledBy: 'worker' }));
+
+    await service.cancelByWorker('worker-account-1', 'request-1', 'Bike broke down');
+
+    expect(repo.cancelByWorker).toHaveBeenCalledWith('request-1', 'worker-1', 'Bike broke down');
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'account-1',
+      'booking_cancelled',
+      'Worker Cancelled',
+      expect.stringContaining('book again'),
+      expect.anything(),
+    );
+  });
+
+  it('reopens the problem when the worker cancels a problem trip', async () => {
+    const listener = { onProblemTripCompleted: jest.fn(), onProblemTripCancelled: jest.fn() };
+    service.setLifecycleListener(listener);
+    asWorker();
+    repo.cancelByWorker.mockResolvedValue(transition('account-1', { status: 'cancelled', problemPostId: 'post-1' }));
+
+    await service.cancelByWorker('worker-account-1', 'trip-1');
+
+    expect(repo.cancelByWorker).toHaveBeenCalledWith('trip-1', 'worker-1', null);
+    expect(listener.onProblemTripCancelled).toHaveBeenCalledWith('post-1');
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'account-1',
+      'booking_cancelled',
+      'Worker Cancelled',
+      expect.stringContaining('open again'),
+      expect.anything(),
+    );
+  });
+
+  it('409s once the PIN was verified', async () => {
+    asWorker();
+    repo.cancelByWorker.mockResolvedValue(null);
+    repo.exists.mockResolvedValue(true);
+
+    await expect(service.cancelByWorker('worker-account-1', 'request-1')).rejects.toMatchObject({
+      code: 'BOOKING_INVALID_STATE',
+    });
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 });
 
@@ -380,7 +508,9 @@ describe('trips started from a problem post', () => {
   });
 
   it('tells the problems module when the trip is completed, with the rating', async () => {
-    repo.complete.mockResolvedValue(transition('worker-account-1', { status: 'completed', acceptedWorkerId: 'worker-1', problemPostId: 'post-1' }));
+    repo.complete.mockResolvedValue(
+      transition('worker-account-1', { status: 'completed', acceptedWorkerId: 'worker-1', problemPostId: 'post-1' }),
+    );
 
     await service.completeBooking('account-1', 'trip-1', { rating: 4, review: 'Good' });
 
@@ -414,5 +544,40 @@ describe('broadcast expiry', () => {
 
     expect(repo.expireStaleBroadcasts).toHaveBeenCalledTimes(2);
     expect(booking.status).toBe('expired');
+  });
+});
+
+describe('admin cancel', () => {
+  it('stops a trip at any step, tells both people with the reason, and reopens a problem', async () => {
+    const listener = { onProblemTripCompleted: jest.fn(), onProblemTripCancelled: jest.fn() };
+    service.setLifecycleListener(listener);
+    repo.adminCancel.mockResolvedValue({
+      request: buildRequest({ status: 'cancelled', problemPostId: 'post-1' }),
+      customer: { accountId: 'account-1', preferredLanguage: 'en' },
+      worker: { accountId: 'worker-account-1', preferredLanguage: 'en' },
+    });
+
+    await service.adminCancel('request-1', 'Safety report');
+
+    expect(notifications.notify).toHaveBeenCalledTimes(2);
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'account-1',
+      'booking_cancelled',
+      'Booking Cancelled by Triolo',
+      'Triolo support cancelled this booking. Reason: Safety report',
+      expect.anything(),
+    );
+    expect(listener.onProblemTripCancelled).toHaveBeenCalledWith('post-1');
+  });
+
+  it('cancels every unfinished booking of a suspended account', async () => {
+    repo.adminActiveIdsForAccount.mockResolvedValue(['a', 'b']);
+    repo.adminCancel.mockResolvedValue({
+      request: buildRequest(),
+      customer: { accountId: 'x', preferredLanguage: 'en' },
+      worker: null,
+    });
+    expect(await service.adminCancelActiveForAccount('account-1', null)).toBe(2);
+    expect(repo.adminCancel).toHaveBeenCalledTimes(2);
   });
 });

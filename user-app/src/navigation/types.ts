@@ -11,7 +11,8 @@ export type MainTabParamList = {
   Home: undefined;
   /** Optional deep link from Home's Browse Services tiles — preselects a category chip. */
   Services: { category?: string; linkedAt?: number } | undefined;
-  PrepareList: undefined;
+  /** `newList` (a timestamp) opens a fresh list in the editor, e.g. from Send List with no lists. */
+  PrepareList: { newList?: number } | undefined;
   Bazaar: undefined;
   Profile: undefined;
 };

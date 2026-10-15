@@ -8,12 +8,14 @@ import { ChooseCapabilityScreen } from '@/screens/capability/ChooseCapabilityScr
 import { WorkerRegistrationScreen } from '@/screens/capability/WorkerRegistrationScreen';
 import { BusinessRegistrationScreen } from '@/screens/capability/BusinessRegistrationScreen';
 import { MyInfoScreen } from '@/screens/capability/MyInfoScreen';
+import { JobPostScreen } from '@/screens/capability/JobPostScreen';
 import { GradientHeader } from '@/components/GradientHeader';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { Button } from '@/components/Button';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { useMyJobPost } from '@/hooks/useJobPost';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -52,8 +54,11 @@ export function MainNavigator() {
   const { colors } = useThemeColors();
   const workerProfile = useMyWorkerProfile();
   const businessProfile = useMyBusinessProfile();
+  // Loaded together with the two profiles, so Home opens with every side already known
+  // (instead of showing two and a third popping in a moment later).
+  const jobPost = useMyJobPost();
 
-  if (workerProfile.isLoading || businessProfile.isLoading) {
+  if (workerProfile.isLoading || businessProfile.isLoading || jobPost.isLoading) {
     return (
       <View style={[styles.loadingCenter, { backgroundColor: colors.background }]}>
         <LoadingIndicator color={colors.primary} />
@@ -116,6 +121,11 @@ export function MainNavigator() {
           state (see .cloud/architecture.md's "Home, Profile, Services, and Bazaar are
           exceptions to the shared header"). */}
       <Stack.Screen name="MyInfo" component={MyInfoScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="JobPost"
+        component={JobPostScreen}
+        options={{ headerShown: true, header: () => <GradientHeader title={t('jobPost.title')} showBack /> }}
+      />
     </Stack.Navigator>
   );
 }

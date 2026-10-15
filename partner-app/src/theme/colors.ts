@@ -10,6 +10,8 @@ const brand = {
   success: '#16A34A',
   warning: '#D97706',
   error: '#DC2626',
+  /** Work that is started but not finished yet — borders/tints of in-progress cards. */
+  pending: '#E11D48',
   white: '#FFFFFF',
 } as const;
 
@@ -20,6 +22,7 @@ export interface ThemeColors {
   success: string;
   warning: string;
   error: string;
+  pending: string;
   white: string;
   background: string;
   surface: string;

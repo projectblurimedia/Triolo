@@ -22,10 +22,7 @@ import { useNearbyBusinesses } from '@/hooks/useNearbyBusinesses';
 import { useMyProblems } from '@/hooks/useProblems';
 import { useMyBookings } from '@/hooks/useBookings';
 import { useMyOrders } from '@/hooks/useOrders';
-import { openOrderTracker } from '@/state/orderTrackerStore';
-import { isOrderOpen, orderStatusTitleKey } from '@/services/ordersService';
-import { ACTIVE_BOOKING_STATUSES } from '@/services/bookingsService';
-import { openBookingTracker } from '@/state/bookingTrackerStore';
+import { ContinueSteps } from '@/components/ContinueSteps';
 import { WorkerNearbyResult, workersService } from '@/services/workersService';
 import { BusinessNearbyResult, businessesService } from '@/services/businessesService';
 import { NearbySearchMode } from '@/utils/nearbyResult';
@@ -33,19 +30,22 @@ import { MainTabParamList } from '@/navigation/types';
 import { useAuthStore } from '@/state/authStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from '@/components/PullToRefresh';
+import { HireStaffModal } from '@/components/HireStaffModal';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
 // Each quick action keeps its own colour, matching the Services menu drawer's palette.
 const QUICK_ACTIONS: {
-  key: 'quickBook' | 'postProblem' | 'nearbyShops' | 'prepareList';
+  key: 'quickBook' | 'postProblem' | 'nearbyShops' | 'prepareList' | 'hireStaff';
   icon: IconName;
-  gradient: readonly [string, string];
+  gradient: readonly [string, string, ...string[]];
 }[] = [
   { key: 'quickBook', icon: 'bolt', gradient: headerGradient },
   { key: 'postProblem', icon: 'clipboard-list', gradient: ['#7C3AED', '#A78BFA'] },
   { key: 'nearbyShops', icon: 'store', gradient: ['#16A34A', '#4ADE80'] },
   { key: 'prepareList', icon: 'list-check', gradient: ['#DB2777', '#F472B6'] },
+  // Full width, under the 2×2 grid.
+  { key: 'hireStaff', icon: 'user-tie', gradient: ['#4338CA', '#7C3AED', '#C026D3'] },
 ];
 
 const CAROUSEL_LIMIT = 10;
@@ -71,6 +71,7 @@ export function HomeScreen() {
   const firstName = account?.fullName?.split(' ')[0] ?? '';
 
   const [quickBookVisible, setQuickBookVisible] = useState(false);
+  const [hireStaffVisible, setHireStaffVisible] = useState(false);
   const [problemFormVisible, setProblemFormVisible] = useState(false);
   const [problemsVisible, setProblemsVisible] = useState(false);
   const [searchMode, setSearchMode] = useState<NearbySearchMode | null>(null);
@@ -92,9 +93,6 @@ export function HomeScreen() {
   const problems = useMyProblems();
   const bookings = useMyBookings();
   const orders = useMyOrders();
-  const liveOrder = (orders.data ?? []).find(isOrderOpen);
-  // The newest Quick Book booking still in progress — shown as a live card that reopens tracking.
-  const liveBooking = (bookings.data ?? []).find((booking) => ACTIVE_BOOKING_STATUSES.includes(booking.status));
 
   const activeProblems = useMemo(
     () => (problems.data ?? []).filter((problem) => ACTIVE_STATUSES.includes(problem.status)),
@@ -131,6 +129,7 @@ export function HomeScreen() {
     if (key === 'quickBook') setQuickBookVisible(true);
     else if (key === 'postProblem') setProblemFormVisible(true);
     else if (key === 'nearbyShops') setSearchMode('business');
+    else if (key === 'hireStaff') setHireStaffVisible(true);
     else navigation.navigate('PrepareList');
   };
 
@@ -206,6 +205,8 @@ export function HomeScreen() {
             </Text>
           </Pressable>
 
+          <ContinueSteps />
+
           {renderSummary()}
 
           {renderSectionHeader(t('home.quickActions'))}
@@ -215,6 +216,7 @@ export function HomeScreen() {
                 key={action.key}
                 style={({ pressed }) => [
                   styles.actionTile,
+                  action.key === 'hireStaff' ? styles.actionTileWide : null,
                   { opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
                 ]}
                 onPress={() => handleQuickAction(action.key)}
@@ -248,45 +250,6 @@ export function HomeScreen() {
               </Pressable>
             ))}
           </View>
-
-          {liveBooking ? (
-            <Pressable
-              style={[styles.problemsCard, styles.liveCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}
-              onPress={() => openBookingTracker(liveBooking.id)}
-            >
-              <View style={[styles.problemsIcon, { backgroundColor: colors.primary }]}>
-                <FontAwesome6 name="bolt" size={17} color="#FFFFFF" solid />
-              </View>
-              <View style={styles.problemsInfo}>
-                <Text style={[styles.problemsTitle, { color: colors.text }]}>
-                  {t(`tracking.status.${liveBooking.status}.title`)}
-                </Text>
-                <Text style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
-                  {liveBooking.worker?.fullName ? `${liveBooking.worker.fullName} · ` : ''}
-                  {liveBooking.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}
-                </Text>
-              </View>
-              <Text style={[styles.liveTrack, { color: colors.primary }]}>{t('home.trackBooking')}</Text>
-            </Pressable>
-          ) : null}
-
-          {liveOrder ? (
-            <Pressable
-              style={[styles.problemsCard, styles.liveCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}
-              onPress={() => openOrderTracker(liveOrder.id)}
-            >
-              <View style={[styles.problemsIcon, { backgroundColor: colors.primary }]}>
-                <FontAwesome6 name="basket-shopping" size={17} color="#FFFFFF" solid />
-              </View>
-              <View style={styles.problemsInfo}>
-                <Text style={[styles.problemsTitle, { color: colors.text }]}>{t(orderStatusTitleKey(liveOrder))}</Text>
-                <Text style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
-                  {liveOrder.shop.name} · {t('orders.itemsCount', { count: liveOrder.items.length })}
-                </Text>
-              </View>
-              <Text style={[styles.liveTrack, { color: colors.primary }]}>{t('home.trackBooking')}</Text>
-            </Pressable>
-          ) : null}
 
           {latestActive ? (
             <Pressable
@@ -363,6 +326,7 @@ export function HomeScreen() {
       </PullToRefresh>
 
       <QuickBookModal visible={quickBookVisible} onClose={() => setQuickBookVisible(false)} />
+      <HireStaffModal visible={hireStaffVisible} onClose={() => setHireStaffVisible(false)} />
       <ProblemFormModal visible={problemFormVisible} onClose={() => setProblemFormVisible(false)} />
       <YourProblemsModal visible={problemsVisible} onClose={() => setProblemsVisible(false)} />
       <HomeSearchModal visible={homeSearchVisible} onClose={() => setHomeSearchVisible(false)} />
@@ -420,6 +384,7 @@ const styles = StyleSheet.create({
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   // Two per row: (100% - one 12px gap) / 2.
   actionTile: { width: '48.2%', borderRadius: 20, overflow: 'hidden' },
+  actionTileWide: { width: '100%' },
   actionGradient: { height: 112, padding: 14, justifyContent: 'flex-end' },
   actionWatermark: { position: 'absolute', right: -10, bottom: -12 },
   actionIcon: {
@@ -437,8 +402,6 @@ const styles = StyleSheet.create({
   },
   actionLabel: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 15 },
   actionHint: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', fontSize: 11, marginTop: 2 },
-  liveCard: { borderWidth: 1.5 },
-  liveTrack: { ...typography.caption, fontFamily: fonts.semiBold },
   problemsCard: {
     flexDirection: 'row',
     alignItems: 'center',

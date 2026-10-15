@@ -48,6 +48,13 @@ export class BookingsController {
     return ok(res, result);
   });
 
+  searchOffers = asyncHandler(async (req: Request, res: Response) => {
+    const { latitude, longitude } = req.body ?? {};
+    const here = typeof latitude === 'number' && typeof longitude === 'number' ? { latitude, longitude } : undefined;
+    const result = await this.service.searchOpenRequests(requireAccountId(req), here);
+    return ok(res, result);
+  });
+
   listMyJobs = asyncHandler(async (req: Request, res: Response) => {
     const result = await this.service.listMyJobs(requireAccountId(req));
     return ok(res, result);
@@ -86,6 +93,11 @@ export class BookingsController {
   verifyPin = asyncHandler(async (req: Request, res: Response) => {
     await this.service.verifyPin(requireAccountId(req), req.params.id, req.body.pin);
     return ok(res, null, 'PIN verified');
+  });
+
+  workerCancel = asyncHandler(async (req: Request, res: Response) => {
+    await this.service.cancelByWorker(requireAccountId(req), req.params.id, req.body?.reason);
+    return ok(res, null, 'Job cancelled');
   });
 
   markWorkDone = asyncHandler(async (req: Request, res: Response) => {

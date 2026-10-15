@@ -24,9 +24,11 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 interface HomeSearchModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Which results it opens on: Services opens on workers, Bazaar on shops. */
+  initialScope?: Scope;
 }
 
-type Scope = 'all' | 'workers' | 'shops';
+export type Scope = 'all' | 'workers' | 'shops';
 type Row =
   | { kind: 'header'; key: string; title: string }
   | { kind: 'worker'; key: string; worker: WorkerNearbyResult }
@@ -43,7 +45,7 @@ const SHOP_SUGGESTIONS = ['grocery', 'restaurant', 'pharmacy', 'electronics', 'c
  * same nearby endpoints' free-text `query` (skill/category, name, city, area) and the shared
  * device location; tapping a result opens the shared detail view and records a profile view.
  */
-export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
+export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: HomeSearchModalProps) {
   const { t } = useTranslation();
   const { colors, isDark } = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -53,7 +55,8 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
   const suggestionRef = useRef<{ label: string; key: string } | null>(null);
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
-  const [scope, setScope] = useState<Scope>('all');
+  const [scope, setScope] = useState<Scope>(initialScope);
+  const locked = initialScope !== 'all';
   const [selected, setSelected] = useState<{
     mode: NearbySearchMode;
     result: WorkerNearbyResult | BusinessNearbyResult;
@@ -71,9 +74,9 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
     if (!visible) return;
     setInput('');
     setQuery('');
-    setScope('all');
+    setScope(initialScope);
     setSelected(null);
-  }, [visible]);
+  }, [visible, initialScope]);
 
   useEffect(() => {
     const suggestion = suggestionRef.current;
@@ -221,32 +224,40 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[styles.suggestions, { paddingTop: contentTop }]}
     >
-      <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{t('homeSearch.tryServices')}</Text>
-      <View style={styles.chipRow}>
-        {SKILL_CATEGORIES.map((skill) => (
-          <Pressable
-            key={skill.key}
-            style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
-            onPress={() => applySuggestion(t(`workerProfile.skills.${skill.key}`), skill.key)}
-          >
-            <FontAwesome6 name={skill.icon} size={11} color={colors.primary} solid />
-            <Text style={[styles.chipText, { color: colors.text }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{t('homeSearch.tryShops')}</Text>
-      <View style={styles.chipRow}>
-        {SHOP_SUGGESTIONS.map((key) => (
-          <Pressable
-            key={key}
-            style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
-            onPress={() => applySuggestion(t(`businessProfile.categories.${key}`), key)}
-          >
-            <FontAwesome6 name="store" size={11} color={colors.primary} solid />
-            <Text style={[styles.chipText, { color: colors.text }]}>{t(`businessProfile.categories.${key}`)}</Text>
-          </Pressable>
-        ))}
-      </View>
+      {initialScope === 'shops' ? null : (
+        <>
+          <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{t('homeSearch.tryServices')}</Text>
+          <View style={styles.chipRow}>
+            {SKILL_CATEGORIES.map((skill) => (
+              <Pressable
+                key={skill.key}
+                style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                onPress={() => applySuggestion(t(`workerProfile.skills.${skill.key}`), skill.key)}
+              >
+                <FontAwesome6 name={skill.icon} size={11} color={colors.primary} solid />
+                <Text style={[styles.chipText, { color: colors.text }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+      {initialScope === 'workers' ? null : (
+        <>
+          <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{t('homeSearch.tryShops')}</Text>
+          <View style={styles.chipRow}>
+            {SHOP_SUGGESTIONS.map((key) => (
+              <Pressable
+                key={key}
+                style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                onPress={() => applySuggestion(t(`businessProfile.categories.${key}`), key)}
+              >
+                <FontAwesome6 name="store" size={11} color={colors.primary} solid />
+                <Text style={[styles.chipText, { color: colors.text }]}>{t(`businessProfile.categories.${key}`)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 
@@ -307,8 +318,10 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.flex}>
-              <Text style={styles.headerTitle}>{t('homeSearch.title')}</Text>
-              <Text style={styles.headerSubtitle}>{t('homeSearch.subtitle')}</Text>
+              <Text style={styles.headerTitle}>{t(locked ? `homeSearch.${initialScope}Title` : 'homeSearch.title')}</Text>
+              <Text style={styles.headerSubtitle}>
+                {t(locked ? `homeSearch.${initialScope}Subtitle` : 'homeSearch.subtitle')}
+              </Text>
             </View>
           </View>
         </LinearGradient>
@@ -326,14 +339,12 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
           )}
 
           <View style={styles.panelWrap} onLayout={onPanelLayout}>
-            <GlassPanel blurTarget={blurTargetRef} style={styles.panel}>
+            <GlassPanel blurTarget={blurTargetRef} style={[styles.panel, locked ? styles.panelSingle : null]}>
               <View
                 style={[
                   styles.searchBox,
-                  {
-                    backgroundColor: searchFill,
-                    borderColor: `${colors.primary}26`,
-                  },
+                  // Scoped to one tab there are no chips, so the glass panel itself is the search bar.
+                  locked ? styles.searchBoxSingle : { backgroundColor: searchFill, borderColor: `${colors.primary}26` },
                 ]}
               >
                 <FontAwesome6 name="magnifying-glass" size={14} color={colors.primary} solid />
@@ -342,7 +353,7 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
                   style={[styles.searchInput, { color: colors.text }]}
                   value={input}
                   onChangeText={setInput}
-                  placeholder={t('homeSearch.placeholder')}
+                  placeholder={t(locked ? `homeSearch.${initialScope}Placeholder` : 'homeSearch.placeholder')}
                   placeholderTextColor={colors.textMuted}
                   returnKeyType="search"
                   onSubmitEditing={() =>
@@ -355,37 +366,39 @@ export function HomeSearchModal({ visible, onClose }: HomeSearchModalProps) {
                   </Pressable>
                 ) : null}
               </View>
-              <View style={styles.scopeRow}>
-                {scopes.map((option) => {
-                  const active = scope === option.key;
-                  return (
-                    <Pressable key={option.key} onPress={() => setScope(option.key)} style={styles.scopeChipWrap}>
-                      {active ? (
-                        <LinearGradient
-                          colors={headerGradient}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={styles.scopeChip}
-                        >
-                          <Text style={[styles.scopeText, { color: '#FFFFFF' }]}>{option.label}</Text>
-                        </LinearGradient>
-                      ) : (
-                        <View
-                          style={[
-                            styles.scopeChip,
-                            {
-                              borderColor: `${colors.primary}33`,
-                              borderWidth: 1,
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.scopeText, { color: colors.text }]}>{option.label}</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
+              {locked ? null : (
+                <View style={styles.scopeRow}>
+                  {scopes.map((option) => {
+                    const active = scope === option.key;
+                    return (
+                      <Pressable key={option.key} onPress={() => setScope(option.key)} style={styles.scopeChipWrap}>
+                        {active ? (
+                          <LinearGradient
+                            colors={headerGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.scopeChip}
+                          >
+                            <Text style={[styles.scopeText, { color: '#FFFFFF' }]}>{option.label}</Text>
+                          </LinearGradient>
+                        ) : (
+                          <View
+                            style={[
+                              styles.scopeChip,
+                              {
+                                borderColor: `${colors.primary}33`,
+                                borderWidth: 1,
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.scopeText, { color: colors.text }]}>{option.label}</Text>
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
             </GlassPanel>
           </View>
         </View>
@@ -440,6 +453,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
   },
   panel: { borderRadius: 22, padding: 12 },
+  panelSingle: { padding: 0, borderRadius: 18 },
+  searchBoxSingle: { height: 54, borderWidth: 0, paddingHorizontal: 18, borderRadius: 18 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',

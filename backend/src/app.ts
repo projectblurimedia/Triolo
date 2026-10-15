@@ -14,6 +14,7 @@ import { problemsRouter } from '@/modules/problems/routes';
 import { reviewsRouter } from '@/modules/reviews/routes';
 import { ordersRouter } from '@/modules/orders/routes';
 import { favoritesRouter } from '@/modules/favorites/routes';
+import { jobSeekersRouter } from '@/modules/jobSeekers/routes';
 
 export function createApp(): Express {
   const app = express();
@@ -60,6 +61,7 @@ export function createApp(): Express {
   app.use('/api/v1/reviews', reviewsRouter);
   app.use('/api/v1/orders', ordersRouter);
   app.use('/api/v1/favorites', favoritesRouter);
+  app.use('/api/v1/job-seekers', jobSeekersRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

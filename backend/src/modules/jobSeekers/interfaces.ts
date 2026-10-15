@@ -1,0 +1,91 @@
+export const JOB_SEEKER_CATEGORIES = [
+  'teacher',
+  'cook',
+  'housekeeper',
+  'nanny',
+  'elder_care',
+  'driver',
+  'security_guard',
+  'gardener',
+  'office_assistant',
+  'shop_assistant',
+  'other',
+] as const;
+export type JobSeekerCategory = (typeof JOB_SEEKER_CATEGORIES)[number];
+
+export const JOB_SEEKER_PAY_PERIODS = ['daily', 'monthly'] as const;
+export type JobSeekerPayPeriod = (typeof JOB_SEEKER_PAY_PERIODS)[number];
+
+export const JOB_SEEKER_AVAILABILITIES = ['full_time', 'part_time', 'live_in'] as const;
+export type JobSeekerAvailability = (typeof JOB_SEEKER_AVAILABILITIES)[number];
+
+/** A person's "I'm looking for work" post — what they do, expected pay, skills, where they are. */
+export interface JobSeekerPost {
+  id: string;
+  accountId: string;
+  category: JobSeekerCategory;
+  title: string;
+  payAmount: number;
+  payPeriod: JobSeekerPayPeriod;
+  availability: JobSeekerAvailability;
+  experienceYears: number;
+  skills: string[];
+  description: string | null;
+  latitude: number;
+  longitude: number;
+  locationAddress: string;
+  /** Profile photo (Cloudinary), or null. */
+  photoUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A post as a customer sees it in search: with the poster's name, phone to call, and distance. */
+export interface JobSeekerSearchResult extends JobSeekerPost {
+  fullName: string;
+  mobileNumber: string;
+  distanceMeters: number;
+}
+
+/** A post as the admin sees it: the poster's name, phone and account standing. */
+export interface AdminJobSeekerPost extends JobSeekerPost {
+  fullName: string;
+  mobileNumber: string;
+  accountStatus: string;
+}
+
+export interface AdminJobSeekerListFilter {
+  q?: string;
+  active?: boolean;
+  page: number;
+  limit: number;
+}
+
+export interface SaveJobSeekerPostParams {
+  category: JobSeekerCategory;
+  title: string;
+  payAmount: number;
+  payPeriod: JobSeekerPayPeriod;
+  availability: JobSeekerAvailability;
+  experienceYears: number;
+  skills: string[];
+  description?: string | null;
+  latitude: number;
+  longitude: number;
+  locationAddress: string;
+}
+
+export type JobSeekerSort = 'distance' | 'pay';
+
+export interface JobSeekerSearchParams {
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  category?: JobSeekerCategory;
+  payPeriod?: JobSeekerPayPeriod;
+  availability?: JobSeekerAvailability;
+  query?: string;
+  sort: JobSeekerSort;
+  limit: number;
+}

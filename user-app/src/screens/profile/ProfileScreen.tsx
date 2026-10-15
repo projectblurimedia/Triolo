@@ -61,24 +61,14 @@ export function ProfileScreen() {
     <ScreenContainer edges={['left', 'right']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         {account ? (
-          <LinearGradient
-            colors={HERO_GRADIENT}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.hero, HERO_SHADOW]}
-          >
+          <LinearGradient colors={HERO_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, HERO_SHADOW]}>
             {/* Soft light circles give the card depth. */}
             <View style={[styles.bubble, styles.bubbleLarge]} />
             <View style={[styles.bubble, styles.bubbleSmall]} />
 
             <View style={styles.heroTop}>
               <View style={styles.avatarRing}>
-                <LinearGradient
-                  colors={['#FFFFFF', '#DCE8FF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.avatar}
-                >
+                <LinearGradient colors={['#FFFFFF', '#DCE8FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
                   <Text style={styles.avatarText}>{initial}</Text>
                 </LinearGradient>
               </View>
@@ -94,30 +84,37 @@ export function ProfileScreen() {
                 ) : null}
               </View>
             </View>
-
-            <View style={styles.heroDivider} />
-
-            <View style={styles.heroChips}>
-              <View style={styles.heroChip}>
-                <View style={styles.heroChipIcon}>
-                  <FontAwesome6 name="phone" size={11} color={headerGradient[0]} solid />
-                </View>
-                <Text style={styles.heroChipText} numberOfLines={1}>
-                  {account.mobileNumber}
-                </Text>
-              </View>
-              {account.email ? (
-                <View style={[styles.heroChip, styles.heroChipWide]}>
-                  <View style={styles.heroChipIcon}>
-                    <FontAwesome6 name="envelope" size={11} color={headerGradient[0]} solid />
-                  </View>
-                  <Text style={styles.heroChipText} numberOfLines={1}>
-                    {account.email}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
           </LinearGradient>
+        ) : null}
+
+        {account ? (
+          <View style={styles.detailsSection}>
+            <Text style={[styles.detailsTitle, { color: colors.textMuted }]}>{t('profile.detailsTitle')}</Text>
+            <View style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {[
+                { icon: 'phone' as const, label: t('profile.detailPhone'), value: account.mobileNumber },
+                ...(account.email ? [{ icon: 'envelope' as const, label: t('profile.detailEmail'), value: account.email }] : []),
+              ].map((row, index) => (
+                <View
+                  key={row.icon}
+                  style={[
+                    styles.detailRow,
+                    index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null,
+                  ]}
+                >
+                  <View style={[styles.detailIcon, { backgroundColor: `${colors.primary}14` }]}>
+                    <FontAwesome6 name={row.icon} size={13} color={colors.primary} solid />
+                  </View>
+                  <View style={styles.detailText}>
+                    <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{row.label}</Text>
+                    <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
+                      {row.value}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
         ) : null}
 
         {account ? (
@@ -196,29 +193,24 @@ export function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { borderRadius: 24, padding: 18, marginBottom: 20, overflow: 'hidden' },
+  // Compact: just who you are. Contact details are in the card below.
+  hero: { borderRadius: 22, padding: 16, marginBottom: 20, overflow: 'hidden' },
   bubble: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255, 255, 255, 0.08)' },
-  bubbleLarge: { width: 180, height: 180, top: -70, right: -50 },
-  bubbleSmall: { width: 110, height: 110, bottom: -50, left: -30 },
+  bubbleLarge: { width: 150, height: 150, top: -70, right: -40 },
+  bubbleSmall: { width: 90, height: 90, bottom: -50, left: -20 },
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatarRing: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    padding: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
-  },
-  avatar: { flex: 1, borderRadius: 32, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontFamily: fonts.semiBold, fontSize: 26, lineHeight: 32, color: '#0055D3' },
+  avatarRing: { width: 58, height: 58, borderRadius: 29, padding: 3, backgroundColor: 'rgba(255, 255, 255, 0.28)' },
+  avatar: { flex: 1, borderRadius: 26, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontFamily: fonts.semiBold, fontSize: 22, lineHeight: 28, color: '#0055D3' },
   heroIdentity: { flex: 1, gap: 6 },
-  heroName: { ...typography.subheading, fontFamily: fonts.semiBold, fontSize: 19, lineHeight: 25, color: '#FFFFFF' },
+  heroName: { ...typography.subheading, fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 24, color: '#FFFFFF' },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
     borderWidth: 1,
@@ -226,24 +218,21 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ADE80' },
   statusText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11, color: '#FFFFFF' },
-  heroDivider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255, 255, 255, 0.3)', marginVertical: 14 },
-  heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  heroChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingLeft: 4,
-    paddingRight: 12,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.24)',
-    maxWidth: '100%',
+  // Same header and card style as the activity cards below.
+  detailsSection: { marginBottom: 22 },
+  detailsTitle: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
   },
-  heroChipWide: { flexShrink: 1 },
-  heroChipIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  heroChipText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12, color: '#FFFFFF', flexShrink: 1 },
+  detailsCard: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 14 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  detailIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  detailText: { flex: 1 },
+  detailLabel: { ...typography.caption, fontSize: 11 },
+  detailValue: { ...typography.body, fontFamily: fonts.medium, fontSize: 14, marginTop: 1 },
   section: { marginBottom: 4 },
   sectionTitle: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 10, marginLeft: 4 },
   emptyCard: {

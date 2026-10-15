@@ -17,6 +17,10 @@ import {
   ShopOrderStatus,
   ShopSideOrder,
   VerifyOrderPinResult,
+  ACTIVE_ORDER_STATUSES,
+  AdminOrder,
+  AdminOrderCancelResult,
+  AdminOrderListFilter,
 } from './interfaces';
 
 const toNumber = (value: unknown): number | null => (value == null ? null : Number(value));
@@ -124,7 +128,10 @@ export class OrdersRepository {
           params.items.map((item) => item.unit),
         ],
       );
-      return mapOrder(order, items.rows.map(mapItem).sort((a, b) => a.position - b.position));
+      return mapOrder(
+        order,
+        items.rows.map(mapItem).sort((a, b) => a.position - b.position),
+      );
     });
   }
 
@@ -282,7 +289,10 @@ export class OrdersRepository {
    * Finishes packing: needs every item decided, a price on every packed item, and at least one
    * packed item. Computes the bill (items + delivery charge for delivery orders) and → packed.
    */
-  async markPacked(id: string, businessId: string): Promise<{ transition: OrderTransition | null; problem?: 'pending' | 'price' | 'empty' }> {
+  async markPacked(
+    id: string,
+    businessId: string,
+  ): Promise<{ transition: OrderTransition | null; problem?: 'pending' | 'price' | 'empty' }> {
     return this.inTransaction(async (client) => {
       const current = await client.query(
         `SELECT * FROM shop_orders WHERE id = $1 AND business_id = $2 AND status = ANY($3::shop_order_status[]) FOR UPDATE`,
@@ -402,7 +412,8 @@ export class OrdersRepository {
     const items = await this.itemsFor(rows.map((row) => row.id));
     return rows.map((row) => {
       const ratingCount = Number(row.shop_rating_count ?? 0);
-      const accepted = !['placed', 'declined', 'expired'].includes(row.status) && !(row.status === 'cancelled' && !row.accepted_at);
+      const accepted =
+        !['placed', 'declined', 'expired'].includes(row.status) && !(row.status === 'cancelled' && !row.accepted_at);
       return {
         ...mapOrder(row, items.get(row.id) ?? []),
         shop: {
@@ -440,7 +451,10 @@ export class OrdersRepository {
     };
   }
 
-  private async inTransaction<T>(work: (client: PoolClient) => Promise<T>, options?: { rollbackOn?: (value: T) => boolean }): Promise<T> {
+  private async inTransaction<T>(
+    work: (client: PoolClient) => Promise<T>,
+    options?: { rollbackOn?: (value: T) => boolean },
+  ): Promise<T> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -454,4 +468,126 @@ export class OrdersRepository {
       client.release();
     }
   }
+
+  // --- Admin ---
+
+  async adminList(filter: AdminOrderListFilter): Promise<{ items: AdminOrder[]; total: number; page: number; limit: number }> {
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    const groups: Record<string, string> = {
+      new: `o.status = 'placed'`,
+      active: `o.status IN ('accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery')`,
+      completed: `o.status = 'completed'`,
+      cancelled: `o.status IN ('cancelled', 'declined', 'expired')`,
+    };
+    if (filter.group) conditions.push(groups[filter.group]);
+    if (filter.accountId) {
+      values.push(filter.accountId);
+      conditions.push(`(o.account_id = $${values.length} OR b.account_id = $${values.length})`);
+    }
+    if (filter.q) {
+      values.push(`%${filter.q}%`);
+      const i = values.length;
+      conditions.push(
+        `(ca.full_name ILIKE $${i} OR ca.mobile_number ILIKE $${i} OR b.shop_name ILIKE $${i} OR oa.full_name ILIKE $${i} OR oa.mobile_number ILIKE $${i})`,
+      );
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const count = await this.pool.query(`SELECT COUNT(*) ${ADMIN_FROM} ${where}`, values);
+    values.push(filter.limit, (filter.page - 1) * filter.limit);
+    const rows = await this.pool.query(
+      `${ADMIN_SELECT} ${ADMIN_FROM} ${where} ORDER BY o.created_at DESC LIMIT $${values.length - 1} OFFSET $${values.length}`,
+      values,
+    );
+    return {
+      items: await this.withAdminShape(rows.rows),
+      total: Number(count.rows[0].count),
+      page: filter.page,
+      limit: filter.limit,
+    };
+  }
+
+  async adminGet(id: string): Promise<AdminOrder | null> {
+    const result = await this.pool.query(`${ADMIN_SELECT} ${ADMIN_FROM} WHERE o.id = $1`, [id]);
+    return result.rows[0] ? (await this.withAdminShape(result.rows))[0] : null;
+  }
+
+  /** Stops any unfinished order; returns the customer and shop owner to tell. Null if it was over. */
+  async adminCancel(id: string, reason: string | null): Promise<AdminOrderCancelResult | null> {
+    const result = await this.pool.query(
+      `WITH updated AS (
+         UPDATE shop_orders
+         SET status = 'cancelled', cancelled_by = 'admin', cancel_reason = $2, cancelled_at = now(), pin = NULL, updated_at = now()
+         WHERE id = $1 AND status = ANY($3::shop_order_status[])
+         RETURNING *
+       )
+       SELECT u.*, b.shop_name, ca.id AS customer_id, ca.preferred_language AS customer_language,
+              oa.id AS owner_id, oa.preferred_language AS owner_language
+       FROM updated u
+       JOIN business_profiles b ON b.id = u.business_id
+       JOIN accounts ca ON ca.id = u.account_id
+       JOIN accounts oa ON oa.id = b.account_id`,
+      [id, reason, ACTIVE_ORDER_STATUSES],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    const items = await this.itemsFor([row.id]);
+    return {
+      order: mapOrder(row, items.get(row.id) ?? []),
+      shopName: row.shop_name,
+      customer: { accountId: row.customer_id, preferredLanguage: row.customer_language },
+      shopOwner: { accountId: row.owner_id, preferredLanguage: row.owner_language },
+    };
+  }
+
+  /** Unfinished orders an account is part of, as the customer or as the shop owner. */
+  async adminActiveIdsForAccount(accountId: string): Promise<string[]> {
+    const result = await this.pool.query(
+      `SELECT o.id FROM shop_orders o JOIN business_profiles b ON b.id = o.business_id
+       WHERE (o.account_id = $1 OR b.account_id = $1) AND o.status = ANY($2::shop_order_status[])`,
+      [accountId, ACTIVE_ORDER_STATUSES],
+    );
+    return result.rows.map((row) => row.id);
+  }
+
+  async adminCounts(): Promise<{ new: number; active: number; completed: number; cancelled: number; today: number }> {
+    const result = await this.pool.query(
+      `SELECT COUNT(*) FILTER (WHERE status = 'placed') AS new_count,
+              COUNT(*) FILTER (WHERE status IN ('accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery')) AS active,
+              COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+              COUNT(*) FILTER (WHERE status IN ('cancelled', 'declined', 'expired')) AS cancelled,
+              COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now())) AS today
+       FROM shop_orders`,
+    );
+    const row = result.rows[0];
+    return {
+      new: Number(row.new_count),
+      active: Number(row.active),
+      completed: Number(row.completed),
+      cancelled: Number(row.cancelled),
+      today: Number(row.today),
+    };
+  }
+
+  private async withAdminShape(rows: QueryResultRow[]): Promise<AdminOrder[]> {
+    const items = await this.itemsFor(rows.map((row) => row.id));
+    return rows.map((row) => ({
+      ...mapOrder(row, items.get(row.id) ?? []),
+      customer: { accountId: row.account_id, fullName: row.customer_full_name, mobileNumber: row.customer_mobile_number },
+      shop: {
+        businessId: row.business_id,
+        accountId: row.shop_account_id,
+        name: row.shop_name,
+        ownerName: row.owner_full_name,
+        mobileNumber: row.owner_mobile_number,
+      },
+    }));
+  }
 }
+
+const ADMIN_SELECT = `SELECT o.*, ca.full_name AS customer_full_name, ca.mobile_number AS customer_mobile_number,
+  b.shop_name, b.account_id AS shop_account_id, oa.full_name AS owner_full_name, oa.mobile_number AS owner_mobile_number`;
+const ADMIN_FROM = `FROM shop_orders o
+  JOIN accounts ca ON ca.id = o.account_id
+  JOIN business_profiles b ON b.id = o.business_id
+  JOIN accounts oa ON oa.id = b.account_id`;

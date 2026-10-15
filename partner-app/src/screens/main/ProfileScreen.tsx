@@ -8,13 +8,15 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { VerificationBadge } from '@/components/VerificationBadge';
-import { WorkerProfileHero, WorkerReviewsSection } from '@/components/WorkerProfileGlass';
+import { WorkerReviewsSection } from '@/components/WorkerProfileGlass';
 import { useMyReviews, useMyShopReviews } from '@/hooks/useReviews';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { MainStackParamList, MainTabParamList } from '@/navigation/types';
+import { JobPostCard } from '@/components/JobPostCard';
+import { useMyJobPost } from '@/hooks/useJobPost';
 
 type Props = CompositeScreenProps<BottomTabScreenProps<MainTabParamList, 'Profile'>, NativeStackScreenProps<MainStackParamList>>;
 
@@ -36,44 +38,70 @@ export function ProfileScreen({ navigation }: Props) {
   const businessProfile = useMyBusinessProfile();
   const worker = workerProfile.data;
   const reviews = useMyReviews(!!worker);
+  const jobPost = useMyJobPost();
   const shop = businessProfile.data;
   const shopReviews = useMyShopReviews(!!shop);
 
   return (
     <ScreenContainer edges={['left', 'right']}>
       <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
-        {account && worker ? (
-          // A worker sees their profile the way customers do: rating, jobs, experience, reviews.
-          <WorkerProfileHero
-            name={account.fullName}
-            skills={worker.skillCategories.filter((key) => key !== 'other').map((key) => t(`workerProfile.skills.${key}`))}
-            ratingAverage={worker.ratingAverage}
-            ratingCount={worker.ratingCount}
-            experienceYears={worker.experienceYears}
-            subtitle={account.mobileNumber}
-            badge={<VerificationBadge status={worker.verificationStatus} />}
-          />
-        ) : account ? (
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroCard}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarInitials}>{getInitials(account.fullName)}</Text>
-            </View>
-            <Text style={styles.heroName} numberOfLines={1}>
-              {account.fullName}
-            </Text>
-            <View style={styles.heroMetaRow}>
-              <FontAwesome6 name="phone" size={11} color="rgba(255,255,255,0.85)" solid />
-              <Text style={styles.heroMeta}>{account.mobileNumber}</Text>
-            </View>
-            {account.email ? (
-              <View style={styles.heroMetaRow}>
-                <FontAwesome6 name="envelope" size={11} color="rgba(255,255,255,0.85)" solid />
-                <Text style={styles.heroMeta} numberOfLines={1}>
-                  {account.email}
-                </Text>
+        {account ? (
+          <>
+            {/* Compact: just who you are. Contact details are in the card below. */}
+            <LinearGradient
+              colors={['#0A3FAE', '#0055D3', '#2B83FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroCard}
+            >
+              <View style={[styles.bubble, styles.bubbleLarge]} />
+              <View style={[styles.bubble, styles.bubbleSmall]} />
+              <View style={styles.heroRow}>
+                <View style={styles.avatarRing}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarInitials}>{getInitials(account.fullName)}</Text>
+                  </View>
+                </View>
+                <View style={styles.heroIdentity}>
+                  <Text style={styles.heroName} numberOfLines={1}>
+                    {account.fullName}
+                  </Text>
+                  <View style={styles.statusPill}>
+                    <View style={styles.statusDot} />
+                    <Text style={styles.statusText}>{t('mainTabs.Profile.activeStatus')}</Text>
+                  </View>
+                </View>
               </View>
-            ) : null}
-          </LinearGradient>
+            </LinearGradient>
+
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('mainTabs.Profile.detailsTitle')}</Text>
+            <View style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {[
+                { icon: 'phone' as const, label: t('mainTabs.Profile.detailPhone'), value: account.mobileNumber },
+                ...(account.email
+                  ? [{ icon: 'envelope' as const, label: t('mainTabs.Profile.detailEmail'), value: account.email }]
+                  : []),
+              ].map((row, index) => (
+                <View
+                  key={row.icon}
+                  style={[
+                    styles.detailRow,
+                    index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null,
+                  ]}
+                >
+                  <View style={[styles.detailIcon, { backgroundColor: `${colors.primary}14` }]}>
+                    <FontAwesome6 name={row.icon} size={13} color={colors.primary} solid />
+                  </View>
+                  <View style={styles.detailText}>
+                    <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{row.label}</Text>
+                    <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
+                      {row.value}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
         ) : null}
 
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('mainTabs.Profile.capabilitiesLabel')}</Text>
@@ -100,6 +128,8 @@ export function ProfileScreen({ navigation }: Props) {
           onAdd={() => navigation.navigate('BusinessRegistration')}
           colors={colors}
         />
+
+        <JobPostCard post={jobPost.data} onPress={() => navigation.navigate('JobPost')} />
 
         {worker ? <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} /> : null}
         {shop ? (
@@ -175,29 +205,36 @@ const styles = StyleSheet.create({
   // extra vertical-only padding layered on top of it).
   // Clears the floating CustomTabBar so the last review isn't hidden under it.
   body: { paddingBottom: 140 },
-  heroCard: {
-    borderRadius: 22,
-    padding: 22,
+  heroCard: { borderRadius: 22, padding: 16, marginBottom: 24, overflow: 'hidden' },
+  bubble: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' },
+  bubbleLarge: { width: 150, height: 150, top: -70, right: -40 },
+  bubbleSmall: { width: 90, height: 90, bottom: -50, left: -20 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  avatarRing: { width: 58, height: 58, borderRadius: 29, padding: 3, backgroundColor: 'rgba(255,255,255,0.28)' },
+  avatar: { flex: 1, borderRadius: 26, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  avatarInitials: { fontFamily: fonts.semiBold, fontSize: 22, lineHeight: 28, color: '#0055D3' },
+  heroIdentity: { flex: 1, gap: 6 },
+  heroName: { ...typography.subheading, fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 24, color: '#FFFFFF' },
+  statusPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    ...CARD_SHADOW,
-    shadowOpacity: 0.18,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+    borderColor: 'rgba(255,255,255,0.28)',
   },
-  avatarInitials: { ...typography.heading, fontFamily: fonts.semiBold, fontSize: 22, color: '#FFFFFF' },
-  heroName: { ...typography.heading, fontFamily: fonts.semiBold, fontSize: 19, color: '#FFFFFF', marginBottom: 8 },
-  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 3 },
-  heroMeta: { ...typography.caption, color: 'rgba(255,255,255,0.9)' },
+  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ADE80' },
+  statusText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11, color: '#FFFFFF' },
+  detailsCard: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, marginBottom: 24 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  detailIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  detailText: { flex: 1 },
+  detailLabel: { ...typography.caption, fontSize: 11 },
+  detailValue: { ...typography.body, fontFamily: fonts.medium, fontSize: 14, marginTop: 1 },
   sectionLabel: {
     ...typography.caption,
     fontFamily: fonts.semiBold,

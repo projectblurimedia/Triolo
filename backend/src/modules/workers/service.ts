@@ -22,11 +22,7 @@ export class WorkersService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async createProfile(
-    accountId: string,
-    dto: CreateWorkerProfileDto,
-    files: Express.Multer.File[],
-  ): Promise<WorkerProfile> {
+  async createProfile(accountId: string, dto: CreateWorkerProfileDto, files: Express.Multer.File[]): Promise<WorkerProfile> {
     const existing = await this.repository.findByAccountId(accountId);
     if (existing) {
       throw AppError.conflict('You already have a worker profile.', 'WORKER_PROFILE_EXISTS');
@@ -71,11 +67,7 @@ export class WorkersService {
     return rest;
   }
 
-  async updateProfile(
-    accountId: string,
-    dto: UpdateWorkerProfileDto,
-    files: Express.Multer.File[],
-  ): Promise<WorkerProfile> {
+  async updateProfile(accountId: string, dto: UpdateWorkerProfileDto, files: Express.Multer.File[]): Promise<WorkerProfile> {
     const existing = await this.repository.findByAccountId(accountId);
     if (!existing) {
       throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
@@ -177,5 +169,18 @@ export class WorkersService {
       throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
     }
     return updated;
+  }
+
+  adminCounts() {
+    return this.repository.adminCounts();
+  }
+
+  /** Admin removal of an account's profile (and its photos). False when there was none. */
+  async adminDeleteForAccount(accountId: string): Promise<boolean> {
+    const existing = await this.repository.findByAccountId(accountId);
+    if (!existing) return false;
+    await deletePhotosFromCloudinary(existing.portfolioPhotoUrls);
+    await this.repository.remove(accountId);
+    return true;
   }
 }

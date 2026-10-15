@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
@@ -8,6 +8,11 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { ProblemDetailModal } from '@/components/ProblemDetailModal';
 import { ShopHomeSection } from '@/components/ShopHomeSection';
+import { JobPostHomeSection } from '@/components/JobPostHomeSection';
+import { useMyJobPost } from '@/hooks/useJobPost';
+import { ContinueSteps } from '@/components/ContinueSteps';
+import { FindJobsButton } from '@/components/FindJobsButton';
+import { navigateToBookings } from '@/navigation/navigationRef';
 import { useQueryClient } from '@tanstack/react-query';
 import { openJob } from '@/state/jobFocusStore';
 import { jobQueryKey } from '@/hooks/useJobs';
@@ -24,6 +29,7 @@ import { ApiError } from '@/services/apiClient';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistance } from '@/utils/formatDistance';
 import { PullToRefresh } from '@/components/PullToRefresh';
+import { SmartImage } from '@/components/SmartImage';
 
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const FINISHED_PREVIEW_LIMIT = 5;
@@ -39,6 +45,10 @@ const MODAL_HANDOFF_MS = 350;
  *  - Finished Jobs: the last few the customer confirmed.
  * Only for a verified Worker capability — a Business-only partner sees an explanation.
  */
+type HomeSide = 'shop' | 'worker' | 'job';
+const SIDE_ICONS = { shop: 'store', worker: 'screwdriver-wrench', job: 'user-tie' } as const;
+const SIDE_LABELS = { shop: 'shopHome.myShop', worker: 'shopHome.myServices', job: 'jobPost.homeTab' } as const;
+
 export function HomeScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
@@ -49,15 +59,25 @@ export function HomeScreen() {
   const isVerifiedShop = businessProfile.data?.verificationStatus === 'verified';
   const shopOrders = useShopOrders(isVerifiedShop);
   const newOrderCount = (shopOrders.data ?? []).filter((order) => order.status === 'placed').length;
-  // A partner with both a worker and a shop profile switches Home between them. Until they
-  // pick, it shows the shop when an order is waiting, otherwise their worker jobs.
-  const [pickedSide, setPickedSide] = useState<'shop' | 'worker' | null>(null);
-  const isDual = isVerifiedWorker && isVerifiedShop;
-  const side: 'shop' | 'worker' = isDual
-    ? (pickedSide ?? (newOrderCount > 0 ? 'shop' : 'worker'))
-    : isVerifiedShop
-      ? 'shop'
-      : 'worker';
+  // Home switches between the partner's sides: their shop, their services (worker jobs) and
+  // their "looking for work" post. Until they pick, it shows the shop when an order is waiting,
+  // otherwise their worker jobs, otherwise the shop.
+  const [pickedSide, setPickedSide] = useState<HomeSide | null>(null);
+  // Only what the partner has made: a verified shop, verified services, a job post. Adding
+  // or editing any of them lives in the menu (SettingsMenuModal → My Profiles).
+  const jobPost = useMyJobPost();
+  const hasJobPost = !!jobPost.data;
+  // All three answers together, so the switch never shows two sides and then a third.
+  const profilesLoading = workerProfile.isLoading || businessProfile.isLoading || jobPost.isLoading;
+  const ownSides: HomeSide[] = [
+    ...(isVerifiedShop ? ['shop' as const] : []),
+    ...(isVerifiedWorker ? ['worker' as const] : []),
+    ...(hasJobPost ? ['job' as const] : []),
+  ];
+  const sides: HomeSide[] = ownSides.length > 0 ? ownSides : ['job'];
+  const defaultSide: HomeSide =
+    isVerifiedShop && (newOrderCount > 0 || !isVerifiedWorker) ? 'shop' : isVerifiedWorker ? 'worker' : 'job';
+  const side: HomeSide = pickedSide && sides.includes(pickedSide) ? pickedSide : defaultSide;
   const nearby = useNearbyProblems(isVerifiedWorker);
   const assigned = useAssignedProblems(isVerifiedWorker);
   const acceptProblem = useAcceptProblem();
@@ -125,7 +145,7 @@ export function HomeScreen() {
       >
         {photoUrls.map((url) => (
           <Pressable key={url} onPress={onPress} disabled={!onPress}>
-            <Image source={{ uri: url }} style={styles.photo} />
+            <SmartImage source={{ uri: url }} style={styles.photo} />
           </Pressable>
         ))}
       </ScrollView>
@@ -160,14 +180,17 @@ export function HomeScreen() {
         key={job.id}
         disabled={!tripId}
         onPress={() => tripId && openJob(tripId)}
-        style={[styles.card, { backgroundColor: colors.surface, borderColor: brandColors.success }]}
+        style={[styles.card, { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` }]}
       >
         <View style={styles.cardHeader}>
           <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
-            {skillLabel(job.skillCategories)}
+            {job.customerFullName}
           </Text>
           {renderStatusPill(statusLabel, isWorkDone ? brandColors.warning : brandColors.success)}
         </View>
+        <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
+          {skillLabel(job.skillCategories)}
+        </Text>
         <Text style={[styles.quotation, { color: colors.primary }]}>₹{job.quotationAmount.toLocaleString('en-IN')}</Text>
 
         <View style={[styles.customerRow, { backgroundColor: `${colors.primary}0F` }]}>
@@ -297,6 +320,8 @@ export function HomeScreen() {
 
     return (
       <>
+        <FindJobsButton variant="card" onFound={() => navigateToBookings('jobs', 'requests')} />
+
         {activeJobs.length > 0 ? (
           <>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('problems.myJobsTitle')}</Text>
@@ -346,15 +371,17 @@ export function HomeScreen() {
             </Text>
           ) : null}
 
-          {workerProfile.isLoading ? (
+          <ContinueSteps isShop={isVerifiedShop} />
+
+          {profilesLoading ? (
             <View style={styles.loading}>
               <LoadingIndicator size={36} dotSize={5} color={colors.primary} />
             </View>
           ) : null}
 
-          {isDual ? (
+          {!profilesLoading && sides.length > 1 ? (
             <View style={[styles.sideSwitch, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-              {(['shop', 'worker'] as const).map((value) => {
+              {sides.map((value) => {
                 const active = side === value;
                 return (
                   <Pressable
@@ -362,14 +389,14 @@ export function HomeScreen() {
                     onPress={() => setPickedSide(value)}
                     style={[styles.sideOption, active ? { backgroundColor: colors.primary } : null]}
                   >
-                    <FontAwesome6
-                      name={value === 'shop' ? 'store' : 'screwdriver-wrench'}
-                      size={12}
-                      color={active ? '#FFFFFF' : colors.textMuted}
-                      solid
-                    />
-                    <Text style={[styles.sideText, { color: active ? '#FFFFFF' : colors.textMuted }]}>
-                      {t(value === 'shop' ? 'shopHome.myShop' : 'shopHome.myServices')}
+                    <FontAwesome6 name={SIDE_ICONS[value]} size={12} color={active ? '#FFFFFF' : colors.textMuted} solid />
+                    <Text
+                      style={[styles.sideText, { color: active ? '#FFFFFF' : colors.textMuted }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                    >
+                      {t(SIDE_LABELS[value])}
                     </Text>
                     {value === 'shop' && newOrderCount > 0 ? (
                       <View style={[styles.sideBadge, { backgroundColor: active ? '#FFFFFF' : brandColors.error }]}>
@@ -384,7 +411,9 @@ export function HomeScreen() {
             </View>
           ) : null}
 
-          {workerProfile.isLoading ? null : side === 'shop' && isVerifiedShop && businessProfile.data ? (
+          {profilesLoading ? null : side === 'job' ? (
+            <JobPostHomeSection />
+          ) : side === 'shop' && isVerifiedShop && businessProfile.data ? (
             <ShopHomeSection profile={businessProfile.data} />
           ) : isVerifiedWorker ? (
             renderWorkerBody()

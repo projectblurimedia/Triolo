@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dimensions, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import { PhotoViewer } from './PhotoViewer';
 import { ToastHost } from './ToastHost';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { formatDistance } from '@/utils/formatDistance';
+import { SmartImage } from './SmartImage';
 
 /** What this screen needs — both a nearby (open) problem and an accepted one fit. */
 export interface ProblemDetails {
@@ -64,7 +65,7 @@ export function ProblemDetailModal({ problem, onClose, onAccept, accepting }: Pr
           onMomentumScrollEnd={(event) => setGalleryIndex(Math.round(event.nativeEvent.contentOffset.x / width))}
           renderItem={({ item, index }) => (
             <Pressable onPress={() => setViewerIndex(index)} accessibilityLabel={t('problemDetail.viewPhoto')}>
-              <Image source={{ uri: item }} style={{ width, height: GALLERY_HEIGHT }} resizeMode="cover" />
+              <SmartImage source={{ uri: item }} style={{ width, height: GALLERY_HEIGHT }} resizeMode="cover" />
             </Pressable>
           )}
         />

@@ -50,7 +50,12 @@ beforeEach(() => {
     createForAcceptedProblem: jest.fn().mockResolvedValue('trip-1'),
     getStatuses: jest.fn().mockResolvedValue(new Map()),
   } as unknown as jest.Mocked<BookingsService>;
-  service = new ProblemsService(repository as unknown as ProblemsRepository, workersService, notificationsService, bookingsService);
+  service = new ProblemsService(
+    repository as unknown as ProblemsRepository,
+    workersService,
+    notificationsService,
+    bookingsService,
+  );
 });
 
 function buildFile(): Express.Multer.File {
@@ -129,7 +134,11 @@ describe('updatePost', () => {
 
     await service.updatePost('account-1', 'post-1', { ...dto, keepPhotoUrls: ['https://cdn/a.jpg'] });
 
-    expect(repository.update).toHaveBeenCalledWith('post-1', 'account-1', expect.objectContaining({ photoUrls: ['https://cdn/a.jpg'] }));
+    expect(repository.update).toHaveBeenCalledWith(
+      'post-1',
+      'account-1',
+      expect.objectContaining({ photoUrls: ['https://cdn/a.jpg'] }),
+    );
     expect(deletePhotosFromCloudinary).toHaveBeenCalledWith(['https://cdn/b.jpg']);
   });
 
@@ -137,9 +146,16 @@ describe('updatePost', () => {
     repository.findByIdForAccount.mockResolvedValue(buildPost({ photoUrls: ['https://cdn/a.jpg'] }));
     repository.update.mockResolvedValue(buildPost());
 
-    await service.updatePost('account-1', 'post-1', { ...dto, keepPhotoUrls: ['https://cdn/a.jpg', 'https://evil.example/x.jpg'] });
+    await service.updatePost('account-1', 'post-1', {
+      ...dto,
+      keepPhotoUrls: ['https://cdn/a.jpg', 'https://evil.example/x.jpg'],
+    });
 
-    expect(repository.update).toHaveBeenCalledWith('post-1', 'account-1', expect.objectContaining({ photoUrls: ['https://cdn/a.jpg'] }));
+    expect(repository.update).toHaveBeenCalledWith(
+      'post-1',
+      'account-1',
+      expect.objectContaining({ photoUrls: ['https://cdn/a.jpg'] }),
+    );
   });
 
   it('refuses to edit once a worker has accepted', async () => {
@@ -266,7 +282,12 @@ describe('acceptProblem', () => {
 
     expect(repository.accept).toHaveBeenCalledWith('post-1', 'worker-1', 'worker-account-1');
     expect(bookingsService.createForAcceptedProblem).toHaveBeenCalledWith(
-      expect.objectContaining({ customerAccountId: 'account-1', workerId: 'worker-1', problemPostId: 'post-1', quotationAmount: 500 }),
+      expect.objectContaining({
+        customerAccountId: 'account-1',
+        workerId: 'worker-1',
+        problemPostId: 'post-1',
+        quotationAmount: 500,
+      }),
     );
     expect(repository.setBookingRequest).toHaveBeenCalledWith('post-1', 'trip-1');
     expect(post.status).toBe('accepted');

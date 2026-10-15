@@ -8,6 +8,7 @@ import { QuickBookModal } from './QuickBookModal';
 import { YourProblemsModal } from './YourProblemsModal';
 import { MyBookingsModal } from './MyBookingsModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { HireStaffModal } from './HireStaffModal';
 
 interface ServicesMenuDrawerProps {
   visible: boolean;
@@ -23,8 +24,9 @@ const BLUE_GRADIENT = headerGradient;
 const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
 const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
 const PINK_GRADIENT = ['#DB2777', '#F472B6'] as const;
+const TEAL_GRADIENT = ['#0D9488', '#2DD4BF'] as const;
 
-type ServicesMenuItemKey = 'quickBook' | 'yourProblems' | 'myBookings' | 'favoriteWorkers';
+type ServicesMenuItemKey = 'quickBook' | 'yourProblems' | 'hireStaff' | 'myBookings' | 'favoriteWorkers';
 
 const ITEMS: {
   key: ServicesMenuItemKey;
@@ -83,6 +85,16 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
             setActiveItem('yourProblems');
           }}
         />
+        <DrawerMenuItem
+          icon="user-tie"
+          gradient={TEAL_GRADIENT}
+          title={t('hireStaff.menuTitle')}
+          subtitle={t('hireStaff.menuSubtitle')}
+          onPress={() => {
+            onClose();
+            setActiveItem('hireStaff');
+          }}
+        />
 
         <Text style={[styles.sectionTitle, styles.sectionSpacing, { color: colors.textMuted }]}>
           {t('servicesMenu.manageSection')}
@@ -111,6 +123,7 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
 
       <QuickBookModal visible={activeItem === 'quickBook'} onClose={() => setActiveItem(null)} />
       <YourProblemsModal visible={activeItem === 'yourProblems'} onClose={() => setActiveItem(null)} />
+      <HireStaffModal visible={activeItem === 'hireStaff'} onClose={() => setActiveItem(null)} />
       <MyBookingsModal visible={activeItem === 'myBookings'} onClose={() => setActiveItem(null)} />
 
       <FavoritesModal visible={activeItem === 'favoriteWorkers'} onClose={() => setActiveItem(null)} type="worker" />

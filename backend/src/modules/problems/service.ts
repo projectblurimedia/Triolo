@@ -8,7 +8,17 @@ import { BookingsService } from '@/modules/bookings/service';
 import { BookingLifecycleListener } from '@/modules/bookings/interfaces';
 import { ProblemsRepository } from './repository';
 import { CompleteProblemDto, CreateProblemPostDto, UpdateProblemPostDto } from './dto';
-import { AssignedProblem, NearbyProblem, OwnProblemPost, ProblemPost, ProblemTransitionResult, RatedJob, WithTripStatus } from './interfaces';
+import {
+  AssignedProblem,
+  NearbyProblem,
+  OwnProblemPost,
+  ProblemPost,
+  ProblemTransitionResult,
+  RatedJob,
+  WithTripStatus,
+  AdminProblemListFilter,
+  AdminProblemPost,
+} from './interfaces';
 import { problemPushTemplates } from './pushTemplates';
 
 const PROBLEM_PHOTOS_FOLDER = 'triolo/problems';
@@ -254,12 +264,7 @@ export class ProblemsService implements BookingLifecycleListener {
    * Saved as an in-app notification (so it shows in the recipient's notification list in
    * either app) plus a best-effort push. The push never fails the transition itself.
    */
-  private async push(
-    result: ProblemTransitionResult,
-    text: { title: string; body: string },
-    kind: PushKind,
-    bookingId?: string,
-  ) {
+  private async push(result: ProblemTransitionResult, text: { title: string; body: string }, kind: PushKind, bookingId?: string) {
     // `bookingId` lets a tap open the trip tracker straight away.
     const data: Record<string, string> = { kind, problemId: result.post.id };
     if (bookingId) data.bookingId = bookingId;
@@ -279,6 +284,39 @@ export class ProblemsService implements BookingLifecycleListener {
       bookingStatus: post.bookingRequestId ? (statuses.get(post.bookingRequestId) ?? null) : null,
     }));
   }
+
+  // --- Admin ---
+
+  adminList(filter: AdminProblemListFilter) {
+    return this.repository.adminList(filter);
+  }
+
+  async adminGet(id: string): Promise<AdminProblemPost> {
+    const post = await this.repository.adminGet(id);
+    if (!post) throw AppError.notFound('Problem post not found.', 'PROBLEM_NOT_FOUND');
+    return post;
+  }
+
+  /**
+   * Takes an open post down. A post a worker already took is stopped by cancelling its trip
+   * (bookings) instead, which reopens it — then it can be closed here.
+   */
+  async adminClose(id: string, reason: string | null): Promise<ProblemPost> {
+    const closed = await this.repository.adminClose(id, reason);
+    if (!closed) {
+      await this.adminGet(id);
+      throw AppError.conflict('Only an open problem can be closed. Cancel its booking first.', 'PROBLEM_NOT_OPEN');
+    }
+    return closed;
+  }
+
+  adminCloseOpenForAccount(accountId: string, reason: string | null) {
+    return this.repository.adminCloseOpenForAccount(accountId, reason);
+  }
+
+  adminCounts() {
+    return this.repository.adminCounts();
+  }
 }
 
 /** Haversine distance in meters, or null when either point is unknown. */
@@ -286,7 +324,6 @@ function distanceBetween(lat1: number | null, lng1: number | null, lat2: number 
   if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
   const toRad = (degrees: number) => (degrees * Math.PI) / 180;
   const a =
-    Math.sin(toRad(lat2 - lat1) / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lng2 - lng1) / 2) ** 2;
+    Math.sin(toRad(lat2 - lat1) / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lng2 - lng1) / 2) ** 2;
   return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(a)));
 }

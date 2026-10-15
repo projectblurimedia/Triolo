@@ -14,6 +14,7 @@ import { useCreateBusinessProfile, useDeleteBusinessProfile, useUpdateBusinessPr
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { BusinessProfile } from '@/services/businessesService';
+import { CancelButton } from './CancelButton';
 
 export const SHOP_GRADIENT = ['#F59E0B', '#D97706'] as const;
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
@@ -387,10 +388,7 @@ export function BusinessProfileModal({ visible, onClose, profile }: BusinessProf
           />
 
           {isEditMode ? (
-            <Pressable style={styles.deleteButton} onPress={() => setShowDeleteConfirm(true)}>
-              <FontAwesome6 name="trash" size={14} color={colors.error} solid />
-              <Text style={[styles.deleteText, { color: colors.error }]}>{t('businessProfile.deleteAction')}</Text>
-            </Pressable>
+            <CancelButton icon="trash" label={t('businessProfile.deleteAction')} onPress={() => setShowDeleteConfirm(true)} />
           ) : null}
         </ScrollView>
       </View>
@@ -453,13 +451,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   error: { ...typography.caption, marginBottom: 12 },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 18,
-    paddingVertical: 10,
-  },
-  deleteText: { ...typography.body, fontFamily: fonts.semiBold },
 });

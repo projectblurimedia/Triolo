@@ -20,11 +20,23 @@ const MESSAGES: Record<string, string> = {
   UNAUTHORIZED: 'Your session has expired. Please log in again.',
   FORBIDDEN: "You don't have permission to do that.",
   NOT_FOUND: "We couldn't find what you're looking for.",
+  ACCOUNT_SUSPENDED: 'This account is suspended.',
+  ACCOUNT_BLOCKED: 'This account has been banned.',
+  ADMIN_ACCOUNT_PROTECTED: 'Admin accounts cannot be suspended, banned or removed.',
+  BOOKING_INVALID_STATE: 'This booking is already finished.',
+  BOOKING_REQUEST_NOT_FOUND: 'That booking no longer exists.',
+  ORDER_INVALID_STATE: 'This order is already finished.',
+  ORDER_NOT_FOUND: 'That order no longer exists.',
+  PROBLEM_NOT_OPEN: 'Only a waiting problem post can be closed. Cancel its booking first.',
+  PROBLEM_NOT_FOUND: 'That problem post no longer exists.',
+  JOB_POST_NOT_FOUND: 'That job post no longer exists.',
 };
 
 export function getErrorMessage(err: unknown): string {
   if (err instanceof ApiError && err.code && MESSAGES[err.code]) {
     return MESSAGES[err.code];
   }
+  // An admin tool: the server's own message is clear enough when there's no friendlier one.
+  if (err instanceof ApiError && err.message) return err.message;
   return 'Something went wrong. Please try again.';
 }

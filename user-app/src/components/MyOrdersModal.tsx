@@ -55,7 +55,12 @@ export function MyOrdersModal({ visible, onClose }: { visible: boolean; onClose:
     const tone = isOrderOpen(item) && item.status === 'completed' ? brandColors.warning : statusColor(item.status);
     return (
       <Pressable
-        style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[
+          styles.card,
+          isOrderOpen(item)
+            ? { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` }
+            : { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
         onPress={() => openOrderTracker(item.id)}
       >
         <Avatar photoUrl={item.shop.photoUrl ?? undefined} name={item.shop.name} size={46} />

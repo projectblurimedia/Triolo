@@ -21,6 +21,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { MainTabParamList } from '@/navigation/types';
 import { PullToRefresh } from '@/components/PullToRefresh';
+import { HomeSearchModal } from '@/components/HomeSearchModal';
 
 const TOP_RATED_LIMIT = 10;
 /**
@@ -38,6 +39,7 @@ export function ServicesScreen() {
   const { colors } = useThemeColors();
   const { data: workerProfile } = useMyWorkerProfile();
   const [editVisible, setEditVisible] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<NearbyWorkerSort>('distance');
   const [selectedWorker, setSelectedWorker] = useState<WorkerNearbyResult | null>(null);
@@ -291,6 +293,17 @@ export function ServicesScreen() {
     <ScreenContainer edges={['left', 'right']}>
       <PullToRefresh refreshing={activeQuery.isRefetching} onRefresh={onRefresh}>
         <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <Pressable
+            style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setSearchVisible(true)}
+            accessibilityRole="search"
+          >
+            <FontAwesome6 name="magnifying-glass" size={15} color={colors.textMuted} solid />
+            <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
+              {t('services.searchPlaceholder')}
+            </Text>
+          </Pressable>
+
           {workerProfile ? <WorkerProfileCard profile={workerProfile} onEdit={() => setEditVisible(true)} /> : null}
 
           <View style={styles.titleRow}>
@@ -317,11 +330,24 @@ export function ServicesScreen() {
         result={selectedWorker}
       />
       <WorkerProfileModal visible={editVisible} onClose={() => setEditVisible(false)} profile={workerProfile} />
+      <HomeSearchModal visible={searchVisible} onClose={() => setSearchVisible(false)} initialScope="workers" />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  // Opens the full search screen, like Home's search bar.
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    marginBottom: 14,
+  },
+  searchPlaceholder: { flex: 1, fontSize: 14, fontFamily: fonts.regular },
   // Extra bottom padding clears the floating CustomTabBar.
   body: { paddingBottom: 120 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10 },

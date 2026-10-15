@@ -17,6 +17,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { LiveMap, MapPoint } from './LiveMap';
@@ -26,7 +27,7 @@ import { ProblemDetailModal } from './ProblemDetailModal';
 import { useAssignedProblems } from '@/hooks/useProblems';
 import { useJob, useJobAction } from '@/hooks/useJobs';
 import { useJobFocusStore } from '@/state/jobFocusStore';
-import { JobStatus, jobsService, WorkerJob } from '@/services/jobsService';
+import { JobStatus, jobsService, WORKER_CANCELLABLE_STATUSES, WorkerJob } from '@/services/jobsService';
 import { ApiError } from '@/services/apiClient';
 import { isTrackingTrip, startTripTracking, stopTripTracking } from '@/services/tripTracking';
 import { showToast } from '@/state/toastStore';
@@ -90,6 +91,7 @@ export function JobTrackingModal() {
   const [pinError, setPinError] = useState<string | null>(null);
   const pinInputRef = useRef<TextInput>(null);
   const [confirmDone, setConfirmDone] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   // This modal draws edge-to-edge, so Android doesn't resize it for the keyboard on its own:
   // while the PIN keyboard is up, the map hides and the screen shrinks to the space above
   // the keyboard, so the PIN boxes and Verify button stay in view.
@@ -112,6 +114,7 @@ export function JobTrackingModal() {
   const arrive = useJobAction(({ id }: { id: string }) => jobsService.arrive(id));
   const verifyPin = useJobAction(({ id, value }: { id: string; value: string }) => jobsService.verifyPin(id, value));
   const workDone = useJobAction(({ id }: { id: string }) => jobsService.workDone(id));
+  const cancelJob = useJobAction(({ id }: { id: string }) => jobsService.cancel(id));
 
   useEffect(() => {
     if (!visible) {
@@ -237,6 +240,20 @@ export function JobTrackingModal() {
     );
   };
 
+  const handleCancel = (j: WorkerJob) => {
+    cancelJob.mutate(
+      { id: j.id },
+      {
+        onSuccess: () => {
+          stopTripTracking();
+          showToast({ variant: 'info', title: t('job.cancelledToastTitle'), message: t('job.cancelledToastMessage') });
+        },
+        onError,
+        onSettled: () => setConfirmCancel(false),
+      },
+    );
+  };
+
   const jobPoint = job ? { latitude: job.latitude, longitude: job.longitude } : null;
   const workerPoint =
     myPosition ??
@@ -260,7 +277,11 @@ export function JobTrackingModal() {
         <View style={styles.flex}>
           <Text style={[styles.bannerTitle, { color: colors.text }]}>{t(`job.status.${j.status}.title`)}</Text>
           <Text style={[styles.bannerMessage, { color: colors.textMuted }]}>
-            {t(`job.status.${j.status}.message`, { name: j.customerFullName })}
+            {j.status === 'cancelled' && j.cancelledBy === 'admin'
+              ? `${t('job.adminCancelled')}${j.cancelReason ? ` ${t('job.reason', { reason: j.cancelReason })}` : ''}`
+              : j.status === 'cancelled' && j.cancelledBy === 'worker'
+                ? t('job.cancelledByYou')
+                : t(`job.status.${j.status}.message`, { name: j.customerFullName })}
             {MAP_STATUSES.includes(j.status) && distance != null
               ? ` · ${t('job.distanceAway', { distance: formatDistance(distance) })}`
               : ''}
@@ -461,6 +482,9 @@ export function JobTrackingModal() {
           {renderProblem(job)}
           {renderCustomer(job)}
           {renderFeedback(job)}
+          {WORKER_CANCELLABLE_STATUSES.includes(job.status) ? (
+            <CancelButton label={t('job.cancelJob')} hint={t('job.cancelHint')} onPress={() => setConfirmCancel(true)} />
+          ) : null}
         </ScrollView>
       </>
     );
@@ -491,7 +515,9 @@ export function JobTrackingModal() {
                   {status ? t(`job.status.${status}.title`) : t('job.title')}
                 </Text>
                 <Text style={styles.headerSubtitle} numberOfLines={1}>
-                  {job ? job.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ') : ''}
+                  {job
+                    ? `${job.customerFullName} · ${job.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}`
+                    : ''}
                 </Text>
               </View>
             </View>
@@ -513,10 +539,26 @@ export function JobTrackingModal() {
           onConfirm={() => job && handleWorkDone(job)}
           onCancel={() => setConfirmDone(false)}
         />
+
+        <ConfirmModal
+          visible={confirmCancel}
+          icon="ban"
+          gradient={CANCEL_GRADIENT}
+          title={t('job.confirmCancelTitle')}
+          message={t(job?.problemPostId ? 'job.confirmCancelProblemMessage' : 'job.confirmCancelMessage', {
+            name: job?.customerFullName ?? '',
+          })}
+          confirmLabel={t('job.cancelJob')}
+          loading={cancelJob.isPending}
+          onConfirm={() => job && handleCancel(job)}
+          onCancel={() => setConfirmCancel(false)}
+        />
       </View>
     </Modal>
   );
 }
+
+const CANCEL_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

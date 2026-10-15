@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -110,7 +111,9 @@ export function OrderTrackingModal() {
           <Text style={[styles.bannerMessage, { color: colors.textMuted }]}>
             {o.status === 'completed' && !o.shopRating
               ? t('orders.rateStepMessage')
-              : t(`orders.status.${o.status}.message`, { shop: o.shop.name })}
+              : o.status === 'cancelled' && o.cancelledBy === 'admin'
+                ? t('orders.adminCancelled')
+                : t(`orders.status.${o.status}.message`, { shop: o.shop.name })}
           </Text>
           {o.cancelReason ? (
             <Text style={[styles.bannerMessage, { color: colors.textMuted }]}>
@@ -374,9 +377,7 @@ export function OrderTrackingModal() {
           {renderShop(order)}
           {renderSteps(order)}
           {CUSTOMER_CANCELLABLE.includes(order.status) ? (
-            <Pressable style={styles.cancelLink} onPress={() => setConfirmCancel(true)} hitSlop={8}>
-              <Text style={[styles.cancelText, { color: brandColors.error }]}>{t('orders.cancel')}</Text>
-            </Pressable>
+            <CancelButton label={t('orders.cancel')} hint={t('orders.cancelHint')} onPress={() => setConfirmCancel(true)} />
           ) : null}
         </ScrollView>
       </PullToRefresh>
@@ -518,6 +519,4 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontSize: 14,
   },
-  cancelLink: { alignSelf: 'center', paddingVertical: 8 },
-  cancelText: { ...typography.body, fontFamily: fonts.semiBold },
 });

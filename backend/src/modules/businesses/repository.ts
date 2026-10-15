@@ -40,6 +40,7 @@ function mapBusinessProfileWithAccount(row: QueryResultRow): BusinessProfileWith
     accountFullName: row.account_full_name,
     accountMobileNumber: row.account_mobile_number,
     accountEmail: row.account_email,
+    accountStatus: row.account_status ?? 'active',
   };
 }
 
@@ -150,15 +151,25 @@ export class BusinessesRepository {
       params.push(filter.status);
       conditions.push(`b.verification_status = $${params.length}`);
     }
+    if (filter.q) {
+      params.push(`%${filter.q}%`);
+      conditions.push(
+        `(a.full_name ILIKE $${params.length} OR a.mobile_number ILIKE $${params.length} OR b.shop_name ILIKE $${params.length})`,
+      );
+    }
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const countResult = await this.pool.query(`SELECT COUNT(*) FROM business_profiles b ${whereClause}`, params);
+    const countResult = await this.pool.query(
+      `SELECT COUNT(*) FROM business_profiles b JOIN accounts a ON a.id = b.account_id ${whereClause}`,
+      params,
+    );
     const total = Number(countResult.rows[0].count);
 
     const offset = (filter.page - 1) * filter.limit;
     params.push(filter.limit, offset);
     const rows = await this.pool.query(
-      `SELECT b.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
+      `SELECT b.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email,
+              a.status AS account_status
        FROM business_profiles b
        JOIN accounts a ON a.id = b.account_id
        ${whereClause}
@@ -190,7 +201,8 @@ export class BusinessesRepository {
 
   async findById(id: string): Promise<BusinessProfileWithAccount | null> {
     const result = await this.pool.query(
-      `SELECT b.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email
+      `SELECT b.*, a.full_name AS account_full_name, a.mobile_number AS account_mobile_number, a.email AS account_email,
+              a.status AS account_status
        FROM business_profiles b
        JOIN accounts a ON a.id = b.account_id
        WHERE b.id = $1`,
@@ -225,7 +237,7 @@ export class BusinessesRepository {
            )))) AS distance_meters
          FROM business_profiles b
          JOIN accounts a ON a.id = b.account_id
-         WHERE b.verification_status = 'verified'
+         WHERE b.verification_status = 'verified' AND a.status = 'active'
            AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL
            AND b.account_id != $3
        ) sub
@@ -247,5 +259,23 @@ export class BusinessesRepository {
       ],
     );
     return result.rows.map((row) => ({ ...mapBusinessProfile(row), distanceMeters: Number(row.distance_meters) }));
+  }
+
+  /** Profile counts by verification state, for the admin dashboard. */
+  async adminCounts(): Promise<{ total: number; pending: number; verified: number; rejected: number }> {
+    const result = await this.pool.query(
+      `SELECT COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE verification_status = 'pending_verification') AS pending,
+              COUNT(*) FILTER (WHERE verification_status = 'verified') AS verified,
+              COUNT(*) FILTER (WHERE verification_status = 'rejected') AS rejected
+       FROM business_profiles`,
+    );
+    const row = result.rows[0];
+    return {
+      total: Number(row.total),
+      pending: Number(row.pending),
+      verified: Number(row.verified),
+      rejected: Number(row.rejected),
+    };
   }
 }

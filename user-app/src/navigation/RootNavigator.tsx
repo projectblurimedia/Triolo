@@ -7,6 +7,7 @@ import { useThemeColors } from '@/theme';
 import { AuthNavigator } from './AuthNavigator';
 import { AppNavigator } from './AppNavigator';
 import { LanguageSelectScreen } from '@/screens/auth/LanguageSelectScreen';
+import { navigationRef } from './navigationRef';
 
 export function RootNavigator() {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -45,7 +46,7 @@ export function RootNavigator() {
   };
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       {accessToken ? <AppNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );

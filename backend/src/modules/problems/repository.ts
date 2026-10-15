@@ -10,6 +10,8 @@ import {
   ProblemTransitionResult,
   RatedJob,
   UpdateProblemPostParams,
+  AdminProblemListFilter,
+  AdminProblemPost,
 } from './interfaces';
 
 function mapProblemPost(row: QueryResultRow): ProblemPost {
@@ -302,4 +304,100 @@ export class ProblemsRepository {
     );
     return mapTransition(result.rows[0]);
   }
+
+  // --- Admin ---
+
+  async adminList(
+    filter: AdminProblemListFilter,
+  ): Promise<{ items: AdminProblemPost[]; total: number; page: number; limit: number }> {
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    const groups: Record<string, string> = {
+      open: `p.status = 'open'`,
+      in_progress: `p.status IN ('accepted', 'work_done')`,
+      completed: `p.status = 'completed'`,
+      closed: `p.status = 'closed'`,
+    };
+    if (filter.group) conditions.push(groups[filter.group]);
+    if (filter.accountId) {
+      values.push(filter.accountId);
+      conditions.push(`(p.account_id = $${values.length} OR w.account_id = $${values.length})`);
+    }
+    if (filter.q) {
+      values.push(`%${filter.q}%`);
+      const i = values.length;
+      conditions.push(
+        `(ca.full_name ILIKE $${i} OR ca.mobile_number ILIKE $${i} OR wa.full_name ILIKE $${i} OR p.location_address ILIKE $${i} OR p.description ILIKE $${i})`,
+      );
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const count = await this.pool.query(`SELECT COUNT(*) ${ADMIN_FROM} ${where}`, values);
+    values.push(filter.limit, (filter.page - 1) * filter.limit);
+    const rows = await this.pool.query(
+      `${ADMIN_SELECT} ${ADMIN_FROM} ${where} ORDER BY p.created_at DESC LIMIT $${values.length - 1} OFFSET $${values.length}`,
+      values,
+    );
+    return { items: rows.rows.map(mapAdminPost), total: Number(count.rows[0].count), page: filter.page, limit: filter.limit };
+  }
+
+  async adminGet(id: string): Promise<AdminProblemPost | null> {
+    const result = await this.pool.query(`${ADMIN_SELECT} ${ADMIN_FROM} WHERE p.id = $1`, [id]);
+    return result.rows[0] ? mapAdminPost(result.rows[0]) : null;
+  }
+
+  /** open → closed, with the admin's reason. Null if the post isn't open any more. */
+  async adminClose(id: string, reason: string | null): Promise<ProblemPost | null> {
+    const result = await this.pool.query(
+      `UPDATE problem_posts SET status = 'closed', closed_reason = $2, closed_at = now()
+       WHERE id = $1 AND status = 'open' RETURNING *`,
+      [id, reason],
+    );
+    return result.rows[0] ? mapProblemPost(result.rows[0]) : null;
+  }
+
+  /** Closes every open post of an account (when the admin suspends or bans it). */
+  async adminCloseOpenForAccount(accountId: string, reason: string | null): Promise<number> {
+    const result = await this.pool.query(
+      `UPDATE problem_posts SET status = 'closed', closed_reason = $2, closed_at = now()
+       WHERE account_id = $1 AND status = 'open'`,
+      [accountId, reason],
+    );
+    return result.rowCount ?? 0;
+  }
+
+  async adminCounts(): Promise<{ open: number; inProgress: number; completed: number; closed: number }> {
+    const result = await this.pool.query(
+      `SELECT COUNT(*) FILTER (WHERE status = 'open') AS open,
+              COUNT(*) FILTER (WHERE status IN ('accepted', 'work_done')) AS in_progress,
+              COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+              COUNT(*) FILTER (WHERE status = 'closed') AS closed
+       FROM problem_posts`,
+    );
+    const row = result.rows[0];
+    return {
+      open: Number(row.open),
+      inProgress: Number(row.in_progress),
+      completed: Number(row.completed),
+      closed: Number(row.closed),
+    };
+  }
+}
+
+const ADMIN_SELECT = `SELECT p.*, ca.full_name AS customer_full_name, ca.mobile_number AS customer_mobile_number,
+  wa.full_name AS worker_full_name, wa.mobile_number AS worker_mobile_number`;
+const ADMIN_FROM = `FROM problem_posts p
+  JOIN accounts ca ON ca.id = p.account_id
+  LEFT JOIN worker_profiles w ON w.id = p.accepted_worker_id
+  LEFT JOIN accounts wa ON wa.id = w.account_id`;
+
+function mapAdminPost(row: QueryResultRow): AdminProblemPost {
+  return {
+    ...mapProblemPost(row),
+    customerFullName: row.customer_full_name,
+    customerMobileNumber: row.customer_mobile_number,
+    workerFullName: row.worker_full_name ?? null,
+    workerMobileNumber: row.worker_mobile_number ?? null,
+    closedReason: row.closed_reason ?? null,
+    closedAt: row.closed_at ?? null,
+  };
 }

@@ -46,7 +46,7 @@ export interface ShopOrder {
   itemsTotal: number | null;
   totalAmount: number | null;
   note: string | null;
-  cancelledBy: 'customer' | 'shop' | null;
+  cancelledBy: 'customer' | 'shop' | 'admin' | null;
   cancelReason: string | null;
   shopRating: number | null;
   shopReview: string | null;

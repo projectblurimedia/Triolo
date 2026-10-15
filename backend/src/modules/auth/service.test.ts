@@ -21,6 +21,11 @@ function createMockRepository(): MockRepository {
     createRefreshToken: jest.fn(),
     findRefreshTokenBySelector: jest.fn(),
     revokeRefreshToken: jest.fn(),
+    revokeAllRefreshTokens: jest.fn(),
+    liftExpiredSuspension: jest.fn(),
+    adminList: jest.fn(),
+    adminSetStatus: jest.fn(),
+    adminStats: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -36,6 +41,8 @@ function buildAccount(overrides: Partial<Account> = {}): Account {
     latitude: 17.385,
     longitude: 78.4867,
     locationAddress: 'Hyderabad, Telangana',
+    suspendedUntil: null,
+    statusReason: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -156,9 +163,10 @@ describe('AuthService.verifyRegistrationOtp', () => {
 
     const service = new AuthService(repo as unknown as AuthRepository);
 
-    await expect(
-      service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' }),
-    ).rejects.toMatchObject({ statusCode: 400, code: 'OTP_CONTEXT_MISSING' });
+    await expect(service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' })).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'OTP_CONTEXT_MISSING',
+    });
 
     expect(repo.createAccount).not.toHaveBeenCalled();
   });
@@ -209,9 +217,10 @@ describe('AuthService.verifyRegistrationOtp', () => {
 
     const service = new AuthService(repo as unknown as AuthRepository);
 
-    await expect(
-      service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '000000' }),
-    ).rejects.toMatchObject({ statusCode: 400, code: 'OTP_INVALID' });
+    await expect(service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '000000' })).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'OTP_INVALID',
+    });
 
     expect(repo.incrementOtpAttempts).toHaveBeenCalledWith('otp-1');
     expect(repo.createAccount).not.toHaveBeenCalled();
@@ -234,9 +243,10 @@ describe('AuthService.verifyRegistrationOtp', () => {
 
     const service = new AuthService(repo as unknown as AuthRepository);
 
-    await expect(
-      service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' }),
-    ).rejects.toMatchObject({ statusCode: 400, code: 'OTP_EXPIRED' });
+    await expect(service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' })).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'OTP_EXPIRED',
+    });
   });
 
   it('rejects once attempt limit is exceeded', async () => {
@@ -256,9 +266,10 @@ describe('AuthService.verifyRegistrationOtp', () => {
 
     const service = new AuthService(repo as unknown as AuthRepository);
 
-    await expect(
-      service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' }),
-    ).rejects.toMatchObject({ statusCode: 400, code: 'OTP_ATTEMPTS_EXCEEDED' });
+    await expect(service.verifyRegistrationOtp({ mobileNumber: '9876543210', otp: '111111' })).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'OTP_ATTEMPTS_EXCEEDED',
+    });
   });
 });
 
@@ -317,9 +328,10 @@ describe('AuthService.requestLoginOtp / verifyLoginOtp', () => {
 
     const service = new AuthService(repo as unknown as AuthRepository);
 
-    await expect(
-      service.verifyLoginOtp({ mobileNumber: '9876543210', otp: '222222' }),
-    ).rejects.toMatchObject({ statusCode: 403, code: 'ACCOUNT_NOT_ACTIVE' });
+    await expect(service.verifyLoginOtp({ mobileNumber: '9876543210', otp: '222222' })).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'ACCOUNT_BLOCKED',
+    });
   });
 });
 
@@ -423,5 +435,63 @@ describe('AuthService.getAccount', () => {
     const service = new AuthService(repo as unknown as AuthRepository);
 
     await expect(service.getAccount('account-1')).resolves.toMatchObject({ id: 'account-1' });
+  });
+});
+
+describe('admin moderation', () => {
+  it('suspends for N days with a reason and signs the account out everywhere', async () => {
+    const repo = createMockRepository();
+    repo.findAccountById.mockResolvedValue(buildAccount());
+    repo.adminSetStatus.mockImplementation(async (_id, status, until, reason) =>
+      buildAccount({ status, suspendedUntil: until, statusReason: reason }),
+    );
+    const service = new AuthService(repo as unknown as AuthRepository);
+
+    const before = Date.now();
+    const account = await service.adminModerate('account-1', 'suspend', { days: 3, reason: 'Spam' });
+
+    const until = (account.suspendedUntil as Date).getTime();
+    expect(account.status).toBe('suspended');
+    expect(until - before).toBeGreaterThanOrEqual(3 * 86_400_000 - 1000);
+    expect(until - before).toBeLessThanOrEqual(3 * 86_400_000 + 1000);
+    expect(repo.revokeAllRefreshTokens).toHaveBeenCalledWith('account-1');
+  });
+
+  it('refuses to ban an admin', async () => {
+    const repo = createMockRepository();
+    repo.findAccountById.mockResolvedValue(buildAccount({ role: 'admin' }));
+    const service = new AuthService(repo as unknown as AuthRepository);
+
+    await expect(service.adminModerate('account-1', 'ban')).rejects.toMatchObject({ code: 'ADMIN_ACCOUNT_PROTECTED' });
+    expect(repo.adminSetStatus).not.toHaveBeenCalled();
+  });
+
+  it('tells a suspended account until when, before sending any OTP', async () => {
+    const repo = createMockRepository();
+    const until = new Date(Date.now() + 86_400_000);
+    repo.findAccountByMobile.mockResolvedValue(
+      buildAccount({ status: 'suspended', suspendedUntil: until, statusReason: 'Spam' }),
+    );
+    const service = new AuthService(repo as unknown as AuthRepository);
+
+    await expect(service.requestLoginOtp({ mobileNumber: '9876543210' })).rejects.toMatchObject({
+      code: 'ACCOUNT_SUSPENDED',
+      details: { until: until.toISOString(), reason: 'Spam' },
+    });
+    expect(repo.createOtp).not.toHaveBeenCalled();
+  });
+
+  it('lifts a suspension that has ended', async () => {
+    const repo = createMockRepository();
+    repo.findAccountByMobile.mockResolvedValue(
+      buildAccount({ status: 'suspended', suspendedUntil: new Date(Date.now() - 1000) }),
+    );
+    repo.findAccountById.mockResolvedValue(buildAccount());
+    const service = new AuthService(repo as unknown as AuthRepository);
+
+    await service.requestLoginOtp({ mobileNumber: '9876543210' });
+
+    expect(repo.liftExpiredSuspension).toHaveBeenCalledWith('account-1');
+    expect(repo.createOtp).toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import { PreferredLanguage } from '@/modules/auth/interfaces';
 
-/** open → accepted → work_done → completed. 'closed' exists in the DB enum but is unused. */
+/** open → accepted → work_done → completed. 'closed': an open post the admin took down. */
 export type ProblemPostStatus = 'open' | 'closed' | 'accepted' | 'work_done' | 'completed';
 
 export const MAX_PROBLEM_PHOTOS = 5;
@@ -29,6 +29,26 @@ export interface ProblemPost {
    */
   bookingRequestId: string | null;
   createdAt: Date;
+}
+
+/** A post as the admin sees it: who posted it, who took it, and why it was closed. */
+export interface AdminProblemPost extends ProblemPost {
+  customerFullName: string;
+  customerMobileNumber: string;
+  workerFullName: string | null;
+  workerMobileNumber: string | null;
+  closedReason: string | null;
+  closedAt: Date | null;
+}
+
+export type AdminProblemGroup = 'open' | 'in_progress' | 'completed' | 'closed';
+
+export interface AdminProblemListFilter {
+  q?: string;
+  group?: AdminProblemGroup;
+  accountId?: string;
+  page: number;
+  limit: number;
 }
 
 /** A post plus its linked trip's live status (e.g. 'on_the_way'), for the job lists. */

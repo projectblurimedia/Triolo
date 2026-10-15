@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { FinishJobModal } from './FinishJobModal';
@@ -173,7 +174,14 @@ export function BookingTrackingModal() {
         <View style={styles.bannerText}>
           <Text style={[styles.bannerTitle, { color: colors.text }]}>{t(`tracking.status.${b.status}.title`)}</Text>
           <Text style={[styles.bannerMessage, { color: colors.textMuted }]}>
-            {t(`tracking.status.${b.status}.message`, { name: workerName })}
+            {b.status === 'cancelled' && b.cancelledBy === 'admin'
+              ? t('tracking.adminCancelled')
+              : b.status === 'cancelled' && b.cancelledBy === 'worker'
+                ? t(b.problemPostId ? 'tracking.workerCancelledProblem' : 'tracking.workerCancelled', { name: workerName })
+                : t(`tracking.status.${b.status}.message`, { name: workerName })}
+            {b.status === 'cancelled' && b.cancelledBy === 'admin' && b.cancelReason
+              ? ` ${t('tracking.reason', { reason: b.cancelReason })}`
+              : ''}
             {b.status === 'on_the_way' && distance != null
               ? ` · ${t('tracking.distanceAway', { distance: formatDistanceValue(distance) })}`
               : ''}
@@ -327,17 +335,11 @@ export function BookingTrackingModal() {
           <Text style={[styles.searchTitle, { color: colors.text }]}>{t('quickBook.searchingTitle')}</Text>
           <Text style={[styles.searchMessage, { color: colors.textMuted }]}>{t('quickBook.searchingMessage')}</Text>
           <Text style={[styles.searchSkills, { color: colors.primary }]}>{skillLabels}</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.cancelLink,
-              { backgroundColor: `${brandColors.error}${pressed ? '24' : '12'}`, borderColor: `${brandColors.error}59` },
-            ]}
+          <CancelButton
+            label={t('tracking.cancelBooking')}
+            hint={t('tracking.cancelHint')}
             onPress={() => setConfirmCancel(true)}
-            hitSlop={8}
-          >
-            <FontAwesome6 name="xmark" size={13} color={brandColors.error} solid />
-            <Text style={[styles.cancelLinkText, { color: brandColors.error }]}>{t('tracking.cancelBooking')}</Text>
-          </Pressable>
+          />
         </View>
       );
     }
@@ -377,18 +379,18 @@ export function BookingTrackingModal() {
           {renderRating(booking)}
           {renderLocation(booking)}
           {booking.status !== 'cancelled' ? renderSteps(booking) : null}
+          {/* The worker backed out of a Quick Book: one tap to find someone else. */}
+          {booking.status === 'cancelled' && booking.cancelledBy === 'worker' && !booking.problemPostId ? (
+            <View style={styles.actionWrap}>
+              <Button label={t('tracking.bookAgain')} onPress={handleBookAgain} loading={rebooking} />
+            </View>
+          ) : null}
           {canCancel ? (
-            <Pressable
-              style={({ pressed }) => [
-                styles.cancelLink,
-                { backgroundColor: `${brandColors.error}${pressed ? '24' : '12'}`, borderColor: `${brandColors.error}59` },
-              ]}
+            <CancelButton
+              label={t('tracking.cancelBooking')}
+              hint={t('tracking.cancelHint')}
               onPress={() => setConfirmCancel(true)}
-              hitSlop={8}
-            >
-              <FontAwesome6 name="xmark" size={13} color={brandColors.error} solid />
-              <Text style={[styles.cancelLinkText, { color: brandColors.error }]}>{t('tracking.cancelBooking')}</Text>
-            </Pressable>
+            />
           ) : null}
         </ScrollView>
       </>
@@ -503,17 +505,4 @@ const styles = StyleSheet.create({
   stepTitle: { ...typography.body, fontSize: 13, fontFamily: fonts.medium },
   stepTime: { ...typography.caption, fontSize: 11 },
   // A soft red pill, so cancelling is easy to find without competing with the main action.
-  cancelLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    alignSelf: 'center',
-    height: 44,
-    paddingHorizontal: 24,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    marginTop: 14,
-  },
-  cancelLinkText: { ...typography.body, fontFamily: fonts.semiBold },
 });

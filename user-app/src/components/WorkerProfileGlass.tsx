@@ -64,39 +64,22 @@ export function Stars({
   );
 }
 
-interface WorkerProfileHeroProps {
-  name: string;
+interface WorkerProfileFactsProps {
   skills: string[];
   ratingAverage: number | null;
   ratingCount: number;
   experienceYears: number;
-  /** Small line under the name, e.g. "1.2 km away" or "Your worker profile". */
-  subtitle?: string;
-  /** Rendered under the skills, e.g. a VerificationBadge. */
+  /** Shown above the tiles, e.g. a VerificationBadge. */
   badge?: ReactNode;
-  /** Extra top padding when the hero sits under the status bar. */
-  topInset?: number;
-  /** Rendered in the hero's top row, e.g. a back button. */
-  topLeft?: ReactNode;
-  /** Rendered at the right of that top row, e.g. a favorite heart. */
-  topRight?: ReactNode;
-  style?: StyleProp<ViewStyle>;
 }
 
-export function WorkerProfileHero({
-  name,
-  skills,
-  ratingAverage,
-  ratingCount,
-  experienceYears,
-  subtitle,
-  badge,
-  topInset = 0,
-  topLeft,
-  topRight,
-  style,
-}: WorkerProfileHeroProps) {
+/**
+ * The worker's key facts under the profile header: approval badge, three tiles (rating, rated
+ * jobs, experience) and their skills as chips.
+ */
+export function WorkerProfileFacts({ skills, ratingAverage, ratingCount, experienceYears, badge }: WorkerProfileFactsProps) {
   const { t } = useTranslation();
+  const { colors } = useThemeColors();
 
   const tiles: { icon: React.ComponentProps<typeof FontAwesome6>['name']; value: string; label: string; gold?: boolean }[] = [
     {
@@ -114,59 +97,42 @@ export function WorkerProfileHero({
   ];
 
   return (
-    <LinearGradient
-      colors={headerGradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.hero, { paddingTop: topInset + 16 }, style]}
-    >
-      {/* Soft light blobs behind the content — what makes the frosted tiles read as glass. */}
-      <View style={[styles.blob, styles.blobOne]} />
-      <View style={[styles.blob, styles.blobTwo]} />
-
-      {topLeft || topRight ? (
-        <View style={styles.heroTopRow}>
-          {topLeft ?? <View />}
-          {topRight ?? null}
-        </View>
-      ) : null}
-
-      <View style={styles.avatarRing}>
-        <LinearGradient colors={['#FFFFFF', '#DCEBFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
-          <Text style={styles.avatarText}>{initialsOf(name)}</Text>
-        </LinearGradient>
-      </View>
-      <Text style={styles.heroName} numberOfLines={1}>
-        {name}
-      </Text>
-      {subtitle ? <Text style={styles.heroSubtitle}>{subtitle}</Text> : null}
-      {skills.length > 0 ? (
-        <View style={styles.heroSkills}>
-          {skills.map((label) => (
-            <View key={label} style={styles.glassChip}>
-              <Text style={styles.glassChipText}>{label}</Text>
+    <View style={styles.facts}>
+      {badge ? <View style={styles.factsBadge}>{badge}</View> : null}
+      <View style={[styles.factsTiles, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {tiles.map((tile, index) => (
+          <View
+            key={tile.label}
+            style={[
+              styles.factsTile,
+              index > 0 ? { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border } : null,
+            ]}
+          >
+            <View style={[styles.factsIcon, { backgroundColor: tile.gold ? `${STAR_GOLD}22` : `${colors.primary}14` }]}>
+              <FontAwesome6 name={tile.icon} size={13} color={tile.gold ? STAR_GOLD : colors.primary} solid />
             </View>
-          ))}
-        </View>
-      ) : null}
-      {badge ? <View style={styles.heroBadge}>{badge}</View> : null}
-
-      <View style={styles.tiles}>
-        {tiles.map((tile) => (
-          <View key={tile.label} style={styles.glassTile}>
-            <View style={styles.tileValueRow}>
-              <FontAwesome6 name={tile.icon} size={13} color={tile.gold ? STAR_GOLD : '#FFFFFF'} solid />
-              <Text style={styles.tileValue} numberOfLines={1}>
-                {tile.value}
-              </Text>
-            </View>
-            <Text style={styles.tileLabel} numberOfLines={1}>
+            <Text style={[styles.factsValue, { color: colors.text }]} numberOfLines={1}>
+              {tile.value}
+            </Text>
+            <Text style={[styles.factsLabel, { color: colors.textMuted }]} numberOfLines={1}>
               {tile.label}
             </Text>
           </View>
         ))}
       </View>
-    </LinearGradient>
+      {skills.length > 0 ? (
+        <View style={styles.factsSkills}>
+          {skills.map((label) => (
+            <View
+              key={label}
+              style={[styles.factsSkill, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}33` }]}
+            >
+              <Text style={[styles.factsSkillText, { color: colors.primary }]}>{label}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -284,6 +250,16 @@ const GLASS_FILL = 'rgba(255,255,255,0.16)';
 const GLASS_BORDER = 'rgba(255,255,255,0.32)';
 
 const styles = StyleSheet.create({
+  facts: { gap: 12, marginBottom: 6 },
+  factsBadge: { alignItems: 'flex-start' },
+  factsTiles: { flexDirection: 'row', borderRadius: 18, borderWidth: 1, paddingVertical: 14 },
+  factsTile: { flex: 1, alignItems: 'center', gap: 4, paddingHorizontal: 4 },
+  factsIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  factsValue: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 21 },
+  factsLabel: { ...typography.caption, fontSize: 11 },
+  factsSkills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  factsSkill: { borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
+  factsSkillText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12.5 },
   flex: { flex: 1 },
   starsRow: { flexDirection: 'row', gap: 3 },
   hero: { borderRadius: 26, paddingHorizontal: 18, paddingBottom: 18, alignItems: 'center', overflow: 'hidden' },
@@ -293,7 +269,7 @@ const styles = StyleSheet.create({
   blobTwo: { width: 160, height: 160, bottom: -70, left: -50, backgroundColor: 'rgba(255,255,255,0.10)' },
   avatarRing: { padding: 4, borderRadius: 52, backgroundColor: GLASS_FILL, borderWidth: 1, borderColor: GLASS_BORDER },
   avatar: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontFamily: fonts.semiBold, fontSize: 30, lineHeight: 38, color: '#0055D3' },
+  avatarText: { fontFamily: fonts.semiBold, fontSize: 30, lineHeight: 38, color: '#FFFFFF' },
   heroName: { fontFamily: fonts.semiBold, fontSize: 21, lineHeight: 28, color: '#FFFFFF', marginTop: 12 },
   heroSubtitle: { ...typography.caption, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
   heroSkills: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 10 },

@@ -74,7 +74,11 @@ function buildOrder(overrides: Partial<ShopOrder> = {}): ShopOrder {
 }
 
 function transition(overrides: Partial<ShopOrder> = {}): OrderTransition {
-  return { order: buildOrder(overrides), notify: { accountId: 'customer-1', preferredLanguage: 'en' }, shopName: 'Sri Lakshmi Stores' };
+  return {
+    order: buildOrder(overrides),
+    notify: { accountId: 'customer-1', preferredLanguage: 'en' },
+    shopName: 'Sri Lakshmi Stores',
+  };
 }
 
 const orderDto = {
@@ -106,6 +110,8 @@ beforeEach(() => {
     cancelByShop: jest.fn(),
     languageOf: jest.fn().mockResolvedValue('te'),
     statusOf: jest.fn(),
+    adminCancel: jest.fn(),
+    adminActiveIdsForAccount: jest.fn(),
   } as unknown as MockRepository;
   businesses = {
     getPublicProfile: jest.fn(),
@@ -161,7 +167,13 @@ describe('customer steps', () => {
   it('cancels only while placed, and tells the shop', async () => {
     repo.cancelByCustomer.mockResolvedValue(transition({ status: 'cancelled' }));
     await service.cancelOrder('customer-1', 'order-1');
-    expect(notifications.notify).toHaveBeenCalledWith('customer-1', 'order_cancelled', expect.any(String), expect.any(String), expect.anything());
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'customer-1',
+      'order_cancelled',
+      expect.any(String),
+      expect.any(String),
+      expect.anything(),
+    );
 
     repo.cancelByCustomer.mockResolvedValue(null);
     repo.exists.mockResolvedValue(true);
@@ -175,7 +187,9 @@ describe('customer steps', () => {
 
     repo.rate.mockResolvedValue(null);
     repo.exists.mockResolvedValue(true);
-    await expect(service.rateOrder('customer-1', 'order-1', { rating: 4 })).rejects.toMatchObject({ code: 'ORDER_INVALID_STATE' });
+    await expect(service.rateOrder('customer-1', 'order-1', { rating: 4 })).rejects.toMatchObject({
+      code: 'ORDER_INVALID_STATE',
+    });
   });
 });
 
@@ -184,7 +198,13 @@ describe('shop steps', () => {
     repo.accept.mockResolvedValue(transition({ status: 'accepted' }));
     await service.acceptOrder('owner-1', 'order-1');
     expect(repo.accept).toHaveBeenCalledWith('order-1', 'shop-1');
-    expect(notifications.notify).toHaveBeenCalledWith('customer-1', 'order_accepted', 'Order Accepted', expect.any(String), expect.anything());
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'customer-1',
+      'order_accepted',
+      'Order Accepted',
+      expect.any(String),
+      expect.anything(),
+    );
   });
 
   it('explains why packing cannot finish yet', async () => {
@@ -212,7 +232,13 @@ describe('shop steps', () => {
     repo.markReady.mockResolvedValue(transition({ status: 'out_for_delivery', fulfillment: 'delivery' }));
     await service.markReady('owner-1', 'order-1');
     expect(repo.markReady).toHaveBeenCalledWith('order-1', 'shop-1', expect.stringMatching(/^\d{4}$/));
-    expect(notifications.notify).toHaveBeenCalledWith('customer-1', 'order_out_for_delivery', expect.any(String), expect.any(String), expect.anything());
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'customer-1',
+      'order_out_for_delivery',
+      expect.any(String),
+      expect.any(String),
+      expect.anything(),
+    );
   });
 
   it('completes on the right PIN and reports wrong / locked PINs', async () => {
@@ -225,12 +251,53 @@ describe('shop steps', () => {
     await expect(service.verifyPin('owner-1', 'order-1', '0000')).rejects.toMatchObject({ code: 'ORDER_PIN_LOCKED' });
     repo.verifyPin.mockResolvedValueOnce({ outcome: 'verified', transition: transition({ status: 'completed' }) });
     await service.verifyPin('owner-1', 'order-1', '1234');
-    expect(notifications.notify).toHaveBeenCalledWith('customer-1', 'order_completed', expect.any(String), expect.any(String), expect.anything());
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'customer-1',
+      'order_completed',
+      expect.any(String),
+      expect.any(String),
+      expect.anything(),
+    );
   });
 
   it('needs a business profile for every shop step', async () => {
     businesses.getMyProfile.mockResolvedValue(null);
     await expect(service.acceptOrder('someone', 'order-1')).rejects.toMatchObject({ code: 'BUSINESS_PROFILE_NOT_FOUND' });
     expect(await service.listShopOrders('someone')).toEqual([]);
+  });
+});
+
+describe('admin cancel', () => {
+  it('cancels at any step and tells the customer and the shop owner, each in their language, with the reason', async () => {
+    repo.adminCancel.mockResolvedValue({
+      order: buildOrder({ status: 'cancelled' }),
+      shopName: 'Sri Lakshmi Stores',
+      customer: { accountId: 'customer-1', preferredLanguage: 'en' },
+      shopOwner: { accountId: 'owner-1', preferredLanguage: 'te' },
+    });
+
+    await service.adminCancel('order-1', 'Reported by customer');
+
+    expect(repo.adminCancel).toHaveBeenCalledWith('order-1', 'Reported by customer');
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'customer-1',
+      'order_cancelled',
+      'Order Cancelled by Triolo',
+      expect.stringContaining('Reason: Reported by customer'),
+      expect.anything(),
+    );
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'owner-1',
+      'order_cancelled',
+      expect.any(String),
+      expect.stringContaining('కారణం'),
+      expect.anything(),
+    );
+  });
+
+  it('409s for a finished order', async () => {
+    repo.adminCancel.mockResolvedValue(null);
+    repo.exists.mockResolvedValue(true);
+    await expect(service.adminCancel('order-1', null)).rejects.toMatchObject({ code: 'ORDER_INVALID_STATE' });
   });
 });

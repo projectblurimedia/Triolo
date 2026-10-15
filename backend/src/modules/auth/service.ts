@@ -11,7 +11,15 @@ import {
   refreshExpiryToDate,
   signAccessToken,
 } from './jwt.util';
-import { Account, AuthTokens } from './interfaces';
+import {
+  Account,
+  AuthTokens,
+  AccountModerationAction,
+  AdminAccountListFilter,
+  AdminAccountListResult,
+  AdminAccountStats,
+} from './interfaces';
+import { forgetAccountStanding, standingError } from './accountAccess';
 import {
   LogoutDto,
   RefreshTokenDto,
@@ -83,10 +91,13 @@ export class AuthService {
   }
 
   async requestLoginOtp(dto: RequestLoginOtpDto): Promise<void> {
-    const account = await this.repository.findAccountByMobile(dto.mobileNumber);
+    const account = await this.liftIfExpired(await this.repository.findAccountByMobile(dto.mobileNumber));
     if (!account) {
       throw AppError.notFound('No account found for this mobile number.', 'ACCOUNT_NOT_FOUND');
     }
+    // A suspended or banned account is told why before any OTP is sent.
+    const standing = standingError(account.status, account.suspendedUntil, account.statusReason);
+    if (standing) throw standing;
 
     const otp = generateOtp();
     const otpHash = await hashOtp(otp);
@@ -103,13 +114,12 @@ export class AuthService {
   async verifyLoginOtp(dto: VerifyLoginOtpDto): Promise<{ account: Account; tokens: AuthTokens }> {
     await this.consumeValidOtp(dto.mobileNumber, dto.otp, 'login');
 
-    const account = await this.repository.findAccountByMobile(dto.mobileNumber);
+    const account = await this.liftIfExpired(await this.repository.findAccountByMobile(dto.mobileNumber));
     if (!account) {
       throw AppError.notFound('No account found for this mobile number.', 'ACCOUNT_NOT_FOUND');
     }
-    if (BLOCKED_STATUSES.has(account.status)) {
-      throw AppError.forbidden('This account has been suspended or blocked.', 'ACCOUNT_NOT_ACTIVE');
-    }
+    const standing = standingError(account.status, account.suspendedUntil, account.statusReason);
+    if (standing) throw standing;
 
     const tokens = await this.issueTokens(account);
     return { account, tokens };
@@ -134,7 +144,7 @@ export class AuthService {
     // Rotate: revoke the used token and issue a fresh pair.
     await this.repository.revokeRefreshToken(record.id);
 
-    const account = await this.repository.findAccountById(record.accountId);
+    const account = await this.liftIfExpired(await this.repository.findAccountById(record.accountId));
     if (!account || BLOCKED_STATUSES.has(account.status)) {
       throw AppError.unauthorized('Account is no longer active.');
     }
@@ -214,6 +224,61 @@ export class AuthService {
     });
 
     return { accessToken, refreshToken: token };
+  }
+
+  /** A suspension past its end date is lifted before anything checks it. */
+  private async liftIfExpired(account: Account | null): Promise<Account | null> {
+    if (account && account.status === 'suspended' && account.suspendedUntil && account.suspendedUntil <= new Date()) {
+      await this.repository.liftExpiredSuspension(account.id);
+      return this.repository.findAccountById(account.id);
+    }
+    return account;
+  }
+
+  // --- Admin ---
+
+  adminListAccounts(filter: AdminAccountListFilter): Promise<AdminAccountListResult> {
+    return this.repository.adminList(filter);
+  }
+
+  async adminGetAccount(accountId: string): Promise<Account> {
+    const account = await this.liftIfExpired(await this.repository.findAccountById(accountId));
+    if (!account) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
+    return account;
+  }
+
+  adminStats(): Promise<AdminAccountStats> {
+    return this.repository.adminStats();
+  }
+
+  /**
+   * Suspend (for `days`), ban permanently, or reactivate. A suspended or banned account is
+   * signed out everywhere at once. Admin accounts can't be moderated from here.
+   */
+  async adminModerate(
+    accountId: string,
+    action: AccountModerationAction,
+    options: { days?: number; reason?: string | null } = {},
+  ): Promise<Account> {
+    const account = await this.adminGetAccount(accountId);
+    if (account.role === 'admin') {
+      throw AppError.forbidden('Admin accounts cannot be suspended or banned.', 'ADMIN_ACCOUNT_PROTECTED');
+    }
+    const reason = options.reason?.trim() || null;
+    let updated: Account | null;
+    if (action === 'reactivate') {
+      updated = await this.repository.adminSetStatus(accountId, 'active', null, null);
+    } else if (action === 'suspend') {
+      const days = Math.min(365, Math.max(1, Math.round(options.days ?? 1)));
+      const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      updated = await this.repository.adminSetStatus(accountId, 'suspended', until, reason);
+    } else {
+      updated = await this.repository.adminSetStatus(accountId, 'blocked', null, reason);
+    }
+    if (!updated) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
+    if (action !== 'reactivate') await this.repository.revokeAllRefreshTokens(accountId);
+    forgetAccountStanding(accountId);
+    return updated;
   }
 }
 

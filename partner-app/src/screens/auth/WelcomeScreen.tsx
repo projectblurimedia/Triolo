@@ -52,6 +52,13 @@ export function WelcomeScreen({ navigation }: Props) {
           colors={colors}
           onPress={() => navigation.navigate('RegisterBusiness')}
         />
+        <EntryCard
+          icon="user-tie"
+          title={t('jobPost.lookingTitle')}
+          subtitle={t('jobPost.lookingSubtitle')}
+          colors={colors}
+          onPress={() => navigation.navigate('RegisterJobSeeker')}
+        />
       </View>
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>

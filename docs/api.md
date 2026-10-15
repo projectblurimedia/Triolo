@@ -148,30 +148,48 @@ Records that the caller viewed this business's profile (fired by `user-app` when
 
 ## Admin Module
 
-Every route requires `authorize('admin')` in addition to `authenticate` — a valid access token for a non-`admin` account gets `403 FORBIDDEN`, not just a hidden UI. `admin` accounts are provisioned via `backend/scripts/seedAdmin.ts` (`npm run seed:admin -- <mobileNumber> <fullName> [email]`), never self-registered — the admin then logs in through the same `/auth/login/*` endpoints above. This module has no data of its own — it lists/reviews the `worker_profiles`/`business_profiles` rows the Workers/Businesses modules already own, via those modules' own service layer (see `.cloud/architecture.md`'s Backend Module Boundaries).
+Every route requires `authorize('admin')` in addition to `authenticate` — a valid access token for a non-`admin` account gets `403 FORBIDDEN`. `admin` accounts are provisioned via `backend/scripts/seedAdmin.ts` (`npm run seed:admin -- <mobileNumber> <fullName> [email]`), never self-registered, and log in through `/auth/login/*`. The module owns no tables: every read and change goes through the owning module's service (see `.cloud/architecture.md`).
 
-### GET /admin/workers
-List worker profiles for review, each joined with its account's `fullName`/`mobileNumber`/`email`.
-- Auth: Bearer access token, `admin` role
-- Query: `status?: "pending_verification" | "verified" | "rejected"` (omit for all statuses), `page?: number` (default 1), `limit?: number` (default 20, max 100)
-- 200: `{ success: true, data: { items: WorkerProfile[] & { accountFullName, accountMobileNumber, accountEmail }[], total, page, limit } }`
+Lists all take `page` (default 1), `limit` (default 20, max 100) and `q` (free-text search), and return `{ items, total, page, limit }`. Every action that affects someone tells them (saved notification + push, in their language) — with the admin's `reason` when one is given (≤300 chars).
 
-### GET /admin/workers/:id
-Return one worker profile (by its own `id`, not `accountId`) with account contact info.
-- Auth: Bearer access token, `admin` role
-- 200: `{ success: true, data: WorkerProfile & { accountFullName, accountMobileNumber, accountEmail } }`
-- 404: `WORKER_PROFILE_NOT_FOUND`
+### GET /admin/stats
+Dashboard numbers: `{ accounts: { total, active, suspended, blocked, newToday }, workers: { total, pending, verified, rejected }, businesses: {…same}, jobPosts: { total, live }, bookings: { active, searching, completed, cancelled, today }, orders: { new, active, completed, cancelled, today }, problems: { open, inProgress, completed, closed } }` (admin accounts are not counted).
 
-### PATCH /admin/workers/:id/verification
-Approve or reject a worker profile.
-- Auth: Bearer access token, `admin` role
-- Body: `{ status: "verified" | "rejected" }`
-- 200: `{ success: true, message: "Verification status updated", data: WorkerProfile }`
-- 400: invalid status value
-- 404: `WORKER_PROFILE_NOT_FOUND`
+### Accounts
+- `GET /admin/accounts` — `q` (name, mobile, email), `status?: active|suspended|blocked`. Items are `Account` incl. `suspendedUntil`, `statusReason`.
+- `GET /admin/accounts/:id` — `{ account, workerProfile, businessProfile, jobPost, bookings: AdminBooking[], orders: AdminOrder[], problems: AdminProblem[] }` (latest 25 of each, as customer or provider).
+- `PATCH /admin/accounts/:id/status` — body `{ action: "suspend" | "ban" | "reactivate", days?: 1–365 (required for suspend), reason? }`. Suspend/ban: status `suspended` (until now + days) or `blocked`; every refresh token is revoked; their unfinished bookings and shop orders are cancelled (the other side told) and their open problem posts closed. 403 `ADMIN_ACCOUNT_PROTECTED` for an admin.
+- `POST /admin/accounts/:id/remove-profiles` — body `{ reason? }`. "Delete": cancels their unfinished activity, deletes their worker, shop and job post profiles (with photos), and bans the account. Past bookings/orders are kept. Returns `{ account, removed: { worker, shop, jobPost } }`.
 
-### GET /admin/businesses, GET /admin/businesses/:id, PATCH /admin/businesses/:id/verification
-Same shape as the three Worker endpoints above, `BusinessProfile`-flavored (`BUSINESS_PROFILE_NOT_FOUND` instead of `WORKER_PROFILE_NOT_FOUND`).
+A suspended or banned account gets `403 ACCOUNT_SUSPENDED` (details `{ until, reason }`) or `403 ACCOUNT_BLOCKED` (details `{ reason }`) from `/auth/login/request-otp`, `/auth/login/verify-otp`, and — via `authenticate` — from every authenticated endpoint within ~30 s of the change (per-instance cache). A suspension whose end has passed is lifted automatically on the next login or request.
+
+### Workers and shops (verification)
+- `GET /admin/workers`, `GET /admin/businesses` — `status?: pending_verification|verified|rejected`, `q` (name, mobile; shops also shop name). Items include `accountFullName`, `accountMobileNumber`, `accountEmail`, `accountStatus`.
+- `GET /admin/workers/:id`, `GET /admin/businesses/:id` — one profile with the same account fields. 404 `WORKER_PROFILE_NOT_FOUND` / `BUSINESS_PROFILE_NOT_FOUND`.
+- `PATCH /admin/workers/:id/verification`, `PATCH /admin/businesses/:id/verification` — body `{ status: "verified" | "rejected" }`.
+
+Suspended or banned workers, shops and job posters no longer appear in customer search, nearby lists or Quick Book broadcasts.
+
+### Bookings (Quick Book and problem trips)
+- `GET /admin/bookings` — `kind?: quick|problem`, `group?: active|completed|cancelled|expired`, `q` (customer/worker name or mobile, address, skill). Items: `AdminBooking` = the booking fields (incl. `cancelledBy: customer|worker|admin`, `cancelReason`) + `customer { accountId, fullName, mobileNumber }`, `worker { accountId, workerId, fullName, mobileNumber } | null`, `offerCount`. Never the arrival PIN.
+- `GET /admin/bookings/:id` — plus `offers: [{ workerId, fullName, mobileNumber, distanceMeters, status, createdAt }]`.
+- `POST /admin/bookings/:id/cancel` — body `{ reason? }`. Any unfinished step (`broadcasting` … `work_done`) → `cancelled`, `cancelledBy: "admin"`; the customer and the worker are both told ("Booking Cancelled by Triolo" + reason); a problem trip reopens its problem. 409 `BOOKING_INVALID_STATE` once finished.
+
+### Shop orders
+- `GET /admin/orders` — `group?: new|active|completed|cancelled` (cancelled includes declined and expired), `q` (customer, shop, owner). Items: `AdminOrder` = the order with its items + `customer {…}`, `shop { businessId, accountId, name, ownerName, mobileNumber }`. Never the PIN.
+- `GET /admin/orders/:id`
+- `POST /admin/orders/:id/cancel` — body `{ reason? }`. Any unfinished status → `cancelled`, `cancelledBy: "admin"`; the customer and the shop owner are both told. 409 `ORDER_INVALID_STATE` once finished.
+
+### Problem posts
+- `GET /admin/problems` — `group?: open|in_progress|completed|closed`, `q`. Items: the post + `customerFullName`, `customerMobileNumber`, `workerFullName`, `workerMobileNumber`, `closedReason`, `closedAt`.
+- `GET /admin/problems/:id`
+- `POST /admin/problems/:id/close` — body `{ reason? }`. Only an `open` post (`closed`; the customer is told). A post a worker took is stopped by cancelling its booking, which reopens it. 409 `PROBLEM_NOT_OPEN`.
+
+### Job posts
+- `GET /admin/job-posts` — `active?: true|false`, `q` (name, mobile, work, area). Items: the post + `fullName`, `mobileNumber`, `accountStatus`.
+- `GET /admin/job-posts/:id`
+- `PATCH /admin/job-posts/:id/active` — body `{ isActive, reason? }` (hide / show; the poster is told).
+- `POST /admin/job-posts/:id/remove` — body `{ reason? }`. Deletes the post and its photo; the poster is told.
 
 ## Notifications Module
 
@@ -250,7 +268,7 @@ The caller's own bookings, newest first (max 50) — feeds `user-app`'s My Booki
 One booking the caller made — polled by `user-app`'s tracker (dynamic interval: 3s while broadcasting, 4s during the trip, slower afterwards).
 - Auth: Bearer access token; scoped to the caller's own request
 - 200: `{ success: true, data: CustomerBooking }`:
-  `{ id, accountId, skillCategories, latitude, longitude, locationAddress, radiusKm, status, acceptedWorkerId, acceptedAt, startedAt, arrivedAt, pinVerifiedAt, workDoneAt, completedAt, cancelledAt, workerRating, workerReview, createdAt, arrivalPin: string|null, worker: { fullName, mobileNumber, skillCategories, ratingAverage, ratingCount, latitude, longitude, locationUpdatedAt } | null, acceptedWorkerFullName, acceptedWorkerSkillCategories }` — `arrivalPin` and `worker.latitude/longitude` are null outside `accepted`/`on_the_way`/`arrived`; the two `acceptedWorker*` fields are kept for older app builds
+  `{ id, accountId, skillCategories, latitude, longitude, locationAddress, radiusKm, status, acceptedWorkerId, acceptedAt, startedAt, arrivedAt, pinVerifiedAt, workDoneAt, completedAt, cancelledAt, cancelledBy: "customer"|"worker"|null, cancelReason: string|null, workerRating, workerReview, createdAt, arrivalPin: string|null, worker: { fullName, mobileNumber, skillCategories, ratingAverage, ratingCount, latitude, longitude, locationUpdatedAt } | null, acceptedWorkerFullName, acceptedWorkerSkillCategories }` — `arrivalPin` and `worker.latitude/longitude` are null outside `accepted`/`on_the_way`/`arrived`; the two `acceptedWorker*` fields are kept for older app builds
 - 404: `BOOKING_REQUEST_NOT_FOUND`
 
 #### POST /bookings/:id/cancel
@@ -271,7 +289,7 @@ Confirm the job is finished — only once the worker has marked it `work_done`, 
 #### GET /bookings/offers/mine
 The caller's own still-open offers (only requests still `broadcasting`) — `partner-app`'s Bookings → Requests tab and `IncomingJobModal`.
 - Auth: Bearer access token; returns `[]` if the caller has no worker profile
-- 200: `{ success: true, data: Array<{ offerId, bookingRequestId, skillCategories: string[], distanceMeters: number, createdAt }> }`
+- 200: `{ success: true, data: Array<{ offerId, bookingRequestId, skillCategories: string[], distanceMeters: number, customerFullName: string, locationAddress: string|null, createdAt }> }` — the customer's phone is only shared after accepting
 
 #### POST /bookings/:id/accept
 Accept an offer — exactly one worker can win. Generates the arrival PIN, notifies the customer (`booking_accepted`), pushes "job taken" to every other invited worker.
@@ -320,6 +338,20 @@ Report the worker's current position during the trip.
 #### POST /bookings/:id/work-done
 `in_progress` → `work_done`. Notifies the customer (`booking_work_done`) to confirm and rate.
 - 200: `{ success: true, message: "Work marked done", data: null }`
+
+#### POST /bookings/offers/search
+Worker's "Find Jobs Now". Adds an offer for this worker on every Quick Book request still `broadcasting` (and under 3 minutes old) that needs only skills they have, lies within that request's own radius of the worker, and isn't their own — a request they declined comes back as pending; one they lost stays gone (unique request+worker). Then returns their open offers, same shape as `GET /bookings/offers/mine`. Safe to call repeatedly.
+- Auth: Bearer access token (a worker; unverified workers get `[]`)
+- Body: `{ latitude?, longitude? }` — the device's position; the profile's service location is used without it
+- 200: `{ success: true, data: PendingOffer[] }`
+
+#### POST /bookings/:id/worker-cancel
+The accepted worker backs out while `accepted`, `on_the_way` or `arrived` (not once the PIN is verified). Sets `cancelledBy: "worker"` and the optional reason, clears the PIN, and notifies the customer (`booking_cancelled`, "Worker Cancelled"). A trip started from a Your Problems post reopens that post for other workers.
+- Auth: Bearer access token (the accepted worker)
+- Body: `{ reason?: string }` (≤200 chars)
+- 200: `{ success: true, message: "Job cancelled", data: null }`
+- 404: `BOOKING_REQUEST_NOT_FOUND`, `WORKER_PROFILE_NOT_FOUND`
+- 409: `BOOKING_INVALID_STATE` — not this worker's job, or past the PIN
 
 ## Problems Module
 
@@ -465,6 +497,19 @@ Common errors: `404 ORDER_NOT_FOUND` (also for a malformed id), `409 ORDER_INVAL
 A customer's saved workers and shops (Services/Bazaar menus → Favorites, and the heart on a profile).
 - `GET /favorites` → `{ workers: Array<WorkerProfile & { accountFullName }>, businesses: BusinessProfile[] }` — newest saved first, verified profiles only.
 - `PUT /favorites/:type/:id` · `DELETE /favorites/:type/:id` — `type` is `worker` or `business`; idempotent. 400 `VALIDATION_ERROR` for a bad type/id.
+
+## Job Seekers Module
+
+People looking for regular work (a home cook, a tutor, a driver, a nanny…), posted from the partner app and found from the user app's **Hire Staff**. One post per account; posts are live immediately (no admin review) and the poster can hide one. All routes require a login.
+
+- `GET /job-seekers/me` → the caller's post, or `null`.
+- `PUT /job-seekers/me` → creates or replaces the caller's post (keeps its shown/hidden state). Body: `category` (`teacher`, `cook`, `housekeeper`, `nanny`, `elder_care`, `driver`, `security_guard`, `gardener`, `office_assistant`, `shop_assistant`, `other`), `title` (2–80), `payAmount` (whole ₹, ≥1), `payPeriod` (`daily` | `monthly`), `availability` (`full_time` | `part_time` | `live_in`), `experienceYears` (0–60, default 0), `skills` (≤15 strings, trimmed and de-duplicated), `description?` (≤500), `latitude`, `longitude` (required), `locationAddress` (3–300). 400 `VALIDATION_ERROR`.
+- `PATCH /job-seekers/me/active` `{ isActive }` → show or hide. 404 `JOB_POST_NOT_FOUND` with no post.
+- `DELETE /job-seekers/me` → also removes the photo from storage. 404 `JOB_POST_NOT_FOUND` with no post.
+- `PUT /job-seekers/me/photo` (multipart, field `photo`, one image ≤8MB) → the post with its new `photoUrl`; the previous photo is deleted from storage. 400 `PHOTO_REQUIRED`, 404 `JOB_POST_NOT_FOUND`.
+- `DELETE /job-seekers/me/photo` → the post with `photoUrl: null`. 404 `JOB_POST_NOT_FOUND`.
+- Every post (own and search results) carries `photoUrl` (string or null). The apps no longer ask for a separate title: they send the work itself as `title` (the person's own words when `category` is `other`).
+- `GET /job-seekers/search?latitude&longitude&radiusKm(0.1–50, default 25)&category?&payPeriod?&availability?&query?&sort(distance|pay)&limit(≤50, default 30)` → shown posts within the radius, never the caller's own, each with `fullName`, `mobileNumber` (so the customer can call) and `distanceMeters`. `query` matches the title, name, description and skills. `sort=pay` compares a daily rate as 26 working days. 400 `VALIDATION_ERROR` for bad parameters.
 
 ---
 

@@ -20,7 +20,10 @@ export const createBusinessProfileSchema = z
     city: z.string().trim().min(2, 'City is required').max(100),
     district: z.string().trim().min(2, 'District is required').max(100),
     state: z.string().trim().min(2, 'State is required').max(100),
-    pincode: z.string().trim().regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
+    pincode: z
+      .string()
+      .trim()
+      .regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
     deliveryAvailable: z.preprocess(parseBooleanIfString, z.boolean()),
     deliveryPricePerKm: z.coerce.number().min(0).max(1000).optional(),
   })
@@ -64,7 +67,10 @@ export const updateBusinessProfileSchema = z
     city: z.string().trim().min(2, 'City is required').max(100),
     district: z.string().trim().min(2, 'District is required').max(100),
     state: z.string().trim().min(2, 'State is required').max(100),
-    pincode: z.string().trim().regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
+    pincode: z
+      .string()
+      .trim()
+      .regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
     deliveryAvailable: z.preprocess(parseBooleanIfString, z.boolean()),
     deliveryPricePerKm: z.coerce.number().min(0).max(1000).optional(),
     existingPhotoUrls: z.preprocess(parseJsonIfString, z.array(z.string())).optional(),

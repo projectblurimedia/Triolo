@@ -1,12 +1,5 @@
 export type WorkerSkillCategory =
-  | 'electrician'
-  | 'plumber'
-  | 'painter'
-  | 'carpenter'
-  | 'mechanic'
-  | 'cleaner'
-  | 'mason'
-  | 'other';
+  'electrician' | 'plumber' | 'painter' | 'carpenter' | 'mechanic' | 'cleaner' | 'mason' | 'other';
 
 export const WORKER_SKILL_CATEGORIES: WorkerSkillCategory[] = [
   'electrician',
@@ -48,10 +41,14 @@ export interface WorkerProfileWithAccount extends WorkerProfile {
   accountFullName: string;
   accountMobileNumber: string;
   accountEmail: string;
+  /** The account's standing — 'active', 'suspended' or 'blocked'. */
+  accountStatus: string;
 }
 
 export interface AdminListFilter {
   status?: ProfileVerificationStatus;
+  /** Name, mobile number. */
+  q?: string;
   page: number;
   limit: number;
 }

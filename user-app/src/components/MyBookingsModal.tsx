@@ -111,7 +111,12 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
 
     return (
       <Pressable
-        style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[
+          styles.card,
+          item.active
+            ? { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` }
+            : { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
         onPress={() => (isBooking ? openBookingTracker(item.booking.id) : setProblemsVisible(true))}
       >
         <View style={[styles.icon, { backgroundColor: `${accent}1A` }]}>

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { authService } from '@/services/authService';
 import { useAuthStore } from '@/state/authStore';
-import { LoadingSpinner } from './LoadingSpinner';
+import { Spinner } from './ui';
 
 /**
  * Client-side gate only, for a decent redirect experience — the actual enforcement is
@@ -47,7 +47,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
   if (status === 'checking') {
     return (
       <div className="loading-wrap">
-        <LoadingSpinner dark />
+        <Spinner />
       </div>
     );
   }

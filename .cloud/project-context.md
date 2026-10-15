@@ -127,6 +127,27 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
     - **Next round:** glass on every overlay (`Glass.tsx`), custom `PullToRefresh` replacing every `RefreshControl`, axis-locked toast swipe, and partner "Worker Jobs" renamed to Service Jobs / My Services. See `.cloud/architecture.md` "Glass overlays and pull-to-refresh".
     - **user-app Profile:** a `ProfileOrders` card (in `ProfileActivity.tsx`, which shares the `StatsCard` layout) and bottom spacing on both cards. The shop stats use the real `ratingAverage`/`ratingCount`; the placeholder keys were removed.
 
+- **Job Seekers / Hire Staff** (explicit request: people looking for regular work such as a teacher or home cook post their expected daily or monthly pay, skills and experience in the partner app; customers find them in the user app and call them). Decisions taken without asking (all reversible): posts go live with no admin review; one post per account; GPS location required so posts appear in nearby search; the poster can hide a post; customers see the poster's name and phone number (asked for explicitly).
+  - **Backend:** `jobSeekers` module (migration `0022`, `job_seeker_posts`), no dependencies on other modules; its search joins `accounts` only to read the name and phone for display.
+  - **partner-app:** `RegisterJobSeekerScreen` (auth stack, same `isCompletingRegistration` pattern as worker/business registration), `JobPostScreen` (main stack), shared `JobPostForm`/`JobPostCard`, `JobPostHomeSection` (Home's switch is now My Shop / My Services / Job Post, built from whichever sides apply). A job-post-only partner has no verified capability, so they stay on Choose Capability, which shows their post card.
+  - **user-app:** `HireStaffModal` reached from the Services menu, the Home menu and a full-width Home quick action.
+  - 176 backend tests; 23-check live run passed, test data removed. Not yet tried on a device.
+  - **Follow-up (explicit request):**
+    - Profile photo (`photo_url`, migration `0023`, own upload request like problem photos).
+    - No title field: the app sends the work as `title` (custom words for `other`). Work type is `WorkTypePicker`, a searchable dropdown with "add new".
+    - `KeyboardAwareView` on both job-post screens. The Live/Hidden switch updates optimistically.
+    - user-app `JobSeekerDetailModal`.
+    - Profile "My Activity" renamed "Your service bookings".
+    - 179 tests; 26-check live run passed.
+
+- **Worker cancel + Continue Where You Left Off** (explicit request). Decided without asking, following the existing rule that cancellation locks at PIN verification: the accepted worker may cancel from `accepted`/`on_the_way`/`arrived` (`POST /bookings/:id/worker-cancel`, migration `0024` `cancelled_by`/`cancel_reason`); a Quick Book then ends as cancelled (the customer gets **Book Again**), and a problem trip reopens its problem. Both apps' Home shows a `ContinueSteps` list (separate copies, keep in sync) of every in-progress job/booking/order that opens its step screen directly. partner-app job cards lead with the customer's name. 182 tests; 11-check live run passed.
+
+- **Find Jobs Now + partner Home sides** (explicit request). `POST /bookings/offers/search` lets a worker pull in every open Quick Book nearby on demand (offer rows created idempotently; accept never required an offer row). partner-app Home lists only the sides the partner has; adding/editing services, shop and job post moved to the menu's My Profiles section. Shared `CancelButton` (both apps, keep in sync).
+
+- **Customer name on job requests** (explicit request, reversing the earlier "no customer identity before accept" choice for Quick Book offers): offers show the customer's name and area; the phone stays hidden until accepted. Find Jobs Now revives declined offers on still-open requests.
+
+- **Admin console + moderation** (explicit request; user decided "Delete" = remove profiles + permanent ban, history kept; admin cancels notify both sides with the reason). Backend `admin` module grew from list/verify to the whole control surface (stats, accounts, workers, shops, bookings, orders, problems, job posts), all through the owning modules' services; migration `0025` (account suspension columns, `cancelled_by = 'admin'`, problem `closed`, `admin_notice`). `auth/accountAccess.ts` enforces standing on every authenticated request (30 s per-instance cache). admin-web was rewritten (see its README); it is not deployed anywhere yet — runs with `npm run dev` against the production API. 194 tests; 25-check live run passed.
+
 ## Pending Modules (build order, current plan)
 
 1. ~~Auth~~ — done (localization support included)
@@ -135,7 +156,7 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
 4. Worker module remainder (~~nearby search~~, ~~Quick Book broadcast booking~~, ~~full booking status pipeline + PIN verification + live tracking~~, ~~ratings~~ — done, see "Completed Modules" above; worker availability/online toggle and favorites still pending)
 5. Business module remainder (~~nearby search~~, ~~shopping list + order flow + PIN verification + shop ratings~~ — done, see "Completed Modules" above; staff accounts and open/closed hours still pending)
 6. ~~Notifications (in-app `profile_view` event, polled by partner-app; push/FCM delivery)~~ — done, see "Completed Modules" above; other event types beyond `profile_view` still pending
-7. ~~Admin module — list/verify Worker/Business profiles~~ — done (see "Completed Modules" above); the rest of Admin's planned scope (user/worker/business management, complaints, warnings, suspension/blocking, announcements, audit logs) is still pending
+7. ~~Admin module — list/verify, user/worker/business management, suspension/blocking, admin cancel~~ — done (see "Completed Modules" above); complaints, warnings, announcements and audit logs are still pending
 8. ~~Public web sign-up forms for workers/shops (no app install)~~ — done, as its own site `registration-web/`, separate from the Admin website `admin-web/` (see "Completed Modules" above)
 
 Localization is no longer a separate future module — it's a cross-cutting requirement applied to every module above as it's built (English + Telugu keys ship in the same change as any new user-visible text; see `.cloud/development-rules.md` Definition of Done).

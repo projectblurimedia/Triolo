@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PullToRefresh } from './PullToRefresh';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ConfirmModal } from './ConfirmModal';
 import { SwipeableRow } from './SwipeableRow';
@@ -136,11 +137,12 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     });
   };
 
-  const deleteIds = (ids: string[], onDone?: () => void) => {
+  // The rows go at once (optimistic), so the toast does too — no waiting for the server.
+  // If the delete fails, the rows come back and an error toast replaces this one.
+  const deleteIds = (ids: string[]) => {
+    showToast({ variant: 'success', title: t('notifications.deletedToast', { count: ids.length }) });
     deleteNotifications.mutate(ids, {
-      onSuccess: () => showToast({ variant: 'success', title: t('notifications.deletedToast', { count: ids.length }) }),
       onError: () => showToast({ variant: 'error', title: t('common.errorTitle'), message: t('errors.generic') }),
-      onSettled: onDone,
     });
   };
 
@@ -287,7 +289,14 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
               )
             : [
                 unreadCount > 0
-                  ? pill('read', 'check-double', t('notifications.markAllRead'), () => markAllRead.mutate(), true, markAllRead.isPending)
+                  ? pill(
+                      'read',
+                      'check-double',
+                      t('notifications.markAllRead'),
+                      () => markAllRead.mutate(),
+                      true,
+                      markAllRead.isPending,
+                    )
                   : null,
                 pill('select', 'list-check', t('notifications.select'), () => {
                   setOpenRowId(null);
@@ -374,14 +383,8 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     return (
       <>
         {!selectionMode ? <Text style={[styles.hint, { color: colors.textMuted }]}>{t('notifications.gestureHint')}</Text> : null}
-        <FlatList
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          data={items}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          extraData={{ openRowId, revealedRowIds, selectionMode, selectedIds }}
-          contentContainerStyle={[styles.listContent, selectionMode ? { paddingBottom: 120 } : null]}
+        <PullToRefresh
+          refreshing={manualRefreshing}
           onRefresh={async () => {
             setManualRefreshing(true);
             try {
@@ -390,9 +393,18 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
               setManualRefreshing(false);
             }
           }}
-          refreshing={manualRefreshing}
-          onScrollBeginDrag={() => setOpenRowId(null)}
-        />
+        >
+          <FlatList
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            data={items}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            extraData={{ openRowId, revealedRowIds, selectionMode, selectedIds }}
+            contentContainerStyle={[styles.listContent, selectionMode ? { paddingBottom: 120 } : null]}
+            onScrollBeginDrag={() => setOpenRowId(null)}
+          />
+        </PullToRefresh>
       </>
     );
   };
@@ -422,7 +434,6 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
             </View>
           </View>
         </LinearGradient>
-
 
         {renderToolbar()}
 

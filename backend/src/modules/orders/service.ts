@@ -6,7 +6,7 @@ import { NotificationsService } from '@/modules/notifications/service';
 import { NotificationType } from '@/modules/notifications/interfaces';
 import { OrdersRepository } from './repository';
 import { CreateOrderDto, RateOrderDto, SaveItemsDto } from './dto';
-import { CustomerOrder, OrderTransition, RatedOrder, ShopSideOrder } from './interfaces';
+import { CustomerOrder, OrderTransition, RatedOrder, ShopSideOrder, AdminOrder, AdminOrderListFilter } from './interfaces';
 import { OrderEvent, orderTemplate } from './pushTemplates';
 
 const LIST_LIMIT = 50;
@@ -59,7 +59,9 @@ export class OrdersService {
     }
 
     const distance =
-      shop.latitude != null && shop.longitude != null ? distanceMeters(dto.latitude, dto.longitude, shop.latitude, shop.longitude) : 0;
+      shop.latitude != null && shop.longitude != null
+        ? distanceMeters(dto.latitude, dto.longitude, shop.latitude, shop.longitude)
+        : 0;
     const order = await this.repository.create({
       accountId,
       businessId: shop.id,
@@ -235,6 +237,49 @@ export class OrdersService {
       data: { kind: type, orderId: order.id },
       channelId: 'default',
     });
+  }
+
+  // --- Admin ---
+
+  async adminList(filter: AdminOrderListFilter) {
+    await this.repository.expireStale();
+    return this.repository.adminList(filter);
+  }
+
+  async adminGet(id: string): Promise<AdminOrder> {
+    await this.repository.expireStale();
+    const order = await this.repository.adminGet(id);
+    if (!order) throw AppError.notFound('Order not found.', 'ORDER_NOT_FOUND');
+    return order;
+  }
+
+  /** The admin stops an unfinished order at any step; the customer and the shop are both told, with the reason. */
+  async adminCancel(id: string, reason: string | null): Promise<void> {
+    const result = await this.repository.adminCancel(id, reason);
+    if (!result) throw await this.transitionError(id, 'This order is already finished.');
+    await Promise.all(
+      [result.customer, result.shopOwner].map((target) => {
+        const text = orderTemplate('cancelled_by_admin', target.preferredLanguage, { shop: result.shopName });
+        const why = reason ? (target.preferredLanguage === 'te' ? ` కారణం: ${reason}` : ` Reason: ${reason}`) : '';
+        return this.notificationsService.notify(target.accountId, 'order_cancelled', text.title, `${text.body}${why}`, {
+          data: { kind: 'order_cancelled', orderId: id },
+          channelId: 'default',
+        });
+      }),
+    );
+  }
+
+  /** Cancels every unfinished order an account is part of (when it's suspended or banned). */
+  async adminCancelActiveForAccount(accountId: string, reason: string | null): Promise<number> {
+    const ids = await this.repository.adminActiveIdsForAccount(accountId);
+    for (const id of ids) {
+      await this.adminCancel(id, reason).catch(() => undefined);
+    }
+    return ids.length;
+  }
+
+  adminCounts() {
+    return this.repository.adminCounts();
   }
 }
 

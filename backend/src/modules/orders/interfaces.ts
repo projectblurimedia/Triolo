@@ -24,12 +24,26 @@ export type ShopOrderItemStatus = 'pending' | 'packed' | 'unavailable';
 /** The customer may cancel only before the shop starts reviewing (spec §3 Cancellation Rules). */
 export const CUSTOMER_CANCELLABLE: ShopOrderStatus[] = ['placed'];
 /** The shop may cancel at any step before completion. */
-export const SHOP_CANCELLABLE: ShopOrderStatus[] = ['placed', 'accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery'];
+export const SHOP_CANCELLABLE: ShopOrderStatus[] = [
+  'placed',
+  'accepted',
+  'preparing',
+  'packed',
+  'ready_for_pickup',
+  'out_for_delivery',
+];
 /** The shop marks items (and their prices) while reviewing. */
 export const PACKING_STATUSES: ShopOrderStatus[] = ['accepted', 'preparing'];
 /** The customer's PIN is shown — and accepted by the shop — only at handover. */
 export const HANDOVER_STATUSES: ShopOrderStatus[] = ['ready_for_pickup', 'out_for_delivery'];
-export const ACTIVE_ORDER_STATUSES: ShopOrderStatus[] = ['placed', 'accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery'];
+export const ACTIVE_ORDER_STATUSES: ShopOrderStatus[] = [
+  'placed',
+  'accepted',
+  'preparing',
+  'packed',
+  'ready_for_pickup',
+  'out_for_delivery',
+];
 
 /** A list the shop doesn't answer within this many minutes ends as 'expired'. */
 export const ORDER_TTL_MINUTES = 30;
@@ -61,7 +75,7 @@ export interface ShopOrder {
   itemsTotal: number | null;
   totalAmount: number | null;
   note: string | null;
-  cancelledBy: 'customer' | 'shop' | null;
+  cancelledBy: 'customer' | 'shop' | 'admin' | null;
   cancelReason: string | null;
   shopRating: number | null;
   shopReview: string | null;
@@ -144,4 +158,27 @@ export interface RatedOrder {
   review: string | null;
   customerFullName: string;
   completedAt: Date;
+}
+
+/** An order as the admin sees it: the customer and the shop with their phones (never the PIN). */
+export interface AdminOrder extends ShopOrder {
+  customer: { accountId: string; fullName: string; mobileNumber: string };
+  shop: { businessId: string; accountId: string; name: string; ownerName: string; mobileNumber: string };
+}
+
+export type AdminOrderGroup = 'new' | 'active' | 'completed' | 'cancelled';
+
+export interface AdminOrderListFilter {
+  q?: string;
+  group?: AdminOrderGroup;
+  accountId?: string;
+  page: number;
+  limit: number;
+}
+
+export interface AdminOrderCancelResult {
+  order: ShopOrder;
+  shopName: string;
+  customer: { accountId: string; preferredLanguage: 'en' | 'te' };
+  shopOwner: { accountId: string; preferredLanguage: 'en' | 'te' };
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { RatingStars } from './RatingStars';
 import { WorkerNearbyResult } from '@/services/workersService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { SmartImage } from './SmartImage';
 
 export const MINI_CARD_WIDTH = 168;
 
@@ -22,7 +23,7 @@ export function initialsOf(name: string): string {
 /** Round photo, or brand-gradient initials when there's no photo. */
 export function Avatar({ photoUrl, name, size }: { photoUrl?: string; name: string; size: number }) {
   if (photoUrl) {
-    return <Image source={{ uri: photoUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+    return <SmartImage source={{ uri: photoUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   }
   return (
     <LinearGradient

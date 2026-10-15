@@ -9,6 +9,7 @@ export type AuthStackParamList = {
   // See RegisterWorkerScreen's own doc comment for the full rationale.
   RegisterWorker: undefined;
   RegisterBusiness: undefined;
+  RegisterJobSeeker: undefined;
   Login: undefined;
   Otp: { mode: 'login'; mobileNumber: string };
 };
@@ -28,6 +29,8 @@ export type MainStackParamList = {
   WorkerRegistration: { profile?: WorkerProfile } | undefined;
   BusinessRegistration: { profile?: BusinessProfile } | undefined;
   MyInfo: { capability: CapabilityType };
+  // Create or edit the "looking for work" post (no admin review, so no verification state).
+  JobPost: undefined;
 };
 
 /**
@@ -43,7 +46,7 @@ export type MainTabParamList = {
   Home: undefined;
   // `mode` opens a dual (worker + shop) partner's Bookings on that side; `linkedAt` makes a
   // repeat navigation with the same mode still apply after the user switched sides by hand.
-  Bookings: { mode?: 'jobs' | 'orders'; linkedAt?: number } | undefined;
+  Bookings: { mode?: 'jobs' | 'orders'; tab?: 'requests' | 'active' | 'history'; linkedAt?: number } | undefined;
   Earnings: undefined;
   Profile: undefined;
 };

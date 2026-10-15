@@ -1,5 +1,14 @@
 import { Pool, QueryResultRow } from 'pg';
-import { Account, AccountRole, AccountStatus, OtpPurpose, PreferredLanguage } from './interfaces';
+import {
+  Account,
+  AccountRole,
+  AccountStatus,
+  OtpPurpose,
+  PreferredLanguage,
+  AdminAccountListFilter,
+  AdminAccountListResult,
+  AdminAccountStats,
+} from './interfaces';
 
 interface OtpRecord {
   id: string;
@@ -39,6 +48,8 @@ function mapAccount(row: QueryResultRow): Account {
     latitude: row.latitude,
     longitude: row.longitude,
     locationAddress: row.location_address,
+    suspendedUntil: row.suspended_until ?? null,
+    statusReason: row.status_reason ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -173,12 +184,7 @@ export class AuthRepository {
     await this.pool.query('UPDATE otp_verifications SET consumed_at = now() WHERE id = $1', [id]);
   }
 
-  async createRefreshToken(params: {
-    accountId: string;
-    selector: string;
-    tokenHash: string;
-    expiresAt: Date;
-  }): Promise<void> {
+  async createRefreshToken(params: { accountId: string; selector: string; tokenHash: string; expiresAt: Date }): Promise<void> {
     await this.pool.query(
       `INSERT INTO refresh_tokens (account_id, selector, token_hash, expires_at)
        VALUES ($1, $2, $3, $4)`,
@@ -193,5 +199,80 @@ export class AuthRepository {
 
   async revokeRefreshToken(id: string): Promise<void> {
     await this.pool.query('UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1', [id]);
+  }
+
+  /** Signs the account out everywhere (used when the admin suspends or bans it). */
+  async revokeAllRefreshTokens(accountId: string): Promise<void> {
+    await this.pool.query('UPDATE refresh_tokens SET revoked_at = now() WHERE account_id = $1 AND revoked_at IS NULL', [
+      accountId,
+    ]);
+  }
+
+  /** A suspension whose end has passed becomes active again (applied lazily on read). */
+  async liftExpiredSuspension(accountId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE accounts SET status = 'active', suspended_until = NULL, status_reason = NULL, status_changed_at = now()
+       WHERE id = $1 AND status = 'suspended' AND suspended_until IS NOT NULL AND suspended_until <= now()`,
+      [accountId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // --- Admin ---
+
+  async adminList(filter: AdminAccountListFilter): Promise<AdminAccountListResult> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (filter.status) {
+      params.push(filter.status);
+      conditions.push(`status = $${params.length}`);
+    }
+    if (filter.q) {
+      params.push(`%${filter.q}%`);
+      conditions.push(
+        `(full_name ILIKE $${params.length} OR mobile_number ILIKE $${params.length} OR email ILIKE $${params.length})`,
+      );
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const count = await this.pool.query(`SELECT COUNT(*) FROM accounts ${where}`, params);
+    params.push(filter.limit, (filter.page - 1) * filter.limit);
+    const rows = await this.pool.query(
+      `SELECT * FROM accounts ${where} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
+    return { items: rows.rows.map(mapAccount), total: Number(count.rows[0].count), page: filter.page, limit: filter.limit };
+  }
+
+  async adminSetStatus(
+    accountId: string,
+    status: 'active' | 'suspended' | 'blocked',
+    suspendedUntil: Date | null,
+    reason: string | null,
+  ): Promise<Account | null> {
+    const result = await this.pool.query(
+      `UPDATE accounts SET status = $2, suspended_until = $3, status_reason = $4, status_changed_at = now(), updated_at = now()
+       WHERE id = $1 RETURNING *`,
+      [accountId, status, suspendedUntil, reason],
+    );
+    return result.rows[0] ? mapAccount(result.rows[0]) : null;
+  }
+
+  async adminStats(): Promise<AdminAccountStats> {
+    const result = await this.pool.query(
+      `SELECT COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE status = 'active') AS active,
+              COUNT(*) FILTER (WHERE status = 'suspended') AS suspended,
+              COUNT(*) FILTER (WHERE status = 'blocked') AS blocked,
+              COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now())) AS new_today
+       FROM accounts WHERE role != 'admin'`,
+    );
+    const row = result.rows[0];
+    return {
+      total: Number(row.total),
+      active: Number(row.active),
+      suspended: Number(row.suspended),
+      blocked: Number(row.blocked),
+      newToday: Number(row.new_today),
+    };
   }
 }

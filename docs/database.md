@@ -41,6 +41,9 @@ Every self-registered account is a plain `user` — not one of an exclusive set 
 | latitude | double precision nullable | GPS coordinate captured at registration (auto-detect or manual); null if the user only entered a manual address with no GPS fix |
 | longitude | double precision nullable | see `latitude` |
 | location_address | text nullable | human-readable address (reverse-geocoded from GPS, or manually typed) — required by the API for new registrations |
+| suspended_until | timestamptz nullable | end of an admin suspension (`status = 'suspended'`); lifted automatically once passed (migration `0025`) |
+| status_reason | text nullable | the admin's reason for the current suspension or ban (migration `0025`) |
+| status_changed_at | timestamptz nullable | when the admin last changed `status` (migration `0025`) |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 
@@ -145,6 +148,8 @@ Migration `0010_create_push_tokens.sql`. Owned by the `notifications` module, no
 | pin_attempts | integer, default 0 | wrong PIN tries — locked at 5, counted under a `SELECT … FOR UPDATE` row lock |
 | worker_latitude / worker_longitude / worker_location_at | double precision / timestamptz, nullable | the worker's last reported position during the trip (`PUT /bookings/:id/location`); only exposed to the customer while `accepted`/`on_the_way`/`arrived` |
 | started_at / arrived_at / pin_verified_at / work_done_at / completed_at / cancelled_at | timestamptz, nullable | one timestamp per step — drives the customer's progress timeline |
+| cancelled_by | text, nullable, `CHECK (customer, worker)` | who cancelled (migration `0024`); the worker can cancel until the PIN is verified |
+| cancel_reason | text, nullable | the worker's optional reason (migration `0024`) |
 | worker_rating | smallint, nullable, `CHECK (1..5)` | the customer's rating, set once on completion; also added to `worker_profiles.rating_sum/rating_count` via `WorkersService.recordRating()` |
 | worker_review | text, nullable | optional feedback (≤300 chars at the API) |
 | created_at | timestamptz | |
@@ -210,6 +215,35 @@ Migration `0021_shop_orders_favorites_shop_ratings.sql`. A list the customer sen
 `shop_order_items`: `id`, `order_id` (FK, cascade), `position`, `name`, `quantity` (text, kept as spoken/typed), `unit`, `status` enum `shop_order_item_status` (`pending`, `packed`, `unavailable`), `price` numeric(10,2) (packed items only); `UNIQUE (order_id, position)`. Indexes: `(account_id, created_at DESC)`, `(business_id, created_at DESC)`, partial `(created_at) WHERE status = 'placed'` for expiry.
 
 The same migration added `business_profiles.rating_sum/rating_count` (shop ratings, same pattern as workers), the `favorites` table (`account_id`, `target_type` enum `favorite_target_type` (`worker`, `business`), `target_id`, `created_at`; PK on all three) and the `order_*` notification types.
+
+### job_seeker_posts (Job Seekers module — implemented, migration `0022`)
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| account_id | uuid, UNIQUE, FK → accounts (cascade) | one post per account |
+| category | enum `job_seeker_category` | teacher, cook, housekeeper, nanny, elder_care, driver, security_guard, gardener, office_assistant, shop_assistant, other |
+| title | text | e.g. "Maths tutor" |
+| pay_amount | integer > 0 | rupees |
+| pay_period | enum `job_seeker_pay_period` | daily, monthly |
+| availability | enum `job_seeker_availability` | full_time, part_time, live_in |
+| experience_years | integer ≥ 0 | |
+| skills | text[] | |
+| description | text, nullable | |
+| latitude / longitude | double precision, NOT NULL | GPS, for nearby search |
+| location_address | text | |
+| photo_url | text, nullable | profile photo (Cloudinary), migration `0023` |
+| is_active | boolean, default true | hidden posts drop out of search |
+| created_at / updated_at | timestamptz | updated_at set on every save |
+
+Partial index `(category) WHERE is_active`. No admin review: a post is live as soon as it's saved.
+
+### Admin controls (migration `0025`)
+
+- `booking_requests.cancelled_by` and `shop_orders.cancelled_by` also accept `'admin'` (the admin stopped it; `cancel_reason` holds their reason).
+- `problem_posts.closed_reason`, `closed_at`: an open post the admin took down (`status = 'closed'`, unused before).
+- `notification_type` gained `'admin_notice'` (suspension, ban, reactivation, removed profiles, closed problem, hidden/removed job post).
+- `idx_accounts_status` for the admin's account filters.
 
 ## Planned Tables (subsequent modules — outline only, refine when implemented)
 

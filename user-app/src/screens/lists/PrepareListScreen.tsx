@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -16,6 +16,8 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { listFallbackName, SavedList, useListStore } from '@/state/listStore';
 import { showToast } from '@/state/toastStore';
 import { parseVoiceListText } from '@/utils/parseVoiceList';
+import { RouteProp, useRoute } from '@react-navigation/native';
+import { MainTabParamList } from '@/navigation/types';
 
 const MIC_SIZE = 84;
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
@@ -72,6 +74,42 @@ export function PrepareListScreen() {
   const [sendListId, setSendListId] = useState<string | null>(null);
   const [focusItemId, setFocusItemId] = useState<string | null>(null);
   const pulse = useRef(new Animated.Value(0)).current;
+  // Keeps the row being typed in on screen: the keyboard covers the bottom of this edge-to-edge
+  // screen, so the list gets the keyboard's height as extra bottom room and scrolls the active
+  // row up into view (a newly added row as soon as it appears).
+  const scrollRef = useRef<ScrollView>(null);
+  const rowYs = useRef<Record<string, number>>({});
+  const activeRowId = useRef<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollToRow = (id: string) => {
+    const y = rowYs.current[id];
+    if (y === undefined) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 120), animated: true });
+  };
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+      const id = activeRowId.current;
+      if (id) setTimeout(() => scrollToRow(id), 60);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  // Opened with `newList` (e.g. from Send List when there are no lists): start a fresh list.
+  const route = useRoute<RouteProp<MainTabParamList, 'PrepareList'>>();
+  const newListRequest = route.params?.newList;
+  useEffect(() => {
+    if (!newListRequest) return;
+    startNewList();
+    setScreen('editor');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newListRequest]);
 
   const items = draft.items;
   const isEditingSaved = draft.listId !== null;
@@ -152,7 +190,9 @@ export function PrepareListScreen() {
   const handleAddBlankItem = () => {
     addItems([{ name: '', quantity: '1', unit: '' }]);
     const added = useListStore.getState().draft.items;
-    setFocusItemId(added[added.length - 1]?.id ?? null);
+    const id = added[added.length - 1]?.id ?? null;
+    activeRowId.current = id;
+    setFocusItemId(id);
   };
 
   const handleSave = () => {
@@ -343,7 +383,16 @@ export function PrepareListScreen() {
         </View>
       ) : (
         items.map((item, index) => (
-          <View key={item.id} style={[styles.itemRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View
+            key={item.id}
+            style={[styles.itemRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onLayout={(event) => {
+              const firstLayout = rowYs.current[item.id] === undefined;
+              rowYs.current[item.id] = event.nativeEvent.layout.y;
+              // A row just added with "Add Item" scrolls into view as soon as it exists.
+              if (firstLayout && item.id === focusItemId) setTimeout(() => scrollToRow(item.id), 80);
+            }}
+          >
             <Text style={[styles.itemIndex, { color: colors.textMuted }]}>{index + 1}.</Text>
             <View style={styles.itemFields}>
               <TextInput
@@ -353,12 +402,20 @@ export function PrepareListScreen() {
                 placeholder={t('prepareList.namePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 autoFocus={item.id === focusItemId}
+                onFocus={() => {
+                  activeRowId.current = item.id;
+                  scrollToRow(item.id);
+                }}
               />
               <View style={styles.qtyRow}>
                 <TextInput
                   style={[styles.qtyInput, { color: colors.textMuted, borderColor: colors.border }]}
                   value={item.quantity}
                   onChangeText={(text) => updateItem(item.id, { quantity: text })}
+                  onFocus={() => {
+                    activeRowId.current = item.id;
+                    scrollToRow(item.id);
+                  }}
                   placeholder={t('prepareList.quantityPlaceholder')}
                   placeholderTextColor={colors.textMuted}
                 />
@@ -366,6 +423,10 @@ export function PrepareListScreen() {
                   style={[styles.unitInput, { color: colors.textMuted, borderColor: colors.border }]}
                   value={item.unit}
                   onChangeText={(text) => updateItem(item.id, { unit: text.toUpperCase() })}
+                  onFocus={() => {
+                    activeRowId.current = item.id;
+                    scrollToRow(item.id);
+                  }}
                   placeholder={t('prepareList.unitPlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   autoCapitalize="characters"
@@ -397,9 +458,10 @@ export function PrepareListScreen() {
   return (
     <ScreenContainer edges={['left', 'right']}>
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: tabBarClearance }}
+        contentContainerStyle={{ paddingBottom: tabBarClearance + keyboardHeight }}
       >
         {screen === 'lists' ? renderLists() : renderEditor()}
       </ScrollView>

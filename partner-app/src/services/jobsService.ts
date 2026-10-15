@@ -6,16 +6,11 @@ import { apiClient } from './apiClient';
  * before the PIN is verified.
  */
 export type JobStatus =
-  | 'broadcasting'
-  | 'accepted'
-  | 'on_the_way'
-  | 'arrived'
-  | 'in_progress'
-  | 'work_done'
-  | 'completed'
-  | 'cancelled';
+  'broadcasting' | 'accepted' | 'on_the_way' | 'arrived' | 'in_progress' | 'work_done' | 'completed' | 'cancelled';
 
 export const ACTIVE_JOB_STATUSES: JobStatus[] = ['accepted', 'on_the_way', 'arrived', 'in_progress', 'work_done'];
+/** The worker can back out until the customer's PIN is entered. */
+export const WORKER_CANCELLABLE_STATUSES: JobStatus[] = ['accepted', 'on_the_way', 'arrived'];
 
 /** A Quick Book job this worker accepted (their view — includes the customer's contact details, never the PIN). */
 export interface WorkerJob {
@@ -38,6 +33,8 @@ export interface WorkerJob {
   workDoneAt: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
+  cancelledBy: 'customer' | 'worker' | 'admin' | null;
+  cancelReason: string | null;
   /** Set when this job came from an accepted Your Problems post. */
   problemPostId: string | null;
   /** That problem’s quotation in rupees. */
@@ -56,4 +53,5 @@ export const jobsService = {
   arrive: (id: string) => apiClient.post<null>(`/bookings/${id}/arrive`, undefined, true),
   verifyPin: (id: string, pin: string) => apiClient.post<null>(`/bookings/${id}/verify-pin`, { pin }, true),
   workDone: (id: string) => apiClient.post<null>(`/bookings/${id}/work-done`, undefined, true),
+  cancel: (id: string, reason?: string) => apiClient.post<null>(`/bookings/${id}/worker-cancel`, { reason }, true),
 };

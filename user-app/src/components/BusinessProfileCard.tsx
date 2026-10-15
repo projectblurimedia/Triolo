@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { SHOP_GRADIENT } from './BusinessProfileModal';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { BusinessProfile } from '@/services/businessesService';
 import { formatAddress } from '@/utils/formatAddress';
+import { SmartImage } from './SmartImage';
 
 interface BusinessProfileCardProps {
   profile: BusinessProfile;
@@ -25,7 +26,7 @@ export function BusinessProfileCard({ profile, onEdit }: BusinessProfileCardProp
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.headerRow}>
         {thumbnail ? (
-          <Image source={{ uri: thumbnail }} style={styles.avatar} />
+          <SmartImage source={{ uri: thumbnail }} style={styles.avatar} />
         ) : (
           <LinearGradient colors={SHOP_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
             <FontAwesome6 name="store" size={20} color="#FFFFFF" solid />

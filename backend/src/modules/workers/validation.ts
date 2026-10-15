@@ -19,7 +19,10 @@ export const createWorkerProfileSchema = z
     city: z.string().trim().min(2, 'City is required').max(100),
     district: z.string().trim().min(2, 'District is required').max(100),
     state: z.string().trim().min(2, 'State is required').max(100),
-    pincode: z.string().trim().regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
+    pincode: z
+      .string()
+      .trim()
+      .regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
   })
   .refine((data) => !data.skillCategories.includes('other') || !!data.otherSkillDescription, {
     message: 'Please describe your skill',
@@ -52,7 +55,10 @@ export const updateWorkerProfileSchema = z
     city: z.string().trim().min(2, 'City is required').max(100),
     district: z.string().trim().min(2, 'District is required').max(100),
     state: z.string().trim().min(2, 'State is required').max(100),
-    pincode: z.string().trim().regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
+    pincode: z
+      .string()
+      .trim()
+      .regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
     existingPhotoUrls: z.preprocess(parseJsonIfString, z.array(z.string())).optional(),
   })
   .refine((data) => !data.skillCategories.includes('other') || !!data.otherSkillDescription, {

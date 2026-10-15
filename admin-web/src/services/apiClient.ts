@@ -1,16 +1,10 @@
 import { useAuthStore } from '@/state/authStore';
 
 /**
- * Points at the local backend during development, via the same LAN IP the mobile apps use
- * (`user-app`/`partner-app`'s `constants/config.ts`) rather than `localhost` — this site is
- * itself served from that LAN IP (see `vite.config.ts`'s `server.host`) so it can be opened
- * from another device on the network, and `localhost` from that device would mean itself,
- * not the dev machine. Update alongside the mobile apps' `API_BASE_URL` if that IP changes
- * (find it with `ipconfig` on the dev machine — phone and PC must be on the same Wi-Fi
- * network). Override for staging/production once those API URLs exist (see
- * docs/deployment.md).
+ * The production API by default; `VITE_API_URL` (e.g. in a local `.env`) points it at a
+ * local backend instead, e.g. http://192.168.1.14:4000/api/v1.
  */
-const API_BASE_URL = 'http://192.168.1.14:4000/api/v1';
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://triolo-backend.vercel.app/api/v1';
 
 export interface ApiEnvelope<T> {
   success: boolean;

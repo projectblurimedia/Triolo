@@ -12,9 +12,16 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
 import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
+import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
+import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { useMyJobPost } from '@/hooks/useJobPost';
+import { navigationRef } from '@/navigation/navigationRef';
+import { MainStackParamList } from '@/navigation/types';
 
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
+const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
+const INDIGO_GRADIENT = ['#4338CA', '#7C3AED'] as const;
 
 interface SettingsMenuModalProps {
   visible: boolean;
@@ -22,7 +29,8 @@ interface SettingsMenuModalProps {
 }
 
 /**
- * The menu behind every tab's header `bars` icon — language, theme and logout. A right-side
+ * The menu behind every tab's header `bars` icon — My Profiles (add or edit services, shop and
+ * job post; Home only shows the ones that exist), then language, theme and logout. A right-side
  * drawer built on the same `SideMenuDrawer`/`DrawerMenuItem` as user-app's menus (copied, keep
  * in sync), so both apps' menus look and behave alike.
  */
@@ -36,6 +44,22 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const worker = useMyWorkerProfile().data;
+  const shop = useMyBusinessProfile().data;
+  const jobPost = useMyJobPost().data;
+
+  // Closes the drawer, then opens the form on top of the tabs.
+  const open = <K extends 'WorkerRegistration' | 'BusinessRegistration' | 'JobPost'>(
+    route: K,
+    params?: MainStackParamList[K],
+  ) => {
+    onClose();
+    if (!navigationRef.isReady()) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (navigationRef.navigate as any)(route, params);
+  };
+  const statusLabel = (status: string) =>
+    t(status === 'verified' ? 'verification.verified' : status === 'rejected' ? 'verification.rejected' : 'verification.pending');
 
   const handleLogoutConfirm = () => {
     setLogoutConfirmVisible(false);
@@ -53,7 +77,40 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
         title={t('settingsMenu.title')}
         subtitle={t('settingsMenu.subtitle')}
       >
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settingsMenu.section')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settingsMenu.profilesSection')}</Text>
+        <DrawerMenuItem
+          icon="screwdriver-wrench"
+          gradient={headerGradient}
+          title={t(worker ? 'settingsMenu.editServices' : 'settingsMenu.addServices')}
+          subtitle={
+            worker
+              ? `${statusLabel(worker.verificationStatus)} · ${t('settingsMenu.tapToEdit')}`
+              : t('settingsMenu.addServicesHint')
+          }
+          onPress={() => open('WorkerRegistration', worker ? { profile: worker } : undefined)}
+        />
+        <DrawerMenuItem
+          icon="store"
+          gradient={GREEN_GRADIENT}
+          title={t(shop ? 'settingsMenu.editShop' : 'settingsMenu.addShop')}
+          subtitle={
+            shop ? `${statusLabel(shop.verificationStatus)} · ${t('settingsMenu.tapToEdit')}` : t('settingsMenu.addShopHint')
+          }
+          onPress={() => open('BusinessRegistration', shop ? { profile: shop } : undefined)}
+        />
+        <DrawerMenuItem
+          icon="user-tie"
+          gradient={INDIGO_GRADIENT}
+          title={t(jobPost ? 'settingsMenu.editJobPost' : 'settingsMenu.addJobPost')}
+          subtitle={
+            jobPost
+              ? `${t(jobPost.isActive ? 'settingsMenu.jobPostLive' : 'settingsMenu.jobPostHidden')} · ${t('settingsMenu.tapToEdit')}`
+              : t('settingsMenu.addJobPostHint')
+          }
+          onPress={() => open('JobPost')}
+        />
+
+        <Text style={[styles.sectionTitle, styles.sectionGap, { color: colors.textMuted }]}>{t('settingsMenu.section')}</Text>
         <DrawerMenuItem
           icon="language"
           gradient={headerGradient}
@@ -100,6 +157,7 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
 
 const styles = StyleSheet.create({
   sectionTitle: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 10, marginLeft: 4 },
+  sectionGap: { marginTop: 14 },
   logout: { marginTop: 14, borderRadius: 14, overflow: 'hidden' },
   logoutGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48 },
   logoutText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },

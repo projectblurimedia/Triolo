@@ -60,7 +60,14 @@ export function ShopOrdersList({ bottomPadding = 120 }: { bottomPadding?: number
     return (
       <Pressable
         key={order.id}
-        style={[styles.card, { backgroundColor: colors.surface, borderColor: order.status === 'placed' ? color : colors.border }]}
+        style={[
+          styles.card,
+          order.status === 'placed'
+            ? { backgroundColor: colors.surface, borderColor: color }
+            : ACTIVE_SHOP_STATUSES.includes(order.status)
+              ? { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` }
+              : { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
         onPress={() => openShopOrder(order.id)}
       >
         <View style={[styles.icon, { backgroundColor: `${color}1A` }]}>

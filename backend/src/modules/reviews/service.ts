@@ -50,7 +50,11 @@ export class ReviewsService {
     return this.summarizeShop(shop.id, shop.ratingAverage, shop.ratingCount);
   }
 
-  private async summarizeShop(businessId: string, ratingAverage: number | null, ratingCount: number): Promise<WorkerReviewsSummary> {
+  private async summarizeShop(
+    businessId: string,
+    ratingAverage: number | null,
+    ratingCount: number,
+  ): Promise<WorkerReviewsSummary> {
     const orders = await this.ordersService.listRatedOrdersForBusiness(businessId, RATED_JOBS_LIMIT);
     return summarize(
       orders.map((order) => ({ ...order, skillCategories: [] })),
@@ -75,7 +79,11 @@ export class ReviewsService {
     return this.summarizeWorker(profile.id, profile.ratingAverage, profile.ratingCount);
   }
 
-  private async summarizeWorker(workerId: string, ratingAverage: number | null, ratingCount: number): Promise<WorkerReviewsSummary> {
+  private async summarizeWorker(
+    workerId: string,
+    ratingAverage: number | null,
+    ratingCount: number,
+  ): Promise<WorkerReviewsSummary> {
     const [trips, legacyProblems] = await Promise.all([
       this.bookingsService.listRatedJobsForWorker(workerId, RATED_JOBS_LIMIT),
       this.problemsService.listRatedJobsForWorker(workerId, RATED_JOBS_LIMIT),
@@ -86,7 +94,13 @@ export class ReviewsService {
 
 /** Newest-first reviews (customer shown by short name) plus a 1–5 star breakdown. */
 function summarize(
-  jobs: { rating: number | null; review: string | null; customerFullName: string; skillCategories: string[]; completedAt: Date }[],
+  jobs: {
+    rating: number | null;
+    review: string | null;
+    customerFullName: string;
+    skillCategories: string[];
+    completedAt: Date;
+  }[],
   ratingAverage: number | null,
   ratingCount: number,
 ): WorkerReviewsSummary {

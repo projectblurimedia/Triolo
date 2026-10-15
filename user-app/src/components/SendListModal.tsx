@@ -24,6 +24,7 @@ import { formatRupees, OrderFulfillment } from '@/services/ordersService';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { openNewList } from '@/navigation/navigationRef';
 
 interface SendListModalProps {
   visible: boolean;
@@ -32,6 +33,8 @@ interface SendListModalProps {
   shop?: BusinessNearbyResult | null;
   /** The saved list to send; the customer can switch lists inside. Defaults to the newest. */
   listId?: string | null;
+  /** Called when the person leaves to create a list, so a screen that opened this one can close too. */
+  onLeave?: () => void;
 }
 
 const SHOP_LIMIT = 50;
@@ -62,7 +65,7 @@ async function addressFor(latitude: number, longitude: number): Promise<string |
  * and delivery, sorted nearest / top rated; then pickup or door delivery (only where the shop
  * delivers, with its charge shown up front), an optional note, Send. Location must be on.
  */
-export function SendListModal({ visible, onClose, shop: preselected, listId: initialListId }: SendListModalProps) {
+export function SendListModal({ visible, onClose, shop: preselected, listId: initialListId, onLeave }: SendListModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -383,6 +386,16 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
             <FontAwesome6 name="list-check" size={26} color={colors.textMuted} solid />
             <Text style={[styles.stateTitle, { color: colors.text }]}>{t('sendList.emptyTitle')}</Text>
             <Text style={[styles.meta, styles.centerText, { color: colors.textMuted }]}>{t('sendList.emptyMessage')}</Text>
+            <View style={styles.stateAction}>
+              <Button
+                label={t('sendList.createList')}
+                onPress={() => {
+                  onClose();
+                  onLeave?.();
+                  openNewList();
+                }}
+              />
+            </View>
           </View>
         ) : (
           <ScrollView

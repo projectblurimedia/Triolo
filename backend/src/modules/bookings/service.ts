@@ -16,6 +16,9 @@ import {
   PendingOffer,
   RatedJob,
   WorkerJob,
+  AdminBookingDetail,
+  AdminBookingListFilter,
+  NotifyTarget,
 } from './interfaces';
 import { bookingOfferBody, bookingOfferTitle, jobTakenBody, jobTakenTitle, TripEvent, tripTemplate } from './pushTemplates';
 
@@ -33,7 +36,8 @@ function generateArrivalPin(): string {
  *   accepted → on_the_way (worker taps Start Trip; their live location is shared)
  *   → arrived → in_progress (worker enters the customer's 4-digit PIN) → work_done
  *   → completed (customer confirms, rating the worker 1–5 with optional feedback)
- * The customer can cancel until the PIN is verified. Each step notifies the other person
+ * The customer can cancel until the PIN is verified, and so can the accepted worker (from
+ * accepted/on_the_way/arrived) — then a problem's trip reopens the problem for other workers. Each step notifies the other person
  * (saved in their notification list + pushed, in their own language). Depends on
  * WorkersService and NotificationsService, never their tables — same module-boundary shape as
  * `admin`/`problems`.
@@ -184,6 +188,22 @@ export class BookingsService {
     return this.repository.findPendingOffersForWorker(profile.id);
   }
 
+  /**
+   * The worker's "Find jobs now" button: picks up every Quick Book request still looking for
+   * a worker nearby (from where the worker is right now when the app sends it, else their
+   * profile's service location), then returns their open offers like getMyOffers.
+   */
+  async searchOpenRequests(workerAccountId: string, here?: { latitude: number; longitude: number }): Promise<PendingOffer[]> {
+    const worker = await this.requireWorker(workerAccountId);
+    if (worker.verificationStatus !== 'verified') return [];
+    const latitude = here?.latitude ?? worker.latitude;
+    const longitude = here?.longitude ?? worker.longitude;
+    if (latitude != null && longitude != null) {
+      await this.repository.addOffersForOpenRequests(worker.id, workerAccountId, worker.skillCategories, latitude, longitude);
+    }
+    return this.repository.findPendingOffersForWorker(worker.id);
+  }
+
   /** Jobs this worker accepted — active first, then history. */
   async listMyJobs(workerAccountId: string): Promise<WorkerJob[]> {
     const profile = await this.workersService.getMyProfile(workerAccountId);
@@ -230,6 +250,20 @@ export class BookingsService {
         ),
       ),
     ]);
+  }
+
+  /** The accepted worker backs out before the PIN is verified, with an optional reason. */
+  async cancelByWorker(workerAccountId: string, bookingRequestId: string, reason?: string): Promise<void> {
+    const worker = await this.requireWorker(workerAccountId);
+    const result = await this.repository.cancelByWorker(bookingRequestId, worker.id, reason || null);
+    if (!result) {
+      throw await this.transitionError(bookingRequestId, 'This job can no longer be cancelled.');
+    }
+    const problemPostId = result.request.problemPostId;
+    await this.notify(result, problemPostId ? 'worker_cancelled_problem' : 'worker_cancelled', 'booking_cancelled');
+    if (problemPostId && this.lifecycleListener) {
+      await this.lifecycleListener.onProblemTripCancelled(problemPostId);
+    }
   }
 
   /** A worker dismissing an offer they don't want — only their own offer; silently no-ops if gone. */
@@ -325,5 +359,53 @@ export class BookingsService {
       data: { kind: type, bookingId: transition.request.id },
       channelId: 'default',
     });
+  }
+
+  // --- Admin ---
+
+  async adminList(filter: AdminBookingListFilter) {
+    await this.repository.expireStaleBroadcasts();
+    return this.repository.adminList(filter);
+  }
+
+  async adminGet(id: string): Promise<AdminBookingDetail> {
+    await this.repository.expireStaleBroadcasts();
+    const booking = await this.repository.adminGet(id);
+    if (!booking) throw AppError.notFound('Booking not found.', 'BOOKING_REQUEST_NOT_FOUND');
+    return booking;
+  }
+
+  /**
+   * The admin stops an unfinished booking at any step. Both people are told, with the reason.
+   * A problem's trip reopens the problem, the same as any other cancellation.
+   */
+  async adminCancel(id: string, reason: string | null): Promise<void> {
+    const result = await this.repository.adminCancel(id, reason);
+    if (!result) throw await this.transitionError(id, 'This booking is already finished.');
+    const tell = (target: NotifyTarget) => {
+      const text = tripTemplate('admin_cancelled', target.preferredLanguage);
+      const why = reason ? (target.preferredLanguage === 'te' ? ` కారణం: ${reason}` : ` Reason: ${reason}`) : '';
+      return this.notificationsService.notify(target.accountId, 'booking_cancelled', text.title, `${text.body}${why}`, {
+        data: { kind: 'booking_cancelled', bookingId: id },
+        channelId: 'default',
+      });
+    };
+    await Promise.all([tell(result.customer), ...(result.worker ? [tell(result.worker)] : [])]);
+    if (result.request.problemPostId && this.lifecycleListener) {
+      await this.lifecycleListener.onProblemTripCancelled(result.request.problemPostId);
+    }
+  }
+
+  /** Cancels every unfinished booking an account is part of (when it's suspended or banned). */
+  async adminCancelActiveForAccount(accountId: string, reason: string | null): Promise<number> {
+    const ids = await this.repository.adminActiveIdsForAccount(accountId);
+    for (const id of ids) {
+      await this.adminCancel(id, reason).catch(() => undefined);
+    }
+    return ids.length;
+  }
+
+  adminCounts() {
+    return this.repository.adminCounts();
   }
 }

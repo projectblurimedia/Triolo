@@ -20,8 +20,37 @@ export interface Account {
   latitude: number | null;
   longitude: number | null;
   locationAddress: string | null;
+  /** End of a temporary suspension ('suspended'); null otherwise. */
+  suspendedUntil: Date | null;
+  /** The admin's reason for the current suspension or ban. */
+  statusReason: string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** Admin moderation of an account. */
+export type AccountModerationAction = 'suspend' | 'ban' | 'reactivate';
+
+export interface AdminAccountListFilter {
+  q?: string;
+  status?: AccountStatus;
+  page: number;
+  limit: number;
+}
+
+export interface AdminAccountListResult {
+  items: Account[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminAccountStats {
+  total: number;
+  active: number;
+  suspended: number;
+  blocked: number;
+  newToday: number;
 }
 
 export interface AccessTokenPayload {

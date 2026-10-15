@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,7 @@ import { ACTIVE_SHOP_STATUSES, formatRupees, ShopOrder } from '@/services/shopOr
 import { MainStackParamList, MainTabParamList } from '@/navigation/types';
 import { formatDistance } from '@/utils/formatDistance';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { SmartImage } from './SmartImage';
 
 const STAR_COLOR = '#FBBF24';
 const PREVIEW_LIMIT = 4;
@@ -80,7 +81,12 @@ export function ShopHomeSection({ profile }: { profile: BusinessProfile }) {
       <Pressable
         key={order.id}
         onPress={() => openShopOrder(order.id)}
-        style={[styles.orderCard, { backgroundColor: colors.surface, borderColor: isNew ? tone : colors.border }]}
+        style={[
+          styles.orderCard,
+          isNew
+            ? { backgroundColor: colors.surface, borderColor: tone }
+            : { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` },
+        ]}
       >
         <View style={[styles.orderIcon, { backgroundColor: `${tone}1A` }]}>
           <FontAwesome6 name={order.fulfillment === 'delivery' ? 'truck' : 'basket-shopping'} size={15} color={tone} solid />
@@ -154,7 +160,7 @@ export function ShopHomeSection({ profile }: { profile: BusinessProfile }) {
       <Pressable onPress={() => navigation.navigate('MyInfo', { capability: 'business' })}>
         <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           {profile.shopPhotoUrls[0] ? (
-            <Image source={{ uri: profile.shopPhotoUrls[0] }} style={styles.heroPhoto} />
+            <SmartImage source={{ uri: profile.shopPhotoUrls[0] }} style={styles.heroPhoto} />
           ) : (
             <View style={[styles.heroPhoto, styles.heroPlaceholder]}>
               <FontAwesome6 name="store" size={24} color="#FFFFFF" solid />

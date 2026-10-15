@@ -2,25 +2,30 @@ import { PreferredLanguage } from '@/modules/auth/interfaces';
 
 /**
  * broadcasting → accepted → on_the_way → arrived → in_progress (PIN verified) → work_done
- * → completed. 'cancelled' is reachable by the customer any time before the PIN is verified.
+ * → completed. 'cancelled' is reachable by the customer any time before the PIN is verified,
+ * and by the accepted worker from accepted/on_the_way/arrived (`cancelledBy` says which).
  * 'expired': no worker accepted within BROADCAST_TTL_MINUTES.
  */
 export type BookingRequestStatus =
-  | 'broadcasting'
-  | 'accepted'
-  | 'on_the_way'
-  | 'arrived'
-  | 'in_progress'
-  | 'work_done'
-  | 'completed'
-  | 'cancelled'
-  | 'expired';
+  'broadcasting' | 'accepted' | 'on_the_way' | 'arrived' | 'in_progress' | 'work_done' | 'completed' | 'cancelled' | 'expired';
 export type BookingOfferStatus = 'pending' | 'accepted' | 'lost' | 'declined';
 
 /** Statuses during which the customer sees the PIN and the worker's live location. */
 export const TRIP_STATUSES: BookingRequestStatus[] = ['accepted', 'on_the_way', 'arrived'];
 /** The customer can cancel up to (not including) PIN verification. */
 export const CANCELLABLE_STATUSES: BookingRequestStatus[] = ['broadcasting', 'accepted', 'on_the_way', 'arrived'];
+/** The accepted worker can back out up to (not including) PIN verification. */
+export const WORKER_CANCELLABLE_STATUSES: BookingRequestStatus[] = ['accepted', 'on_the_way', 'arrived'];
+export type BookingCancelledBy = 'customer' | 'worker' | 'admin';
+/** Everything not finished yet — what the admin can still cancel. */
+export const ADMIN_ACTIVE_STATUSES: BookingRequestStatus[] = [
+  'broadcasting',
+  'accepted',
+  'on_the_way',
+  'arrived',
+  'in_progress',
+  'work_done',
+];
 export const MAX_PIN_ATTEMPTS = 5;
 /**
  * How long a Quick Book request keeps looking for a worker. After this it is 'expired' and no
@@ -45,6 +50,8 @@ export interface BookingRequest {
   workDoneAt: Date | null;
   completedAt: Date | null;
   cancelledAt: Date | null;
+  cancelledBy: BookingCancelledBy | null;
+  cancelReason: string | null;
   expiredAt: Date | null;
   workerRating: number | null;
   workerReview: string | null;
@@ -109,6 +116,9 @@ export interface PendingOffer {
   bookingRequestId: string;
   skillCategories: string[];
   distanceMeters: number;
+  /** Who is asking and where — shown before accepting. Their phone stays hidden until accepted. */
+  customerFullName: string;
+  locationAddress: string | null;
   createdAt: Date;
 }
 
@@ -122,8 +132,7 @@ export interface NotifyTarget {
 export type LosingWorker = NotifyTarget;
 
 export type AcceptOfferResult =
-  | { won: false }
-  | { won: true; request: BookingRequest; customer: NotifyTarget; losingWorkers: LosingWorker[] };
+  { won: false } | { won: true; request: BookingRequest; customer: NotifyTarget; losingWorkers: LosingWorker[] };
 
 /** A status change, with whoever should be told about it (null when nobody needs telling). */
 export interface BookingTransition {
@@ -168,4 +177,44 @@ export interface RatedJob {
   customerFullName: string;
   skillCategories: string[];
   completedAt: Date;
+}
+
+/** A booking as the admin sees it: both people with their phones (never the PIN). */
+export interface AdminBooking extends BookingRequest {
+  customer: { accountId: string; fullName: string; mobileNumber: string };
+  worker: { accountId: string; workerId: string; fullName: string; mobileNumber: string } | null;
+  offerCount: number;
+}
+
+/** Each worker a Quick Book reached, and what they did with it. */
+export interface AdminBookingOffer {
+  workerId: string;
+  fullName: string;
+  mobileNumber: string;
+  distanceMeters: number;
+  status: BookingOfferStatus;
+  createdAt: Date;
+}
+
+export interface AdminBookingDetail extends AdminBooking {
+  offers: AdminBookingOffer[];
+}
+
+export type AdminBookingGroup = 'active' | 'completed' | 'cancelled' | 'expired';
+
+export interface AdminBookingListFilter {
+  q?: string;
+  /** 'quick' = Quick Book, 'problem' = a trip started from a Your Problems post. */
+  kind?: 'quick' | 'problem';
+  group?: AdminBookingGroup;
+  accountId?: string;
+  page: number;
+  limit: number;
+}
+
+/** Both sides of a booking the admin cancelled, to tell each of them. */
+export interface AdminCancelResult {
+  request: BookingRequest;
+  customer: NotifyTarget;
+  worker: NotifyTarget | null;
 }

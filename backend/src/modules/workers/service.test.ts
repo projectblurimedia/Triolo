@@ -72,7 +72,14 @@ describe('WorkersService.createProfile', () => {
     await expect(
       service.createProfile(
         'account-1',
-        { skillCategories: ['electrician'], experienceYears: 3, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+        {
+          skillCategories: ['electrician'],
+          experienceYears: 3,
+          city: 'Hyderabad',
+          district: 'Hyderabad',
+          state: 'Telangana',
+          pincode: '500016',
+        },
         [],
       ),
     ).rejects.toMatchObject({ statusCode: 409, code: 'WORKER_PROFILE_EXISTS' });
@@ -128,7 +135,14 @@ describe('WorkersService.createProfile', () => {
     const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     await service.createProfile(
       'account-1',
-      { skillCategories: ['mason'], experienceYears: 0, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+      {
+        skillCategories: ['mason'],
+        experienceYears: 0,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+      },
       [],
     );
 
@@ -193,7 +207,14 @@ describe('WorkersService.updateProfile', () => {
     await expect(
       service.updateProfile(
         'account-1',
-        { skillCategories: ['plumber'], experienceYears: 4, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+        {
+          skillCategories: ['plumber'],
+          experienceYears: 4,
+          city: 'Hyderabad',
+          district: 'Hyderabad',
+          state: 'Telangana',
+          pincode: '500016',
+        },
         [],
       ),
     ).rejects.toMatchObject({ statusCode: 404, code: 'WORKER_PROFILE_NOT_FOUND' });
@@ -211,7 +232,14 @@ describe('WorkersService.updateProfile', () => {
     const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     await service.updateProfile(
       'account-1',
-      { skillCategories: ['plumber'], experienceYears: 4, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+      {
+        skillCategories: ['plumber'],
+        experienceYears: 4,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+      },
       [],
     );
 
@@ -257,9 +285,7 @@ describe('WorkersService.updateProfile', () => {
 
   it('deletes dropped photos from Cloudinary when they are no longer kept', async () => {
     const repo = createMockRepository();
-    repo.findByAccountId.mockResolvedValue(
-      buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }),
-    );
+    repo.findByAccountId.mockResolvedValue(buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }));
     repo.update.mockResolvedValue(buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg'] }));
 
     const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
@@ -288,7 +314,14 @@ describe('WorkersService.updateProfile', () => {
     const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
     await service.updateProfile(
       'account-1',
-      { skillCategories: ['mason'], experienceYears: 2, city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', pincode: '500016' },
+      {
+        skillCategories: ['mason'],
+        experienceYears: 2,
+        city: 'Hyderabad',
+        district: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500016',
+      },
       [],
     );
 
@@ -324,9 +357,7 @@ describe('WorkersService.deleteProfile', () => {
 
   it('deletes all portfolio photos from Cloudinary when the profile is deleted', async () => {
     const repo = createMockRepository();
-    repo.findByAccountId.mockResolvedValue(
-      buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }),
-    );
+    repo.findByAccountId.mockResolvedValue(buildProfile({ portfolioPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/b.jpg'] }));
     const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
     await service.deleteProfile('account-1');
@@ -366,14 +397,20 @@ describe('WorkersService.findMatchingForBroadcast', () => {
   it('passes the requester account id, skills, location, and radius straight through to the repository', async () => {
     const repo = createMockRepository();
     const matches = [
-      { workerId: 'worker-1', accountId: 'account-2', accountFullName: 'Rajesh', preferredLanguage: 'en' as const, distanceMeters: 480 },
+      {
+        workerId: 'worker-1',
+        accountId: 'account-2',
+        accountFullName: 'Rajesh',
+        preferredLanguage: 'en' as const,
+        distanceMeters: 480,
+      },
     ];
     repo.findMatchingForBroadcast.mockResolvedValue(matches);
     const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
-    await expect(
-      service.findMatchingForBroadcast('account-1', ['electrician', 'plumber'], 17.385, 78.4867, 50),
-    ).resolves.toBe(matches);
+    await expect(service.findMatchingForBroadcast('account-1', ['electrician', 'plumber'], 17.385, 78.4867, 50)).resolves.toBe(
+      matches,
+    );
     expect(repo.findMatchingForBroadcast).toHaveBeenCalledWith('account-1', ['electrician', 'plumber'], 17.385, 78.4867, 50);
   });
 });
@@ -418,9 +455,7 @@ describe('WorkersService admin-facing methods', () => {
     repo.findAll.mockResolvedValue(result);
     const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 
-    await expect(service.adminListProfiles({ status: 'pending_verification', page: 1, limit: 20 })).resolves.toBe(
-      result,
-    );
+    await expect(service.adminListProfiles({ status: 'pending_verification', page: 1, limit: 20 })).resolves.toBe(result);
     expect(repo.findAll).toHaveBeenCalledWith({ status: 'pending_verification', page: 1, limit: 20 });
   });
 
@@ -437,7 +472,12 @@ describe('WorkersService admin-facing methods', () => {
 
   it('adminGetProfile returns the profile when found', async () => {
     const repo = createMockRepository();
-    const withAccount = { ...buildProfile(), accountFullName: 'Asha', accountMobileNumber: '9999999999', accountEmail: 'asha@example.com' };
+    const withAccount = {
+      ...buildProfile(),
+      accountFullName: 'Asha',
+      accountMobileNumber: '9999999999',
+      accountEmail: 'asha@example.com',
+    };
     repo.findById.mockResolvedValue(withAccount);
     const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
 

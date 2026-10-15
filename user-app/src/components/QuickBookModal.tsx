@@ -126,6 +126,8 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
         workDoneAt: null,
         completedAt: null,
         cancelledAt: null,
+        cancelledBy: null,
+        cancelReason: null,
         workerRating: null,
         workerReview: null,
         problemPostId: null,

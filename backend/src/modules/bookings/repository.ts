@@ -18,7 +18,13 @@ import {
   RatedJob,
   TRIP_STATUSES,
   VerifyPinResult,
+  WORKER_CANCELLABLE_STATUSES,
   WorkerJob,
+  ADMIN_ACTIVE_STATUSES,
+  AdminBooking,
+  AdminBookingDetail,
+  AdminBookingListFilter,
+  AdminCancelResult,
 } from './interfaces';
 
 function mapBookingRequest(row: QueryResultRow): BookingRequest {
@@ -39,6 +45,8 @@ function mapBookingRequest(row: QueryResultRow): BookingRequest {
     workDoneAt: row.work_done_at ?? null,
     completedAt: row.completed_at ?? null,
     cancelledAt: row.cancelled_at ?? null,
+    cancelledBy: row.cancelled_by ?? null,
+    cancelReason: row.cancel_reason ?? null,
     expiredAt: row.expired_at ?? null,
     workerRating: row.worker_rating ?? null,
     workerReview: row.worker_review ?? null,
@@ -212,10 +220,7 @@ export class BookingsRepository {
   // --- Customer side ---
 
   async findByIdForAccount(id: string, accountId: string): Promise<CustomerBooking | null> {
-    const result = await this.pool.query(`${CUSTOMER_BOOKING_SELECT} WHERE br.id = $1 AND br.account_id = $2`, [
-      id,
-      accountId,
-    ]);
+    const result = await this.pool.query(`${CUSTOMER_BOOKING_SELECT} WHERE br.id = $1 AND br.account_id = $2`, [id, accountId]);
     return result.rows[0] ? mapCustomerBooking(result.rows[0]) : null;
   }
 
@@ -248,7 +253,7 @@ export class BookingsRepository {
     return this.inTransaction(async (client) => {
       const result = await client.query(
         `WITH updated AS (
-           UPDATE booking_requests SET status = 'cancelled', cancelled_at = now(), arrival_pin = NULL
+           UPDATE booking_requests SET status = 'cancelled', cancelled_by = 'customer', cancelled_at = now(), arrival_pin = NULL
            WHERE id = $1 AND account_id = $2 AND status = ANY($3::booking_request_status[])
            RETURNING *
          ) ${NOTIFY_WORKER}`,
@@ -282,11 +287,48 @@ export class BookingsRepository {
     );
   }
 
+  /**
+   * "Find jobs now": adds an offer for this worker on every Quick Book still looking for
+   * someone that they could have been offered — within that request's own radius of the
+   * worker, needing only skills they have, not their own (a declined one comes back) — so a
+   * missed push (or a worker who wasn't in range when it went out) never hides a live job. The
+   * unique (request, worker) key makes it safe to run any number of times.
+   */
+  async addOffersForOpenRequests(
+    workerId: string,
+    workerAccountId: string,
+    skillCategories: string[],
+    latitude: number,
+    longitude: number,
+  ): Promise<number> {
+    const result = await this.pool.query(
+      `INSERT INTO booking_offers (booking_request_id, worker_id, distance_meters)
+       SELECT sub.id, $1, sub.distance_meters FROM (
+         SELECT br.id, br.radius_km,
+           (6371000 * acos(LEAST(1.0, GREATEST(-1.0,
+             cos(radians($3)) * cos(radians(br.latitude)) * cos(radians(br.longitude) - radians($4)) + sin(radians($3)) * sin(radians(br.latitude))
+           )))) AS distance_meters
+         FROM booking_requests br
+         WHERE br.status = 'broadcasting'
+           AND br.created_at > now() - make_interval(mins => $6)
+           AND br.account_id != $2
+           AND br.skill_categories <@ $5::worker_skill_category[]
+       ) sub
+       WHERE sub.distance_meters <= sub.radius_km * 1000
+       ON CONFLICT (booking_request_id, worker_id)
+         DO UPDATE SET status = 'pending' WHERE booking_offers.status = 'declined'`,
+      [workerId, workerAccountId, latitude, longitude, skillCategories, BROADCAST_TTL_MINUTES],
+    );
+    return result.rowCount ?? 0;
+  }
+
   async findPendingOffersForWorker(workerId: string): Promise<PendingOffer[]> {
     const result = await this.pool.query(
-      `SELECT bo.id AS offer_id, bo.booking_request_id, bo.distance_meters, bo.created_at, br.skill_categories
+      `SELECT bo.id AS offer_id, bo.booking_request_id, bo.distance_meters, bo.created_at, br.skill_categories,
+              br.location_address, ca.full_name AS customer_full_name
        FROM booking_offers bo
        JOIN booking_requests br ON br.id = bo.booking_request_id
+       JOIN accounts ca ON ca.id = br.account_id
        WHERE bo.worker_id = $1 AND bo.status = 'pending' AND br.status = 'broadcasting'
          AND br.created_at > now() - make_interval(mins => $2)
        ORDER BY bo.created_at DESC`,
@@ -297,6 +339,8 @@ export class BookingsRepository {
       bookingRequestId: row.booking_request_id,
       skillCategories: parsePgArray(row.skill_categories),
       distanceMeters: Number(row.distance_meters),
+      customerFullName: row.customer_full_name,
+      locationAddress: row.location_address ?? null,
       createdAt: row.created_at,
     }));
   }
@@ -327,41 +371,58 @@ export class BookingsRepository {
    * transaction so a crash midway can't leave two offers 'accepted'.
    */
   async acceptOffer(bookingRequestId: string, workerId: string, arrivalPin: string): Promise<AcceptOfferResult> {
-    const outcome = await this.inTransaction<AcceptOfferResult | null>(async (client) => {
-      const requestResult = await client.query(
-        `UPDATE booking_requests
+    const outcome = await this.inTransaction<AcceptOfferResult | null>(
+      async (client) => {
+        const requestResult = await client.query(
+          `UPDATE booking_requests
          SET status = 'accepted', accepted_worker_id = $2, accepted_at = now(), arrival_pin = $3, pin_attempts = 0
          WHERE id = $1 AND status = 'broadcasting' AND created_at > now() - make_interval(mins => $4)
          RETURNING *`,
-        [bookingRequestId, workerId, arrivalPin, BROADCAST_TTL_MINUTES],
-      );
-      if (requestResult.rowCount === 0) return null;
+          [bookingRequestId, workerId, arrivalPin, BROADCAST_TTL_MINUTES],
+        );
+        if (requestResult.rowCount === 0) return null;
 
-      await client.query(`UPDATE booking_offers SET status = 'accepted' WHERE booking_request_id = $1 AND worker_id = $2`, [
-        bookingRequestId,
-        workerId,
-      ]);
+        await client.query(`UPDATE booking_offers SET status = 'accepted' WHERE booking_request_id = $1 AND worker_id = $2`, [
+          bookingRequestId,
+          workerId,
+        ]);
 
-      const losers = await client.query(
-        `UPDATE booking_offers bo SET status = 'lost'
+        const losers = await client.query(
+          `UPDATE booking_offers bo SET status = 'lost'
          FROM worker_profiles w, accounts a
          WHERE bo.booking_request_id = $1 AND bo.worker_id != $2 AND bo.status = 'pending'
            AND bo.worker_id = w.id AND w.account_id = a.id
          RETURNING a.id AS account_id, a.preferred_language`,
-        [bookingRequestId, workerId],
-      );
+          [bookingRequestId, workerId],
+        );
 
-      const request = mapBookingRequest(requestResult.rows[0]);
-      const customer = await client.query(`SELECT id, preferred_language FROM accounts WHERE id = $1`, [request.accountId]);
+        const request = mapBookingRequest(requestResult.rows[0]);
+        const customer = await client.query(`SELECT id, preferred_language FROM accounts WHERE id = $1`, [request.accountId]);
 
-      return {
-        won: true,
-        request,
-        customer: { accountId: customer.rows[0].id, preferredLanguage: customer.rows[0].preferred_language } as NotifyTarget,
-        losingWorkers: losers.rows.map((row) => ({ accountId: row.account_id, preferredLanguage: row.preferred_language })),
-      };
-    }, { rollbackOn: (value) => value === null });
+        return {
+          won: true,
+          request,
+          customer: { accountId: customer.rows[0].id, preferredLanguage: customer.rows[0].preferred_language } as NotifyTarget,
+          losingWorkers: losers.rows.map((row) => ({ accountId: row.account_id, preferredLanguage: row.preferred_language })),
+        };
+      },
+      { rollbackOn: (value) => value === null },
+    );
     return outcome ?? { won: false };
+  }
+
+  /** The accepted worker backs out before the PIN is verified; the customer is told. */
+  async cancelByWorker(id: string, workerId: string, reason: string | null): Promise<BookingTransition | null> {
+    const result = await this.pool.query(
+      `WITH updated AS (
+         UPDATE booking_requests
+         SET status = 'cancelled', cancelled_by = 'worker', cancel_reason = $3, cancelled_at = now(), arrival_pin = NULL
+         WHERE id = $1 AND accepted_worker_id = $2 AND status = ANY($4::booking_request_status[])
+         RETURNING *
+       ) ${NOTIFY_CUSTOMER}`,
+      [id, workerId, reason, WORKER_CANCELLABLE_STATUSES],
+    );
+    return mapTransition(result.rows[0]);
   }
 
   /** accepted → on_the_way. */
@@ -458,7 +519,10 @@ export class BookingsRepository {
    * Runs `work` in one transaction. It commits unless `work` throws, or `rollbackOn` says the
    * returned value means "nothing happened" (then it rolls back and still returns the value).
    */
-  private async inTransaction<T>(work: (client: PoolClient) => Promise<T>, options?: { rollbackOn?: (value: T) => boolean }): Promise<T> {
+  private async inTransaction<T>(
+    work: (client: PoolClient) => Promise<T>,
+    options?: { rollbackOn?: (value: T) => boolean },
+  ): Promise<T> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -472,4 +536,153 @@ export class BookingsRepository {
       client.release();
     }
   }
+
+  // --- Admin ---
+
+  async adminList(
+    filter: AdminBookingListFilter,
+  ): Promise<{ items: AdminBooking[]; total: number; page: number; limit: number }> {
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    if (filter.kind === 'quick') conditions.push('br.problem_post_id IS NULL');
+    if (filter.kind === 'problem') conditions.push('br.problem_post_id IS NOT NULL');
+    if (filter.group === 'active') {
+      values.push(ADMIN_ACTIVE_STATUSES);
+      conditions.push(`br.status = ANY($${values.length}::booking_request_status[])`);
+    } else if (filter.group) {
+      values.push(filter.group);
+      conditions.push(`br.status = $${values.length}`);
+    }
+    if (filter.accountId) {
+      values.push(filter.accountId);
+      conditions.push(`(br.account_id = $${values.length} OR w.account_id = $${values.length})`);
+    }
+    if (filter.q) {
+      values.push(`%${filter.q}%`);
+      const i = values.length;
+      conditions.push(
+        `(ca.full_name ILIKE $${i} OR ca.mobile_number ILIKE $${i} OR wa.full_name ILIKE $${i} OR wa.mobile_number ILIKE $${i} OR br.location_address ILIKE $${i} OR array_to_string(br.skill_categories, ',') ILIKE $${i})`,
+      );
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const count = await this.pool.query(`SELECT COUNT(*) ${ADMIN_FROM} ${where}`, values);
+    values.push(filter.limit, (filter.page - 1) * filter.limit);
+    const rows = await this.pool.query(
+      `${ADMIN_SELECT} ${ADMIN_FROM} ${where} ORDER BY br.created_at DESC LIMIT $${values.length - 1} OFFSET $${values.length}`,
+      values,
+    );
+    return { items: rows.rows.map(mapAdminBooking), total: Number(count.rows[0].count), page: filter.page, limit: filter.limit };
+  }
+
+  async adminGet(id: string): Promise<AdminBookingDetail | null> {
+    const result = await this.pool.query(`${ADMIN_SELECT} ${ADMIN_FROM} WHERE br.id = $1`, [id]);
+    if (!result.rows[0]) return null;
+    const offers = await this.pool.query(
+      `SELECT bo.worker_id, bo.distance_meters, bo.status, bo.created_at, a.full_name, a.mobile_number
+       FROM booking_offers bo
+       JOIN worker_profiles w ON w.id = bo.worker_id
+       JOIN accounts a ON a.id = w.account_id
+       WHERE bo.booking_request_id = $1
+       ORDER BY bo.distance_meters ASC`,
+      [id],
+    );
+    return {
+      ...mapAdminBooking(result.rows[0]),
+      offers: offers.rows.map((row) => ({
+        workerId: row.worker_id,
+        fullName: row.full_name,
+        mobileNumber: row.mobile_number,
+        distanceMeters: Number(row.distance_meters),
+        status: row.status,
+        createdAt: row.created_at,
+      })),
+    };
+  }
+
+  /** Stops any unfinished booking; returns both people to tell. Null if it was already over. */
+  async adminCancel(id: string, reason: string | null): Promise<AdminCancelResult | null> {
+    return this.inTransaction(async (client) => {
+      const updated = await client.query(
+        `UPDATE booking_requests
+         SET status = 'cancelled', cancelled_by = 'admin', cancel_reason = $2, cancelled_at = now(), arrival_pin = NULL
+         WHERE id = $1 AND status = ANY($3::booking_request_status[])
+         RETURNING *`,
+        [id, reason, ADMIN_ACTIVE_STATUSES],
+      );
+      if (!updated.rows[0]) return null;
+      await client.query(`UPDATE booking_offers SET status = 'lost' WHERE booking_request_id = $1 AND status = 'pending'`, [id]);
+      const request = mapBookingRequest(updated.rows[0]);
+      const people = await client.query(
+        `SELECT ca.id AS customer_id, ca.preferred_language AS customer_language,
+                wa.id AS worker_account_id, wa.preferred_language AS worker_language
+         FROM booking_requests br
+         JOIN accounts ca ON ca.id = br.account_id
+         LEFT JOIN worker_profiles w ON w.id = br.accepted_worker_id
+         LEFT JOIN accounts wa ON wa.id = w.account_id
+         WHERE br.id = $1`,
+        [id],
+      );
+      const row = people.rows[0];
+      return {
+        request,
+        customer: { accountId: row.customer_id, preferredLanguage: row.customer_language },
+        worker: row.worker_account_id ? { accountId: row.worker_account_id, preferredLanguage: row.worker_language } : null,
+      };
+    });
+  }
+
+  /** Unfinished bookings an account is part of, as the customer or as the worker. */
+  async adminActiveIdsForAccount(accountId: string): Promise<string[]> {
+    const result = await this.pool.query(
+      `SELECT br.id FROM booking_requests br
+       LEFT JOIN worker_profiles w ON w.id = br.accepted_worker_id
+       WHERE (br.account_id = $1 OR w.account_id = $1) AND br.status = ANY($2::booking_request_status[])`,
+      [accountId, ADMIN_ACTIVE_STATUSES],
+    );
+    return result.rows.map((row) => row.id);
+  }
+
+  async adminCounts(): Promise<{ active: number; searching: number; completed: number; cancelled: number; today: number }> {
+    const result = await this.pool.query(
+      `SELECT COUNT(*) FILTER (WHERE status = ANY($1::booking_request_status[])) AS active,
+              COUNT(*) FILTER (WHERE status = 'broadcasting') AS searching,
+              COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+              COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled,
+              COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now())) AS today
+       FROM booking_requests`,
+      [ADMIN_ACTIVE_STATUSES],
+    );
+    const row = result.rows[0];
+    return {
+      active: Number(row.active),
+      searching: Number(row.searching),
+      completed: Number(row.completed),
+      cancelled: Number(row.cancelled),
+      today: Number(row.today),
+    };
+  }
+}
+
+const ADMIN_SELECT = `SELECT br.*, ca.full_name AS customer_full_name, ca.mobile_number AS customer_mobile_number,
+  w.account_id AS worker_account_id, wa.full_name AS worker_full_name, wa.mobile_number AS worker_mobile_number,
+  (SELECT COUNT(*) FROM booking_offers bo WHERE bo.booking_request_id = br.id) AS offer_count`;
+const ADMIN_FROM = `FROM booking_requests br
+  JOIN accounts ca ON ca.id = br.account_id
+  LEFT JOIN worker_profiles w ON w.id = br.accepted_worker_id
+  LEFT JOIN accounts wa ON wa.id = w.account_id`;
+
+function mapAdminBooking(row: QueryResultRow): AdminBooking {
+  return {
+    ...mapBookingRequest(row),
+    customer: { accountId: row.account_id, fullName: row.customer_full_name, mobileNumber: row.customer_mobile_number },
+    worker: row.worker_account_id
+      ? {
+          accountId: row.worker_account_id,
+          workerId: row.accepted_worker_id,
+          fullName: row.worker_full_name,
+          mobileNumber: row.worker_mobile_number,
+        }
+      : null,
+    offerCount: Number(row.offer_count ?? 0),
+  };
 }

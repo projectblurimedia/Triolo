@@ -16,7 +16,8 @@ export type NotificationType =
   | 'order_ready'
   | 'order_out_for_delivery'
   | 'order_completed'
-  | 'order_cancelled';
+  | 'order_cancelled'
+  | 'admin_notice';
 
 export const MAX_BULK_DELETE = 100;
 
