@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { authService } from '@/services/authService';
 import { useAuthStore, AccountLanguage } from '@/state/authStore';
+import { pushTokenService } from '@/services/pushTokenService';
 
 export function useRequestRegistrationOtp() {
   return useMutation({
@@ -43,7 +44,11 @@ export function useLogout() {
   const refreshToken = useAuthStore((state) => state.refreshToken);
   const setLoggingOut = useAuthStore((state) => state.setLoggingOut);
   return useMutation({
-    mutationFn: () => authService.logout(refreshToken ?? ''),
+    mutationFn: async () => {
+      // Best-effort, while still signed in: this phone stops getting this account's notifications.
+      await pushTokenService.remove().catch(() => undefined);
+      return authService.logout(refreshToken ?? '');
+    },
     onMutate: () => setLoggingOut(true),
     // Clear the session first so RootNavigator swaps to the Welcome screen underneath
     // the overlay, then hide the overlay — it fades away to reveal Welcome already in

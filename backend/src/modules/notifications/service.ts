@@ -1,6 +1,6 @@
 import { NotificationsRepository } from './repository';
 import { PushNotificationOptions, sendPushNotification } from './pushSender';
-import { NotificationListResult, NotificationType } from './interfaces';
+import { AUDIENCE_BY_TYPE, NotificationListResult, NotificationType, PushApp, PushAudience } from './interfaces';
 
 const DEFAULT_LIST_LIMIT = 50;
 
@@ -29,14 +29,35 @@ export class NotificationsService {
     // recipient's device even if their app is fully closed (see pushSender.ts), same as the
     // in-app list either way once they open the app. No-ops silently if the recipient never
     // registered a push token, or if push isn't configured on this server at all.
-    const pushToken = await this.repository.findPushToken(recipientAccountId);
-    if (pushToken) {
-      await sendPushNotification(pushToken, title, body);
-    }
+    await this.pushTo(recipientAccountId, 'partner', title, body);
   }
 
-  async registerPushToken(accountId: string, token: string): Promise<void> {
-    await this.repository.upsertPushToken(accountId, token);
+  async registerPushToken(accountId: string, token: string, app: PushApp | 'legacy' = 'legacy'): Promise<void> {
+    await this.repository.upsertPushToken(accountId, token, app as PushApp);
+  }
+
+  async unregisterPushToken(accountId: string, app: PushApp, token?: string): Promise<void> {
+    await this.repository.removePushToken(accountId, app, token);
+  }
+
+  /**
+   * Sends to the account's device(s) in the right app: exact-app tokens first; a 'legacy'
+   * token (registered before the apps said which app they are) only when there's none.
+   */
+  private async pushTo(
+    accountId: string,
+    audience: PushAudience,
+    title: string,
+    body: string,
+    options?: PushNotificationOptions,
+  ): Promise<void> {
+    const tokens = await this.repository.findPushTokens(accountId);
+    let targets =
+      audience === 'any' ? tokens.map((row) => row.token) : tokens.filter((row) => row.app === audience).map((row) => row.token);
+    if (targets.length === 0) targets = tokens.filter((row) => row.app === 'legacy').map((row) => row.token);
+    for (const token of new Set(targets)) {
+      await sendPushNotification(token, title, body, options);
+    }
   }
 
   /**
@@ -48,10 +69,7 @@ export class NotificationsService {
    * recipient never registered a device token.
    */
   async sendRawPush(accountId: string, title: string, body: string, options?: PushNotificationOptions): Promise<void> {
-    const pushToken = await this.repository.findPushToken(accountId);
-    if (pushToken) {
-      await sendPushNotification(pushToken, title, body, options);
-    }
+    await this.pushTo(accountId, options?.audience ?? 'partner', title, body, options);
   }
 
   /**
@@ -68,10 +86,7 @@ export class NotificationsService {
     pushOptions?: PushNotificationOptions,
   ): Promise<void> {
     await this.repository.create({ accountId, type, title, body });
-    const pushToken = await this.repository.findPushToken(accountId);
-    if (pushToken) {
-      await sendPushNotification(pushToken, title, body, pushOptions);
-    }
+    await this.pushTo(accountId, pushOptions?.audience ?? AUDIENCE_BY_TYPE[type] ?? 'any', title, body, pushOptions);
   }
 
   async deleteNotifications(accountId: string, ids: string[]): Promise<number> {

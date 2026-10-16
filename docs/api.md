@@ -196,11 +196,19 @@ Suspended or banned workers, shops and job posters no longer appear in customer 
 First slice of the planned Notifications module (Pending Module 6) — currently raises exactly one event type, `profile_view`, fired by `POST /workers/:id/view` / `POST /businesses/:id/view` above. Other backend modules reach this one through `NotificationsService`, never the `notifications`/`push_tokens` tables directly — the same module-boundary pattern `admin` already established for reaching into `workers`/`businesses`. Delivered two ways at once: an in-app row the client polls (`partner-app`'s `useNotifications` hook, ~8s interval) **and**, if the recipient has registered a device via `PUT /notifications/push-token`, a real push notification sent directly to Google's FCM HTTP v1 API (`firebase-admin`, not Expo's own push relay — see `backend/src/modules/notifications/pushSender.ts`'s own doc comment for why) so it reaches the device even with the app fully closed. Push requires the server's `FIREBASE_SERVICE_ACCOUNT_JSON` env var to be configured; if it isn't, `notifyProfileViewed` silently skips the push send and the in-app row still works normally — push is a supplementary delivery channel, never a dependency of the base feature.
 
 ### PATCH /notifications/push-token
-Register (or replace) the caller's device push token — one per account; a newer registration (reinstall, new device) simply overwrites the previous one.
+Registers this phone for push notifications in one app.
 - Auth: Bearer access token
-- Body: `{ token: string }` — the device's native FCM registration token (`expo-notifications`' `getDevicePushTokenAsync()` on Android, not an Expo push token)
+- Body: `{ token: string, app?: "user" | "partner" }`. App versions from before migration 0026 don't send `app`; their tokens are stored as `legacy` and used only as a fallback.
+- Registering a token removes it from every other account, so the account that logged in on the phone most recently gets its notifications. Each account has at most one token per app.
 - 200: `{ success: true, message: "Push token registered", data: null }`
-- 400: `VALIDATION_ERROR` — empty/missing `token`
+
+### POST /notifications/push-token/remove
+Called on logout: this phone stops getting the account's notifications in that app.
+- Auth: Bearer access token
+- Body: `{ app: "user" | "partner", token?: string }`
+- 200: `{ success: true, message: "Push token removed", data: null }`
+
+Each push goes to the right app by notification type (`AUDIENCE_BY_TYPE` in `notifications/interfaces.ts`): offers, new orders, profile views → partner app; booking and order updates → user app; cancellations → the side that should hear about it; admin notices → both.
 
 ### GET /notifications
 List the caller's own notifications, newest first, plus their unread count.

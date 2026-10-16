@@ -61,6 +61,8 @@ function getFirebaseApp(): App | null {
  * the one building the eventual notification and needs to know what to build it with.
  */
 export interface PushNotificationOptions {
+  /** Which app to deliver to (see AUDIENCE_BY_TYPE); defaults per notification type. */
+  audience?: 'user' | 'partner' | 'any';
   data?: Record<string, string>;
   tag?: string;
   channelId?: string;

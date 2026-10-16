@@ -246,6 +246,7 @@ export class BookingsService {
             tag: bookingRequestId,
             channelId: BOOKING_OFFER_CHANNEL,
             dataOnly: true,
+            audience: 'partner',
           },
         ),
       ),
@@ -355,7 +356,10 @@ export class BookingsService {
   private async notify(transition: BookingTransition, event: TripEvent, type: NotificationType): Promise<void> {
     if (!transition.notify) return;
     const text = tripTemplate(event, transition.notify.preferredLanguage);
+    // 'completed' and a customer's 'cancelled' go to the worker; every other trip step to the customer.
+    const audience = event === 'completed' || event === 'cancelled' ? 'partner' : 'user';
     await this.notificationsService.notify(transition.notify.accountId, type, text.title, text.body, {
+      audience,
       data: { kind: type, bookingId: transition.request.id },
       channelId: 'default',
     });
@@ -382,15 +386,16 @@ export class BookingsService {
   async adminCancel(id: string, reason: string | null): Promise<void> {
     const result = await this.repository.adminCancel(id, reason);
     if (!result) throw await this.transitionError(id, 'This booking is already finished.');
-    const tell = (target: NotifyTarget) => {
+    const tell = (target: NotifyTarget, audience: 'user' | 'partner') => {
       const text = tripTemplate('admin_cancelled', target.preferredLanguage);
       const why = reason ? (target.preferredLanguage === 'te' ? ` కారణం: ${reason}` : ` Reason: ${reason}`) : '';
       return this.notificationsService.notify(target.accountId, 'booking_cancelled', text.title, `${text.body}${why}`, {
+        audience,
         data: { kind: 'booking_cancelled', bookingId: id },
         channelId: 'default',
       });
     };
-    await Promise.all([tell(result.customer), ...(result.worker ? [tell(result.worker)] : [])]);
+    await Promise.all([tell(result.customer, 'user'), ...(result.worker ? [tell(result.worker, 'partner')] : [])]);
     if (result.request.problemPostId && this.lifecycleListener) {
       await this.lifecycleListener.onProblemTripCancelled(result.request.problemPostId);
     }

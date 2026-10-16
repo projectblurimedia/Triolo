@@ -20,7 +20,8 @@ function createMockRepository(): MockRepository {
     markRead: jest.fn(),
     markAllRead: jest.fn(),
     upsertPushToken: jest.fn(),
-    findPushToken: jest.fn(),
+    removePushToken: jest.fn(),
+    findPushTokens: jest.fn().mockResolvedValue([]),
     deleteMany: jest.fn(),
   } as unknown as MockRepository;
 }
@@ -46,7 +47,7 @@ describe('NotificationsService.notifyProfileViewed', () => {
   it('creates a profile_view notification for the recipient', async () => {
     const repo = createMockRepository();
     repo.create.mockResolvedValue(buildNotification());
-    repo.findPushToken.mockResolvedValue(null);
+    repo.findPushTokens.mockResolvedValue([]);
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await service.notifyProfileViewed('owner-1', 'viewer-1');
@@ -66,24 +67,29 @@ describe('NotificationsService.notifyProfileViewed', () => {
     await service.notifyProfileViewed('account-1', 'account-1');
 
     expect(repo.create).not.toHaveBeenCalled();
-    expect(repo.findPushToken).not.toHaveBeenCalled();
+    expect(repo.findPushTokens).not.toHaveBeenCalled();
   });
 
   it('sends a push notification when the recipient has a registered token', async () => {
     const repo = createMockRepository();
     repo.create.mockResolvedValue(buildNotification());
-    repo.findPushToken.mockResolvedValue('device-token-123');
+    repo.findPushTokens.mockResolvedValue([{ token: 'device-token-123', app: 'partner' }]);
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await service.notifyProfileViewed('owner-1', 'viewer-1');
 
-    expect(sendPushNotification).toHaveBeenCalledWith('device-token-123', 'Profile Viewed', 'Someone viewed your profile.');
+    expect(sendPushNotification).toHaveBeenCalledWith(
+      'device-token-123',
+      'Profile Viewed',
+      'Someone viewed your profile.',
+      undefined,
+    );
   });
 
   it('skips the push send when the recipient has no registered token', async () => {
     const repo = createMockRepository();
     repo.create.mockResolvedValue(buildNotification());
-    repo.findPushToken.mockResolvedValue(null);
+    repo.findPushTokens.mockResolvedValue([]);
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await service.notifyProfileViewed('owner-1', 'viewer-1');
@@ -128,7 +134,7 @@ describe('NotificationsService.registerPushToken', () => {
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await service.registerPushToken('account-1', 'device-token-123');
-    expect(repo.upsertPushToken).toHaveBeenCalledWith('account-1', 'device-token-123');
+    expect(repo.upsertPushToken).toHaveBeenCalledWith('account-1', 'device-token-123', 'legacy');
   });
 });
 
@@ -139,7 +145,7 @@ describe('NotificationsService.sendRawPush', () => {
 
   it('sends a push with the given options when the recipient has a registered token, and writes no in-app row', async () => {
     const repo = createMockRepository();
-    repo.findPushToken.mockResolvedValue('device-token-123');
+    repo.findPushTokens.mockResolvedValue([{ token: 'device-token-123', app: 'partner' }]);
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await service.sendRawPush('account-1', 'New Job Nearby', 'Someone 500m away needs Electrician.', {
@@ -163,7 +169,7 @@ describe('NotificationsService.sendRawPush', () => {
 
   it('skips the send when the recipient has no registered token', async () => {
     const repo = createMockRepository();
-    repo.findPushToken.mockResolvedValue(null);
+    repo.findPushTokens.mockResolvedValue([]);
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await service.sendRawPush('account-1', 'title', 'body');
@@ -176,7 +182,7 @@ describe('NotificationsService.notify', () => {
 
   it('saves an in-app notification and pushes it when the recipient has a device token', async () => {
     const repository = createMockRepository();
-    repository.findPushToken.mockResolvedValue('device-token');
+    repository.findPushTokens.mockResolvedValue([{ token: 'device-token', app: 'user' }]);
     const service = new NotificationsService(repository as unknown as NotificationsRepository);
 
     await service.notify('account-1', 'problem_accepted', 'Worker Found', 'A worker accepted.', { channelId: 'default' });
@@ -194,7 +200,7 @@ describe('NotificationsService.notify', () => {
 
   it('still saves the notification when there is no device token', async () => {
     const repository = createMockRepository();
-    repository.findPushToken.mockResolvedValue(null);
+    repository.findPushTokens.mockResolvedValue([]);
     const service = new NotificationsService(repository as unknown as NotificationsRepository);
 
     await service.notify('account-1', 'problem_completed', 'Job Finished', 'Confirmed.');
@@ -214,5 +220,71 @@ describe('NotificationsService.deleteNotifications', () => {
 
     expect(repository.deleteMany).toHaveBeenCalledWith('account-1', ['n-1', 'n-2']);
     expect(deleted).toBe(2);
+  });
+});
+
+describe('push tokens per app', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('sends a customer notification to the user app only, never the partner app', async () => {
+    const repository = createMockRepository();
+    repository.findPushTokens.mockResolvedValue([
+      { token: 'user-phone', app: 'user' },
+      { token: 'partner-phone', app: 'partner' },
+    ]);
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    await service.notify('account-1', 'booking_on_the_way', 'On the way', 'Coming');
+
+    expect(sendPushNotification).toHaveBeenCalledTimes(1);
+    expect(sendPushNotification).toHaveBeenCalledWith('user-phone', 'On the way', 'Coming', undefined);
+  });
+
+  it('sends a job offer to the partner app even when the user app registered later', async () => {
+    const repository = createMockRepository();
+    repository.findPushTokens.mockResolvedValue([
+      { token: 'partner-phone', app: 'partner' },
+      { token: 'user-phone', app: 'user' },
+    ]);
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    await service.sendRawPush('worker-1', 'New job', 'Electrician needed', { dataOnly: true });
+
+    expect(sendPushNotification).toHaveBeenCalledTimes(1);
+    expect(sendPushNotification).toHaveBeenCalledWith('partner-phone', 'New job', 'Electrician needed', { dataOnly: true });
+  });
+
+  it('falls back to a token from an older app version when there is no exact-app token', async () => {
+    const repository = createMockRepository();
+    repository.findPushTokens.mockResolvedValue([{ token: 'old-phone', app: 'legacy' }]);
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    await service.sendRawPush('worker-1', 'New job', 'Electrician needed');
+
+    expect(sendPushNotification).toHaveBeenCalledWith('old-phone', 'New job', 'Electrician needed', undefined);
+  });
+
+  it('admin notices go to every app the account is signed in to', async () => {
+    const repository = createMockRepository();
+    repository.findPushTokens.mockResolvedValue([
+      { token: 'user-phone', app: 'user' },
+      { token: 'partner-phone', app: 'partner' },
+    ]);
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    await service.notify('account-1', 'admin_notice', 'Suspended', 'Reason');
+
+    expect(sendPushNotification).toHaveBeenCalledTimes(2);
+  });
+
+  it('registers a token for its app, and removes it on logout', async () => {
+    const repository = createMockRepository();
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    await service.registerPushToken('account-1', 'phone', 'partner');
+    await service.unregisterPushToken('account-1', 'partner', 'phone');
+
+    expect(repository.upsertPushToken).toHaveBeenCalledWith('account-1', 'phone', 'partner');
+    expect(repository.removePushToken).toHaveBeenCalledWith('account-1', 'partner', 'phone');
   });
 });

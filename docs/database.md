@@ -238,6 +238,10 @@ The same migration added `business_profiles.rating_sum/rating_count` (shop ratin
 
 Partial index `(category) WHERE is_active`. No admin review: a post is live as soon as it's saved.
 
+### push_tokens per app (migration `0026`)
+
+`push_tokens` primary key is now `(account_id, app)`, with `app` one of `user`, `partner`, `legacy` (registered before apps sent it). Indexed on `token`, so registering a phone removes it from other accounts.
+
 ### Admin controls (migration `0025`)
 
 - `booking_requests.cancelled_by` and `shop_orders.cancelled_by` also accept `'admin'` (the admin stopped it; `cancel_reason` holds their reason).

@@ -233,7 +233,10 @@ export class OrdersService {
       packed,
       total: rupees(order.totalAmount),
     });
+    // Only the customer's own cancellation goes to the shop; every other step to the customer.
+    const audience = event === 'cancelled_by_customer' ? 'partner' : 'user';
     await this.notificationsService.notify(transition.notify.accountId, type, text.title, text.body, {
+      audience,
       data: { kind: type, orderId: order.id },
       channelId: 'default',
     });
@@ -258,10 +261,14 @@ export class OrdersService {
     const result = await this.repository.adminCancel(id, reason);
     if (!result) throw await this.transitionError(id, 'This order is already finished.');
     await Promise.all(
-      [result.customer, result.shopOwner].map((target) => {
+      [
+        { target: result.customer, audience: 'user' as const },
+        { target: result.shopOwner, audience: 'partner' as const },
+      ].map(({ target, audience }) => {
         const text = orderTemplate('cancelled_by_admin', target.preferredLanguage, { shop: result.shopName });
         const why = reason ? (target.preferredLanguage === 'te' ? ` కారణం: ${reason}` : ` Reason: ${reason}`) : '';
         return this.notificationsService.notify(target.accountId, 'order_cancelled', text.title, `${text.body}${why}`, {
+          audience,
           data: { kind: 'order_cancelled', orderId: id },
           channelId: 'default',
         });

@@ -51,7 +51,15 @@ export class NotificationsController {
     if (!req.account) {
       throw AppError.unauthorized();
     }
-    await this.service.registerPushToken(req.account.accountId, req.body.token);
+    await this.service.registerPushToken(req.account.accountId, req.body.token, req.body.app ?? 'legacy');
     return ok(res, null, 'Push token registered');
+  });
+
+  unregisterPushToken = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    await this.service.unregisterPushToken(req.account.accountId, req.body.app, req.body.token);
+    return ok(res, null, 'Push token removed');
   });
 }

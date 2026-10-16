@@ -148,6 +148,8 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
 
 - **Admin console + moderation** (explicit request; user decided "Delete" = remove profiles + permanent ban, history kept; admin cancels notify both sides with the reason). Backend `admin` module grew from list/verify to the whole control surface (stats, accounts, workers, shops, bookings, orders, problems, job posts), all through the owning modules' services; migration `0025` (account suspension columns, `cancelled_by = 'admin'`, problem `closed`, `admin_notice`). `auth/accountAccess.ts` enforces standing on every authenticated request (30 s per-instance cache). admin-web was rewritten (see its README); it is not deployed anywhere yet — runs with `npm run dev` against the production API. 194 tests; 25-check live run passed.
 
+- **Push tokens per app (fix: Quick Book offers not reaching workers).** `push_tokens` held one row per account, so when an account was signed in to both apps, whichever app opened last replaced the other's token, and offers could go to user-app, which can't show data-only pushes. Migration `0026` keys the table by `(account_id, app)` (`user`/`partner`, or `legacy` for older app builds, used only as a fallback). Registering a token removes it from every other account. Logout calls `POST /notifications/push-token/remove`. `AUDIENCE_BY_TYPE` in `notifications/interfaces.ts` routes each notification type to the right app; `sendRawPush` defaults to the partner app. Shipped OTA to both apps; existing tokens are re-registered with their app the next time each app is opened while logged in.
+
 ## Pending Modules (build order, current plan)
 
 1. ~~Auth~~ — done (localization support included)

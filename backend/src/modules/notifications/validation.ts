@@ -3,6 +3,13 @@ import { MAX_BULK_DELETE } from './interfaces';
 
 export const registerPushTokenSchema = z.object({
   token: z.string().trim().min(1, 'Push token is required'),
+  /** Which app this device token is for; older app versions don't send it. */
+  app: z.enum(['user', 'partner']).optional(),
+});
+
+export const unregisterPushTokenSchema = z.object({
+  app: z.enum(['user', 'partner']),
+  token: z.string().trim().min(1).optional(),
 });
 
 // Bulk delete from the selection mode in both apps' notification lists.

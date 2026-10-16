@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format: date, module, s
 
 ## Unreleased
 
+- **Fix: job offers not reaching the worker's phone.** `push_tokens` held one token per account, so when an account was signed in to both apps, whichever app opened last replaced the other's token. Quick Book offers then went to the user app, which can't show them. A phone also stayed attached to accounts it had logged out of. Now (migration `0026`) tokens are kept per account **per app** (`user` / `partner`; `legacy` rows from older app versions are only a fallback). Registering a phone removes it from every other account, and logging out removes it (`POST /notifications/push-token/remove`). Every send picks the right app: job offers, new orders and profile views go to the partner app; booking and order updates go to the user app; cancellations go to whichever side should hear about it; admin notices go to both. 199 tests; 7-check live run passed. Both apps send their app name when registering and remove their token on logout (OTA).
+
 - **admin-web: photo viewer and avatars.** Clicking a photo opens a full-page viewer centred on the screen: a ✕ close button (Esc or a click outside also closes), ‹ › arrows and arrow keys when there are several, and an "n / total" counter. Before, it opened inside the card, because a glass card (with `backdrop-filter`) traps `position: fixed` children. It and the confirmation pop-ups now render on the page itself (`Overlay`, a portal). People always show their initials: a problem's photos and a worker's work photos are no longer used as the person's picture. They appear as a separate small thumbnail with a +N count on list rows.
 
 - **Admin sidebar toggle and page icons; smoother Quick Book accept.**
