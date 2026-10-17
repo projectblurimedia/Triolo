@@ -28,6 +28,7 @@ function createMockRepository(): MockRepository {
     findNearby: jest.fn(),
     findMatchingForBroadcast: jest.fn(),
     addRating: jest.fn(),
+    setProfilePhoto: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -49,6 +50,8 @@ function buildProfile(overrides: Partial<WorkerProfile> = {}): WorkerProfile {
     district: 'Hyderabad',
     state: 'Telangana',
     pincode: '500016',
+    locationName: 'Ameerpet',
+    profilePhotoUrl: null,
     portfolioPhotoUrls: [],
     verificationStatus: 'pending_verification',
     ratingAverage: null,
@@ -75,6 +78,9 @@ describe('WorkersService.createProfile', () => {
         {
           skillCategories: ['electrician'],
           experienceYears: 3,
+          latitude: 17.385,
+          longitude: 78.4867,
+          locationName: 'Ameerpet',
           city: 'Hyderabad',
           district: 'Hyderabad',
           state: 'Telangana',
@@ -103,6 +109,9 @@ describe('WorkersService.createProfile', () => {
       {
         skillCategories: ['plumber'],
         experienceYears: 5,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -138,6 +147,9 @@ describe('WorkersService.createProfile', () => {
       {
         skillCategories: ['mason'],
         experienceYears: 0,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -162,6 +174,9 @@ describe('WorkersService.createProfile', () => {
         skillCategories: ['electrician', 'other'],
         otherSkillDescription: 'Roofing',
         experienceYears: 2,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -210,6 +225,9 @@ describe('WorkersService.updateProfile', () => {
         {
           skillCategories: ['plumber'],
           experienceYears: 4,
+          latitude: 17.385,
+          longitude: 78.4867,
+          locationName: 'Ameerpet',
           city: 'Hyderabad',
           district: 'Hyderabad',
           state: 'Telangana',
@@ -235,6 +253,9 @@ describe('WorkersService.updateProfile', () => {
       {
         skillCategories: ['plumber'],
         experienceYears: 4,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -268,6 +289,9 @@ describe('WorkersService.updateProfile', () => {
       {
         skillCategories: ['mason'],
         experienceYears: 2,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -294,6 +318,9 @@ describe('WorkersService.updateProfile', () => {
       {
         skillCategories: ['mason'],
         experienceYears: 2,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -317,6 +344,9 @@ describe('WorkersService.updateProfile', () => {
       {
         skillCategories: ['mason'],
         experienceYears: 2,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -504,5 +534,55 @@ describe('WorkersService admin-facing methods', () => {
       verificationStatus: 'verified',
     });
     expect(repo.updateVerificationStatus).toHaveBeenCalledWith('worker-1', 'verified');
+  });
+});
+
+describe('WorkersService profile photo', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('uploads the new photo and deletes the one it replaces', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(buildProfile());
+    repo.setProfilePhoto.mockResolvedValue({
+      profile: buildProfile({ profilePhotoUrl: 'https://cdn/new.jpg' }),
+      previousUrl: 'https://cdn/old.jpg',
+    });
+    uploadToCloudinary.mockResolvedValue({ url: 'https://cdn/new.jpg', publicId: 'new' });
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
+
+    const saved = await service.setProfilePhoto('account-1', { path: '/tmp/me.jpg' } as Express.Multer.File);
+
+    expect(uploadToCloudinary).toHaveBeenCalledWith('/tmp/me.jpg', 'triolo/workers/profile');
+    expect(repo.setProfilePhoto).toHaveBeenCalledWith('account-1', 'https://cdn/new.jpg');
+    expect(deletePhotosFromCloudinary).toHaveBeenCalledWith(['https://cdn/old.jpg']);
+    expect(saved.profilePhotoUrl).toBe('https://cdn/new.jpg');
+  });
+
+  it('refuses a photo when there is no worker profile', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(null);
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
+
+    await expect(service.setProfilePhoto('account-1', { path: '/tmp/me.jpg' } as Express.Multer.File)).rejects.toMatchObject({
+      code: 'WORKER_PROFILE_NOT_FOUND',
+    });
+    expect(uploadToCloudinary).not.toHaveBeenCalled();
+  });
+
+  it('keeps the place name and stores the rest of the address', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(null);
+    repo.create.mockResolvedValue(buildProfile());
+    const service = new WorkersService(repo as unknown as WorkersRepository, createMockNotificationsService());
+
+    await service.createProfile(
+      'account-1',
+      { skillCategories: ['plumber'], experienceYears: 2, latitude: 16.7, longitude: 81.1, locationName: 'Kannapuram' },
+      [],
+    );
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ locationName: 'Kannapuram', latitude: 16.7, city: null, pincode: null }),
+    );
   });
 });

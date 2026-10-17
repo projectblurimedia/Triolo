@@ -3,6 +3,7 @@ import { pool } from '@/config/database';
 import { validateBody } from '@/common/middleware/validate';
 import { authenticate } from '@/common/middleware/authenticate';
 import { otpRateLimiter } from '@/common/middleware/rateLimiter';
+import { logUploadedFiles, upload } from '@/common/middleware/upload';
 import { AuthController } from './controller';
 import { AuthService } from './service';
 import { AuthRepository } from './repository';
@@ -12,6 +13,7 @@ import {
   requestLoginOtpSchema,
   requestRegistrationOtpSchema,
   updateLanguageSchema,
+  updateProfileSchema,
   verifyLoginOtpSchema,
   verifyRegistrationOtpSchema,
 } from './validation';
@@ -34,19 +36,13 @@ authRouter.post(
   validateBody(verifyRegistrationOtpSchema),
   controller.verifyRegistrationOtp,
 );
-authRouter.post(
-  '/login/request-otp',
-  otpRateLimiter,
-  validateBody(requestLoginOtpSchema),
-  controller.requestLoginOtp,
-);
-authRouter.post(
-  '/login/verify-otp',
-  otpRateLimiter,
-  validateBody(verifyLoginOtpSchema),
-  controller.verifyLoginOtp,
-);
+authRouter.post('/login/request-otp', otpRateLimiter, validateBody(requestLoginOtpSchema), controller.requestLoginOtp);
+authRouter.post('/login/verify-otp', otpRateLimiter, validateBody(verifyLoginOtpSchema), controller.verifyLoginOtp);
 authRouter.post('/refresh', validateBody(refreshTokenSchema), controller.refresh);
 authRouter.post('/logout', validateBody(logoutSchema), controller.logout);
 authRouter.get('/me', authenticate, controller.me);
+authRouter.patch('/me', authenticate, validateBody(updateProfileSchema), controller.updateProfile);
+// Its own request, like profile photos elsewhere (keeps each body small for Vercel).
+authRouter.put('/me/photo', authenticate, upload.single('photo'), logUploadedFiles, controller.setProfilePhoto);
+authRouter.delete('/me/photo', authenticate, controller.removeProfilePhoto);
 authRouter.patch('/me/language', authenticate, validateBody(updateLanguageSchema), controller.updateLanguage);

@@ -26,6 +26,9 @@ function buildShop(overrides: Partial<BusinessProfile> = {}): BusinessProfile {
     district: 'Eluru',
     state: 'Andhra Pradesh',
     pincode: '534001',
+    locationName: 'Ameerpet',
+    profilePhotoUrl: null,
+    deliveryMinCharge: null,
     shopPhotoUrls: [],
     deliveryAvailable: true,
     deliveryPricePerKm: 10,
@@ -158,8 +161,19 @@ describe('createOrder', () => {
 
 describe('deliveryCharge', () => {
   it('is the price per km times the distance, in whole rupees', () => {
-    expect(deliveryCharge({ deliveryPricePerKm: 10 }, 2340)).toBe(23);
-    expect(deliveryCharge({ deliveryPricePerKm: null }, 5000)).toBe(0);
+    expect(deliveryCharge({ deliveryPricePerKm: 10, deliveryMinCharge: null }, 2340)).toBe(23);
+    expect(deliveryCharge({ deliveryPricePerKm: null, deliveryMinCharge: null }, 5000)).toBe(0);
+  });
+
+  it('charges at least 1 km, and per km beyond that', () => {
+    expect(deliveryCharge({ deliveryPricePerKm: 10, deliveryMinCharge: null }, 300)).toBe(10);
+    expect(deliveryCharge({ deliveryPricePerKm: 10, deliveryMinCharge: 5 }, 300)).toBe(10);
+    expect(deliveryCharge({ deliveryPricePerKm: 10, deliveryMinCharge: null }, 2000)).toBe(20);
+  });
+
+  it('never goes below the shop’s minimum delivery charge', () => {
+    expect(deliveryCharge({ deliveryPricePerKm: 10, deliveryMinCharge: 30 }, 1200)).toBe(30);
+    expect(deliveryCharge({ deliveryPricePerKm: 10, deliveryMinCharge: 30 }, 5000)).toBe(50);
   });
 });
 

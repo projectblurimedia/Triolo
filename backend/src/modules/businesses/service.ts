@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { NotificationsService } from '@/modules/notifications/service';
@@ -14,6 +15,7 @@ import {
 } from './interfaces';
 
 const SHOP_PHOTO_FOLDER = 'triolo/businesses/shop-photos';
+const PROFILE_PHOTO_FOLDER = 'triolo/businesses/profile';
 
 export class BusinessesService {
   constructor(
@@ -38,16 +40,19 @@ export class BusinessesService {
       shopName: dto.shopName,
       shopCategories: dto.shopCategories,
       otherCategoryDescription: dto.otherCategoryDescription ?? null,
-      latitude: dto.latitude ?? null,
-      longitude: dto.longitude ?? null,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      locationName: dto.locationName,
       area: dto.area ?? null,
-      city: dto.city,
-      district: dto.district,
-      state: dto.state,
-      pincode: dto.pincode,
+      city: dto.city ?? null,
+      district: dto.district ?? null,
+      state: dto.state ?? null,
+      pincode: dto.pincode ?? null,
       shopPhotoUrls,
       deliveryAvailable: dto.deliveryAvailable,
       deliveryPricePerKm: dto.deliveryAvailable ? (dto.deliveryPricePerKm ?? null) : null,
+      // The minimum is the price of 1 km unless one is given, so a delivery under 1 km costs a full km.
+      deliveryMinCharge: dto.deliveryAvailable ? (dto.deliveryMinCharge ?? dto.deliveryPricePerKm ?? null) : null,
     });
   }
 
@@ -95,16 +100,19 @@ export class BusinessesService {
       shopName: dto.shopName,
       shopCategories: dto.shopCategories,
       otherCategoryDescription: dto.otherCategoryDescription ?? null,
-      latitude: dto.latitude ?? null,
-      longitude: dto.longitude ?? null,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      locationName: dto.locationName,
       area: dto.area ?? null,
-      city: dto.city,
-      district: dto.district,
-      state: dto.state,
-      pincode: dto.pincode,
+      city: dto.city ?? null,
+      district: dto.district ?? null,
+      state: dto.state ?? null,
+      pincode: dto.pincode ?? null,
       shopPhotoUrls,
       deliveryAvailable: dto.deliveryAvailable,
       deliveryPricePerKm: dto.deliveryAvailable ? (dto.deliveryPricePerKm ?? null) : null,
+      // The minimum is the price of 1 km unless one is given, so a delivery under 1 km costs a full km.
+      deliveryMinCharge: dto.deliveryAvailable ? (dto.deliveryMinCharge ?? dto.deliveryPricePerKm ?? null) : null,
       // Edits keep whatever verification status the profile already had — a confirmed
       // reversal of an earlier "any edit resets to pending_verification" design. Admin still
       // sees when a verified profile was last edited via `updatedAt` (set by the repository's
@@ -113,12 +121,40 @@ export class BusinessesService {
     });
   }
 
+  /** Uploads the profile photo (replacing any previous one) — its own request, so the body stays small for Vercel. */
+  async setProfilePhoto(accountId: string, file: Express.Multer.File | undefined): Promise<BusinessProfile> {
+    if (!file) throw AppError.badRequest('A photo is required.', 'PHOTO_REQUIRED');
+    if (!(await this.repository.findByAccountId(accountId))) {
+      // uploadToCloudinary would normally remove the temp file; it won't run here.
+      fs.promises.unlink(file.path).catch(() => {});
+      throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
+    }
+    const uploaded = await uploadToCloudinary(file.path, PROFILE_PHOTO_FOLDER);
+    const result = await this.repository.setProfilePhoto(accountId, uploaded.url);
+    if (!result) {
+      await deletePhotosFromCloudinary([uploaded.url]);
+      throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
+    }
+    if (result.previousUrl) await deletePhotosFromCloudinary([result.previousUrl]);
+    return result.profile;
+  }
+
+  async removeProfilePhoto(accountId: string): Promise<BusinessProfile> {
+    const result = await this.repository.setProfilePhoto(accountId, null);
+    if (!result) throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
+    if (result.previousUrl) await deletePhotosFromCloudinary([result.previousUrl]);
+    return result.profile;
+  }
+
   async deleteProfile(accountId: string): Promise<void> {
     const existing = await this.repository.findByAccountId(accountId);
     if (!existing) {
       throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
     }
-    await deletePhotosFromCloudinary(existing.shopPhotoUrls);
+    await deletePhotosFromCloudinary([
+      ...existing.shopPhotoUrls,
+      ...(existing.profilePhotoUrl ? [existing.profilePhotoUrl] : []),
+    ]);
     await this.repository.remove(accountId);
   }
 
@@ -166,7 +202,10 @@ export class BusinessesService {
   async adminDeleteForAccount(accountId: string): Promise<boolean> {
     const existing = await this.repository.findByAccountId(accountId);
     if (!existing) return false;
-    await deletePhotosFromCloudinary(existing.shopPhotoUrls);
+    await deletePhotosFromCloudinary([
+      ...existing.shopPhotoUrls,
+      ...(existing.profilePhotoUrl ? [existing.profilePhotoUrl] : []),
+    ]);
     await this.repository.remove(accountId);
     return true;
   }

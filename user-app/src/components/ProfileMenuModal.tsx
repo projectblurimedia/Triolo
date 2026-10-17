@@ -8,6 +8,7 @@ import { LanguagePickerModal } from './LanguagePickerModal';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
+import { EditProfileModal } from './EditProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
@@ -15,13 +16,14 @@ import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
 
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
+const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
 
 interface ProfileMenuModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
-/** Profile's menu (language, theme, logout) — the same glass SideMenuDrawer as every other menu in the app. */
+/** Profile's menu (edit profile, language, theme, logout) — the same glass SideMenuDrawer as every other menu in the app. */
 export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
@@ -32,6 +34,7 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [editVisible, setEditVisible] = useState(false);
 
   const handleLogoutConfirm = () => {
     setLogoutConfirmVisible(false);
@@ -49,7 +52,19 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
         title={t('profile.menuTitle')}
         subtitle={t('profile.menuSubtitle')}
       >
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('homeMenu.settingsSection')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.accountSection')}</Text>
+        <DrawerMenuItem
+          icon="user-pen"
+          gradient={GREEN_GRADIENT}
+          title={t('editProfile.title')}
+          subtitle={t('editProfile.menuSubtitle')}
+          onPress={() => {
+            onClose();
+            setEditVisible(true);
+          }}
+        />
+
+        <Text style={[styles.sectionTitle, styles.sectionGap, { color: colors.textMuted }]}>{t('homeMenu.settingsSection')}</Text>
         <DrawerMenuItem
           icon="language"
           gradient={headerGradient}
@@ -73,6 +88,7 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
         </Pressable>
       </SideMenuDrawer>
 
+      <EditProfileModal visible={editVisible} onClose={() => setEditVisible(false)} />
       <ThemePickerModal visible={themePickerVisible} onClose={() => setThemePickerVisible(false)} />
       <LanguagePickerModal
         visible={languagePickerVisible}
@@ -91,6 +107,7 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
 
 const styles = StyleSheet.create({
   sectionTitle: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 10, marginLeft: 4 },
+  sectionGap: { marginTop: 14 },
   logout: { marginTop: 14, borderRadius: 14, overflow: 'hidden' },
   logoutGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48 },
   logoutText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },

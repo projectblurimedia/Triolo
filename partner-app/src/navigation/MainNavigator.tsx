@@ -101,7 +101,11 @@ export function MainNavigator() {
         options={({ route }) => ({
           headerShown: true,
           header: () => (
-            <GradientHeader title={t(route.params?.profile ? 'workerProfile.editTitle' : 'workerProfile.title')} showBack />
+            <GradientHeader
+              title={t(route.params?.profile ? 'workerProfile.editTitle' : 'workerProfile.title')}
+              subtitle={t(route.params?.profile ? 'workerProfile.editHeaderSubtitle' : 'auth.registerWorkerHeaderSubtitle')}
+              showBack
+            />
           ),
         })}
       />
@@ -111,7 +115,11 @@ export function MainNavigator() {
         options={({ route }) => ({
           headerShown: true,
           header: () => (
-            <GradientHeader title={t(route.params?.profile ? 'businessProfile.editTitle' : 'businessProfile.title')} showBack />
+            <GradientHeader
+              title={t(route.params?.profile ? 'businessProfile.editTitle' : 'businessProfile.title')}
+              subtitle={t(route.params?.profile ? 'businessProfile.editHeaderSubtitle' : 'auth.registerShopHeaderSubtitle')}
+              showBack
+            />
           ),
         })}
       />
@@ -124,7 +132,10 @@ export function MainNavigator() {
       <Stack.Screen
         name="JobPost"
         component={JobPostScreen}
-        options={{ headerShown: true, header: () => <GradientHeader title={t('jobPost.title')} showBack /> }}
+        options={{
+          headerShown: true,
+          header: () => <GradientHeader title={t('jobPost.title')} subtitle={t('jobPost.headerSubtitle')} showBack />,
+        }}
       />
     </Stack.Navigator>
   );

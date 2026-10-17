@@ -17,7 +17,8 @@
     "updatingAppTitle": "Update in Progress",
     "updatingAppMessage": "Please don't close the app while updating...",
     "updateCompleteTitle": "Update Complete!",
-    "updateCompleteMessage": "Restarting the app with the latest version..."
+    "updateCompleteMessage": "Restarting the app with the latest version...",
+    "back": "Back"
   },
   "verification": {
     "pending": "Pending Review",
@@ -38,7 +39,39 @@
     "otpSentLabel": "Enter OTP sent to {{mobileNumber}}",
     "confirmOtp": "Confirm OTP",
     "changeNumber": "Change Number",
-    "verifyToSubmitHint": "Verify your mobile number above to enable Submit."
+    "verifyToSubmitHint": "Verify your mobile number above to enable Submit.",
+    "loginTitle": "Welcome Back",
+    "newHere": "New here?",
+    "createAccount": "Create Account",
+    "otpNote": "We'll send a 6-digit OTP by SMS to check it's you.",
+    "perks": {
+      "secure": "Safe & secure",
+      "languages": "English & తెలుగు",
+      "quick": "Quick sign in"
+    },
+    "otpTitle": "Verify Your Number",
+    "otpSubtitle": "Enter the 6-digit code we sent by SMS to {{mobileNumber}}",
+    "otpResent": "A new OTP has been sent",
+    "resendIn": "Resend OTP in {{seconds}}s",
+    "resendOtp": "Resend OTP",
+    "loginSubtitle": "Log in with your mobile number to manage your jobs, shop and job post",
+    "loginHeaderSubtitle": "Sign in with your mobile number",
+    "otpHeaderSubtitle": "Enter the code we sent by SMS",
+    "registerHeaderSubtitle": "Create your free account in a minute",
+    "registerWorkerHeaderSubtitle": "Get work from customers near you",
+    "registerShopHeaderSubtitle": "Get orders from customers near you",
+    "registerJobHeaderSubtitle": "Let nearby families and shops hire you",
+    "mobilePlaceholder": "Mobile number",
+    "fullNamePlaceholder": "Your full name",
+    "emailPlaceholder": "Your email",
+    "registerButton": "Register",
+    "alreadyRegisteredLogin": "This number already has a Triolo account. Please log in instead.",
+    "alreadyWorker": "This number is already registered as a worker — you're signed in.",
+    "alreadyShop": "This number already has a shop — you're signed in.",
+    "alreadyJobPost": "This number already has a job post — you're signed in.",
+    "mobileInvalid": "Enter a valid 10-digit mobile number.",
+    "nameBeforeVerify": "Enter your full name first, then tap Verify.",
+    "nameForNewAccount": "This number is new to Triolo — enter your full name to create your account, then tap Verify."
   },
   "chooseCapability": {
     "tagline": "Register as a Worker or add your Shop",
@@ -53,7 +86,9 @@
     "businessUnregisteredSubtitle": "Register your shop to get discovered by customers nearby"
   },
   "myInfo": {
-    "title": "My Info"
+    "title": "My Info",
+    "workerSubtitle": "Your worker profile",
+    "shopSubtitle": "Your shop profile"
   },
   "settingsMenu": {
     "title": "Settings",
@@ -133,7 +168,8 @@
       "activeStatus": "Active Account",
       "detailsTitle": "Account details",
       "detailPhone": "Phone number",
-      "detailEmail": "Email"
+      "detailEmail": "Email",
+      "ownerLine": "Owner: {{name}}"
     }
   },
   "bookings": {
@@ -160,7 +196,10 @@
     "emptyHistoryTitle": "No Past Jobs Yet",
     "emptyHistoryMessage": "Finished and cancelled jobs, with customer ratings, will appear here.",
     "shopOrders": "Shop Orders",
-    "serviceJobs": "Service Jobs"
+    "serviceJobs": "Service Jobs",
+    "newJobKicker": "NEW JOB REQUEST",
+    "awayFromYou": "away from you",
+    "respondWithin": "Respond within"
   },
   "location": {
     "useCurrent": "Use My Current Location",
@@ -168,9 +207,9 @@
     "addressPlaceholder": "Village/town, district",
     "gpsDetected": "Detected via GPS",
     "permissionDeniedTitle": "Location Permission Needed",
-    "permissionDeniedMessage": "Allow location access to auto-detect your location, or enter it manually below.",
+    "permissionDeniedMessage": "Allow location access to use your current location, or select it on the map.",
     "detectFailedTitle": "Couldn't Detect Location",
-    "detectFailedMessage": "Something went wrong finding your location. Please enter it manually.",
+    "detectFailedMessage": "Couldn't get your location. Try again, or select it on the map.",
     "areaLabel": "Area / Landmark (optional)",
     "areaPlaceholder": "Street, locality or nearby landmark",
     "cityLabel": "City",
@@ -185,7 +224,22 @@
     "noStatesFound": "No states found",
     "noDistrictsFound": "No districts found",
     "selectDistrictManually": "We detected your state, but couldn't match your district automatically — please select it below.",
-    "selectStateAndDistrictManually": "We couldn't match your state and district automatically — please select them below."
+    "selectStateAndDistrictManually": "We couldn't match your state and district automatically — please select them below.",
+    "useCurrentShort": "Current location",
+    "detecting": "Finding you…",
+    "selectOnMap": "Select on map",
+    "placeSet": "Location set",
+    "pinnedPlace": "Pinned location",
+    "turnOnMessage": "Turn on location and allow access to use your current location.",
+    "mapTitle": "Select Location",
+    "mapSubtitle": "Move the map so the pin is on your place",
+    "mapLoading": "Loading map…",
+    "mapUnavailable": "The map couldn't load. Check your internet, or use your current location instead.",
+    "pinCaption": "Pin location",
+    "findingPlace": "Finding place name…",
+    "confirmPlace": "Confirm Location",
+    "workerPlaceLabel": "Where do you work from?",
+    "shopPlaceLabel": "Shop location"
   },
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",
@@ -221,7 +275,8 @@
     "deleteConfirmTitle": "Delete Worker Profile?",
     "deleteConfirmMessage": "This removes your worker profile permanently. You can create a new one later if you change your mind.",
     "deleteSuccessTitle": "Worker Profile Deleted",
-    "deleteSuccessMessage": "Your worker profile has been removed."
+    "deleteSuccessMessage": "Your worker profile has been removed.",
+    "editHeaderSubtitle": "Update your services, photo and location"
   },
   "businessProfile": {
     "title": "Business Registration",
@@ -243,7 +298,7 @@
     "deliveryLabel": "Do you offer delivery?",
     "deliveryYes": "Yes",
     "deliveryNo": "No",
-    "deliveryPriceLabel": "Delivery Price per KM (₹)",
+    "deliveryPriceLabel": "Price per KM (₹)",
     "successTitle": "Business Profile Created",
     "successMessage": "Your shop details are submitted for verification. We'll notify you once approved.",
     "editTitle": "Edit Business Profile",
@@ -254,7 +309,13 @@
     "deleteConfirmTitle": "Delete Business Profile?",
     "deleteConfirmMessage": "This removes your business profile permanently. You can create a new one later if you change your mind.",
     "deleteSuccessTitle": "Business Profile Deleted",
-    "deleteSuccessMessage": "Your business profile has been removed."
+    "deleteSuccessMessage": "Your business profile has been removed.",
+    "deliveryMinLabel": "Minimum Charge (₹)",
+    "deliveryChargeHint": "Delivery is charged per km. Anything under 1 km is charged as 1 km.",
+    "deliveryCharges": "Yes — ₹{{perKm}}/km",
+    "deliveryMinPlaceholder": "Minimum ₹",
+    "deliveryPerKmPlaceholder": "₹ per km",
+    "editHeaderSubtitle": "Update your shop, photo and delivery"
   },
   "settings": {
     "language": "Language",
@@ -315,7 +376,8 @@
     "ACCOUNT_BLOCKED": "Your account has been banned by Triolo.",
     "standingReason": "Reason: {{reason}}",
     "suspendedTitle": "Account Suspended",
-    "bannedTitle": "Account Banned"
+    "bannedTitle": "Account Banned",
+    "validationFields": "Please check: {{fields}}."
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -578,7 +640,17 @@
     "confirmBillTitle": "Send the bill?",
     "confirmBillMessage": "{{packed}} packed · {{notPacked}} not packed · Total {{total}}. The customer will see the bill and the items you did not have.",
     "cancelHint": "The customer is told right away.",
-    "adminCancelled": "Triolo support cancelled this order."
+    "adminCancelled": "Triolo support cancelled this order.",
+    "pricePlaceholder": "Price",
+    "newOrderKicker": "NEW ORDER",
+    "orderGoneTitle": "Order no longer waiting",
+    "orderGoneMessage": "It was accepted, cancelled or expired. You'll find it under Bookings → Orders.",
+    "moreItems": "+{{count}} more",
+    "fulfillmentDelivery": "Delivery",
+    "fulfillmentPickup": "Pickup",
+    "later": "Later",
+    "openOrder": "Open Order",
+    "respondWithin": "Respond within"
   },
   "shopHome": {
     "myShop": "My Shop",
@@ -678,7 +750,10 @@
     "changePhoto": "Change",
     "removePhoto": "Remove",
     "photoPermission": "Allow photo access to add a profile photo.",
-    "photoFailed": "Post saved, but the photo could not be uploaded. Try again."
+    "photoFailed": "Post saved, but the photo could not be uploaded. Try again.",
+    "payPlaceholder": "Enter amount in ₹",
+    "headerSubtitle": "Your work, pay and location",
+    "cardCaption": "Job post"
   },
   "continueSteps": {
     "title": "Continue Where You Left Off",
@@ -697,5 +772,75 @@
     "foundMessage": "Accept one before another worker does.",
     "noneTitle": "No job requests right now",
     "noneMessage": "Problems near you are on Home. We will notify you as soon as a new request comes in."
+  },
+  "profilePhoto": {
+    "add": "Add photo",
+    "change": "Change",
+    "remove": "Remove",
+    "workerTitle": "Your photo",
+    "workerHint": "A clear photo of your face helps customers trust you.",
+    "businessTitle": "Your photo (shopkeeper)",
+    "businessHint": "A clear photo of you, the shop owner. Add pictures of the shop below.",
+    "uploadFailed": "Profile saved, but the photo didn't upload. Add it again from Edit."
+  },
+  "infoTips": {
+    "button": "Info",
+    "gotIt": "Got it",
+    "workerTitle": "About worker registration",
+    "shopTitle": "About shop registration",
+    "jobTitle": "About your job post",
+    "registerTitle": "About your account",
+    "location": "Your location is picked with GPS or on the map. Only your village or town name is shown to others.",
+    "verification": "Our team checks new profiles. Once approved, customers near you can find you.",
+    "email": "Your email is only used for account messages. It's never shown to anyone.",
+    "editProfileTitle": "About your profile"
+  },
+  "partnerWelcome": {
+    "headline": "Grow your work with customers nearby",
+    "centerTitle": "Earn near you",
+    "centerText": "Jobs, orders and hires from your area",
+    "joinAs": "Join as",
+    "subline": "Work, shop or hire — all in one app",
+    "partnerTag": "Partner"
+  },
+  "formErrors": {
+    "title": "Please complete the form",
+    "shopName": "Enter your shop's name.",
+    "shopCategory": "Choose at least one shop category.",
+    "location": "Set your location — use your current location or select it on the map.",
+    "delivery": "Tell us whether you offer delivery.",
+    "deliveryPrice": "Enter your delivery price per km.",
+    "skills": "Choose at least one skill.",
+    "experience": "Enter your years of experience (0–60).",
+    "otp": "Enter the 6-digit OTP.",
+    "email": "Enter your email address.",
+    "emailInvalid": "That email address doesn't look right."
+  },
+  "fieldNames": {
+    "fullName": "Full name",
+    "mobileNumber": "Mobile number",
+    "email": "Email",
+    "otp": "OTP",
+    "skillCategories": "Skills",
+    "otherSkillDescription": "Your skill",
+    "experienceYears": "Experience",
+    "latitude": "Location",
+    "longitude": "Location",
+    "locationName": "Location",
+    "locationAddress": "Location",
+    "shopName": "Shop name",
+    "shopCategories": "Shop categories",
+    "otherCategoryDescription": "Shop category",
+    "deliveryAvailable": "Delivery",
+    "deliveryPricePerKm": "Delivery price per km",
+    "payAmount": "Pay",
+    "payPeriod": "Pay period",
+    "title": "Work",
+    "category": "Work type",
+    "availability": "Availability",
+    "skills": "Skills",
+    "description": "About you",
+    "quotationAmount": "Quotation",
+    "other": "Some details"
   }
 }

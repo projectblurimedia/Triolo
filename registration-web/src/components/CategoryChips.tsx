@@ -62,12 +62,7 @@ export function CategoryChips({ options, selected, onChange, otherEntries, onOth
           </button>
         ))}
         {otherEntries.map((entry, index) => (
-          <button
-            key={`${entry}-${index}`}
-            type="button"
-            className="chip chip--active"
-            onClick={() => removeOther(index)}
-          >
+          <button key={`${entry}-${index}`} type="button" className="chip chip--active" onClick={() => removeOther(index)}>
             {entry} ✕
           </button>
         ))}

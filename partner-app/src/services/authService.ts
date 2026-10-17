@@ -34,6 +34,9 @@ export const authService = {
 
   me: () => apiClient.get<AuthAccount>('/auth/me', true),
 
+  /** Changes the account's own details (the name is shared by the worker, shop and job-post profiles). */
+  updateProfile: (fields: { fullName?: string }) => apiClient.patch<AuthAccount>('/auth/me', fields, true),
+
   updateLanguage: (preferredLanguage: AccountLanguage) =>
     apiClient.patch<{ preferredLanguage: AccountLanguage }>('/auth/me/language', { preferredLanguage }, true),
 };

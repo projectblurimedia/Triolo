@@ -13,7 +13,7 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { RadarPulse } from './RadarPulse';
 import { RatingStars, STAR_COLOR } from './RatingStars';
 import { Avatar } from './WorkerMiniCard';
-import { SKILL_CATEGORIES } from './WorkerProfileModal';
+import { SKILL_CATEGORIES } from '@/constants/categories';
 import { ToastHost } from './ToastHost';
 import { useBooking, useCancelBooking, useCompleteBooking } from '@/hooks/useBookings';
 import { openBookingTracker, useBookingTrackerStore } from '@/state/bookingTrackerStore';
@@ -193,20 +193,18 @@ export function BookingTrackingModal() {
 
   const renderPin = (b: CustomerBooking) =>
     b.arrivalPin ? (
-      <View style={[styles.card, styles.pinCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
-        <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('tracking.pinLabel')}</Text>
+      // Same card as a shop order's delivery PIN (OrderTrackingModal).
+      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, styles.pinCard]}>
+        <Text style={styles.pinLabel}>{t('tracking.pinLabel')}</Text>
         <View style={styles.pinRow}>
           {b.arrivalPin.split('').map((digit, index) => (
-            <View
-              key={index}
-              style={[styles.pinDigit, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}40` }]}
-            >
-              <Text style={[styles.pinDigitText, { color: colors.primary }]}>{digit}</Text>
+            <View key={index} style={styles.pinDigit}>
+              <Text style={styles.pinDigitText}>{digit}</Text>
             </View>
           ))}
         </View>
-        <Text style={[styles.pinHint, { color: colors.textMuted }]}>{t('tracking.pinHint')}</Text>
-      </View>
+        <Text style={styles.pinHint}>{t('tracking.pinHint')}</Text>
+      </LinearGradient>
     ) : null;
 
   const renderWorker = (b: CustomerBooking) =>
@@ -482,11 +480,19 @@ const styles = StyleSheet.create({
   bannerMessage: { ...typography.caption, marginTop: 2, lineHeight: 17 },
   card: { borderRadius: 16, borderWidth: 1, padding: 14 },
   cardLabel: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 10 },
-  pinCard: { alignItems: 'center', borderWidth: 1.5 },
+  pinCard: { alignItems: 'center', borderWidth: 0, gap: 10 },
+  pinLabel: { color: 'rgba(255,255,255,0.9)', fontFamily: fonts.semiBold, fontSize: 13 },
   pinRow: { flexDirection: 'row', gap: 10 },
-  pinDigit: { width: 50, height: 58, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  pinDigitText: { fontSize: 28, fontFamily: fonts.semiBold },
-  pinHint: { ...typography.caption, textAlign: 'center', marginTop: 10 },
+  pinDigit: {
+    width: 52,
+    height: 60,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinDigitText: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 28, lineHeight: 36, includeFontPadding: false },
+  pinHint: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.regular, fontSize: 12, textAlign: 'center' },
   workerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   workerInfo: { flex: 1, gap: 2 },
   workerName: { ...typography.body, fontFamily: fonts.semiBold },

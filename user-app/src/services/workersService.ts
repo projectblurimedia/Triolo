@@ -1,18 +1,16 @@
 import { apiClient } from './apiClient';
+import { appendPlace, PlaceValue } from '@/utils/place';
 import { PickedImage } from '@/components/ImagePickerField';
 
 export interface CreateWorkerProfileParams {
   skillCategories: string[];
   otherSkillDescription?: string;
   experienceYears: number;
-  latitude: number | null;
-  longitude: number | null;
-  area?: string;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  /** GPS or map pin — the full address is sent too, only the place name is ever shown. */
+  place: PlaceValue;
   portfolioPhotos: PickedImage[];
+  /** A new profile photo, or null to remove the saved one — uploaded by the hooks after the profile saves. */
+  profilePhoto?: PickedImage | null;
 }
 
 export interface UpdateWorkerProfileParams extends CreateWorkerProfileParams {
@@ -28,11 +26,14 @@ export interface WorkerProfile {
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
+  /** The place name shown to people (village / town). The rest is stored, never shown. */
+  locationName: string | null;
   area: string | null;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  city: string | null;
+  district: string | null;
+  state: string | null;
+  pincode: string | null;
+  profilePhotoUrl: string | null;
   portfolioPhotoUrls: string[];
   verificationStatus: string;
   /** Average customer star rating (1 decimal), null until the first rating. */
@@ -80,13 +81,7 @@ export const workersService = {
     formData.append('skillCategories', JSON.stringify(params.skillCategories));
     if (params.otherSkillDescription) formData.append('otherSkillDescription', params.otherSkillDescription);
     formData.append('experienceYears', String(params.experienceYears));
-    if (params.latitude != null) formData.append('latitude', String(params.latitude));
-    if (params.longitude != null) formData.append('longitude', String(params.longitude));
-    if (params.area) formData.append('area', params.area);
-    formData.append('city', params.city);
-    formData.append('district', params.district);
-    formData.append('state', params.state);
-    formData.append('pincode', params.pincode);
+    appendPlace(formData, params.place);
     params.portfolioPhotos.forEach((image) => {
       // React Native's fetch/FormData accepts this {uri,name,type} file-object shape —
       // not a real Blob, but that's what the runtime expects (matches the pattern
@@ -101,13 +96,7 @@ export const workersService = {
     formData.append('skillCategories', JSON.stringify(params.skillCategories));
     if (params.otherSkillDescription) formData.append('otherSkillDescription', params.otherSkillDescription);
     formData.append('experienceYears', String(params.experienceYears));
-    if (params.latitude != null) formData.append('latitude', String(params.latitude));
-    if (params.longitude != null) formData.append('longitude', String(params.longitude));
-    if (params.area) formData.append('area', params.area);
-    formData.append('city', params.city);
-    formData.append('district', params.district);
-    formData.append('state', params.state);
-    formData.append('pincode', params.pincode);
+    appendPlace(formData, params.place);
     formData.append('existingPhotoUrls', JSON.stringify(params.existingPhotoUrls));
     params.portfolioPhotos.forEach((image) => {
       formData.append('portfolioPhotos', { uri: image.uri, name: image.name, type: image.type } as unknown as Blob);
@@ -116,4 +105,11 @@ export const workersService = {
   },
 
   deleteProfile: () => apiClient.delete<null>('/workers/me/profile', true),
+  uploadProfilePhoto: (image: PickedImage) => {
+    const formData = new FormData();
+    // React Native's FormData takes this {uri, name, type} file shape.
+    formData.append('photo', { uri: image.uri, name: image.name, type: image.type } as unknown as Blob);
+    return apiClient.putForm<WorkerProfile>('/workers/me/profile/photo', formData);
+  },
+  removeProfilePhoto: () => apiClient.delete<WorkerProfile>('/workers/me/profile/photo', true),
 };

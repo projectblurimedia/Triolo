@@ -7,9 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from './Button';
 import { ImagePickerField, PickedImage } from './ImagePickerField';
-import { LocationPicker, LocationValue } from './LocationPicker';
+import { LocationField } from './LocationField';
+import { PlaceValue } from '@/utils/place';
 import { ToastHost } from './ToastHost';
-import { SKILL_CATEGORIES } from './WorkerProfileModal';
+import { SKILL_CATEGORIES } from '@/constants/categories';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { ProblemPost, problemsService } from '@/services/problemsService';
 import { MY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
@@ -26,7 +27,6 @@ interface ProblemFormModalProps {
 
 const MAX_PHOTOS = 5;
 const MAX_QUOTATION = 1_000_000;
-const EMPTY_LOCATION: LocationValue = { latitude: null, longitude: null, address: '' };
 
 function isRemote(image: PickedImage): boolean {
   return image.uri.startsWith('http');
@@ -56,29 +56,28 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [quotation, setQuotation] = useState('');
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState<LocationValue>(EMPTY_LOCATION);
+  const [location, setLocation] = useState<PlaceValue | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState<{ current: number; total: number } | null>(null);
 
   useEffect(() => {
     if (!visible) return;
-    setPhotos(
-      (problem?.photoUrls ?? []).map((url, index) => ({ uri: url, name: `existing_${index}.jpg`, type: 'image/jpeg' })),
-    );
+    setPhotos((problem?.photoUrls ?? []).map((url, index) => ({ uri: url, name: `existing_${index}.jpg`, type: 'image/jpeg' })));
     setSelectedSkills(problem?.skillCategories ?? []);
     setQuotation(problem ? String(problem.quotationAmount) : '');
     setDescription(problem?.description ?? '');
     setLocation(
-      problem
-        ? { latitude: problem.latitude, longitude: problem.longitude, address: problem.locationAddress ?? '' }
-        : EMPTY_LOCATION,
+      problem && problem.latitude != null && problem.longitude != null
+        ? { latitude: problem.latitude, longitude: problem.longitude, locationName: problem.locationAddress ?? '' }
+        : null,
     );
     setUploadingPhoto(null);
   }, [visible, problem]);
 
   const quotationAmount = Number(quotation);
-  const quotationValid = quotation !== '' && Number.isInteger(quotationAmount) && quotationAmount > 0 && quotationAmount <= MAX_QUOTATION;
-  const locationValid = location.address.trim().length >= 3;
+  const quotationValid =
+    quotation !== '' && Number.isInteger(quotationAmount) && quotationAmount > 0 && quotationAmount <= MAX_QUOTATION;
+  const locationValid = location !== null;
   const canSubmit = selectedSkills.length > 0 && quotationValid && locationValid;
 
   const toggleSkill = (key: string) => {
@@ -96,10 +95,9 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
     if (!canSubmit || submitting) return;
     setSubmitting(true);
 
-    // Workers only see problems that have map coordinates, so location must be on: a GPS-
-    // detected address keeps its own point; a typed one is pinned to where the customer is now.
+    // Every task needs location on (the picked point is what workers navigate to).
     const here = await ensureLocation();
-    if (!here) {
+    if (!here || !location) {
       showToast({ variant: 'error', title: t('location.requiredTitle'), message: t('location.requiredMessage') });
       setSubmitting(false);
       return;
@@ -109,9 +107,10 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
       skillCategories: selectedSkills,
       description: description.trim() || undefined,
       quotationAmount,
-      locationAddress: location.address.trim(),
-      latitude: location.latitude ?? here.latitude,
-      longitude: location.longitude ?? here.longitude,
+      // Only the place name is shown; workers use the point itself for directions.
+      locationAddress: location.locationName,
+      latitude: location.latitude,
+      longitude: location.longitude,
     };
     const newPhotos = photos.filter((image) => !isRemote(image));
     let createdPostId: string | null = null;
@@ -192,11 +191,9 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
           />
 
           <Text style={[styles.sectionLabel, { color: colors.text }]}>{t('problemForm.locationLabel')}</Text>
-          <LocationPicker value={location} onChange={setLocation} />
+          <LocationField label={t('problemForm.locationHint')} value={location} onChange={setLocation} />
 
-          <Text style={[styles.sectionLabel, styles.sectionSpacing, { color: colors.text }]}>
-            {t('problemForm.workerLabel')}
-          </Text>
+          <Text style={[styles.sectionLabel, styles.sectionSpacing, { color: colors.text }]}>{t('problemForm.workerLabel')}</Text>
           <View style={styles.chipRow}>
             {orderedSkills.map((skill) => {
               const isActive = selectedSkills.includes(skill.key);

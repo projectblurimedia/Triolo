@@ -14,6 +14,8 @@ function createMockRepository(): MockRepository {
     findAccountById: jest.fn(),
     createAccount: jest.fn(),
     updatePreferredLanguage: jest.fn(),
+    updateProfile: jest.fn(),
+    setProfilePhoto: jest.fn(),
     createOtp: jest.fn(),
     findLatestActiveOtp: jest.fn(),
     incrementOtpAttempts: jest.fn(),
@@ -41,6 +43,7 @@ function buildAccount(overrides: Partial<Account> = {}): Account {
     latitude: 17.385,
     longitude: 78.4867,
     locationAddress: 'Hyderabad, Telangana',
+    profilePhotoUrl: null,
     suspendedUntil: null,
     statusReason: null,
     createdAt: new Date(),
@@ -493,5 +496,45 @@ describe('admin moderation', () => {
 
     expect(repo.liftExpiredSuspension).toHaveBeenCalledWith('account-1');
     expect(repo.createOtp).toHaveBeenCalled();
+  });
+});
+
+jest.mock('@/common/services/cloudinaryService', () => ({
+  uploadToCloudinary: jest.fn().mockResolvedValue({ url: 'https://cdn/me.jpg', publicId: 'me' }),
+  deletePhotosFromCloudinary: jest.fn(),
+}));
+
+describe('AuthService Edit Profile', () => {
+  it('changes only the fields given', async () => {
+    const repo = createMockRepository();
+    repo.findAccountById.mockResolvedValue(buildAccount());
+    repo.updateProfile.mockResolvedValue(buildAccount({ fullName: 'Ravi Kumar' }));
+    const service = new AuthService(repo as unknown as AuthRepository);
+
+    const updated = await service.updateProfile('account-1', { fullName: 'Ravi Kumar' });
+
+    expect(repo.updateProfile).toHaveBeenCalledWith('account-1', { fullName: 'Ravi Kumar' });
+    expect(updated.fullName).toBe('Ravi Kumar');
+  });
+
+  it('saves a new photo and deletes the one it replaces', async () => {
+    const cloudinary = jest.requireMock('@/common/services/cloudinaryService');
+    const repo = createMockRepository();
+    repo.setProfilePhoto.mockResolvedValue({
+      account: buildAccount({ profilePhotoUrl: 'https://cdn/me.jpg' }),
+      previousUrl: 'https://cdn/old.jpg',
+    });
+    const service = new AuthService(repo as unknown as AuthRepository);
+
+    const account = await service.setProfilePhoto('account-1', { path: '/tmp/me.jpg' } as Express.Multer.File);
+
+    expect(repo.setProfilePhoto).toHaveBeenCalledWith('account-1', 'https://cdn/me.jpg');
+    expect(cloudinary.deletePhotosFromCloudinary).toHaveBeenCalledWith(['https://cdn/old.jpg']);
+    expect(account.profilePhotoUrl).toBe('https://cdn/me.jpg');
+  });
+
+  it('needs a photo file', async () => {
+    const service = new AuthService(createMockRepository() as unknown as AuthRepository);
+    await expect(service.setProfilePhoto('account-1', undefined)).rejects.toMatchObject({ code: 'PHOTO_REQUIRED' });
   });
 });

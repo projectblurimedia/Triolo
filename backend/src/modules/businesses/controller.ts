@@ -34,6 +34,20 @@ export class BusinessesController {
     return ok(res, profile, 'Business profile updated');
   });
 
+  setProfilePhoto = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    return ok(res, await this.service.setProfilePhoto(req.account.accountId, req.file), 'Photo saved');
+  });
+
+  removeProfilePhoto = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    return ok(res, await this.service.removeProfilePhoto(req.account.accountId), 'Photo removed');
+  });
+
   deleteProfile = asyncHandler(async (req: Request, res: Response) => {
     if (!req.account) {
       throw AppError.unauthorized();

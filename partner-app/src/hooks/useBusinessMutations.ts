@@ -1,9 +1,6 @@
+import { syncProfilePhoto } from './profilePhotoSync';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  businessesService,
-  CreateBusinessProfileParams,
-  UpdateBusinessProfileParams,
-} from '@/services/businessesService';
+import { businessesService, CreateBusinessProfileParams, UpdateBusinessProfileParams } from '@/services/businessesService';
 
 export const BUSINESS_PROFILE_QUERY_KEY = ['businesses', 'me', 'profile'];
 
@@ -14,7 +11,11 @@ export function useMyBusinessProfile(enabled = true) {
 export function useCreateBusinessProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: CreateBusinessProfileParams) => businessesService.createProfile(params),
+    mutationFn: async (params: CreateBusinessProfileParams) => {
+      const saved = await businessesService.createProfile(params);
+      await syncProfilePhoto(params.profilePhoto, businessesService.uploadProfilePhoto, businessesService.removeProfilePhoto);
+      return saved;
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: BUSINESS_PROFILE_QUERY_KEY }),
   });
 }
@@ -22,7 +23,11 @@ export function useCreateBusinessProfile() {
 export function useUpdateBusinessProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: UpdateBusinessProfileParams) => businessesService.updateProfile(params),
+    mutationFn: async (params: UpdateBusinessProfileParams) => {
+      const saved = await businessesService.updateProfile(params);
+      await syncProfilePhoto(params.profilePhoto, businessesService.uploadProfilePhoto, businessesService.removeProfilePhoto);
+      return saved;
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: BUSINESS_PROFILE_QUERY_KEY }),
   });
 }

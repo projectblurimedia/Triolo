@@ -48,6 +48,7 @@ function mapAccount(row: QueryResultRow): Account {
     latitude: row.latitude,
     longitude: row.longitude,
     locationAddress: row.location_address,
+    profilePhotoUrl: row.profile_photo_url ?? null,
     suspendedUntil: row.suspended_until ?? null,
     statusReason: row.status_reason ?? null,
     createdAt: row.created_at,
@@ -126,6 +127,55 @@ export class AuthRepository {
       ],
     );
     return mapAccount(result.rows[0]);
+  }
+
+  /** Edit Profile: only the fields given are changed (null clears email / location). */
+  async updateProfile(
+    accountId: string,
+    fields: {
+      fullName?: string;
+      email?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+      locationAddress?: string | null;
+    },
+  ): Promise<Account> {
+    const columns: Record<string, string> = {
+      fullName: 'full_name',
+      email: 'email',
+      latitude: 'latitude',
+      longitude: 'longitude',
+      locationAddress: 'location_address',
+    };
+    const sets: string[] = [];
+    const params: unknown[] = [accountId];
+    for (const [key, column] of Object.entries(columns)) {
+      const value = fields[key as keyof typeof fields];
+      if (value === undefined) continue;
+      params.push(value);
+      sets.push(column + ' = $' + params.length);
+    }
+    const result = await this.pool.query(
+      'UPDATE accounts SET ' + [...sets, 'updated_at = now()'].join(', ') + ' WHERE id = $1 RETURNING *',
+      params,
+    );
+    return mapAccount(result.rows[0]);
+  }
+
+  /** Sets (or clears) the account photo; returns the account and the photo it replaced. */
+  async setProfilePhoto(
+    accountId: string,
+    photoUrl: string | null,
+  ): Promise<{ account: Account; previousUrl: string | null } | null> {
+    const result = await this.pool.query(
+      `UPDATE accounts a SET profile_photo_url = $2, updated_at = now()
+       FROM (SELECT profile_photo_url AS previous_url FROM accounts WHERE id = $1 FOR UPDATE) old
+       WHERE a.id = $1
+       RETURNING a.*, old.previous_url`,
+      [accountId, photoUrl],
+    );
+    if (!result.rows[0]) return null;
+    return { account: mapAccount(result.rows[0]), previousUrl: result.rows[0].previous_url ?? null };
   }
 
   async updatePreferredLanguage(accountId: string, preferredLanguage: PreferredLanguage): Promise<Account> {

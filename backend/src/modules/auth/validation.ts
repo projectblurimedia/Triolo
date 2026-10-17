@@ -6,7 +6,10 @@ const mobileNumber = z
   .trim()
   .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number');
 
-const otp = z.string().trim().regex(/^\d{6}$/, 'OTP must be 6 digits');
+const otp = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, 'OTP must be 6 digits');
 
 // Full name is free-text Unicode (Telugu names must work) — length-bounded only, no character-set restriction.
 const preferredLanguage = z.enum(SUPPORTED_LANGUAGES as [string, ...string[]]);
@@ -50,6 +53,24 @@ export const refreshTokenSchema = z.object({
 export const logoutSchema = z.object({
   refreshToken: z.string().min(10),
 });
+
+// Edit Profile (user-app). An empty email clears it; the location comes from GPS or a map pin.
+export const updateProfileSchema = z
+  .object({
+    fullName: z.string().trim().min(2, 'Full name is too short').max(100).optional(),
+    email: z
+      .union([z.literal(''), z.string().trim().email('Enter a valid email address').max(255)])
+      .nullable()
+      .optional()
+      .transform((value) => (value === '' ? null : value)),
+    latitude,
+    longitude,
+    locationAddress: z.string().trim().min(1).max(255).nullable().optional(),
+  })
+  .refine((data) => (data.latitude == null) === (data.longitude == null), {
+    message: 'Latitude and longitude go together',
+    path: ['latitude'],
+  });
 
 export const updateLanguageSchema = z.object({
   preferredLanguage,

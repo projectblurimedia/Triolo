@@ -238,6 +238,14 @@ The same migration added `business_profiles.rating_sum/rating_count` (shop ratin
 
 Partial index `(category) WHERE is_active`. No admin review: a post is live as soon as it's saved.
 
+### Account photo (migration `0028`)
+
+`accounts.profile_photo_url` — a customer's own photo (user-app registration and Edit Profile). Worker and shop photos stay on their own profiles.
+
+### Profile photo, place name, delivery minimum (migration `0027`)
+
+`worker_profiles` and `business_profiles` gain `profile_photo_url` (the worker's face / the shop's logo) and `location_name` (the place name shown to people — village / town; backfilled from `city`). Location is now picked only from GPS or a map pin, so `city`, `district`, `state` and `pincode` became nullable: they hold whatever the reverse geocoder found, are never displayed, and `pincode` still has its 6-digit CHECK. `business_profiles.delivery_min_charge NUMERIC(10,2)`: an order's delivery charge is `max(min charge, price per km × distance)`.
+
 ### push_tokens per app (migration `0026`)
 
 `push_tokens` primary key is now `(account_id, app)`, with `app` one of `user`, `partner`, `legacy` (registered before apps sent it). Indexed on `token`, so registering a phone removes it from other accounts.

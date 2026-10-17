@@ -52,6 +52,17 @@ Return the authenticated account's basic info.
 - Auth: Bearer access token
 - 200: `{ success: true, data: { id, fullName, mobileNumber, email, role, status, preferredLanguage } }`
 
+### PATCH /auth/me
+Edit Profile (user-app's Profile menu). Only the fields given change.
+- Auth: Bearer access token
+- Body (JSON): `fullName?: string` (2-100), `email?: string | null` (`""` or `null` clears it), `latitude?` / `longitude?` (`number | null`, given together — from GPS or a map pin), `locationAddress?: string | null` (the place name shown)
+- 200: `{ success: true, message: "Profile updated", data: Account }`. Every account response (`/auth/me`, both `verify-otp`s) now also carries `latitude`, `longitude`, `locationAddress` and `profilePhotoUrl`.
+- The mobile number can't be changed (it is the login).
+
+### PUT /auth/me/photo · DELETE /auth/me/photo
+The customer's own profile photo (`multipart/form-data`, one image under `photo`; its own request for Vercel's body limit). user-app uploads it right after a new account's OTP is verified, and from Edit Profile. The replaced photo is deleted from Cloudinary.
+- 200: `{ success: true, message: "Photo saved" | "Photo removed", data: Account }` · 400: `PHOTO_REQUIRED`
+
 ### PATCH /auth/me/language
 Update the authenticated account's language preference.
 - Auth: Bearer access token
@@ -68,8 +79,8 @@ Adds the Worker capability to the authenticated (already self-registered) `user`
 ### POST /workers/me/profile
 Create the caller's worker profile. `multipart/form-data`, not JSON — the only such endpoint in this API so far, since it carries image files.
 - Auth: Bearer access token
-- Body (multipart fields): `skillCategories: string` — a JSON-stringified array of 1+ of `"electrician"|"plumber"|"painter"|"carpenter"|"mechanic"|"cleaner"|"mason"|"other"` (a worker can have multiple skills), `otherSkillDescription?: string` (required when `skillCategories` includes `"other"`), `experienceYears: number`, `latitude?: number`, `longitude?: number`, `area?: string`, `city: string`, `district: string`, `state: string`, `pincode: string` (required, 6 digits — replaced a single free-text `locationAddress` field, which wasn't precise enough to filter/search on), plus 0-6 image files under the field name `portfolioPhotos` (JPEG/PNG/WEBP, 8MB each max).
-- 201: `{ success: true, message: "Worker profile created", data: { id, accountId, skillCategories, otherSkillDescription, experienceYears, latitude, longitude, area, city, district, state, pincode, portfolioPhotoUrls, verificationStatus, createdAt, updatedAt } }`
+- Body (multipart fields): `skillCategories: string` — a JSON-stringified array of 1+ of `"electrician"|"plumber"|"painter"|"carpenter"|"mechanic"|"cleaner"|"mason"|"other"` (a worker can have multiple skills), `otherSkillDescription?: string` (required when `skillCategories` includes `"other"`), `experienceYears: number`, `latitude: number`, `longitude: number` (both required — from GPS or a map pin; there is no typed address any more), `locationName: string` (required — the place name people see, e.g. the village or town), and the rest of the reverse-geocoded address when the geocoder found it: `area?`, `city?`, `district?`, `state?`, `pincode?` (kept only when it is a real 6-digit pincode, otherwise dropped). Only `locationName` is ever displayed; the other parts are stored in the background, plus 0-6 image files under the field name `portfolioPhotos` (JPEG/PNG/WEBP, 8MB each max). The profile photo is uploaded separately (below).
+- 201: `{ success: true, message: "Worker profile created", data: { id, accountId, skillCategories, otherSkillDescription, experienceYears, latitude, longitude, locationName, area, city, district, state, pincode, profilePhotoUrl, portfolioPhotoUrls, verificationStatus, createdAt, updatedAt } }`
 - 400: validation error (including `otherSkillDescription` missing when `"other"` is selected), or `CLOUDINARY_NOT_CONFIGURED` if image uploads aren't set up on this server yet
 - 409: `WORKER_PROFILE_EXISTS` — one worker profile per account
 
@@ -85,6 +96,16 @@ Update the caller's existing worker profile. `multipart/form-data`, same field s
 - 400: validation error
 - 404: `WORKER_PROFILE_NOT_FOUND` — no profile exists yet to update
 
+### PUT /workers/me/profile/photo
+Upload (or replace) the caller's worker profile photo — their face, shown on their cards and profile. Its own request so each body stays under Vercel's 4.5MB limit; the replaced photo is deleted from Cloudinary.
+- Auth: Bearer access token
+- Body: `multipart/form-data` with one image file under `photo`
+- 200: `{ success: true, message: "Photo saved", data: WorkerProfile }`
+- 400: `PHOTO_REQUIRED` · 404: `WORKER_PROFILE_NOT_FOUND`
+
+### DELETE /workers/me/profile/photo
+Remove the profile photo. 200: `{ success: true, message: "Photo removed", data: WorkerProfile }` · 404: `WORKER_PROFILE_NOT_FOUND`
+
 ### DELETE /workers/me/profile
 Permanently remove the caller's worker profile.
 - Auth: Bearer access token
@@ -94,7 +115,7 @@ Permanently remove the caller's worker profile.
 ### GET /workers/nearby
 Search for verified workers near a given point — backs both Home's Nearby Workers search and the Services tab. Distance is computed server-side (Haversine, in SQL) — this is not a client-side filter over a full list. Excludes the caller's own worker profile, if any.
 - Auth: Bearer access token
-- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against the worker's name, skill category, `otherSkillDescription`, city, and area), `skillCategory?: string` (only workers who have this skill; a valid `worker_skill_category`), `sort?: "distance" | "rating"` (default `distance`; `rating` = best average first, unrated workers last, more ratings then distance breaking ties), `limit?: number` (default 20, max 50)
+- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against the worker's name, skill category, `otherSkillDescription`, place name, city, and area), `skillCategory?: string` (only workers who have this skill; a valid `worker_skill_category`), `sort?: "distance" | "rating"` (default `distance`; `rating` = best average first, unrated workers last, more ratings then distance breaking ties), `limit?: number` (default 20, max 50)
 - Every `WorkerProfile` (this endpoint and `/workers/me/profile`) now carries `ratingAverage: number | null` (1 decimal; null before the first rating) and `ratingCount: number` — from customers rating finished Your Problems jobs (`POST /problems/:id/complete`)
 - 200: `{ success: true, data: Array<WorkerProfile & { distanceMeters: number; accountFullName: string }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned; `accountFullName` is included so a result has a "who" (mobile/email are deliberately not exposed here — no booking/contact flow exists yet)
 - 400: `VALIDATION_ERROR` — missing/invalid `latitude`/`longitude`, or an out-of-range `radiusKm`/`limit`
@@ -112,8 +133,8 @@ Adds the Business capability to the authenticated `user` account — mirrors the
 ### POST /businesses/me/profile
 Create the caller's business profile. `multipart/form-data`.
 - Auth: Bearer access token
-- Body (multipart fields): `shopName: string`, `shopCategories: string` — a JSON-stringified array of 1+ of `"grocery"|"restaurant"|"pharmacy"|"electronics"|"clothing"|"hardware"|"salon"|"other"` (a shop can belong to multiple categories), `otherCategoryDescription?: string` (required when `shopCategories` includes `"other"`), `latitude?: number`, `longitude?: number`, `area?: string`, `city: string`, `district: string`, `state: string`, `pincode: string` (required, 6 digits — replaced a single free-text `locationAddress` field, same as the Workers endpoint), `deliveryAvailable: "true"|"false"`, `deliveryPricePerKm?: number` (required when `deliveryAvailable` is `"true"`), plus 0-6 image files under the field name `shopPhotos`.
-- 201: `{ success: true, message: "Business profile created", data: { id, accountId, shopName, shopCategories, otherCategoryDescription, latitude, longitude, area, city, district, state, pincode, shopPhotoUrls, deliveryAvailable, deliveryPricePerKm, verificationStatus, createdAt, updatedAt } }`
+- Body (multipart fields): `shopName: string`, `shopCategories: string` — a JSON-stringified array of 1+ of `"grocery"|"restaurant"|"pharmacy"|"electronics"|"clothing"|"hardware"|"salon"|"other"` (a shop can belong to multiple categories), `otherCategoryDescription?: string` (required when `shopCategories` includes `"other"`), the same location fields as the Workers endpoint, `deliveryAvailable: "true"|"false"`, `deliveryPricePerKm?: number` (required when `deliveryAvailable` is `"true"`) and `deliveryMinCharge?: number` (optional; defaults to the 1-km price, so a delivery under 1 km costs a full km — the apps no longer send it). An order's delivery charge is the price per km × distance, but never less than the minimum, plus 0-6 image files under the field name `shopPhotos`. The shop's profile photo / logo is uploaded separately (`PUT /businesses/me/profile/photo`, same shape as the Workers one).
+- 201: `{ success: true, message: "Business profile created", data: { id, accountId, shopName, shopCategories, otherCategoryDescription, latitude, longitude, locationName, area, city, district, state, pincode, profilePhotoUrl, shopPhotoUrls, deliveryAvailable, deliveryPricePerKm, deliveryMinCharge, verificationStatus, createdAt, updatedAt } }`
 - 400 / 409: same shape as the Workers endpoint (`BUSINESS_PROFILE_EXISTS` instead of `WORKER_PROFILE_EXISTS`; also validates `otherCategoryDescription`/`deliveryPricePerKm` requirements)
 
 ### GET /businesses/me/profile
@@ -126,6 +147,9 @@ Update the caller's existing business profile. `multipart/form-data`, same field
 - Auth: Bearer access token
 - 200: `{ success: true, message: "Business profile updated", data: BusinessProfile }`
 - 400 / 404: same shape as the Workers endpoint (`BUSINESS_PROFILE_NOT_FOUND` instead of `WORKER_PROFILE_NOT_FOUND`)
+
+### PUT /businesses/me/profile/photo · DELETE /businesses/me/profile/photo
+The shop's profile photo / logo — same shape as the Workers endpoints (`BUSINESS_PROFILE_NOT_FOUND`).
 
 ### DELETE /businesses/me/profile
 Permanently remove the caller's business profile.

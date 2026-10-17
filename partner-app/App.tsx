@@ -6,7 +6,14 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Updates from 'expo-updates';
-import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
+import {
+  useFonts,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+} from '@expo-google-fonts/poppins';
+import { GrandHotel_400Regular } from '@expo-google-fonts/grand-hotel';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { RootNavigator } from '@/navigation/RootNavigator';
@@ -15,6 +22,7 @@ import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
 import { PortalHost } from '@/components/Portal';
 import { IncomingJobModal } from '@/components/IncomingJobModal';
+import { IncomingOrderModal } from '@/components/IncomingOrderModal';
 import { JobTrackingModal } from '@/components/JobTrackingModal';
 import { ShopOrderModal } from '@/components/ShopOrderModal';
 import { useThemeColors } from '@/theme';
@@ -48,6 +56,8 @@ export default function App() {
     Poppins_500Medium,
     Poppins_600SemiBold,
     Poppins_700Bold,
+    // The script face for the app name on the Welcome screen.
+    GrandHotel_400Regular,
   });
   const { colors, isDark } = useThemeColors();
   const isLoggingOut = useAuthStore((state) => state.isLoggingOut);
@@ -161,6 +171,8 @@ export default function App() {
             full-screen takeover card can pop up over whatever screen the worker is
             currently on — see the component's own doc comment. */}
         <IncomingJobModal />
+        {/* A new shop order pops up the same way, over whatever screen is open. */}
+        <IncomingOrderModal />
         {/* The worker's live Quick Book job screen — opened from anywhere via jobFocusStore. */}
         <JobTrackingModal />
         <ShopOrderModal />

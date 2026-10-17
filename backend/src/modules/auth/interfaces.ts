@@ -20,6 +20,8 @@ export interface Account {
   latitude: number | null;
   longitude: number | null;
   locationAddress: string | null;
+  /** The customer's own photo (user-app). */
+  profilePhotoUrl: string | null;
   /** End of a temporary suspension ('suspended'); null otherwise. */
   suspendedUntil: Date | null;
   /** The admin's reason for the current suspension or ban. */

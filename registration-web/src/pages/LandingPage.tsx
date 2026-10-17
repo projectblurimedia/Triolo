@@ -88,6 +88,12 @@ export function LandingPage() {
                 </p>
               </Link>
             )}
+            <Link to="/job" className="card card--clickable">
+              <strong>Looking for a Job?</strong>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: '6px 0 0' }}>
+                Teacher, cook, driver and more — post the work you want and let nearby families and shops hire you.
+              </p>
+            </Link>
           </>
         )}
       </div>

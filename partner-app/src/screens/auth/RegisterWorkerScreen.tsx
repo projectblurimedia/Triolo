@@ -3,16 +3,21 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { KeyboardAwareView } from '@/components/KeyboardAwareView';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { TextField } from '@/components/TextField';
 import { PhoneVerification } from '@/components/PhoneVerification';
-import { AddressPicker, AddressValue, EMPTY_ADDRESS } from '@/components/AddressPicker';
+import { InfoTipsButton } from '@/components/InfoTipsButton';
+import { LocationField } from '@/components/LocationField';
+import { ProfilePhotoField } from '@/components/ProfilePhotoField';
+import { PlaceValue } from '@/utils/place';
 import { ImagePickerField, PickedImage } from '@/components/ImagePickerField';
 import { Button } from '@/components/Button';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useCreateWorkerProfile } from '@/hooks/useWorkerMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
+import { workersService } from '@/services/workersService';
 import { useAuthStore } from '@/state/authStore';
 
 const SKILL_CATEGORIES = [
@@ -57,7 +62,10 @@ export function RegisterWorkerScreen() {
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherInputValue, setOtherInputValue] = useState('');
   const [experienceYears, setExperienceYears] = useState('');
-  const [address, setAddress] = useState<AddressValue>(EMPTY_ADDRESS);
+  const [place, setPlace] = useState<PlaceValue | null>(null);
+  // A newly picked profile photo (uploaded after saving), or a removal of the saved one.
+  const [profilePhoto, setProfilePhoto] = useState<PickedImage | null>(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,30 +113,30 @@ export function RegisterWorkerScreen() {
   const handleSubmit = () => {
     setError(null);
     const includesOther = otherSkillEntries.length > 0;
-    if (
-      (skillCategories.length === 0 && !includesOther) ||
-      !experienceYears.trim() ||
-      !address.city.trim() ||
-      !address.district.trim() ||
-      !address.state.trim() ||
-      !/^[0-9]{6}$/.test(address.pincode)
-    ) {
-      setError(t('errors.VALIDATION_ERROR'));
+    const years = Number(experienceYears);
+    const problem =
+      skillCategories.length === 0 && !includesOther
+        ? t('formErrors.skills')
+        : !experienceYears.trim() || !Number.isInteger(years) || years < 0 || years > 60
+          ? t('formErrors.experience')
+          : !place
+            ? t('formErrors.location')
+            : null;
+    if (problem) {
+      setError(problem);
+      showToast({ variant: 'error', title: t('formErrors.title'), message: problem });
       return;
     }
+    // Already reported above; this only tells TypeScript.
+    if (!place) return;
 
     createProfile.mutate(
       {
         skillCategories: includesOther ? [...skillCategories, 'other'] : skillCategories,
         otherSkillDescription: includesOther ? otherSkillEntries.join(', ') : undefined,
         experienceYears: Number(experienceYears),
-        latitude: address.latitude,
-        longitude: address.longitude,
-        area: address.area.trim() || undefined,
-        city: address.city.trim(),
-        district: address.district.trim(),
-        state: address.state.trim(),
-        pincode: address.pincode,
+        place,
+        profilePhoto: profilePhoto ?? (photoRemoved ? null : undefined),
         portfolioPhotos: photos,
       },
       {
@@ -149,111 +157,165 @@ export function RegisterWorkerScreen() {
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
-      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('workerProfile.subtitle')}</Text>
+      <KeyboardAwareView>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+        >
+          <InfoTipsButton
+            title={t('infoTips.workerTitle')}
+            tips={[
+              { icon: 'briefcase', text: t('workerProfile.subtitle') },
+              { icon: 'camera', text: t('profilePhoto.workerHint') },
+              { icon: 'mobile-screen-button', text: t('auth.verifyToSubmitHint') },
+              { icon: 'location-dot', text: t('infoTips.location') },
+              { icon: 'shield-halved', text: t('infoTips.verification') },
+            ]}
+          />
 
-        <PhoneVerification
-          fullName={fullName}
-          onFullNameChange={setFullName}
-          mobileNumber={mobileNumber}
-          onMobileNumberChange={setMobileNumber}
-          verified={verified}
-          onVerified={() => setVerified(true)}
-        />
+          <ProfilePhotoField
+            uri={profilePhoto?.uri ?? null}
+            name={fullName}
+            title={t('profilePhoto.workerTitle')}
+            onPick={(image) => {
+              setProfilePhoto(image);
+              setPhotoRemoved(false);
+            }}
+            onRemove={() => {
+              setProfilePhoto(null);
+              setPhotoRemoved(true);
+            }}
+          />
 
-        <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.skillLabel')}</Text>
-        <View style={styles.chipRow}>
-          {orderedSkills.map((skill) => {
-            const isActive = skillCategories.includes(skill.key);
-            return (
-              <Pressable key={skill.key} onPress={() => toggleSkill(skill.key)}>
-                {isActive ? (
-                  <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                    <FontAwesome6 name={skill.icon} size={12} color="#FFFFFF" solid />
-                    <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-                  </LinearGradient>
-                ) : (
-                  <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
-                    <FontAwesome6 name={skill.icon} size={12} color={colors.textMuted} solid />
-                    <Text style={[styles.chipLabel, { color: colors.text }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-          {otherSkillEntries.map((entry, index) => (
-            <Pressable key={`other-${entry}-${index}`} onPress={() => removeOtherEntry(index)}>
-              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                <Text style={[styles.chipLabel, { color: '#FFFFFF' }]} numberOfLines={1}>
-                  {entry}
-                </Text>
-                <FontAwesome6 name="xmark" size={10} color="#FFFFFF" solid />
-              </LinearGradient>
-            </Pressable>
-          ))}
-          <Pressable onPress={() => setShowOtherInput(true)}>
-            <View style={[styles.chip, styles.addNewChip, { borderColor: colors.primary, backgroundColor: `${colors.primary}16` }]}>
-              <View style={[styles.addNewBadge, { backgroundColor: colors.primary }]}>
-                <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
-              </View>
-              <Text style={[styles.chipLabel, { color: colors.primary, fontFamily: fonts.semiBold }]}>{t('common.addNew')}</Text>
-            </View>
-          </Pressable>
-        </View>
+          <PhoneVerification
+            fullName={fullName}
+            onFullNameChange={setFullName}
+            mobileNumber={mobileNumber}
+            onMobileNumberChange={setMobileNumber}
+            verified={verified}
+            onVerified={() => {
+              setVerified(true);
+              // One account per number: if this one already has this profile, there is nothing to
+              // register — they are signed in, so open the app.
+              workersService
+                .getMyProfile()
+                .then((existing) => {
+                  if (!existing) return;
+                  showToast({ variant: 'info', title: t('auth.alreadyWorker') });
+                  setCompletingRegistration(false);
+                })
+                .catch(() => undefined);
+            }}
+          />
 
-        {showOtherInput ? (
-          <>
-            <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.otherSkillLabel')}</Text>
-            <View style={styles.otherInputRow}>
-              <View style={styles.otherInputField}>
-                <TextField
-                  containerStyle={styles.noMargin}
-                  value={otherInputValue}
-                  onChangeText={setOtherInputValue}
-                  maxLength={40}
-                  returnKeyType="done"
-                  onSubmitEditing={commitOtherEntry}
-                  autoFocus
-                />
-              </View>
-              <Pressable
-                style={{ opacity: otherInputValue.trim() ? 1 : 0.5 }}
-                onPress={commitOtherEntry}
-                disabled={!otherInputValue.trim()}
-                accessibilityLabel={t('common.done')}
-              >
-                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.otherDoneGradient}>
-                  <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
+          <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.skillLabel')}</Text>
+          <View style={styles.chipRow}>
+            {orderedSkills.map((skill) => {
+              const isActive = skillCategories.includes(skill.key);
+              return (
+                <Pressable key={skill.key} onPress={() => toggleSkill(skill.key)}>
+                  {isActive ? (
+                    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                      <FontAwesome6 name={skill.icon} size={12} color="#FFFFFF" solid />
+                      <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
+                      <FontAwesome6 name={skill.icon} size={12} color={colors.textMuted} solid />
+                      <Text style={[styles.chipLabel, { color: colors.text }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+            {otherSkillEntries.map((entry, index) => (
+              <Pressable key={`other-${entry}-${index}`} onPress={() => removeOtherEntry(index)}>
+                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]} numberOfLines={1}>
+                    {entry}
+                  </Text>
+                  <FontAwesome6 name="xmark" size={10} color="#FFFFFF" solid />
                 </LinearGradient>
               </Pressable>
-            </View>
-          </>
-        ) : null}
+            ))}
+            <Pressable onPress={() => setShowOtherInput(true)}>
+              <View
+                style={[styles.chip, styles.addNewChip, { borderColor: colors.primary, backgroundColor: `${colors.primary}16` }]}
+              >
+                <View style={[styles.addNewBadge, { backgroundColor: colors.primary }]}>
+                  <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
+                </View>
+                <Text style={[styles.chipLabel, { color: colors.primary, fontFamily: fonts.semiBold }]}>
+                  {t('common.addNew')}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
 
-        <TextField
-          label={t('workerProfile.experienceLabel')}
-          value={experienceYears}
-          onChangeText={setExperienceYears}
-          keyboardType="number-pad"
-          maxLength={2}
-        />
+          {showOtherInput ? (
+            <>
+              <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.otherSkillLabel')}</Text>
+              <View style={styles.otherInputRow}>
+                <View style={styles.otherInputField}>
+                  <TextField
+                    containerStyle={styles.noMargin}
+                    value={otherInputValue}
+                    onChangeText={setOtherInputValue}
+                    maxLength={40}
+                    returnKeyType="done"
+                    onSubmitEditing={commitOtherEntry}
+                    autoFocus
+                  />
+                </View>
+                <Pressable
+                  style={{ opacity: otherInputValue.trim() ? 1 : 0.5 }}
+                  onPress={commitOtherEntry}
+                  disabled={!otherInputValue.trim()}
+                  accessibilityLabel={t('common.done')}
+                >
+                  <LinearGradient
+                    colors={headerGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.otherDoneGradient}
+                  >
+                    <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            </>
+          ) : null}
 
-        <AddressPicker value={address} onChange={setAddress} />
+          <TextField
+            label={t('workerProfile.experienceLabel')}
+            value={experienceYears}
+            onChangeText={setExperienceYears}
+            keyboardType="number-pad"
+            maxLength={2}
+          />
 
-        <ImagePickerField label={t('workerProfile.portfolioLabel')} images={photos} onChange={setPhotos} />
+          <LocationField label={t('location.workerPlaceLabel')} value={place} onChange={setPlace} />
 
-        {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
+          <ImagePickerField label={t('workerProfile.portfolioLabel')} images={photos} onChange={setPhotos} />
 
-        <Button label={t('common.submit')} onPress={handleSubmit} loading={createProfile.isPending} disabled={!verified} />
-        {!verified ? <Text style={[styles.hint, { color: colors.textMuted }]}>{t('auth.verifyToSubmitHint')}</Text> : null}
-      </ScrollView>
+          {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
+
+          <Button
+            label={t('auth.registerButton')}
+            onPress={handleSubmit}
+            loading={createProfile.isPending}
+            disabled={!verified}
+          />
+        </ScrollView>
+      </KeyboardAwareView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   body: { paddingBottom: 40 },
-  subtitle: { ...typography.body, marginBottom: 18 },
   label: { ...typography.caption, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 18, paddingVertical: 8, paddingHorizontal: 14 },
@@ -266,5 +328,4 @@ const styles = StyleSheet.create({
   noMargin: { marginBottom: 0 },
   otherDoneGradient: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   error: { ...typography.caption, marginBottom: 12 },
-  hint: { ...typography.caption, textAlign: 'center', marginTop: 10 },
 });

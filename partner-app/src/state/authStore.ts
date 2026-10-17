@@ -38,6 +38,8 @@ interface AuthState {
   isCompletingRegistration: boolean;
   setSession: (params: { accessToken: string; refreshToken: string; account: AuthAccount }) => void;
   setAccessToken: (accessToken: string) => void;
+  /** After a name change — the signed-in account's latest details. */
+  setAccount: (account: AuthAccount) => void;
   clearSession: () => void;
   setLoggingOut: (value: boolean) => void;
   setCompletingRegistration: (value: boolean) => void;
@@ -60,6 +62,7 @@ export const useAuthStore = create<AuthState>()(
         useSettingsStore.getState().setLanguage(account.preferredLanguage);
       },
       setAccessToken: (accessToken) => set({ accessToken }),
+      setAccount: (account) => set({ account }),
       clearSession: () => set({ accessToken: null, refreshToken: null, account: null }),
       setLoggingOut: (isLoggingOut) => set({ isLoggingOut }),
       setCompletingRegistration: (isCompletingRegistration) => set({ isCompletingRegistration }),

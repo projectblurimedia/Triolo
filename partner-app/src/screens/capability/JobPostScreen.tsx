@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { InfoTipsButton } from '@/components/InfoTipsButton';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { JobPostForm } from '@/components/JobPostForm';
@@ -100,10 +101,17 @@ export function JobPostScreen({ navigation }: Props) {
               />
             </Pressable>
           ) : (
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('jobPost.subtitle')}</Text>
+            <InfoTipsButton
+              title={t('infoTips.jobTitle')}
+              tips={[
+                { icon: 'user-tie', text: t('jobPost.subtitle') },
+                { icon: 'camera', text: t('jobPost.photoHint') },
+                { icon: 'location-dot', text: t('infoTips.location') },
+              ]}
+            />
           )}
 
-          <JobPostForm post={post} onSaved={() => navigation.goBack()} />
+          <JobPostForm post={post} showPhotoHint={false} showNameField onSaved={() => navigation.goBack()} />
 
           {post ? <CancelButton icon="trash" label={t('jobPost.delete')} onPress={() => setConfirmDelete(true)} /> : null}
         </ScrollView>
@@ -128,7 +136,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   body: { paddingBottom: 40 },
-  subtitle: { ...typography.body, marginBottom: 18 },
   visibility: {
     flexDirection: 'row',
     alignItems: 'center',

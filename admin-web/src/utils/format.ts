@@ -83,15 +83,9 @@ export const rupees = (amount: number | null | undefined) =>
 export const distance = (meters: number | null | undefined) =>
   meters == null ? '—' : meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
 
-export function formatAddress(parts: {
-  area?: string | null;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
-}): string {
-  const line = [parts.area, parts.city, parts.district, parts.state].filter(Boolean).join(', ');
-  return parts.pincode ? `${line} - ${parts.pincode}` : line;
+/** A worker's or shop's location as shown everywhere: only the place name (village / town). */
+export function formatAddress(parts: { locationName?: string | null; city?: string | null }): string {
+  return parts.locationName || parts.city || '—';
 }
 
 export function accountStatus(status: AccountStatus, until?: string | null): { label: string; tone: Tone } {

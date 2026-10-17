@@ -1,13 +1,12 @@
 interface AddressParts {
-  area?: string | null;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  locationName?: string | null;
+  city?: string | null;
 }
 
-/** Joins the structured Worker/Business address fields into one display line — "Area, City, District, State - Pincode", omitting Area when absent. */
+/**
+ * What people see of a worker's or shop's location: only the place name (village / town).
+ * The full address (area, district, state, pincode) is stored but never shown.
+ */
 export function formatAddress(parts: AddressParts): string {
-  const line = [parts.area, parts.city, parts.district, parts.state].filter(Boolean).join(', ');
-  return parts.pincode ? `${line} - ${parts.pincode}` : line;
+  return parts.locationName || parts.city || '';
 }

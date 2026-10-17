@@ -40,5 +40,8 @@ workersRouter.patch(
   controller.updateProfile,
 );
 workersRouter.delete('/me/profile', authenticate, controller.deleteProfile);
+// Profile photo — its own request, like job-post photos (keeps each body small for Vercel).
+workersRouter.put('/me/profile/photo', authenticate, upload.single('photo'), logUploadedFiles, controller.setProfilePhoto);
+workersRouter.delete('/me/profile/photo', authenticate, controller.removeProfilePhoto);
 workersRouter.get('/nearby', authenticate, controller.searchNearby);
 workersRouter.post('/:id/view', authenticate, controller.recordView);

@@ -7,6 +7,8 @@ export const fonts = {
   medium: 'Poppins_500Medium',
   semiBold: 'Poppins_600SemiBold',
   bold: 'Poppins_700Bold',
+  /** Script lettering for the app name (Welcome screen). */
+  brand: 'GrandHotel_400Regular',
 } as const;
 
 export const typography = {

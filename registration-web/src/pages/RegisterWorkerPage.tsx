@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import { InfoTips } from '@/components/InfoTips';
 import { PhoneVerification } from '@/components/PhoneVerification';
 import { CategoryChips } from '@/components/CategoryChips';
-import { AddressField, AddressValue, EMPTY_ADDRESS } from '@/components/AddressField';
+import { LocationField } from '@/components/LocationField';
+import { ProfilePhotoField } from '@/components/ProfilePhotoField';
+import { PlaceValue } from '@/utils/place';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -51,11 +54,13 @@ export function RegisterWorkerPage() {
   const [checkingProfile, setCheckingProfile] = useState(false);
   const [existingProfile, setExistingProfile] = useState<WorkerProfile | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   const [skillCategories, setSkillCategories] = useState<string[]>([]);
   const [otherEntries, setOtherEntries] = useState<string[]>([]);
   const [experienceYears, setExperienceYears] = useState('');
-  const [address, setAddress] = useState<AddressValue>(EMPTY_ADDRESS);
+  const [place, setPlace] = useState<PlaceValue | null>(null);
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -103,15 +108,17 @@ export function RegisterWorkerPage() {
   const handleSubmit = async () => {
     setError(null);
     const includesOther = otherEntries.length > 0;
-    if (
-      (skillCategories.length === 0 && !includesOther) ||
-      !experienceYears.trim() ||
-      !address.city.trim() ||
-      !address.district.trim() ||
-      !address.state.trim() ||
-      !/^[0-9]{6}$/.test(address.pincode)
-    ) {
-      setError('Please fill in all required fields.');
+    const years = Number(experienceYears);
+    const problem =
+      skillCategories.length === 0 && !includesOther
+        ? 'Choose at least one skill.'
+        : !experienceYears.trim() || !Number.isInteger(years) || years < 0 || years > 60
+          ? 'Enter your years of experience (0–60).'
+          : !place
+            ? 'Set your location — use your current location or select it on the map.'
+            : null;
+    if (problem || !place) {
+      setError(problem);
       return;
     }
     setSubmitting(true);
@@ -120,15 +127,17 @@ export function RegisterWorkerPage() {
         skillCategories: includesOther ? [...skillCategories, 'other'] : skillCategories,
         otherSkillDescription: includesOther ? otherEntries.join(', ') : undefined,
         experienceYears: Number(experienceYears),
-        latitude: address.latitude,
-        longitude: address.longitude,
-        area: address.area.trim() || undefined,
-        city: address.city.trim(),
-        district: address.district.trim(),
-        state: address.state.trim(),
-        pincode: address.pincode,
+        place,
         portfolioPhotos: photos,
       });
+      if (profilePhoto) {
+        try {
+          await workersService.uploadProfilePhoto(profilePhoto);
+        } catch {
+          // The profile is saved; the photo can be added again from the Partner app.
+          setPhotoFailed(true);
+        }
+      }
       setSubmitted(true);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -140,10 +149,15 @@ export function RegisterWorkerPage() {
   if (submitted) {
     return (
       <div className="page">
-        <PageHeader title="Worker Registration" backTo="/" />
+        <PageHeader title="Worker Registration" subtitle="Get work from customers near you" backTo="/" />
         <div className="body">
           <p>✅ Your details are submitted for verification.</p>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>We'll notify you once approved.</p>
+          {photoFailed ? (
+            <p style={{ fontSize: 13, color: 'var(--color-error)' }}>
+              Your photo didn't upload. You can add it later from the Triolo Partner app.
+            </p>
+          ) : null}
         </div>
       </div>
     );
@@ -151,7 +165,7 @@ export function RegisterWorkerPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Worker Registration" backTo="/" />
+      <PageHeader title="Worker Registration" subtitle="Get work from customers near you" backTo="/" />
       <div className="body">
         <form
           onSubmit={(e) => {
@@ -159,6 +173,28 @@ export function RegisterWorkerPage() {
             if (verified && !existingProfile) handleSubmit();
           }}
         >
+          {!existingProfile ? (
+            <InfoTips
+              title="About worker registration"
+              tips={[
+                'Provide your service details to get discovered by customers nearby.',
+                'A clear profile photo helps customers trust you.',
+                'Your location is picked with GPS or on the map. Only your village or town name is shown to others.',
+                'Verify your mobile number to enable Register.',
+                'Our team checks new profiles. Once approved, customers near you can find you.',
+              ]}
+            />
+          ) : null}
+          {!existingProfile ? (
+            <ProfilePhotoField
+              file={profilePhoto}
+              name={fullName}
+              title="Your photo"
+              hint="A clear photo of your face helps customers trust you."
+              onChange={setProfilePhoto}
+            />
+          ) : null}
+
           <PhoneVerification
             fullName={fullName}
             onFullNameChange={setFullName}
@@ -209,19 +245,19 @@ export function RegisterWorkerPage() {
               />
               <div className="field">
                 <label>Years of Experience</label>
-                <input value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} inputMode="numeric" maxLength={2} />
+                <input
+                  value={experienceYears}
+                  onChange={(e) => setExperienceYears(e.target.value)}
+                  inputMode="numeric"
+                  maxLength={2}
+                />
               </div>
-              <AddressField value={address} onChange={setAddress} />
+              <LocationField label="Where do you work from?" value={place} onChange={setPlace} />
               <PhotoUpload label="Photos of Your Work (optional)" files={photos} onChange={setPhotos} />
               {error ? <p className="error-text">{error}</p> : null}
               <button type="submit" className="button" disabled={!verified || submitting}>
-                {submitting ? <LoadingSpinner /> : 'Submit'}
+                {submitting ? <LoadingSpinner /> : 'Register'}
               </button>
-              {!verified ? (
-                <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                  Verify your mobile number above to enable Submit.
-                </p>
-              ) : null}
             </>
           ) : null}
         </form>

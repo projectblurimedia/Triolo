@@ -12,8 +12,6 @@ import { openShopOrder } from '@/state/shopOrderFocusStore';
 import { navigateToBookings } from '@/navigation/navigationRef';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
-const PROBLEM_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
-const ORDER_GRADIENT = ['#0EA5E9', '#38BDF8'] as const;
 const MAX_ROWS = 3;
 
 interface Step {
@@ -113,7 +111,8 @@ export function ContinueSteps({ isShop }: { isShop: boolean }) {
       </View>
 
       {shown.map((step) => {
-        const gradient = step.kind === 'order' ? ORDER_GRADIENT : step.kind === 'problem' ? PROBLEM_GRADIENT : headerGradient;
+        // Every step uses the app's own blue, whatever kind it is.
+        const gradient = headerGradient;
         const icon = step.kind === 'order' ? 'store' : step.kind === 'problem' ? 'clipboard-list' : 'bolt';
         return (
           <Pressable

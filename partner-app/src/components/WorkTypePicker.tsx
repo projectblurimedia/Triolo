@@ -77,7 +77,7 @@ export function WorkTypePicker({ value, onChange }: WorkTypePickerProps) {
         <FontAwesome6 name="chevron-down" size={13} color={colors.textMuted} solid />
       </Pressable>
 
-      <Modal visible={open} animationType="slide" onRequestClose={close} statusBarTranslucent>
+      <Modal visible={open} animationType="fade" onRequestClose={close} statusBarTranslucent>
         <View style={[styles.modal, { backgroundColor: colors.background }]}>
           <LinearGradient
             colors={headerGradient}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircleCheck, faClock } from '@fortawesome/free-solid-svg-icons';
 import { authService } from '@/services/authService';
@@ -51,6 +51,7 @@ export function PhoneVerification({
   const setSession = useAuthStore((s) => s.setSession);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
+  const otpRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<'login' | 'registration' | null>(null);
   const [sending, setSending] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -58,10 +59,11 @@ export function PhoneVerification({
 
   const sendOtp = async () => {
     setError(null);
-    if (!fullName.trim() || !mobileNumber.trim()) {
-      setError('Enter your name and mobile number first.');
+    if (!/^[6-9][0-9]{9}$/.test(mobileNumber.trim())) {
+      setError('Enter a valid 10-digit mobile number.');
       return;
     }
+    const nameMissing = fullName.trim().length < 2;
     setSending(true);
     try {
       await authService.requestLoginOtp({ mobileNumber });
@@ -69,6 +71,10 @@ export function PhoneVerification({
       setOtpSent(true);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'ACCOUNT_NOT_FOUND') {
+        if (nameMissing) {
+          setError('This number is new to Triolo — enter your full name to create your account, then click Verify.');
+          return;
+        }
         try {
           await authService.requestRegistrationOtp({ fullName, mobileNumber, preferredLanguage: 'en' });
           setMode('registration');
@@ -86,8 +92,8 @@ export function PhoneVerification({
 
   const confirmOtp = async () => {
     setError(null);
-    if (!otp.trim()) {
-      setError('Enter the OTP.');
+    if (!/^[0-9]{6}$/.test(otp.trim())) {
+      setError('Enter the 6-digit OTP.');
       return;
     }
     setConfirming(true);
@@ -100,6 +106,9 @@ export function PhoneVerification({
       onVerified();
     } catch (err) {
       setError(getErrorMessage(err));
+      // A wrong code: clear it and put the cursor (and the phone's keyboard) back in the box.
+      setOtp('');
+      setTimeout(() => otpRef.current?.focus(), 50);
     } finally {
       setConfirming(false);
     }
@@ -160,13 +169,25 @@ export function PhoneVerification({
         <>
           <div className="field">
             <label>Enter OTP sent to {mobileNumber}</label>
-            <input value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} inputMode="numeric" autoFocus />
+            <input ref={otpRef} value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} inputMode="numeric" autoFocus />
           </div>
           <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-            <button type="button" className="button button--secondary" style={{ flex: 1 }} onClick={confirmOtp} disabled={confirming}>
+            <button
+              type="button"
+              className="button button--secondary"
+              style={{ flex: 1 }}
+              onClick={confirmOtp}
+              disabled={confirming}
+            >
               {confirming ? <LoadingSpinner dark /> : 'Confirm OTP'}
             </button>
-            <button type="button" className="button button--secondary" style={{ flex: 1 }} onClick={changeNumber} disabled={confirming}>
+            <button
+              type="button"
+              className="button button--secondary"
+              style={{ flex: 1 }}
+              onClick={changeNumber}
+              disabled={confirming}
+            >
               Change Number
             </button>
           </div>

@@ -19,11 +19,13 @@ function mapWorkerProfile(row: QueryResultRow): WorkerProfile {
     experienceYears: row.experience_years,
     latitude: row.latitude,
     longitude: row.longitude,
+    locationName: row.location_name ?? row.city ?? null,
     area: row.area,
     city: row.city,
     district: row.district,
     state: row.state,
     pincode: row.pincode,
+    profilePhotoUrl: row.profile_photo_url ?? null,
     portfolioPhotoUrls: row.portfolio_photo_urls ?? [],
     verificationStatus: row.verification_status,
     ratingAverage: row.rating_count > 0 ? Math.round((row.rating_sum / row.rating_count) * 10) / 10 : null,
@@ -56,18 +58,19 @@ export class WorkersRepository {
     skillCategories: string[];
     otherSkillDescription: string | null;
     experienceYears: number;
-    latitude: number | null;
-    longitude: number | null;
+    latitude: number;
+    longitude: number;
+    locationName: string;
     area: string | null;
-    city: string;
-    district: string;
-    state: string;
-    pincode: string;
+    city: string | null;
+    district: string | null;
+    state: string | null;
+    pincode: string | null;
     portfolioPhotoUrls: string[];
   }): Promise<WorkerProfile> {
     const result = await this.pool.query(
-      `INSERT INTO worker_profiles (account_id, skill_categories, other_skill_description, experience_years, latitude, longitude, area, city, district, state, pincode, portfolio_photo_urls)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO worker_profiles (account_id, skill_categories, other_skill_description, experience_years, latitude, longitude, area, city, district, state, pincode, portfolio_photo_urls, location_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         params.accountId,
@@ -82,6 +85,7 @@ export class WorkersRepository {
         params.state,
         params.pincode,
         params.portfolioPhotoUrls,
+        params.locationName,
       ],
     );
     return mapWorkerProfile(result.rows[0]);
@@ -93,20 +97,21 @@ export class WorkersRepository {
       skillCategories: string[];
       otherSkillDescription: string | null;
       experienceYears: number;
-      latitude: number | null;
-      longitude: number | null;
+      latitude: number;
+      longitude: number;
+      locationName: string;
       area: string | null;
-      city: string;
-      district: string;
-      state: string;
-      pincode: string;
+      city: string | null;
+      district: string | null;
+      state: string | null;
+      pincode: string | null;
       portfolioPhotoUrls: string[];
       verificationStatus: string;
     },
   ): Promise<WorkerProfile> {
     const result = await this.pool.query(
       `UPDATE worker_profiles
-       SET skill_categories = $2, other_skill_description = $3, experience_years = $4, latitude = $5, longitude = $6, area = $7, city = $8, district = $9, state = $10, pincode = $11, portfolio_photo_urls = $12, verification_status = $13, updated_at = now()
+       SET skill_categories = $2, other_skill_description = $3, experience_years = $4, latitude = $5, longitude = $6, area = $7, city = $8, district = $9, state = $10, pincode = $11, portfolio_photo_urls = $12, verification_status = $13, location_name = $14, updated_at = now()
        WHERE account_id = $1
        RETURNING *`,
       [
@@ -123,9 +128,26 @@ export class WorkersRepository {
         params.pincode,
         params.portfolioPhotoUrls,
         params.verificationStatus,
+        params.locationName,
       ],
     );
     return mapWorkerProfile(result.rows[0]);
+  }
+
+  /** Sets (or clears) the profile photo; returns the profile and the photo it replaced, or null with no profile. */
+  async setProfilePhoto(
+    accountId: string,
+    photoUrl: string | null,
+  ): Promise<{ profile: WorkerProfile; previousUrl: string | null } | null> {
+    const result = await this.pool.query(
+      `UPDATE worker_profiles p SET profile_photo_url = $2, updated_at = now()
+       FROM (SELECT profile_photo_url AS previous_url FROM worker_profiles WHERE account_id = $1 FOR UPDATE) old
+       WHERE p.account_id = $1
+       RETURNING p.*, old.previous_url`,
+      [accountId, photoUrl],
+    );
+    if (!result.rows[0]) return null;
+    return { profile: mapWorkerProfile(result.rows[0]), previousUrl: result.rows[0].previous_url ?? null };
   }
 
   async remove(accountId: string): Promise<void> {
@@ -239,7 +261,7 @@ export class WorkersRepository {
            AND w.account_id != $3
        ) sub
        WHERE sub.distance_meters <= $4
-         AND ($5::text IS NULL OR sub.account_full_name ILIKE $5 OR sub.other_skill_description ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.skill_categories, ',') ILIKE $5)
+         AND ($5::text IS NULL OR sub.account_full_name ILIKE $5 OR sub.other_skill_description ILIKE $5 OR sub.location_name ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.skill_categories, ',') ILIKE $5)
          AND ($7::worker_skill_category IS NULL OR $7::worker_skill_category = ANY(sub.skill_categories))
        ORDER BY ${orderBy}
        LIMIT $6`,

@@ -28,6 +28,7 @@ import {
   skillsLabel,
   timeAgo,
   verificationStatus,
+  formatAddress,
 } from '@/utils/format';
 
 const LIMIT = 20;
@@ -178,11 +179,12 @@ export function WorkersPage() {
             <div className="row-main">
               <div className="row-title">{worker.accountFullName}</div>
               <div className="row-sub">
-                {skillsLabel(worker.skillCategories)} · {worker.experienceYears} yr · {worker.city} · {worker.accountMobileNumber}
+                {skillsLabel(worker.skillCategories)} · {worker.experienceYears} yr · {formatAddress(worker)} ·{' '}
+                {worker.accountMobileNumber}
               </div>
             </div>
-            {worker.portfolioPhotoUrls[0] ? (
-              <Thumb url={worker.portfolioPhotoUrls[0]} count={worker.portfolioPhotoUrls.length} />
+            {(worker.profilePhotoUrl ?? worker.portfolioPhotoUrls[0]) ? (
+              <Thumb url={worker.profilePhotoUrl ?? worker.portfolioPhotoUrls[0]} count={worker.portfolioPhotoUrls.length} />
             ) : null}
             <div className="row-side">
               <Badge tone={status.tone}>{status.label}</Badge>
@@ -232,7 +234,7 @@ export function ShopsPage() {
             <div className="row-main">
               <div className="row-title">{shop.shopName}</div>
               <div className="row-sub">
-                {shop.shopCategories.map(shopCategoryLabel).join(', ')} · {shop.accountFullName} · {shop.city}
+                {shop.shopCategories.map(shopCategoryLabel).join(', ')} · {shop.accountFullName} · {formatAddress(shop)}
               </div>
             </div>
             <div className="row-side">

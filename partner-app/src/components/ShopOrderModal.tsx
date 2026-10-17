@@ -358,7 +358,7 @@ export function ShopOrderModal() {
                 value={entry.price}
                 onChangeText={(text) => setItem(item.id, { price: text.replace(/[^0-9.]/g, '') })}
                 keyboardType="decimal-pad"
-                placeholder="0"
+                placeholder={t('shopOrders.pricePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 maxLength={9}
                 accessibilityLabel={t('shopOrders.price')}

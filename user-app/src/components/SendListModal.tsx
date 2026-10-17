@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { clean } from '@/utils/place';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +12,7 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { RatingStars } from './RatingStars';
 import { ToastHost } from './ToastHost';
 import { Avatar } from './WorkerMiniCard';
-import { SHOP_CATEGORIES } from './BusinessProfileModal';
+import { SHOP_CATEGORIES } from '@/constants/categories';
 import { useListStore } from '@/state/listStore';
 import { ensureLocation } from '@/state/locationStore';
 import { openOrderTracker } from '@/state/orderTrackerStore';
@@ -43,9 +44,11 @@ const GEOCODE_TIMEOUT_MS = 4000;
 const MODAL_HANDOFF_MS = 350;
 const PREVIEW_ITEMS = 4;
 
-/** Same rule as the backend: the shop's price per km × distance, in whole rupees. */
+/** Same rule as the backend: the shop's price per km × distance in whole rupees, never below its minimum charge. */
 function estimateDeliveryCharge(shop: BusinessNearbyResult): number {
-  return Math.round(((shop.deliveryPricePerKm ?? 0) * shop.distanceMeters) / 1000);
+  const byDistance = Math.round(((shop.deliveryPricePerKm ?? 0) * shop.distanceMeters) / 1000);
+  // Never less than the price of 1 km (or a larger minimum the shop saved).
+  return Math.max(byDistance, Math.round(Math.max(shop.deliveryMinCharge ?? 0, shop.deliveryPricePerKm ?? 0)));
 }
 
 async function addressFor(latitude: number, longitude: number): Promise<string | undefined> {
@@ -53,7 +56,11 @@ async function addressFor(latitude: number, longitude: number): Promise<string |
     const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), GEOCODE_TIMEOUT_MS));
     const [place] = await Promise.race([Location.reverseGeocodeAsync({ latitude, longitude }), timeout]);
     if (!place) return undefined;
-    return [place.name, place.street, place.city ?? place.subregion].filter(Boolean).join(', ') || undefined;
+    // No Plus Codes or pincode — just the words the shop can read.
+    const parts = [place.name, place.street, place.city ?? place.subregion]
+      .map(clean)
+      .filter((part, index, all) => !!part && all.indexOf(part) === index);
+    return parts.join(', ') || undefined;
   } catch {
     return undefined;
   }
@@ -235,7 +242,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           },
         ]}
       >
-        <Avatar photoUrl={item.shopPhotoUrls[0]} name={item.shopName} size={46} />
+        <Avatar photoUrl={item.shopPhotoUrls[0] ?? item.profilePhotoUrl} name={item.shopName} size={46} />
         <View style={styles.flex}>
           <Text style={[styles.shopName, { color: colors.text }]} numberOfLines={1}>
             {item.shopName}

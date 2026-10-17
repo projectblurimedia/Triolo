@@ -19,7 +19,8 @@
     "updatingAppMessage": "Please don't close the app while updating...",
     "updateCompleteTitle": "Update Complete!",
     "updateCompleteMessage": "Restarting the app with the latest version...",
-    "edit": "Edit"
+    "edit": "Edit",
+    "back": "Back"
   },
   "verification": {
     "pending": "Pending Review",
@@ -39,7 +40,44 @@
     "register": "Register",
     "alreadyHaveAccount": "Already have an account?",
     "accountCreatedTitle": "Account Created",
-    "accountCreatedMessage": "Your account has been created successfully. You may register as a Worker or Business at any time from the menu on the Home screen."
+    "accountCreatedMessage": "Your account has been created successfully. You may register as a Worker or Business at any time from the menu on the Home screen.",
+    "loginTitle": "Welcome Back",
+    "newHere": "New here?",
+    "otpNote": "We'll send a 6-digit OTP by SMS to check it's you.",
+    "perks": {
+      "secure": "Safe & secure",
+      "languages": "English & తెలుగు",
+      "quick": "Quick sign in"
+    },
+    "otpTitle": "Verify Your Number",
+    "otpSubtitle": "Enter the 6-digit code we sent by SMS to {{mobileNumber}}",
+    "otpResent": "A new OTP has been sent",
+    "resendIn": "Resend OTP in {{seconds}}s",
+    "resendOtp": "Resend OTP",
+    "changeNumber": "Change Number",
+    "loginSubtitle": "Log in with your mobile number to book services and order from shops near you",
+    "registerSubtitle": "Create your account to book workers and order from shops near you",
+    "registerAboutSection": "About you",
+    "registerPlaceSection": "Where you are",
+    "registerPlaceHint": "Used to show workers and shops near you",
+    "loginHeaderSubtitle": "Sign in with your mobile number",
+    "otpHeaderSubtitle": "Enter the code we sent by SMS",
+    "registerHeaderSubtitle": "Create your free account in a minute",
+    "mobilePlaceholder": "Mobile number",
+    "fullNamePlaceholder": "Your full name",
+    "emailPlaceholder": "Your email",
+    "verifyMobileNumber": "Verify Mobile Number",
+    "verify": "Verify",
+    "otpSentLabel": "Enter OTP sent to {{mobileNumber}}",
+    "confirmOtp": "Confirm OTP",
+    "verifyToSubmitHint": "Verify your mobile number above to enable Submit.",
+    "alreadyRegisteredLogin": "This number already has a Triolo account. Please log in instead.",
+    "alreadyWorker": "This number is already registered as a worker — you're signed in.",
+    "alreadyShop": "This number already has a shop — you're signed in.",
+    "alreadyJobPost": "This number already has a job post — you're signed in.",
+    "mobileInvalid": "Enter a valid 10-digit mobile number.",
+    "nameBeforeVerify": "Enter your full name first, then tap Verify.",
+    "nameForNewAccount": "This number is new to Triolo — enter your full name to create your account, then tap Verify."
   },
   "location": {
     "useCurrent": "Use My Current Location",
@@ -47,9 +85,9 @@
     "addressPlaceholder": "Village/town, district",
     "gpsDetected": "Detected via GPS",
     "permissionDeniedTitle": "Location Permission Needed",
-    "permissionDeniedMessage": "Allow location access to auto-detect your location, or enter it manually below.",
+    "permissionDeniedMessage": "Allow location access to use your current location, or select it on the map.",
     "detectFailedTitle": "Couldn't Detect Location",
-    "detectFailedMessage": "Something went wrong finding your location. Please enter it manually.",
+    "detectFailedMessage": "Couldn't get your location. Try again, or select it on the map.",
     "areaLabel": "Area / Landmark (optional)",
     "areaPlaceholder": "Street, locality or nearby landmark",
     "cityLabel": "City",
@@ -71,7 +109,22 @@
     "turnOn": "Turn On Location",
     "openSettings": "Open Settings",
     "requiredTitle": "Turn On Location",
-    "requiredMessage": "Location must be on to do this — so workers know exactly where to come."
+    "requiredMessage": "Location must be on to do this — so workers know exactly where to come.",
+    "useCurrentShort": "Current location",
+    "detecting": "Finding you…",
+    "selectOnMap": "Select on map",
+    "placeSet": "Location set",
+    "pinnedPlace": "Pinned location",
+    "turnOnMessage": "Turn on location and allow access to use your current location.",
+    "mapTitle": "Select Location",
+    "mapSubtitle": "Move the map so the pin is on your place",
+    "mapLoading": "Loading map…",
+    "mapUnavailable": "The map couldn't load. Check your internet, or use your current location instead.",
+    "pinCaption": "Pin location",
+    "findingPlace": "Finding place name…",
+    "confirmPlace": "Confirm Location",
+    "workerPlaceLabel": "Where do you work from?",
+    "shopPlaceLabel": "Shop location"
   },
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",
@@ -137,7 +190,7 @@
     "deliveryLabel": "Do you offer delivery?",
     "deliveryYes": "Yes",
     "deliveryNo": "No",
-    "deliveryPriceLabel": "Delivery Price per KM (₹)",
+    "deliveryPriceLabel": "Price per KM (₹)",
     "successTitle": "Business Profile Created",
     "successMessage": "Your shop details are submitted for verification. We'll notify you once approved.",
     "updateSuccessTitle": "Business Profile Updated",
@@ -146,7 +199,10 @@
     "deleteConfirmTitle": "Delete Business Profile?",
     "deleteConfirmMessage": "This removes your business profile permanently. You can create a new one later if you change your mind.",
     "deleteSuccessTitle": "Business Profile Deleted",
-    "deleteSuccessMessage": "Your business profile has been removed."
+    "deleteSuccessMessage": "Your business profile has been removed.",
+    "deliveryMinLabel": "Minimum Charge (₹)",
+    "deliveryChargeHint": "Delivery is charged per km. Anything under 1 km is charged as 1 km.",
+    "deliveryCharges": "Yes — ₹{{perKm}}/km"
   },
   "settings": {
     "language": "Language",
@@ -187,7 +243,8 @@
       "postProblem": "Post a Problem",
       "nearbyShops": "Nearby Shops",
       "prepareList": "Prepare List",
-      "hireStaff": "Hire Staff"
+      "hireStaff": "Hire Staff",
+      "orderShop": "Order from a Shop"
     },
     "activeProblems": "{{count}} active problem",
     "activeProblems_other": "{{count}} active problems",
@@ -205,7 +262,8 @@
       "postProblem": "Workers come to you",
       "nearbyShops": "Shops around you",
       "prepareList": "Plan your list by voice",
-      "hireStaff": "Cooks, tutors, drivers"
+      "hireStaff": "Cooks, tutors, drivers",
+      "orderShop": "Send your list to a nearby shop"
     },
     "trackBooking": "Track"
   },
@@ -422,7 +480,10 @@
     "menuSubtitle": "Language, theme and account",
     "detailsTitle": "Account details",
     "detailPhone": "Phone number",
-    "detailEmail": "Email"
+    "detailEmail": "Email",
+    "manageWorkerInPartnerApp": "To change your services, use the Triolo Partner app.",
+    "manageShopInPartnerApp": "To change your shop, use the Triolo Partner app.",
+    "accountSection": "Account"
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -482,7 +543,8 @@
     "ACCOUNT_BLOCKED": "Your account has been banned by Triolo.",
     "standingReason": "Reason: {{reason}}",
     "suspendedTitle": "Account Suspended",
-    "bannedTitle": "Account Banned"
+    "bannedTitle": "Account Banned",
+    "validationFields": "Please check: {{fields}}."
   },
   "problemForm": {
     "photosLabel": "Photos of the problem (up to 5)",
@@ -503,7 +565,8 @@
     "postedMessage": "Nearby workers will be able to see it soon.",
     "updatedTitle": "Problem Updated",
     "postFailedTitle": "Couldn't Post Problem",
-    "updateFailedTitle": "Couldn't Update Problem"
+    "updateFailedTitle": "Couldn't Update Problem",
+    "locationHint": "Workers come to this spot"
   },
   "yourProblems": {
     "title": "Your Problems",
@@ -901,5 +964,117 @@
     "seeAll": "See all {{count}}",
     "searching": "Finding a worker…",
     "pending": "Pending"
+  },
+  "profilePhoto": {
+    "add": "Add photo",
+    "change": "Change",
+    "remove": "Remove",
+    "workerTitle": "Your photo",
+    "workerHint": "A clear photo of your face helps customers trust you.",
+    "businessTitle": "Your photo (shopkeeper)",
+    "businessHint": "A clear photo of you, the shop owner. Add pictures of the shop below.",
+    "uploadFailed": "Profile saved, but the photo didn't upload. Add it again from Edit.",
+    "customerTitle": "Your photo",
+    "customerHint": "Optional — helps workers and shops know who they're meeting."
+  },
+  "editProfile": {
+    "title": "Edit Profile",
+    "subtitle": "Your photo, name, email and location",
+    "menuSubtitle": "Photo, name, email and location",
+    "nameRequired": "Enter your full name.",
+    "photoFailed": "Your details are saved, but the photo didn't upload. Try again.",
+    "savedTitle": "Profile updated",
+    "mobileLocked": "Your mobile number is your login, so it can't be changed.",
+    "emailLabel": "Email (optional)",
+    "locationLabel": "Your location"
+  },
+  "infoTips": {
+    "button": "Info",
+    "gotIt": "Got it",
+    "workerTitle": "About worker registration",
+    "shopTitle": "About shop registration",
+    "jobTitle": "About your job post",
+    "registerTitle": "About your account",
+    "location": "Your location is picked with GPS or on the map. Only your village or town name is shown to others.",
+    "verification": "Our team checks new profiles. Once approved, customers near you can find you.",
+    "email": "Your email is only used for account messages. It's never shown to anyone.",
+    "editProfileTitle": "About your profile"
+  },
+  "welcome": {
+    "badge": "Trusted locals near you",
+    "featuresTitle": "What you can do",
+    "features": {
+      "workers": {
+        "title": "Book trusted workers",
+        "subtitle": "Electricians, plumbers, painters and more — rated by customers near you"
+      },
+      "shops": {
+        "title": "Order from local shops",
+        "subtitle": "Send your list, the shop packs it — pick it up or get it delivered"
+      },
+      "tracking": {
+        "title": "Track every job live",
+        "subtitle": "See your worker on the map and confirm their arrival with a PIN"
+      }
+    },
+    "trust": [
+      "Verified profiles",
+      "Real ratings",
+      "English & తెలుగు"
+    ],
+    "headline": "Help for every job, right in your area",
+    "shopsChip": "Local shops",
+    "subline": "Workers and shops near you",
+    "centerTitle": "Help near you",
+    "centerText": "Trusted workers and shops in your area"
+  },
+  "formErrors": {
+    "title": "Please complete the form",
+    "shopName": "Enter your shop's name.",
+    "shopCategory": "Choose at least one shop category.",
+    "location": "Set your location — use your current location or select it on the map.",
+    "delivery": "Tell us whether you offer delivery.",
+    "deliveryPrice": "Enter your delivery price per km.",
+    "skills": "Choose at least one skill.",
+    "experience": "Enter your years of experience (0–60).",
+    "otp": "Enter the 6-digit OTP.",
+    "email": "Enter your email address.",
+    "emailInvalid": "That email address doesn't look right."
+  },
+  "fieldNames": {
+    "fullName": "Full name",
+    "mobileNumber": "Mobile number",
+    "email": "Email",
+    "otp": "OTP",
+    "skillCategories": "Skills",
+    "otherSkillDescription": "Your skill",
+    "experienceYears": "Experience",
+    "latitude": "Location",
+    "longitude": "Location",
+    "locationName": "Location",
+    "locationAddress": "Location",
+    "shopName": "Shop name",
+    "shopCategories": "Shop categories",
+    "otherCategoryDescription": "Shop category",
+    "deliveryAvailable": "Delivery",
+    "deliveryPricePerKm": "Delivery price per km",
+    "payAmount": "Pay",
+    "payPeriod": "Pay period",
+    "title": "Work",
+    "category": "Work type",
+    "availability": "Availability",
+    "skills": "Skills",
+    "description": "About you",
+    "quotationAmount": "Quotation",
+    "other": "Some details"
+  },
+  "chooseList": {
+    "title": "Order from a Shop",
+    "subtitle": "Choose a list to send to a nearby shop",
+    "empty": "You don't have a list yet. Make one in Prepare List — speak or type your items.",
+    "create": "Make a List",
+    "untitled": "My list",
+    "itemCount_one": "{{count}} item",
+    "itemCount_other": "{{count}} items"
   }
 }

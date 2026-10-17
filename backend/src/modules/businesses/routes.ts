@@ -35,5 +35,8 @@ businessesRouter.patch(
   controller.updateProfile,
 );
 businessesRouter.delete('/me/profile', authenticate, controller.deleteProfile);
+// Profile photo — its own request, like job-post photos (keeps each body small for Vercel).
+businessesRouter.put('/me/profile/photo', authenticate, upload.single('photo'), logUploadedFiles, controller.setProfilePhoto);
+businessesRouter.delete('/me/profile/photo', authenticate, controller.removeProfilePhoto);
 businessesRouter.get('/nearby', authenticate, controller.searchNearby);
 businessesRouter.post('/:id/view', authenticate, controller.recordView);

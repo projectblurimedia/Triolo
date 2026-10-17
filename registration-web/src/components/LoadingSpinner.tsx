@@ -16,9 +16,7 @@ export function LoadingSpinner({ dark = false }: { dark?: boolean }) {
   return (
     <>
       <style>{KEYFRAMES}</style>
-      <span
-        style={dark ? { ...style, border: '2.5px solid rgba(0,0,0,0.15)', borderTopColor: 'var(--color-primary)' } : style}
-      />
+      <span style={dark ? { ...style, border: '2.5px solid rgba(0,0,0,0.15)', borderTopColor: 'var(--color-primary)' } : style} />
     </>
   );
 }

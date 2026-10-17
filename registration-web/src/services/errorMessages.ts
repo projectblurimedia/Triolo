@@ -22,7 +22,39 @@ const MESSAGES: Record<string, string> = {
   NOT_FOUND: "We couldn't find what you're looking for.",
 };
 
+// Field names for a form the server rejected, so the message says what to fix.
+const FIELD_NAMES: Record<string, string> = {
+  fullName: 'Full name',
+  mobileNumber: 'Mobile number',
+  email: 'Email',
+  otp: 'OTP',
+  skillCategories: 'Skills',
+  otherSkillDescription: 'Your skill',
+  experienceYears: 'Experience',
+  latitude: 'Location',
+  longitude: 'Location',
+  locationName: 'Location',
+  locationAddress: 'Location',
+  shopName: 'Shop name',
+  shopCategories: 'Shop categories',
+  otherCategoryDescription: 'Shop category',
+  deliveryAvailable: 'Delivery',
+  deliveryPricePerKm: 'Delivery price per km',
+  payAmount: 'Pay',
+  payPeriod: 'Pay period',
+  title: 'Work',
+  category: 'Work type',
+  availability: 'Availability',
+  skills: 'Skills',
+  description: 'About you',
+};
+
 export function getErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.code === 'VALIDATION_ERROR') {
+    const fieldErrors = (err.details as { fieldErrors?: Record<string, unknown> } | undefined)?.fieldErrors;
+    const names = [...new Set(Object.keys(fieldErrors ?? {}).map((field) => FIELD_NAMES[field] ?? 'Some details'))];
+    if (names.length > 0) return `Please check: ${names.join(', ')}.`;
+  }
   if (err instanceof ApiError && err.code && MESSAGES[err.code]) {
     return MESSAGES[err.code];
   }

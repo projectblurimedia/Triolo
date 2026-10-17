@@ -103,7 +103,7 @@ let cachedLocation: { latitude: number; longitude: number } | null = null;
  *
  * Real GPS-based, distance-accurate search (Pending Module 4's discovery piece) — device
  * location via expo-location (same permission/getCurrentPositionAsync pattern already
- * proven in AddressPicker), then GET /workers/nearby or /businesses/nearby (Haversine
+ * used by LocationField), then GET /workers/nearby or /businesses/nearby (Haversine
  * distance computed in SQL server-side, see backend repositories) filtered to verified
  * profiles within a user-typed range (a numeric input plus an M/KM unit picker, defaulting
  * to 5km — replaced an earlier fixed-chip-row version per explicit request for free-form

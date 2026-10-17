@@ -159,7 +159,7 @@ async function request<T>(path: string, method: Method, body: unknown, auth: boo
  * boundary itself when it sees this exact header value paired with a FormData body (the
  * same pattern CampuSphere's axios-based upload already relies on).
  */
-async function requestForm<T>(path: string, formData: FormData, method: 'post' | 'patch', _retried = false): Promise<T> {
+async function requestForm<T>(path: string, formData: FormData, method: 'post' | 'patch' | 'put', _retried = false): Promise<T> {
   if (!_retried) {
     await ensureFreshAccessToken();
   }
@@ -236,4 +236,5 @@ export const apiClient = {
   delete: <T>(path: string, auth = false) => request<T>(path, 'delete', undefined, auth),
   postForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'post'),
   patchForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'patch'),
+  putForm: <T>(path: string, formData: FormData) => requestForm<T>(path, formData, 'put'),
 };

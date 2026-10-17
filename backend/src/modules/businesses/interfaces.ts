@@ -22,14 +22,21 @@ export interface BusinessProfile {
   otherCategoryDescription: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** The place name shown to people (village / town / locality). */
+  locationName: string | null;
+  /** The rest of the address is stored for search/admin use but never displayed. */
   area: string | null;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  city: string | null;
+  district: string | null;
+  state: string | null;
+  pincode: string | null;
+  /** The worker's face / the shop's logo. */
+  profilePhotoUrl: string | null;
   shopPhotoUrls: string[];
   deliveryAvailable: boolean;
   deliveryPricePerKm: number | null;
+  /** Delivery never costs less than this (rupees). */
+  deliveryMinCharge: number | null;
   verificationStatus: ProfileVerificationStatus;
   /** Average customer rating of the shop (1 decimal), or null before the first rating. */
   ratingAverage: number | null;

@@ -59,7 +59,9 @@ export function FavoritesModal({ visible, onClose, type }: FavoritesModalProps) 
     const worker = isWorker ? (item as WorkerNearbyResult) : null;
     const shop = !isWorker ? (item as BusinessNearbyResult) : null;
     const name = worker ? worker.accountFullName : (shop as BusinessNearbyResult).shopName;
-    const photo = worker ? worker.portfolioPhotoUrls[0] : (shop as BusinessNearbyResult).shopPhotoUrls[0];
+    const photo = worker
+      ? (worker.profilePhotoUrl ?? worker.portfolioPhotoUrls[0])
+      : ((shop as BusinessNearbyResult).shopPhotoUrls[0] ?? (shop as BusinessNearbyResult).profilePhotoUrl);
     const tags = worker
       ? worker.skillCategories.filter((key) => key !== 'other').map((key) => t(`workerProfile.skills.${key}`))
       : (shop as BusinessNearbyResult).shopCategories

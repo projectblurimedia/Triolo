@@ -150,6 +150,37 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
 
 - **Push tokens per app (fix: Quick Book offers not reaching workers).** `push_tokens` held one row per account, so when an account was signed in to both apps, whichever app opened last replaced the other's token, and offers could go to user-app, which can't show data-only pushes. Migration `0026` keys the table by `(account_id, app)` (`user`/`partner`, or `legacy` for older app builds, used only as a fallback). Registering a token removes it from every other account. Logout calls `POST /notifications/push-token/remove`. `AUDIENCE_BY_TYPE` in `notifications/interfaces.ts` routes each notification type to the right app; `sendRawPush` defaults to the partner app. Shipped OTA to both apps; existing tokens are re-registered with their app the next time each app is opened while logged in.
 
+- **Partner app logo + OTP retype.** The partner icon is the owner's logo recoloured onto white (navy wordmark), master files in `partner-app/assets/brand/`; any icon change needs a new APK, never OTA. A wrong OTP now clears and reopens the keyboard everywhere (blur, then focus after 80 ms, because Android ignores focusing an already-focused input).
+
+- **Profile photo + location by GPS or map only + delivery minimum charge + new login** (explicit request). Migration `0027`.
+  - **Profile photo:** worker, shop and job-post registrations (partner app, registration-web, user-app's profile edit forms) start with a round photo above the name (`ProfilePhotoField`). It's uploaded in its own request after the profile saves (`PUT/DELETE /workers|businesses/me/profile/photo`; mobile hooks call `syncProfilePhoto`). Cards and avatars prefer `profilePhotoUrl` over the first portfolio/shop photo.
+  - **Location:** no typed address anywhere. `LocationField` offers Current location or Select on map (`MapPickerModal`: MapLibre + OpenFreeMap in a WebView, a fixed centre pin, place name previewed as the map moves). On the web, `maplibre-gl` is loaded only when the map opens. Replaces `AddressPicker`, `LocationPicker`, `SelectField` and `indiaLocations` (deleted).
+  - **Address storage:** `utils/place.ts` reverse-geocodes the point (phone geocoder; Nominatim on the web) into `PlaceValue`. Only `locationName` (village / town, Plus Codes stripped) is ever shown. `area`/`city`/`district`/`state`/`pincode` are stored but never displayed, including in admin-web. `formatAddress()` in every app now returns just the place name.
+  - **Backend:** `city`/`district`/`state`/`pincode` are now nullable. `latitude`/`longitude`/`locationName` are required.
+  - **Delivery:** a shop that delivers sets only `deliveryPricePerKm` now (user's choice: "price per 1 km should be the minimum charge"); the backend defaults `deliveryMinCharge` to that 1-km price. Earlier the shop set both. Charge = max(min, per km × distance), in `orders/service.deliveryCharge` and user-app's `SendListModal` estimate. This "minimum" reading was my choice (the usual meaning), not asked.
+  - **Login:** both apps' Login and OTP screens are rebuilt on `AuthScreenLayout` with `OtpCodeInput` (six boxes, auto-submit, 30-second resend). The navigator headers for those two screens are hidden.
+  - 203 backend tests; 10-check live run passed and its data was removed. OTA for both apps. Not tried on a device yet (map picker, GPS naming).
+
+- **Glass sign-in + customer Edit Profile + read-only capability cards** (explicit request). Migration `0028` (`accounts.profile_photo_url`).
+  - **Backend:** `PATCH /auth/me` (name, email, location; mobile fixed), `PUT/DELETE /auth/me/photo`. Account responses carry location and photo.
+  - **Sign-in (both apps):** a glass `AuthScreenLayout` was tried and then removed at the user's request ("make it like the register page"). Login and OTP now render their own `GradientHeader` (title + subtitle), a centred intro and sectioned cards. user-app Register has a language icon in the header (it opens `LanguagePickerModal`) instead of a language card at the bottom. The partner app's registration headers also have subtitles.
+  - **Registration help text:** it now lives behind an `InfoTipsButton` ("Info" pill, top right of the form body; a glass card of tips; both apps) instead of sitting between the fields. `ProfilePhotoField.hint` is optional; `JobPostForm` takes `showPhotoHint`. user-app Register is plain stacked fields like the partner forms. user-app Welcome was rebuilt (a compact hero with categories, a plain info list of what the app does, trust notes, actions pinned at the bottom).
+  - **user-app Register verifies the phone inline** like the partner forms: `PhoneVerification` (copied from partner-app, keep in sync) and `authStore.isCompletingRegistration` (RootNavigator stays on the auth stack until submit). Submit saves email/location via `PATCH /auth/me` and then the photo. OtpScreen's `registration` mode is no longer reached. user-app `TextField` is now the partner copy (adds `rightIcon`).
+  - **One number = one account (both apps).** user-app Register uses `PhoneVerification newAccountsOnly` (an existing number → "log in instead"). Partner registrations sign an existing account in and, if the worker/shop/job-post profile already exists, say so and open the app. Name/mobile/email inputs set `importantForAutofill="no"` (Android's autofill fill colour). All modals fade (no slide). Edit screens mirror their registration forms (Info button).
+  - **Incoming requests (partner-app):** `IncomingRequestScreen` is the shared full-screen takeover. `IncomingJobModal` (Quick Book offers) and the new `IncomingOrderModal` (a shop's new `placed` orders) are both root-mounted and open on their own when the polled list shows something not seen before, as well as from a push. Orders: "Open Order" opens `ShopOrderModal`.
+  - **Form errors:** client checks name the missing field (`formErrors.*`); server `VALIDATION_ERROR` messages list the fields from `error.details.fieldErrors` (`fieldNames.*`). Both apps and registration-web.
+  - **Home quick actions (user-app):** Quick Book, Order from a Shop (`ChooseListModal` → `SendListModal`), Hire Staff, Post a Problem.
+  - **registration-web** mirrors the partner registrations: Info pill, header subtitles, Register button, inline delivery price, plus a Job Post page at `/job`.
+  - Placeholders describe what to type (short enough for one line) instead of looking like filled-in values. Partner registrations use `RegisterHeader` (language icon) and a **Register** button; the verify-to-submit note is in the Info card. user-app Welcome: new header, actions in the middle.
+  - **TextField (both apps):** single-line inputs are a fixed 48px, `includeFontPadding: false`, so Poppins text is centred on Android.
+  - **user-app:**
+    - `WorkerProfileCard`/`BusinessProfileCard` are read-only with a "change it in the Partner app" note; `BusinessProfileCard` is blue.
+    - `WorkerProfileModal`/`BusinessProfileModal` were deleted; the category lists moved to `constants/categories.ts`.
+    - `EditProfileModal` opens from the Profile menu. `authStore.setAccount`.
+    - `RegisterScreen` is a set of sectioned cards with a centred photo; the photo is passed to OtpScreen and uploaded after verification.
+  - `ProfilePhotoField` is centred in both apps and on registration-web.
+  - Not tried on a device yet (real blur on the sign-in card especially).
+
 ## Pending Modules (build order, current plan)
 
 1. ~~Auth~~ — done (localization support included)

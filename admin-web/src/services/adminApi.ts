@@ -35,11 +35,14 @@ export interface WorkerProfile {
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
+  /** The place name shown to people (village / town). The rest of the address is stored, never shown. */
+  locationName: string | null;
   area: string | null;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  city: string | null;
+  district: string | null;
+  state: string | null;
+  pincode: string | null;
+  profilePhotoUrl: string | null;
   portfolioPhotoUrls: string[];
   verificationStatus: Verification;
   ratingAverage: number | null;
@@ -56,14 +59,18 @@ export interface BusinessProfile {
   otherCategoryDescription: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** The place name shown to people (village / town). The rest of the address is stored, never shown. */
+  locationName: string | null;
   area: string | null;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  city: string | null;
+  district: string | null;
+  state: string | null;
+  pincode: string | null;
+  profilePhotoUrl: string | null;
   shopPhotoUrls: string[];
   deliveryAvailable: boolean;
   deliveryPricePerKm: number | null;
+  deliveryMinCharge: number | null;
   verificationStatus: Verification;
   ratingAverage: number | null;
   ratingCount: number;

@@ -26,7 +26,16 @@ export function categoryIcon(category: string): string {
  * The partner's own job post as a card: with no post, an invitation to create one; with a post,
  * its title, category, pay and a Live / Hidden pill. Tapping opens the post screen.
  */
-export function JobPostCard({ post, onPress }: { post: JobPost | null | undefined; onPress: () => void }) {
+export function JobPostCard({
+  post,
+  name,
+  onPress,
+}: {
+  post: JobPost | null | undefined;
+  /** The poster's name, shown above the work (Profile tab). */
+  name?: string;
+  onPress: () => void;
+}) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const live = post?.isActive ?? false;
@@ -43,9 +52,21 @@ export function JobPostCard({ post, onPress }: { post: JobPost | null | undefine
       <View style={styles.text}>
         {post ? (
           <>
-            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-              {jobTitle(post, t)}
-            </Text>
+            {name ? (
+              <>
+                <Text style={[styles.caption, { color: colors.primary }]}>{t('jobPost.cardCaption')}</Text>
+                <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+                  {name}
+                </Text>
+                <Text style={[styles.meta, { color: colors.text }]} numberOfLines={1}>
+                  {jobTitle(post, t)}
+                </Text>
+              </>
+            ) : (
+              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+                {jobTitle(post, t)}
+              </Text>
+            )}
             <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
               {formatPay(post, t)} · {t(`jobPost.availability.${post.availability}`)}
             </Text>
@@ -75,6 +96,7 @@ const styles = StyleSheet.create({
   icon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   photo: { width: 48, height: 48, borderRadius: 24, marginRight: 14 },
   text: { flex: 1, marginRight: 10 },
+  caption: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, letterSpacing: 0.3 },
   title: { ...typography.subheading, fontFamily: fonts.semiBold },
   meta: { ...typography.caption, marginTop: 3 },
   pill: {

@@ -48,7 +48,7 @@ export function WorkerMiniCard({ worker, onPress }: { worker: WorkerNearbyResult
 
   return (
     <Pressable onPress={onPress} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Avatar photoUrl={worker.portfolioPhotoUrls[0]} name={worker.accountFullName} size={56} />
+      <Avatar photoUrl={worker.profilePhotoUrl ?? worker.portfolioPhotoUrls[0]} name={worker.accountFullName} size={56} />
       <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
         {worker.accountFullName}
       </Text>

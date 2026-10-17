@@ -11,6 +11,7 @@ import { navigationRef } from './navigationRef';
 
 export function RootNavigator() {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const isCompletingRegistration = useAuthStore((state) => state.isCompletingRegistration);
   const isAuthHydrated = useAuthStore((state) => state.isHydrated);
   const hasSelectedLanguage = useSettingsStore((state) => state.hasSelectedLanguage);
   const isSettingsHydrated = useSettingsStore((state) => state.isHydrated);
@@ -47,7 +48,8 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer ref={navigationRef} theme={navigationTheme}>
-      {accessToken ? <AppNavigator /> : <AuthNavigator />}
+      {/* Registration verifies the phone mid-form, so it stays on the auth stack until it finishes. */}
+      {accessToken && !isCompletingRegistration ? <AppNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
 }

@@ -1,5 +1,6 @@
 import { AppError } from '@/common/errors/AppError';
 import { env } from '@/config/env';
+import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { AuthRepository } from './repository';
 import { sendOtpSms } from './otpSender';
 import { generateOtp, hashOtp, verifyOtp } from './otp.util';
@@ -22,6 +23,7 @@ import {
 import { forgetAccountStanding, standingError } from './accountAccess';
 import {
   LogoutDto,
+  UpdateProfileDto,
   RefreshTokenDto,
   RequestLoginOtpDto,
   RequestRegistrationOtpDto,
@@ -31,6 +33,7 @@ import {
 } from './dto';
 
 const BLOCKED_STATUSES = new Set(['suspended', 'blocked']);
+const PROFILE_PHOTO_FOLDER = 'triolo/accounts/profile';
 
 export class AuthService {
   constructor(private readonly repository: AuthRepository) {}
@@ -175,6 +178,31 @@ export class AuthService {
       throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
     }
     return account;
+  }
+
+  async updateProfile(accountId: string, dto: UpdateProfileDto): Promise<Account> {
+    await this.getAccount(accountId);
+    return this.repository.updateProfile(accountId, dto);
+  }
+
+  /** Uploads the account photo (replacing any previous one). */
+  async setProfilePhoto(accountId: string, file: Express.Multer.File | undefined): Promise<Account> {
+    if (!file) throw AppError.badRequest('A photo is required.', 'PHOTO_REQUIRED');
+    const uploaded = await uploadToCloudinary(file.path, PROFILE_PHOTO_FOLDER);
+    const result = await this.repository.setProfilePhoto(accountId, uploaded.url);
+    if (!result) {
+      await deletePhotosFromCloudinary([uploaded.url]);
+      throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
+    }
+    if (result.previousUrl) await deletePhotosFromCloudinary([result.previousUrl]);
+    return result.account;
+  }
+
+  async removeProfilePhoto(accountId: string): Promise<Account> {
+    const result = await this.repository.setProfilePhoto(accountId, null);
+    if (!result) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
+    if (result.previousUrl) await deletePhotosFromCloudinary([result.previousUrl]);
+    return result.account;
   }
 
   async updateLanguage(accountId: string, dto: UpdateLanguageDto): Promise<Account> {

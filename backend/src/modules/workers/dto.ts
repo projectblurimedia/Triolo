@@ -4,13 +4,16 @@ export interface CreateWorkerProfileDto {
   skillCategories: WorkerSkillCategory[];
   otherSkillDescription?: string;
   experienceYears: number;
-  latitude?: number | null;
-  longitude?: number | null;
+  latitude: number;
+  longitude: number;
+  /** The place name shown to people (village / town / locality). */
+  locationName: string;
+  /** The rest of the reverse-geocoded address — stored, never shown. */
   area?: string;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
 }
 
 export interface UpdateWorkerProfileDto extends CreateWorkerProfileDto {

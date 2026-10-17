@@ -22,11 +22,16 @@ export interface WorkerProfile {
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
+  /** The place name shown to people (village / town / locality). */
+  locationName: string | null;
+  /** The rest of the address is stored for search/admin use but never displayed. */
   area: string | null;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  city: string | null;
+  district: string | null;
+  state: string | null;
+  pincode: string | null;
+  /** The worker's face / the shop's logo. */
+  profilePhotoUrl: string | null;
   portfolioPhotoUrls: string[];
   verificationStatus: ProfileVerificationStatus;
   /** Average of customer star ratings (1 decimal), or null before the first rating. */

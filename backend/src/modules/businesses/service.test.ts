@@ -47,6 +47,9 @@ function buildProfile(overrides: Partial<BusinessProfile> = {}): BusinessProfile
     district: 'Hyderabad',
     state: 'Telangana',
     pincode: '500016',
+    locationName: 'Ameerpet',
+    profilePhotoUrl: null,
+    deliveryMinCharge: null,
     shopPhotoUrls: [],
     deliveryAvailable: false,
     deliveryPricePerKm: null,
@@ -76,6 +79,9 @@ describe('BusinessesService.createProfile', () => {
           shopName: 'Shop',
           shopCategories: ['grocery'],
           deliveryAvailable: false,
+          latitude: 17.385,
+          longitude: 78.4867,
+          locationName: 'Ameerpet',
           city: 'Hyderabad',
           district: 'Hyderabad',
           state: 'Telangana',
@@ -102,6 +108,9 @@ describe('BusinessesService.createProfile', () => {
       {
         shopName: 'My Shop',
         shopCategories: ['restaurant'],
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -138,6 +147,9 @@ describe('BusinessesService.createProfile', () => {
         shopName: 'Shop',
         shopCategories: ['other'],
         deliveryAvailable: false,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -163,6 +175,9 @@ describe('BusinessesService.createProfile', () => {
         shopCategories: ['grocery'],
         deliveryAvailable: true,
         deliveryPricePerKm: 10,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -187,6 +202,9 @@ describe('BusinessesService.createProfile', () => {
         shopCategories: ['grocery'],
         deliveryAvailable: false,
         deliveryPricePerKm: 10,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -226,6 +244,9 @@ describe('BusinessesService.updateProfile', () => {
           shopName: 'Shop',
           shopCategories: ['grocery'],
           deliveryAvailable: false,
+          latitude: 17.385,
+          longitude: 78.4867,
+          locationName: 'Ameerpet',
           city: 'Hyderabad',
           district: 'Hyderabad',
           state: 'Telangana',
@@ -252,6 +273,9 @@ describe('BusinessesService.updateProfile', () => {
         shopName: 'New Name',
         shopCategories: ['restaurant'],
         deliveryAvailable: false,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -286,6 +310,9 @@ describe('BusinessesService.updateProfile', () => {
         shopName: 'Shop',
         shopCategories: ['grocery'],
         deliveryAvailable: false,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -313,6 +340,9 @@ describe('BusinessesService.updateProfile', () => {
         shopName: 'Shop',
         shopCategories: ['grocery'],
         deliveryAvailable: false,
+        latitude: 17.385,
+        longitude: 78.4867,
+        locationName: 'Ameerpet',
         city: 'Hyderabad',
         district: 'Hyderabad',
         state: 'Telangana',
@@ -468,5 +498,30 @@ describe('BusinessesService admin-facing methods', () => {
       verificationStatus: 'rejected',
     });
     expect(repo.updateVerificationStatus).toHaveBeenCalledWith('business-1', 'rejected');
+  });
+});
+
+describe('BusinessesService delivery charges', () => {
+  it('uses the 1-km price as the minimum when none is given', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(null);
+    repo.create.mockResolvedValue(buildProfile());
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
+
+    await service.createProfile(
+      'account-1',
+      {
+        shopName: 'Sri Lakshmi Stores',
+        shopCategories: ['grocery'],
+        deliveryAvailable: true,
+        deliveryPricePerKm: 12,
+        latitude: 16.7,
+        longitude: 81.1,
+        locationName: 'Kannapuram',
+      },
+      [],
+    );
+
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ deliveryPricePerKm: 12, deliveryMinCharge: 12 }));
   });
 });

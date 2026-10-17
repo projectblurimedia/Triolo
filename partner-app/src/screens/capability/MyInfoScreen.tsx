@@ -41,15 +41,35 @@ function WorkerInfo({ navigation }: { navigation: MyInfoNavigation }) {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <GradientHeader
         title={t('myInfo.title')}
+        subtitle={t('myInfo.workerSubtitle')}
         showBack
-        actions={profile ? [{ icon: 'pen', accessibilityLabel: t('common.edit'), onPress: () => navigation.navigate('WorkerRegistration', { profile }) }] : undefined}
+        actions={
+          profile
+            ? [
+                {
+                  icon: 'pen',
+                  accessibilityLabel: t('common.edit'),
+                  onPress: () => navigation.navigate('WorkerRegistration', { profile }),
+                },
+              ]
+            : undefined
+        }
       />
 
       {isLoading || !profile ? (
         <LoadingView />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
-          <HeroCard icon="screwdriver-wrench" name={account?.fullName ?? t('workerProfile.title')} tagline={t('mainTabs.Profile.workerTitle')} />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.body}
+        >
+          <HeroCard
+            icon="screwdriver-wrench"
+            photoUrl={profile.profilePhotoUrl}
+            name={account?.fullName ?? t('workerProfile.title')}
+            tagline={t('mainTabs.Profile.workerTitle')}
+          />
           <View style={styles.statusRow}>
             <VerificationBadge status={profile.verificationStatus} />
           </View>
@@ -66,7 +86,10 @@ function WorkerInfo({ navigation }: { navigation: MyInfoNavigation }) {
                 ))}
               {(profile.otherSkillDescription ? profile.otherSkillDescription.split(', ').filter(Boolean) : []).map(
                 (entry, index) => (
-                  <View key={`${entry}-${index}`} style={[styles.chip, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View
+                    key={`${entry}-${index}`}
+                    style={[styles.chip, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  >
                     <Text style={[styles.chipLabel, { color: colors.text }]}>{entry}</Text>
                   </View>
                 ),
@@ -74,7 +97,12 @@ function WorkerInfo({ navigation }: { navigation: MyInfoNavigation }) {
             </View>
 
             <Divider colors={colors} />
-            <InfoRow icon="briefcase" label={t('workerProfile.experienceLabel')} value={String(profile.experienceYears)} colors={colors} />
+            <InfoRow
+              icon="briefcase"
+              label={t('workerProfile.experienceLabel')}
+              value={String(profile.experienceYears)}
+              colors={colors}
+            />
             <Divider colors={colors} />
             <InfoRow icon="location-dot" label={t('location.addressLabel')} value={formatAddress(profile)} colors={colors} />
           </DetailCard>
@@ -100,15 +128,35 @@ function BusinessInfo({ navigation }: { navigation: MyInfoNavigation }) {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <GradientHeader
         title={t('myInfo.title')}
+        subtitle={t('myInfo.shopSubtitle')}
         showBack
-        actions={profile ? [{ icon: 'pen', accessibilityLabel: t('common.edit'), onPress: () => navigation.navigate('BusinessRegistration', { profile }) }] : undefined}
+        actions={
+          profile
+            ? [
+                {
+                  icon: 'pen',
+                  accessibilityLabel: t('common.edit'),
+                  onPress: () => navigation.navigate('BusinessRegistration', { profile }),
+                },
+              ]
+            : undefined
+        }
       />
 
       {isLoading || !profile ? (
         <LoadingView />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
-          <HeroCard icon="store" name={profile.shopName} tagline={t('mainTabs.Profile.businessTitle')} />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.body}
+        >
+          <HeroCard
+            icon="store"
+            photoUrl={profile.profilePhotoUrl}
+            name={profile.shopName}
+            tagline={t('mainTabs.Profile.businessTitle')}
+          />
           <View style={styles.statusRow}>
             <VerificationBadge status={profile.verificationStatus} />
           </View>
@@ -125,7 +173,10 @@ function BusinessInfo({ navigation }: { navigation: MyInfoNavigation }) {
                 ))}
               {(profile.otherCategoryDescription ? profile.otherCategoryDescription.split(', ').filter(Boolean) : []).map(
                 (entry, index) => (
-                  <View key={`${entry}-${index}`} style={[styles.chip, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View
+                    key={`${entry}-${index}`}
+                    style={[styles.chip, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  >
                     <Text style={[styles.chipLabel, { color: colors.text }]}>{entry}</Text>
                   </View>
                 ),
@@ -136,7 +187,14 @@ function BusinessInfo({ navigation }: { navigation: MyInfoNavigation }) {
             <InfoRow
               icon="truck"
               label={t('businessProfile.deliveryLabel')}
-              value={profile.deliveryAvailable ? t('businessProfile.deliveryYes') : t('businessProfile.deliveryNo')}
+              value={
+                profile.deliveryAvailable
+                  ? t('businessProfile.deliveryCharges', {
+                      min: profile.deliveryMinCharge ?? 0,
+                      perKm: profile.deliveryPricePerKm ?? 0,
+                    })
+                  : t('businessProfile.deliveryNo')
+              }
               colors={colors}
             />
             <Divider colors={colors} />
@@ -166,17 +224,25 @@ function LoadingView() {
 
 interface HeroCardProps {
   icon: React.ComponentProps<typeof FontAwesome6>['name'];
+  /** The profile photo, shown instead of the icon when there is one. */
+  photoUrl?: string | null;
   name: string;
   tagline: string;
 }
 
 /** Identity banner shared by both capability views — same gradient/avatar treatment as ProfileScreen's own hero, for visual consistency across "who is this" surfaces in the app. */
-function HeroCard({ icon, name, tagline }: HeroCardProps) {
+function HeroCard({ icon, photoUrl, name, tagline }: HeroCardProps) {
   return (
     <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroCard}>
-      <View style={styles.heroIcon}>
-        <FontAwesome6 name={icon} size={24} color="#FFFFFF" solid />
-      </View>
+      {photoUrl ? (
+        <View style={styles.heroPhotoRing}>
+          <SmartImage source={{ uri: photoUrl }} style={styles.heroPhoto} />
+        </View>
+      ) : (
+        <View style={styles.heroIcon}>
+          <FontAwesome6 name={icon} size={24} color="#FFFFFF" solid />
+        </View>
+      )}
       <Text style={styles.heroName} numberOfLines={1}>
         {name}
       </Text>
@@ -237,6 +303,8 @@ const styles = StyleSheet.create({
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   body: { padding: 20, paddingBottom: 40 },
   heroCard: { borderRadius: 22, padding: 22, alignItems: 'center', ...CARD_SHADOW, shadowOpacity: 0.18 },
+  heroPhotoRing: { padding: 3, borderRadius: 48, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: 12 },
+  heroPhoto: { width: 86, height: 86, borderRadius: 43 },
   heroIcon: {
     width: 56,
     height: 56,
@@ -252,7 +320,13 @@ const styles = StyleSheet.create({
   heroTagline: { ...typography.caption, color: 'rgba(255,255,255,0.85)', marginTop: 4 },
   statusRow: { alignItems: 'center', marginTop: 14, marginBottom: 4 },
   detailCard: { borderRadius: 18, padding: 16, marginTop: 18, ...CARD_SHADOW },
-  sectionLabel: { ...typography.caption, fontFamily: fonts.semiBold, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.4 },
+  sectionLabel: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderRadius: 18, paddingVertical: 7, paddingHorizontal: 13 },
   chipLabel: { ...typography.caption, fontFamily: fonts.medium },

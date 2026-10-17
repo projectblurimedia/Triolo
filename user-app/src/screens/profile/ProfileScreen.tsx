@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
+import { SmartImage } from '@/components/SmartImage';
 import { WorkerProfileCard } from '@/components/WorkerProfileCard';
 import { BusinessProfileCard } from '@/components/BusinessProfileCard';
-import { WorkerProfileModal } from '@/components/WorkerProfileModal';
-import { BusinessProfileModal } from '@/components/BusinessProfileModal';
 import { ProfileStatsRow } from '@/components/ProfileStatsRow';
 import { ProfileActivity, ProfileOrders } from '@/components/ProfileActivity';
-import { SHOP_GRADIENT } from '@/components/BusinessProfileModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
@@ -37,8 +35,8 @@ const SOFT_SHADOW = Platform.select({
 // capabilities added. Each capability gets its own stats row + profile card, since a
 // rating/completed-work count is per-capability, not per-account. Worker/Business
 // registration itself now happens outside this app (Triolo Partner app / registration
-// website, per product decision) — this screen only shows and lets you edit a capability
-// that already exists on the account.
+// website, per product decision) — this screen only shows a capability that already exists on
+// the account (editing it is done in the Partner app).
 export function ProfileScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
@@ -47,8 +45,6 @@ export function ProfileScreen() {
   const { data: workerProfile } = useMyWorkerProfile();
   const { data: businessProfile } = useMyBusinessProfile();
   const initial = account?.fullName?.trim().charAt(0).toUpperCase() ?? '?';
-  const [editWorkerVisible, setEditWorkerVisible] = useState(false);
-  const [editBusinessVisible, setEditBusinessVisible] = useState(false);
   const hasNoCapability = !workerProfile && !businessProfile;
   // CustomTabBar floats via `position: 'absolute'` (see its own doc comment), so it
   // contributes ~0 height to layout and never reserves scroll space on its own — every
@@ -68,9 +64,18 @@ export function ProfileScreen() {
 
             <View style={styles.heroTop}>
               <View style={styles.avatarRing}>
-                <LinearGradient colors={['#FFFFFF', '#DCE8FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initial}</Text>
-                </LinearGradient>
+                {account.profilePhotoUrl ? (
+                  <SmartImage source={{ uri: account.profilePhotoUrl }} style={styles.avatar} />
+                ) : (
+                  <LinearGradient
+                    colors={['#FFFFFF', '#DCE8FF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.avatar}
+                  >
+                    <Text style={styles.avatarText}>{initial}</Text>
+                  </LinearGradient>
+                )}
               </View>
               <View style={styles.heroIdentity}>
                 <Text style={styles.heroName} numberOfLines={1}>
@@ -143,7 +148,7 @@ export function ProfileScreen() {
                 },
               ]}
             />
-            <WorkerProfileCard profile={workerProfile} onEdit={() => setEditWorkerVisible(true)} />
+            <WorkerProfileCard profile={workerProfile} />
           </View>
         ) : null}
 
@@ -157,17 +162,17 @@ export function ProfileScreen() {
                   value:
                     businessProfile.ratingAverage != null ? businessProfile.ratingAverage.toFixed(1) : t('workerReviews.new'),
                   label: t('workerReviews.statRating'),
-                  tint: SHOP_GRADIENT[0],
+                  tint: colors.primary,
                 },
                 {
                   icon: 'bag-shopping',
                   value: String(businessProfile.ratingCount),
                   label: t('profile.ratedOrders'),
-                  tint: SHOP_GRADIENT[0],
+                  tint: colors.primary,
                 },
               ]}
             />
-            <BusinessProfileCard profile={businessProfile} onEdit={() => setEditBusinessVisible(true)} />
+            <BusinessProfileCard profile={businessProfile} />
           </View>
         ) : null}
 
@@ -181,13 +186,6 @@ export function ProfileScreen() {
           </View>
         ) : null}
       </ScrollView>
-
-      <WorkerProfileModal visible={editWorkerVisible} onClose={() => setEditWorkerVisible(false)} profile={workerProfile} />
-      <BusinessProfileModal
-        visible={editBusinessVisible}
-        onClose={() => setEditBusinessVisible(false)}
-        profile={businessProfile}
-      />
     </ScreenContainer>
   );
 }

@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { appendPlace, PlaceValue } from '@/utils/place';
 
 export interface WorkerProfile {
   id: string;
@@ -8,11 +9,14 @@ export interface WorkerProfile {
   experienceYears: number;
   latitude: number | null;
   longitude: number | null;
+  /** The place name shown to people (village / town). The rest is stored, never shown. */
+  locationName: string | null;
   area: string | null;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  city: string | null;
+  district: string | null;
+  state: string | null;
+  pincode: string | null;
+  profilePhotoUrl: string | null;
   portfolioPhotoUrls: string[];
   verificationStatus: string;
 }
@@ -27,13 +31,8 @@ export interface CreateWorkerProfileParams {
   skillCategories: string[];
   otherSkillDescription?: string;
   experienceYears: number;
-  latitude: number | null;
-  longitude: number | null;
-  area?: string;
-  city: string;
-  district: string;
-  state: string;
-  pincode: string;
+  /** GPS or map pin — the full address is sent too, only the place name is ever shown. */
+  place: PlaceValue;
   portfolioPhotos: File[];
 }
 
@@ -45,14 +44,14 @@ export const workersService = {
     formData.append('skillCategories', JSON.stringify(params.skillCategories));
     if (params.otherSkillDescription) formData.append('otherSkillDescription', params.otherSkillDescription);
     formData.append('experienceYears', String(params.experienceYears));
-    if (params.latitude != null) formData.append('latitude', String(params.latitude));
-    if (params.longitude != null) formData.append('longitude', String(params.longitude));
-    if (params.area) formData.append('area', params.area);
-    formData.append('city', params.city);
-    formData.append('district', params.district);
-    formData.append('state', params.state);
-    formData.append('pincode', params.pincode);
+    appendPlace(formData, params.place);
     params.portfolioPhotos.forEach((file) => formData.append('portfolioPhotos', file));
     return apiClient.postForm('/workers/me/profile', formData);
+  },
+  /** The profile photo goes in its own request after the profile is created. */
+  uploadProfilePhoto: (file: File) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    return apiClient.putForm<WorkerProfile>('/workers/me/profile/photo', formData);
   },
 };

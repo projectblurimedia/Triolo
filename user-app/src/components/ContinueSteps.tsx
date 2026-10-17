@@ -11,9 +11,6 @@ import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { openOrderTracker } from '@/state/orderTrackerStore';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
-const PROBLEM_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
-const ORDER_GRADIENT = ['#0EA5E9', '#38BDF8'] as const;
-const RATE_GRADIENT = ['#F59E0B', '#FBBF24'] as const;
 const MAX_ROWS = 4;
 
 interface Step {
@@ -77,7 +74,7 @@ export function ContinueSteps() {
         return {
           key: `booking-${booking.id}`,
           icon: booking.problemPostId ? 'clipboard-list' : 'bolt',
-          gradient: booking.problemPostId ? PROBLEM_GRADIENT : headerGradient,
+          gradient: headerGradient,
           name: workerName ?? t('continueSteps.searching'),
           stepTitle: `${t(`tracking.status.${booking.status}.title`)} · ${skills(booking.skillCategories)}`,
           hint: t(`tracking.status.${booking.status}.message`, { name: workerName ?? t('tracking.yourWorker') }),
@@ -91,7 +88,7 @@ export function ContinueSteps() {
       return {
         key: `order-${order.id}`,
         icon: toRate ? 'star' : 'basket-shopping',
-        gradient: toRate ? RATE_GRADIENT : ORDER_GRADIENT,
+        gradient: headerGradient,
         name: order.shop.name,
         stepTitle: `${t(orderStatusTitleKey(order))} · ${t('orders.itemsCount', { count: order.items.length })}`,
         hint: toRate ? '' : t(`orders.status.${order.status}.message`, { shop: order.shop.name, name: order.shop.name }),

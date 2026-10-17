@@ -12,10 +12,9 @@ import { ShopMiniCard } from '@/components/ShopMiniCard';
 import { QuickBookModal } from '@/components/QuickBookModal';
 import { ProblemFormModal } from '@/components/ProblemFormModal';
 import { YourProblemsModal } from '@/components/YourProblemsModal';
-import { NearbySearchModal } from '@/components/NearbySearchModal';
 import { HomeSearchModal } from '@/components/HomeSearchModal';
 import { NearbyResultDetailModal } from '@/components/NearbyResultDetailModal';
-import { SKILL_CATEGORIES } from '@/components/WorkerProfileModal';
+import { SKILL_CATEGORIES } from '@/constants/categories';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
 import { SERVICES_RADIUS_KM, useNearbyWorkers } from '@/hooks/useNearbyWorkers';
 import { useNearbyBusinesses } from '@/hooks/useNearbyBusinesses';
@@ -31,21 +30,22 @@ import { useAuthStore } from '@/state/authStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { HireStaffModal } from '@/components/HireStaffModal';
+import { ChooseListModal } from '@/components/ChooseListModal';
+import { SendListModal } from '@/components/SendListModal';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
 // Each quick action keeps its own colour, matching the Services menu drawer's palette.
 const QUICK_ACTIONS: {
-  key: 'quickBook' | 'postProblem' | 'nearbyShops' | 'prepareList' | 'hireStaff';
+  key: 'quickBook' | 'orderShop' | 'hireStaff' | 'postProblem';
   icon: IconName;
   gradient: readonly [string, string, ...string[]];
 }[] = [
   { key: 'quickBook', icon: 'bolt', gradient: headerGradient },
-  { key: 'postProblem', icon: 'clipboard-list', gradient: ['#7C3AED', '#A78BFA'] },
-  { key: 'nearbyShops', icon: 'store', gradient: ['#16A34A', '#4ADE80'] },
-  { key: 'prepareList', icon: 'list-check', gradient: ['#DB2777', '#F472B6'] },
-  // Full width, under the 2×2 grid.
+  // Send one of your saved lists to a nearby shop (Prepare List's colour, now the shop action).
+  { key: 'orderShop', icon: 'basket-shopping', gradient: ['#DB2777', '#F472B6'] },
   { key: 'hireStaff', icon: 'user-tie', gradient: ['#4338CA', '#7C3AED', '#C026D3'] },
+  { key: 'postProblem', icon: 'clipboard-list', gradient: ['#0D9488', '#2DD4BF'] },
 ];
 
 const CAROUSEL_LIMIT = 10;
@@ -55,8 +55,8 @@ const ACTIVE_STATUSES = ['open', 'accepted', 'work_done'];
  * Home dashboard — everything near the user at a glance, all from live data:
  *  - a search bar over BOTH workers and marketplace shops (HomeSearchModal) and a "what's
  *    near you" summary card
- *  - quick actions as a 2×2 grid of gradient cards: Quick Book, Post a Problem, Nearby
- *    Shops, Prepare List
+ *  - quick actions as a 2×2 grid of gradient cards: Quick Book, Order from a Shop (pick a saved
+ *    list, then a nearby shop), Hire Staff, Post a Problem
  *  - an active Your Problems card (only when something is in progress)
  *  - Browse Services tiles (deep-link into the Services tab with that category)
  *  - Top Workers Near You and Marketplace Near You carousels, each with "See all"
@@ -72,9 +72,10 @@ export function HomeScreen() {
 
   const [quickBookVisible, setQuickBookVisible] = useState(false);
   const [hireStaffVisible, setHireStaffVisible] = useState(false);
+  const [chooseListVisible, setChooseListVisible] = useState(false);
+  const [sendListId, setSendListId] = useState<string | null>(null);
   const [problemFormVisible, setProblemFormVisible] = useState(false);
   const [problemsVisible, setProblemsVisible] = useState(false);
-  const [searchMode, setSearchMode] = useState<NearbySearchMode | null>(null);
   const [homeSearchVisible, setHomeSearchVisible] = useState(false);
   const [selected, setSelected] = useState<{ mode: NearbySearchMode; result: WorkerNearbyResult | BusinessNearbyResult } | null>(
     null,
@@ -128,9 +129,8 @@ export function HomeScreen() {
   const handleQuickAction = (key: (typeof QUICK_ACTIONS)[number]['key']) => {
     if (key === 'quickBook') setQuickBookVisible(true);
     else if (key === 'postProblem') setProblemFormVisible(true);
-    else if (key === 'nearbyShops') setSearchMode('business');
     else if (key === 'hireStaff') setHireStaffVisible(true);
-    else navigation.navigate('PrepareList');
+    else setChooseListVisible(true);
   };
 
   const renderSectionHeader = (title: string, onSeeAll?: () => void) => (
@@ -216,7 +216,6 @@ export function HomeScreen() {
                 key={action.key}
                 style={({ pressed }) => [
                   styles.actionTile,
-                  action.key === 'hireStaff' ? styles.actionTileWide : null,
                   { opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
                 ]}
                 onPress={() => handleQuickAction(action.key)}
@@ -326,11 +325,28 @@ export function HomeScreen() {
       </PullToRefresh>
 
       <QuickBookModal visible={quickBookVisible} onClose={() => setQuickBookVisible(false)} />
+      <ChooseListModal
+        visible={chooseListVisible}
+        onClose={() => setChooseListVisible(false)}
+        onPick={(listId) => {
+          setChooseListVisible(false);
+          setSendListId(listId);
+        }}
+        onCreate={() => {
+          setChooseListVisible(false);
+          navigation.navigate('PrepareList');
+        }}
+      />
+      <SendListModal
+        visible={sendListId !== null}
+        listId={sendListId}
+        onClose={() => setSendListId(null)}
+        onLeave={() => setSendListId(null)}
+      />
       <HireStaffModal visible={hireStaffVisible} onClose={() => setHireStaffVisible(false)} />
       <ProblemFormModal visible={problemFormVisible} onClose={() => setProblemFormVisible(false)} />
       <YourProblemsModal visible={problemsVisible} onClose={() => setProblemsVisible(false)} />
       <HomeSearchModal visible={homeSearchVisible} onClose={() => setHomeSearchVisible(false)} />
-      <NearbySearchModal visible={searchMode !== null} onClose={() => setSearchMode(null)} mode={searchMode ?? 'worker'} />
       <NearbyResultDetailModal
         visible={selected !== null}
         onClose={() => setSelected(null)}
@@ -384,7 +400,6 @@ const styles = StyleSheet.create({
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   // Two per row: (100% - one 12px gap) / 2.
   actionTile: { width: '48.2%', borderRadius: 20, overflow: 'hidden' },
-  actionTileWide: { width: '100%' },
   actionGradient: { height: 112, padding: 14, justifyContent: 'flex-end' },
   actionWatermark: { position: 'absolute', right: -10, bottom: -12 },
   actionIcon: {

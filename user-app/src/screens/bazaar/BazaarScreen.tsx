@@ -13,7 +13,7 @@ import { ShopMiniCard } from '@/components/ShopMiniCard';
 import { NearbyResultDetailModal } from '@/components/NearbyResultDetailModal';
 import { SendListModal } from '@/components/SendListModal';
 import { BusinessProfileCard } from '@/components/BusinessProfileCard';
-import { BusinessProfileModal, SHOP_CATEGORIES } from '@/components/BusinessProfileModal';
+import { SHOP_CATEGORIES } from '@/constants/categories';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
 import { SERVICES_RADIUS_KM } from '@/hooks/useNearbyWorkers';
@@ -41,7 +41,6 @@ export function BazaarScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const { data: businessProfile } = useMyBusinessProfile();
-  const [editVisible, setEditVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
   const [deliveryOnly, setDeliveryOnly] = useState(false);
@@ -112,7 +111,7 @@ export function BazaarScreen() {
       onPress={() => openShop(shop)}
       style={[styles.wideCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
-      <Avatar photoUrl={shop.shopPhotoUrls[0]} name={shop.shopName} size={56} />
+      <Avatar photoUrl={shop.shopPhotoUrls[0] ?? shop.profilePhotoUrl} name={shop.shopName} size={56} />
       <View style={styles.wideInfo}>
         <Text style={[styles.wideName, { color: colors.text }]} numberOfLines={1}>
           {shop.shopName}
@@ -281,7 +280,7 @@ export function BazaarScreen() {
             </Text>
           </Pressable>
 
-          {businessProfile ? <BusinessProfileCard profile={businessProfile} onEdit={() => setEditVisible(true)} /> : null}
+          {businessProfile ? <BusinessProfileCard profile={businessProfile} /> : null}
 
           <Pressable onPress={() => setSendVisible(true)}>
             <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
@@ -360,7 +359,6 @@ export function BazaarScreen() {
         result={selectedShop}
       />
       <SendListModal visible={sendVisible} onClose={() => setSendVisible(false)} />
-      <BusinessProfileModal visible={editVisible} onClose={() => setEditVisible(false)} profile={businessProfile} />
       <HomeSearchModal visible={searchVisible} onClose={() => setSearchVisible(false)} initialScope="shops" />
     </ScreenContainer>
   );

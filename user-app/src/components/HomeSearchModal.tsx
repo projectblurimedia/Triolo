@@ -13,7 +13,7 @@ import { NearbyResultDetailModal } from './NearbyResultDetailModal';
 import { ToastHost } from './ToastHost';
 import { GlassPanel } from './GlassPanel';
 import { ANDROID_REAL_BLUR } from '@/state/blurTargetStore';
-import { SKILL_CATEGORIES } from './WorkerProfileModal';
+import { SKILL_CATEGORIES } from '@/constants/categories';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
 import { SERVICES_RADIUS_KM } from '@/hooks/useNearbyWorkers';
 import { WorkerNearbyResult, workersService } from '@/services/workersService';
@@ -158,7 +158,9 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
     }
     const isWorker = item.kind === 'worker';
     const name = isWorker ? item.worker.accountFullName : item.shop.shopName;
-    const photo = isWorker ? item.worker.portfolioPhotoUrls[0] : item.shop.shopPhotoUrls[0];
+    const photo = isWorker
+      ? (item.worker.profilePhotoUrl ?? item.worker.portfolioPhotoUrls[0])
+      : (item.shop.shopPhotoUrls[0] ?? item.shop.profilePhotoUrl);
     const tags = isWorker
       ? item.worker.skillCategories.filter((k) => k !== 'other').map((k) => t(`workerProfile.skills.${k}`))
       : item.shop.shopCategories.filter((k) => k !== 'other').map((k) => t(`businessProfile.categories.${k}`));

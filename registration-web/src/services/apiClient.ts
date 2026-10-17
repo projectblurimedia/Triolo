@@ -27,11 +27,14 @@ export interface ApiErrorBody {
 export class ApiError extends Error {
   readonly statusCode: number;
   readonly code?: string;
+  /** The API's `error.details` (e.g. the fields a rejected form got wrong). */
+  readonly details?: unknown;
 
-  constructor(statusCode: number, message: string, code?: string) {
+  constructor(statusCode: number, message: string, code?: string, details?: unknown) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -61,7 +64,12 @@ async function request<T>(path: string, init: RequestInit, auth: boolean, retrie
   const body = (await response.json().catch(() => null)) as ApiEnvelope<T> | ApiErrorBody | null;
   if (!response.ok || !body?.success) {
     const errorBody = body as ApiErrorBody | null;
-    throw new ApiError(response.status, errorBody?.message ?? 'Request failed', errorBody?.error?.code);
+    throw new ApiError(
+      response.status,
+      errorBody?.message ?? 'Request failed',
+      errorBody?.error?.code,
+      errorBody?.error?.details,
+    );
   }
   return (body as ApiEnvelope<T>).data;
 }
@@ -109,6 +117,8 @@ export const apiClient = {
   get: <T>(path: string, auth = false) => request<T>(path, { method: 'GET' }, auth),
   post: <T>(path: string, body?: unknown, auth = false) => request<T>(path, jsonInit('POST', body), auth),
   patch: <T>(path: string, body?: unknown, auth = false) => request<T>(path, jsonInit('PATCH', body), auth),
+  put: <T>(path: string, body?: unknown, auth = false) => request<T>(path, jsonInit('PUT', body), auth),
   delete: <T>(path: string, auth = false) => request<T>(path, { method: 'DELETE' }, auth),
   postForm: <T>(path: string, formData: FormData) => request<T>(path, { method: 'POST', body: formData }, true),
+  putForm: <T>(path: string, formData: FormData) => request<T>(path, { method: 'PUT', body: formData }, true),
 };

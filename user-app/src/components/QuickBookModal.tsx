@@ -4,12 +4,13 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { clean } from '@/utils/place';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RadarPulse } from './RadarPulse';
 import { ToastHost } from './ToastHost';
 import { Button } from './Button';
-import { SKILL_CATEGORIES } from './WorkerProfileModal';
+import { SKILL_CATEGORIES } from '@/constants/categories';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { bookingsService, CustomerBooking } from '@/services/bookingsService';
 import { bookingQueryKey } from '@/hooks/useBookings';
@@ -39,9 +40,10 @@ async function addressFor(latitude: number, longitude: number): Promise<string |
     ]);
     const place = places?.[0];
     if (!place) return undefined;
-    const parts = [place.name, place.street, place.district ?? place.subregion, place.city, place.postalCode].filter(
-      (part, index, all): part is string => !!part && all.indexOf(part) === index,
-    );
+    // No Plus Codes or pincode — just the words a worker can read (street, area, village).
+    const parts = [place.name, place.street, place.district ?? place.subregion, place.city]
+      .map(clean)
+      .filter((part, index, all): part is string => !!part && all.indexOf(part) === index);
     return parts.join(', ').slice(0, 300) || undefined;
   } catch {
     return undefined;

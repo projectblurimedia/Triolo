@@ -3,10 +3,16 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { saveAccountName } from '@/utils/saveAccountName';
+import { useAuthStore } from '@/state/authStore';
+import { InfoTipsButton } from '@/components/InfoTipsButton';
+import { KeyboardAwareView } from '@/components/KeyboardAwareView';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { TextField } from '@/components/TextField';
-import { AddressPicker, AddressValue, EMPTY_ADDRESS } from '@/components/AddressPicker';
+import { LocationField } from '@/components/LocationField';
+import { ProfilePhotoField } from '@/components/ProfilePhotoField';
+import { PlaceValue, placeFromProfile } from '@/utils/place';
 import { ImagePickerField, PickedImage } from '@/components/ImagePickerField';
 import { Button } from '@/components/Button';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -33,7 +39,7 @@ const SHOP_CATEGORIES = [
 
 /**
  * Adapted from user-app's BusinessProfileModal — same fields, same multi-select chip +
- * "+ Add New" pattern, same delivery Yes/No chip pair, same shared AddressPicker/
+ * "+ Add New" pattern, same delivery Yes/No chip pair, same shared LocationField/
  * ImagePickerField, submitting to the same `POST /businesses/me/profile`.
  *
  * Also doubles as the edit form (mirrors WorkerRegistrationScreen's own edit-mode addition —
@@ -45,6 +51,7 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
   const { colors } = useThemeColors();
   const profile = route.params?.profile;
   const isEditMode = !!profile;
+  const account = useAuthStore((state) => state.account);
   const createProfile = useCreateBusinessProfile();
   const updateProfile = useUpdateBusinessProfile();
   const deleteProfile = useDeleteBusinessProfile();
@@ -54,10 +61,14 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
   const [otherCategoryEntries, setOtherCategoryEntries] = useState<string[]>([]);
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherInputValue, setOtherInputValue] = useState('');
-  const [address, setAddress] = useState<AddressValue>(EMPTY_ADDRESS);
+  const [place, setPlace] = useState<PlaceValue | null>(null);
+  // A newly picked profile photo (uploaded after saving), or a removal of the saved one.
+  const [profilePhoto, setProfilePhoto] = useState<PickedImage | null>(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
   const [deliveryPricePerKm, setDeliveryPricePerKm] = useState('');
+  const [fullName, setFullName] = useState(account?.fullName ?? '');
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -68,15 +79,9 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
       setOtherCategoryEntries(
         profile.otherCategoryDescription ? profile.otherCategoryDescription.split(', ').filter(Boolean) : [],
       );
-      setAddress({
-        latitude: profile.latitude,
-        longitude: profile.longitude,
-        area: profile.area ?? '',
-        city: profile.city,
-        district: profile.district,
-        state: profile.state,
-        pincode: profile.pincode,
-      });
+      setPlace(placeFromProfile(profile));
+      setProfilePhoto(null);
+      setPhotoRemoved(false);
       setPhotos(
         profile.shopPhotoUrls.map((url) => ({ uri: url, name: url.split('/').pop() ?? 'photo.jpg', type: 'image/jpeg' })),
       );
@@ -127,20 +132,35 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
     showToast({ variant: 'error', title: t('common.errorTitle'), message });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError(null);
+    if (fullName.trim().length < 2) {
+      setError(t('auth.nameBeforeVerify'));
+      return;
+    }
     const includesOther = otherCategoryEntries.length > 0;
-    if (
-      !shopName.trim() ||
-      (shopCategories.length === 0 && !includesOther) ||
-      !address.city.trim() ||
-      !address.district.trim() ||
-      !address.state.trim() ||
-      !/^[0-9]{6}$/.test(address.pincode) ||
-      deliveryAvailable === null ||
-      (deliveryAvailable && !deliveryPricePerKm.trim())
-    ) {
-      setError(t('errors.VALIDATION_ERROR'));
+    const problem = !shopName.trim()
+      ? t('formErrors.shopName')
+      : shopCategories.length === 0 && !includesOther
+        ? t('formErrors.shopCategory')
+        : !place
+          ? t('formErrors.location')
+          : deliveryAvailable === null
+            ? t('formErrors.delivery')
+            : deliveryAvailable && !(Number(deliveryPricePerKm) > 0)
+              ? t('formErrors.deliveryPrice')
+              : null;
+    if (problem) {
+      setError(problem);
+      showToast({ variant: 'error', title: t('formErrors.title'), message: problem });
+      return;
+    }
+    // Already reported above; this only tells TypeScript.
+    if (!place || deliveryAvailable === null) return;
+    try {
+      await saveAccountName(fullName);
+    } catch (err) {
+      handleMutationError(err);
       return;
     }
 
@@ -148,13 +168,8 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
       shopName,
       shopCategories: includesOther ? [...shopCategories, 'other'] : shopCategories,
       otherCategoryDescription: includesOther ? otherCategoryEntries.join(', ') : undefined,
-      latitude: address.latitude,
-      longitude: address.longitude,
-      area: address.area.trim() || undefined,
-      city: address.city.trim(),
-      district: address.district.trim(),
-      state: address.state.trim(),
-      pincode: address.pincode,
+      place,
+      profilePhoto: profilePhoto ?? (photoRemoved ? null : undefined),
       deliveryAvailable,
       deliveryPricePerKm: deliveryAvailable ? Number(deliveryPricePerKm) : undefined,
     };
@@ -214,155 +229,191 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.body}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {t(isEditMode ? 'businessProfile.editSubtitle' : 'businessProfile.subtitle')}
-        </Text>
+      <KeyboardAwareView>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+        >
+          <InfoTipsButton
+            title={t('infoTips.shopTitle')}
+            tips={[
+              { icon: 'store', text: t(isEditMode ? 'businessProfile.editSubtitle' : 'businessProfile.subtitle') },
+              { icon: 'camera', text: t('profilePhoto.businessHint') },
+              { icon: 'location-dot', text: t('infoTips.location') },
+              { icon: 'truck', text: t('businessProfile.deliveryChargeHint') },
+              { icon: 'shield-halved', text: t('infoTips.verification') },
+            ]}
+          />
 
-        <TextField label={t('businessProfile.shopNameLabel')} value={shopName} onChangeText={setShopName} />
+          <ProfilePhotoField
+            uri={profilePhoto?.uri ?? (photoRemoved ? null : (profile?.profilePhotoUrl ?? null))}
+            name={fullName}
+            title={t('profilePhoto.businessTitle')}
+            onPick={(image) => {
+              setProfilePhoto(image);
+              setPhotoRemoved(false);
+            }}
+            onRemove={() => {
+              setProfilePhoto(null);
+              setPhotoRemoved(true);
+            }}
+          />
 
-        <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.categoryLabel')}</Text>
-        <View style={styles.chipRow}>
-          {orderedCategories.map((category) => {
-            const isActive = shopCategories.includes(category.key);
-            return (
-              <Pressable key={category.key} onPress={() => toggleCategory(category.key)}>
-                {isActive ? (
-                  <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                    <FontAwesome6 name={category.icon} size={12} color="#FFFFFF" solid />
-                    <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>
-                      {t(`businessProfile.categories.${category.key}`)}
-                    </Text>
-                  </LinearGradient>
-                ) : (
-                  <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
-                    <FontAwesome6 name={category.icon} size={12} color={colors.textMuted} solid />
-                    <Text style={[styles.chipLabel, { color: colors.text }]}>
-                      {t(`businessProfile.categories.${category.key}`)}
-                    </Text>
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-          {otherCategoryEntries.map((entry, index) => (
-            <Pressable key={`other-${entry}-${index}`} onPress={() => removeOtherEntry(index)}>
-              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                <Text style={[styles.chipLabel, { color: '#FFFFFF' }]} numberOfLines={1}>
-                  {entry}
-                </Text>
-                <FontAwesome6 name="xmark" size={10} color="#FFFFFF" solid />
-              </LinearGradient>
-            </Pressable>
-          ))}
-          <Pressable onPress={() => setShowOtherInput(true)}>
-            <View
-              style={[
-                styles.chip,
-                styles.addNewChip,
-                { borderColor: headerGradient[0], backgroundColor: `${headerGradient[0]}16` },
-              ]}
-            >
-              <View style={[styles.addNewBadge, { backgroundColor: headerGradient[0] }]}>
-                <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
-              </View>
-              <Text style={[styles.chipLabel, { color: headerGradient[0], fontFamily: fonts.semiBold }]}>
-                {t('common.addNew')}
-              </Text>
-            </View>
-          </Pressable>
-        </View>
+          <TextField
+            label={t('auth.fullNameLabel')}
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder={t('auth.fullNamePlaceholder')}
+            maxLength={100}
+            importantForAutofill="no"
+          />
 
-        {showOtherInput ? (
-          <>
-            <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.otherCategoryLabel')}</Text>
-            <View style={styles.otherInputRow}>
-              <View style={styles.otherInputField}>
-                <TextField
-                  containerStyle={styles.noMargin}
-                  value={otherInputValue}
-                  onChangeText={setOtherInputValue}
-                  maxLength={40}
-                  returnKeyType="done"
-                  onSubmitEditing={commitOtherEntry}
-                  autoFocus
-                />
-              </View>
-              <Pressable
-                style={{ opacity: otherInputValue.trim() ? 1 : 0.5 }}
-                onPress={commitOtherEntry}
-                disabled={!otherInputValue.trim()}
-                accessibilityLabel={t('common.done')}
-              >
-                <LinearGradient
-                  colors={headerGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.otherDoneGradient}
-                >
-                  <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
+          <TextField label={t('businessProfile.shopNameLabel')} value={shopName} onChangeText={setShopName} />
+
+          <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.categoryLabel')}</Text>
+          <View style={styles.chipRow}>
+            {orderedCategories.map((category) => {
+              const isActive = shopCategories.includes(category.key);
+              return (
+                <Pressable key={category.key} onPress={() => toggleCategory(category.key)}>
+                  {isActive ? (
+                    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                      <FontAwesome6 name={category.icon} size={12} color="#FFFFFF" solid />
+                      <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>
+                        {t(`businessProfile.categories.${category.key}`)}
+                      </Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
+                      <FontAwesome6 name={category.icon} size={12} color={colors.textMuted} solid />
+                      <Text style={[styles.chipLabel, { color: colors.text }]}>
+                        {t(`businessProfile.categories.${category.key}`)}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+            {otherCategoryEntries.map((entry, index) => (
+              <Pressable key={`other-${entry}-${index}`} onPress={() => removeOtherEntry(index)}>
+                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]} numberOfLines={1}>
+                    {entry}
+                  </Text>
+                  <FontAwesome6 name="xmark" size={10} color="#FFFFFF" solid />
                 </LinearGradient>
               </Pressable>
-            </View>
-          </>
-        ) : null}
-
-        <AddressPicker value={address} onChange={setAddress} />
-
-        <ImagePickerField label={t('businessProfile.photosLabel')} images={photos} onChange={setPhotos} />
-
-        <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.deliveryLabel')}</Text>
-        <View style={styles.chipRow}>
-          <Pressable onPress={() => setDeliveryAvailable(true)}>
-            {deliveryAvailable === true ? (
-              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t('businessProfile.deliveryYes')}</Text>
-              </LinearGradient>
-            ) : (
-              <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
-                <Text style={[styles.chipLabel, { color: colors.text }]}>{t('businessProfile.deliveryYes')}</Text>
+            ))}
+            <Pressable onPress={() => setShowOtherInput(true)}>
+              <View
+                style={[
+                  styles.chip,
+                  styles.addNewChip,
+                  { borderColor: headerGradient[0], backgroundColor: `${headerGradient[0]}16` },
+                ]}
+              >
+                <View style={[styles.addNewBadge, { backgroundColor: headerGradient[0] }]}>
+                  <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
+                </View>
+                <Text style={[styles.chipLabel, { color: headerGradient[0], fontFamily: fonts.semiBold }]}>
+                  {t('common.addNew')}
+                </Text>
               </View>
-            )}
-          </Pressable>
-          <Pressable onPress={() => setDeliveryAvailable(false)}>
-            {deliveryAvailable === false ? (
-              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t('businessProfile.deliveryNo')}</Text>
-              </LinearGradient>
-            ) : (
-              <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
-                <Text style={[styles.chipLabel, { color: colors.text }]}>{t('businessProfile.deliveryNo')}</Text>
-              </View>
-            )}
-          </Pressable>
-        </View>
+            </Pressable>
+          </View>
 
-        {deliveryAvailable ? (
-          <TextField
-            label={t('businessProfile.deliveryPriceLabel')}
-            value={deliveryPricePerKm}
-            onChangeText={setDeliveryPricePerKm}
-            keyboardType="decimal-pad"
+          {showOtherInput ? (
+            <>
+              <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.otherCategoryLabel')}</Text>
+              <View style={styles.otherInputRow}>
+                <View style={styles.otherInputField}>
+                  <TextField
+                    containerStyle={styles.noMargin}
+                    value={otherInputValue}
+                    onChangeText={setOtherInputValue}
+                    maxLength={40}
+                    returnKeyType="done"
+                    onSubmitEditing={commitOtherEntry}
+                    autoFocus
+                  />
+                </View>
+                <Pressable
+                  style={{ opacity: otherInputValue.trim() ? 1 : 0.5 }}
+                  onPress={commitOtherEntry}
+                  disabled={!otherInputValue.trim()}
+                  accessibilityLabel={t('common.done')}
+                >
+                  <LinearGradient
+                    colors={headerGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.otherDoneGradient}
+                  >
+                    <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            </>
+          ) : null}
+
+          <LocationField label={t('location.shopPlaceLabel')} value={place} onChange={setPlace} />
+
+          <ImagePickerField label={t('businessProfile.photosLabel')} images={photos} onChange={setPhotos} />
+
+          <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.deliveryLabel')}</Text>
+          <View style={styles.deliveryRow}>
+            <Pressable onPress={() => setDeliveryAvailable(true)}>
+              {deliveryAvailable === true ? (
+                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t('businessProfile.deliveryYes')}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
+                  <Text style={[styles.chipLabel, { color: colors.text }]}>{t('businessProfile.deliveryYes')}</Text>
+                </View>
+              )}
+            </Pressable>
+            <Pressable onPress={() => setDeliveryAvailable(false)}>
+              {deliveryAvailable === false ? (
+                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
+                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t('businessProfile.deliveryNo')}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
+                  <Text style={[styles.chipLabel, { color: colors.text }]}>{t('businessProfile.deliveryNo')}</Text>
+                </View>
+              )}
+            </Pressable>
+            {/* The price sits right beside Yes / No, not on a line of its own. */}
+            {deliveryAvailable ? (
+              <View style={styles.deliveryInput}>
+                <TextField
+                  containerStyle={styles.deliveryInputField}
+                  value={deliveryPricePerKm}
+                  onChangeText={(text) => setDeliveryPricePerKm(text.replace(/[^0-9.]/g, ''))}
+                  keyboardType="decimal-pad"
+                  placeholder={t('businessProfile.deliveryPerKmPlaceholder')}
+                  accessibilityLabel={t('businessProfile.deliveryPriceLabel')}
+                />
+              </View>
+            ) : null}
+          </View>
+
+          {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
+
+          <Button
+            label={t(isEditMode ? 'common.saveChanges' : 'common.submit')}
+            onPress={handleSubmit}
+            loading={isEditMode ? updateProfile.isPending : createProfile.isPending}
           />
-        ) : null}
 
-        {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
-
-        <Button
-          label={t(isEditMode ? 'common.saveChanges' : 'common.submit')}
-          onPress={handleSubmit}
-          loading={isEditMode ? updateProfile.isPending : createProfile.isPending}
-        />
-
-        {isEditMode ? (
-          <CancelButton icon="trash" label={t('businessProfile.deleteAction')} onPress={() => setShowDeleteConfirm(true)} />
-        ) : null}
-      </ScrollView>
+          {isEditMode ? (
+            <CancelButton icon="trash" label={t('businessProfile.deleteAction')} onPress={() => setShowDeleteConfirm(true)} />
+          ) : null}
+        </ScrollView>
+      </KeyboardAwareView>
 
       <ConfirmModal
         visible={showDeleteConfirm}
@@ -381,9 +432,12 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   body: { paddingBottom: 40 },
-  subtitle: { ...typography.body, marginBottom: 18 },
   label: { ...typography.caption, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  deliveryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  // A fixed width at the right of the row, so it doesn't stretch across all the space beside Yes / No.
+  deliveryInput: { width: 140, marginLeft: 'auto' },
+  deliveryInputField: { marginBottom: 0 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 18, paddingVertical: 8, paddingHorizontal: 14 },
   chipInactive: { borderWidth: 1 },
   addNewChip: { borderWidth: 1.5 },

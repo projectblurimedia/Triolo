@@ -6,7 +6,14 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Updates from 'expo-updates';
-import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
+import {
+  useFonts,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+} from '@expo-google-fonts/poppins';
+import { GrandHotel_400Regular } from '@expo-google-fonts/grand-hotel';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { RootNavigator } from '@/navigation/RootNavigator';
@@ -45,6 +52,8 @@ export default function App() {
     Poppins_500Medium,
     Poppins_600SemiBold,
     Poppins_700Bold,
+    // The script face for the app name on the Welcome screen.
+    GrandHotel_400Regular,
   });
   const { colors, isDark } = useThemeColors();
   const isLoggingOut = useAuthStore((state) => state.isLoggingOut);

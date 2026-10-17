@@ -10,7 +10,7 @@ import { RatingStars } from '@/components/RatingStars';
 import { Avatar, WorkerMiniCard } from '@/components/WorkerMiniCard';
 import { NearbyResultDetailModal } from '@/components/NearbyResultDetailModal';
 import { WorkerProfileCard } from '@/components/WorkerProfileCard';
-import { SKILL_CATEGORIES, WorkerProfileModal } from '@/components/WorkerProfileModal';
+import { SKILL_CATEGORIES } from '@/constants/categories';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
 import { useNearbyWorkers } from '@/hooks/useNearbyWorkers';
@@ -38,7 +38,6 @@ export function ServicesScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const { data: workerProfile } = useMyWorkerProfile();
-  const [editVisible, setEditVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<NearbyWorkerSort>('distance');
@@ -117,7 +116,7 @@ export function ServicesScreen() {
       onPress={() => openWorker(worker)}
       style={[styles.wideCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
-      <Avatar photoUrl={worker.portfolioPhotoUrls[0]} name={worker.accountFullName} size={56} />
+      <Avatar photoUrl={worker.profilePhotoUrl ?? worker.portfolioPhotoUrls[0]} name={worker.accountFullName} size={56} />
       <View style={styles.wideInfo}>
         <Text style={[styles.wideName, { color: colors.text }]} numberOfLines={1}>
           {worker.accountFullName}
@@ -304,7 +303,7 @@ export function ServicesScreen() {
             </Text>
           </Pressable>
 
-          {workerProfile ? <WorkerProfileCard profile={workerProfile} onEdit={() => setEditVisible(true)} /> : null}
+          {workerProfile ? <WorkerProfileCard profile={workerProfile} /> : null}
 
           <View style={styles.titleRow}>
             <Text style={[styles.pageTitle, { color: colors.text }]}>{t('services.findWorkersTitle')}</Text>
@@ -329,7 +328,6 @@ export function ServicesScreen() {
         mode="worker"
         result={selectedWorker}
       />
-      <WorkerProfileModal visible={editVisible} onClose={() => setEditVisible(false)} profile={workerProfile} />
       <HomeSearchModal visible={searchVisible} onClose={() => setSearchVisible(false)} initialScope="workers" />
     </ScreenContainer>
   );

@@ -16,6 +16,11 @@ export interface AuthAccount {
   role: AccountRole;
   status: AccountStatus;
   preferredLanguage: AccountLanguage;
+  // Optional: sessions saved by older app versions don't have these until Edit Profile refreshes them.
+  latitude?: number | null;
+  longitude?: number | null;
+  locationAddress?: string | null;
+  profilePhotoUrl?: string | null;
 }
 
 interface AuthState {
@@ -25,8 +30,16 @@ interface AuthState {
   isHydrated: boolean;
   /** True for the duration of the logout request — drives a full-screen overlay (LogoutOverlay) rendered at the app root. Not persisted: a stuck-true value should never survive a restart. */
   isLoggingOut: boolean;
+  /**
+   * True while RegisterScreen is open: verifying the phone signs the person in mid-form, and this
+   * keeps RootNavigator on the auth stack until they finish (or leave) the form. Not persisted.
+   */
+  isCompletingRegistration: boolean;
+  setCompletingRegistration: (value: boolean) => void;
   setSession: (params: { accessToken: string; refreshToken: string; account: AuthAccount }) => void;
   setAccessToken: (accessToken: string) => void;
+  /** After Edit Profile (or a photo upload) — the signed-in account's latest details. */
+  setAccount: (account: AuthAccount) => void;
   clearSession: () => void;
   setLoggingOut: (value: boolean) => void;
   setHydrated: () => void;
@@ -47,8 +60,11 @@ export const useAuthStore = create<AuthState>()(
         useSettingsStore.getState().setLanguage(account.preferredLanguage);
       },
       setAccessToken: (accessToken) => set({ accessToken }),
+      setAccount: (account) => set({ account }),
       clearSession: () => set({ accessToken: null, refreshToken: null, account: null }),
       setLoggingOut: (isLoggingOut) => set({ isLoggingOut }),
+      isCompletingRegistration: false,
+      setCompletingRegistration: (isCompletingRegistration) => set({ isCompletingRegistration }),
       setHydrated: () => set({ isHydrated: true }),
     }),
     {

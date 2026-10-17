@@ -8,7 +8,7 @@ import { RegisterBusinessScreen } from '@/screens/auth/RegisterBusinessScreen';
 import { RegisterJobSeekerScreen } from '@/screens/auth/RegisterJobSeekerScreen';
 import { LoginScreen } from '@/screens/auth/LoginScreen';
 import { OtpScreen } from '@/screens/auth/OtpScreen';
-import { GradientHeader } from '@/components/GradientHeader';
+import { RegisterHeader } from '@/components/RegisterHeader';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -21,28 +21,29 @@ export function AuthNavigator() {
       <Stack.Screen
         name="RegisterWorker"
         component={RegisterWorkerScreen}
-        options={{ headerShown: true, header: () => <GradientHeader title={t('workerProfile.title')} showBack /> }}
+        options={{
+          headerShown: true,
+          header: () => <RegisterHeader title={t('workerProfile.title')} subtitle={t('auth.registerWorkerHeaderSubtitle')} />,
+        }}
       />
       <Stack.Screen
         name="RegisterBusiness"
         component={RegisterBusinessScreen}
-        options={{ headerShown: true, header: () => <GradientHeader title={t('businessProfile.title')} showBack /> }}
+        options={{
+          headerShown: true,
+          header: () => <RegisterHeader title={t('businessProfile.title')} subtitle={t('auth.registerShopHeaderSubtitle')} />,
+        }}
       />
       <Stack.Screen
         name="RegisterJobSeeker"
         component={RegisterJobSeekerScreen}
-        options={{ headerShown: true, header: () => <GradientHeader title={t('jobPost.title')} showBack /> }}
+        options={{
+          headerShown: true,
+          header: () => <RegisterHeader title={t('jobPost.title')} subtitle={t('auth.registerJobHeaderSubtitle')} />,
+        }}
       />
-      <Stack.Screen
-        name="Login"
-        component={LoginScreen}
-        options={{ headerShown: true, header: () => <GradientHeader title={t('auth.login')} showBack /> }}
-      />
-      <Stack.Screen
-        name="Otp"
-        component={OtpScreen}
-        options={{ headerShown: true, header: () => <GradientHeader title={t('auth.verifyOtp')} showBack /> }}
-      />
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Otp" component={OtpScreen} />
     </Stack.Navigator>
   );
 }

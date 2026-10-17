@@ -45,6 +45,27 @@ export class AuthController {
     return ok(res, toPublicAccount(account));
   });
 
+  updateProfile = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    return ok(res, toPublicAccount(await this.service.updateProfile(req.account.accountId, req.body)), 'Profile updated');
+  });
+
+  setProfilePhoto = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    return ok(res, toPublicAccount(await this.service.setProfilePhoto(req.account.accountId, req.file)), 'Photo saved');
+  });
+
+  removeProfilePhoto = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    return ok(res, toPublicAccount(await this.service.removeProfilePhoto(req.account.accountId)), 'Photo removed');
+  });
+
   updateLanguage = asyncHandler(async (req: Request, res: Response) => {
     if (!req.account) {
       throw AppError.unauthorized();
@@ -62,6 +83,10 @@ function toPublicAccount(account: {
   role: string;
   status: string;
   preferredLanguage: string;
+  latitude: number | null;
+  longitude: number | null;
+  locationAddress: string | null;
+  profilePhotoUrl: string | null;
 }) {
   return {
     id: account.id,
@@ -71,5 +96,9 @@ function toPublicAccount(account: {
     role: account.role,
     status: account.status,
     preferredLanguage: account.preferredLanguage,
+    latitude: account.latitude,
+    longitude: account.longitude,
+    locationAddress: account.locationAddress,
+    profilePhotoUrl: account.profilePhotoUrl,
   };
 }

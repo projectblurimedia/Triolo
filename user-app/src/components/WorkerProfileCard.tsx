@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -11,14 +11,13 @@ import { SmartImage } from './SmartImage';
 
 interface WorkerProfileCardProps {
   profile: WorkerProfile;
-  onEdit: () => void;
 }
 
 /** Summary card shown at the top of the Services tab body once the account has a Worker profile — replaces the header edit pill, which appeared too late (after the profile query resolved) to feel intentional. */
-export function WorkerProfileCard({ profile, onEdit }: WorkerProfileCardProps) {
+export function WorkerProfileCard({ profile }: WorkerProfileCardProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const thumbnail = profile.portfolioPhotoUrls[0];
+  const thumbnail = profile.profilePhotoUrl ?? profile.portfolioPhotoUrls[0];
   const fixedSkills = profile.skillCategories.filter((key) => key !== 'other');
 
   return (
@@ -37,14 +36,6 @@ export function WorkerProfileCard({ profile, onEdit }: WorkerProfileCardProps) {
           </Text>
           <VerificationBadge status={profile.verificationStatus} />
         </View>
-        <Pressable
-          onPress={onEdit}
-          style={[styles.editButton, { backgroundColor: `${colors.primary}16` }]}
-          accessibilityLabel={t('services.editWorkerProfile')}
-          hitSlop={8}
-        >
-          <FontAwesome6 name="pen" size={13} color={colors.primary} solid />
-        </Pressable>
       </View>
 
       <View style={styles.chipRow}>
@@ -78,11 +69,24 @@ export function WorkerProfileCard({ profile, onEdit }: WorkerProfileCardProps) {
           </Text>
         </View>
       ) : null}
+      <View style={[styles.manageRow, { borderTopColor: colors.border }]}>
+        <FontAwesome6 name="circle-info" size={11} color={colors.textMuted} solid />
+        <Text style={[styles.manageText, { color: colors.textMuted }]}>{t('profile.manageWorkerInPartnerApp')}</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  manageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 12,
+    paddingTop: 10,
+  },
+  manageText: { ...typography.caption, fontSize: 11.5, flex: 1 },
   card: { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   avatar: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

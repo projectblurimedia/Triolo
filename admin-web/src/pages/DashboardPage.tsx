@@ -16,7 +16,7 @@ import { Topbar } from '@/components/Layout';
 import { Avatar, Badge, Empty, ErrorState, Loading, SectionHead } from '@/components/ui';
 import { useApi } from '@/hooks/useApi';
 import { adminApi } from '@/services/adminApi';
-import { skillsLabel, timeAgo, Tone } from '@/utils/format';
+import { formatAddress, skillsLabel, timeAgo, Tone } from '@/utils/format';
 
 interface StatCardProps {
   to: string;
@@ -205,7 +205,7 @@ export function DashboardPage() {
                   <div className="row-main">
                     <div className="row-title">{worker.accountFullName}</div>
                     <div className="row-sub">
-                      {skillsLabel(worker.skillCategories)} · {worker.city}
+                      {skillsLabel(worker.skillCategories)} · {formatAddress(worker)}
                     </div>
                   </div>
                   <span className="row-meta">{timeAgo(worker.createdAt)}</span>
@@ -229,7 +229,7 @@ export function DashboardPage() {
                   <div className="row-main">
                     <div className="row-title">{shop.shopName}</div>
                     <div className="row-sub">
-                      {shop.accountFullName} · {shop.city}
+                      {shop.accountFullName} · {formatAddress(shop)}
                     </div>
                   </div>
                   <span className="row-meta">{timeAgo(shop.createdAt)}</span>

@@ -2,6 +2,28 @@ import { z } from 'zod';
 import { WORKER_SKILL_CATEGORIES } from './interfaces';
 import { parseJsonIfString } from '@/common/utils/parseMultipartField';
 
+// Location comes from GPS or a map pin: the point and the place name people see are required;
+// the rest of the reverse-geocoded address is stored when the geocoder found it.
+const optionalText = (max: number) =>
+  z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().trim().max(max).optional(),
+  );
+const locationFields = {
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+  locationName: z.string().trim().min(1, 'Choose your location').max(150),
+  area: optionalText(150),
+  city: optionalText(100),
+  district: optionalText(100),
+  state: optionalText(100),
+  // Kept only when it is a real 6-digit pincode; anything else from a geocoder is dropped.
+  pincode: z.preprocess(
+    (value) => (typeof value === 'string' && /^[0-9]{6}$/.test(value.trim()) ? value.trim() : undefined),
+    z.string().optional(),
+  ),
+};
+
 // multipart/form-data fields all arrive as strings (multer doesn't coerce types), so
 // numeric/nullable fields use z.coerce here, and the array field is JSON-stringified by
 // the client and parsed back via preprocess — unlike the JSON-body schemas elsewhere.
@@ -13,16 +35,7 @@ export const createWorkerProfileSchema = z
     ),
     otherSkillDescription: z.string().trim().max(100).optional(),
     experienceYears: z.coerce.number().int().min(0).max(60),
-    latitude: z.coerce.number().min(-90).max(90).optional(),
-    longitude: z.coerce.number().min(-180).max(180).optional(),
-    area: z.string().trim().max(150).optional(),
-    city: z.string().trim().min(2, 'City is required').max(100),
-    district: z.string().trim().min(2, 'District is required').max(100),
-    state: z.string().trim().min(2, 'State is required').max(100),
-    pincode: z
-      .string()
-      .trim()
-      .regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
+    ...locationFields,
   })
   .refine((data) => !data.skillCategories.includes('other') || !!data.otherSkillDescription, {
     message: 'Please describe your skill',
@@ -49,16 +62,7 @@ export const updateWorkerProfileSchema = z
     ),
     otherSkillDescription: z.string().trim().max(100).optional(),
     experienceYears: z.coerce.number().int().min(0).max(60),
-    latitude: z.coerce.number().min(-90).max(90).optional(),
-    longitude: z.coerce.number().min(-180).max(180).optional(),
-    area: z.string().trim().max(150).optional(),
-    city: z.string().trim().min(2, 'City is required').max(100),
-    district: z.string().trim().min(2, 'District is required').max(100),
-    state: z.string().trim().min(2, 'State is required').max(100),
-    pincode: z
-      .string()
-      .trim()
-      .regex(/^[0-9]{6}$/, 'Enter a valid 6-digit pincode'),
+    ...locationFields,
     existingPhotoUrls: z.preprocess(parseJsonIfString, z.array(z.string())).optional(),
   })
   .refine((data) => !data.skillCategories.includes('other') || !!data.otherSkillDescription, {

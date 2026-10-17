@@ -18,14 +18,17 @@ function mapBusinessProfile(row: QueryResultRow): BusinessProfile {
     otherCategoryDescription: row.other_category_description,
     latitude: row.latitude,
     longitude: row.longitude,
+    locationName: row.location_name ?? row.city ?? null,
     area: row.area,
     city: row.city,
     district: row.district,
     state: row.state,
     pincode: row.pincode,
+    profilePhotoUrl: row.profile_photo_url ?? null,
     shopPhotoUrls: row.shop_photo_urls ?? [],
     deliveryAvailable: row.delivery_available,
     deliveryPricePerKm: row.delivery_price_per_km != null ? Number(row.delivery_price_per_km) : null,
+    deliveryMinCharge: row.delivery_min_charge != null ? Number(row.delivery_min_charge) : null,
     verificationStatus: row.verification_status,
     ratingAverage: row.rating_count > 0 ? Math.round((row.rating_sum / row.rating_count) * 10) / 10 : null,
     ratingCount: row.rating_count ?? 0,
@@ -57,20 +60,22 @@ export class BusinessesRepository {
     shopName: string;
     shopCategories: string[];
     otherCategoryDescription: string | null;
-    latitude: number | null;
-    longitude: number | null;
+    latitude: number;
+    longitude: number;
+    locationName: string;
     area: string | null;
-    city: string;
-    district: string;
-    state: string;
-    pincode: string;
+    city: string | null;
+    district: string | null;
+    state: string | null;
+    pincode: string | null;
     shopPhotoUrls: string[];
     deliveryAvailable: boolean;
     deliveryPricePerKm: number | null;
+    deliveryMinCharge: number | null;
   }): Promise<BusinessProfile> {
     const result = await this.pool.query(
-      `INSERT INTO business_profiles (account_id, shop_name, shop_categories, other_category_description, latitude, longitude, area, city, district, state, pincode, shop_photo_urls, delivery_available, delivery_price_per_km)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `INSERT INTO business_profiles (account_id, shop_name, shop_categories, other_category_description, latitude, longitude, area, city, district, state, pincode, shop_photo_urls, delivery_available, delivery_price_per_km, location_name, delivery_min_charge)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
         params.accountId,
@@ -87,6 +92,8 @@ export class BusinessesRepository {
         params.shopPhotoUrls,
         params.deliveryAvailable,
         params.deliveryPricePerKm,
+        params.locationName,
+        params.deliveryMinCharge,
       ],
     );
     return mapBusinessProfile(result.rows[0]);
@@ -98,22 +105,24 @@ export class BusinessesRepository {
       shopName: string;
       shopCategories: string[];
       otherCategoryDescription: string | null;
-      latitude: number | null;
-      longitude: number | null;
+      latitude: number;
+      longitude: number;
+      locationName: string;
       area: string | null;
-      city: string;
-      district: string;
-      state: string;
-      pincode: string;
+      city: string | null;
+      district: string | null;
+      state: string | null;
+      pincode: string | null;
       shopPhotoUrls: string[];
       deliveryAvailable: boolean;
       deliveryPricePerKm: number | null;
+      deliveryMinCharge: number | null;
       verificationStatus: string;
     },
   ): Promise<BusinessProfile> {
     const result = await this.pool.query(
       `UPDATE business_profiles
-       SET shop_name = $2, shop_categories = $3, other_category_description = $4, latitude = $5, longitude = $6, area = $7, city = $8, district = $9, state = $10, pincode = $11, shop_photo_urls = $12, delivery_available = $13, delivery_price_per_km = $14, verification_status = $15, updated_at = now()
+       SET shop_name = $2, shop_categories = $3, other_category_description = $4, latitude = $5, longitude = $6, area = $7, city = $8, district = $9, state = $10, pincode = $11, shop_photo_urls = $12, delivery_available = $13, delivery_price_per_km = $14, verification_status = $15, location_name = $16, delivery_min_charge = $17, updated_at = now()
        WHERE account_id = $1
        RETURNING *`,
       [
@@ -132,9 +141,27 @@ export class BusinessesRepository {
         params.deliveryAvailable,
         params.deliveryPricePerKm,
         params.verificationStatus,
+        params.locationName,
+        params.deliveryMinCharge,
       ],
     );
     return mapBusinessProfile(result.rows[0]);
+  }
+
+  /** Sets (or clears) the profile photo; returns the profile and the photo it replaced, or null with no profile. */
+  async setProfilePhoto(
+    accountId: string,
+    photoUrl: string | null,
+  ): Promise<{ profile: BusinessProfile; previousUrl: string | null } | null> {
+    const result = await this.pool.query(
+      `UPDATE business_profiles p SET profile_photo_url = $2, updated_at = now()
+       FROM (SELECT profile_photo_url AS previous_url FROM business_profiles WHERE account_id = $1 FOR UPDATE) old
+       WHERE p.account_id = $1
+       RETURNING p.*, old.previous_url`,
+      [accountId, photoUrl],
+    );
+    if (!result.rows[0]) return null;
+    return { profile: mapBusinessProfile(result.rows[0]), previousUrl: result.rows[0].previous_url ?? null };
   }
 
   async remove(accountId: string): Promise<void> {
@@ -242,7 +269,7 @@ export class BusinessesRepository {
            AND b.account_id != $3
        ) sub
        WHERE sub.distance_meters <= $4
-         AND ($5::text IS NULL OR sub.shop_name ILIKE $5 OR sub.other_category_description ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.shop_categories, ',') ILIKE $5)
+         AND ($5::text IS NULL OR sub.shop_name ILIKE $5 OR sub.other_category_description ILIKE $5 OR sub.location_name ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.shop_categories, ',') ILIKE $5)
          AND ($7::business_shop_category IS NULL OR $7::business_shop_category = ANY(sub.shop_categories))
          AND ($8::boolean IS NOT TRUE OR sub.delivery_available)
        ORDER BY ${orderBy}

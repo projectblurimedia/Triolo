@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { NotificationsService } from '@/modules/notifications/service';
@@ -15,6 +16,7 @@ import {
 } from './interfaces';
 
 const PORTFOLIO_FOLDER = 'triolo/workers/portfolio';
+const PROFILE_PHOTO_FOLDER = 'triolo/workers/profile';
 
 export class WorkersService {
   constructor(
@@ -39,13 +41,14 @@ export class WorkersService {
       skillCategories: dto.skillCategories,
       otherSkillDescription: dto.otherSkillDescription ?? null,
       experienceYears: dto.experienceYears,
-      latitude: dto.latitude ?? null,
-      longitude: dto.longitude ?? null,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      locationName: dto.locationName,
       area: dto.area ?? null,
-      city: dto.city,
-      district: dto.district,
-      state: dto.state,
-      pincode: dto.pincode,
+      city: dto.city ?? null,
+      district: dto.district ?? null,
+      state: dto.state ?? null,
+      pincode: dto.pincode ?? null,
       portfolioPhotoUrls,
     });
   }
@@ -89,13 +92,14 @@ export class WorkersService {
       skillCategories: dto.skillCategories,
       otherSkillDescription: dto.otherSkillDescription ?? null,
       experienceYears: dto.experienceYears,
-      latitude: dto.latitude ?? null,
-      longitude: dto.longitude ?? null,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      locationName: dto.locationName,
       area: dto.area ?? null,
-      city: dto.city,
-      district: dto.district,
-      state: dto.state,
-      pincode: dto.pincode,
+      city: dto.city ?? null,
+      district: dto.district ?? null,
+      state: dto.state ?? null,
+      pincode: dto.pincode ?? null,
       portfolioPhotoUrls,
       // Edits keep whatever verification status the profile already had — a confirmed
       // reversal of an earlier "any edit resets to pending_verification" design. Admin still
@@ -105,12 +109,40 @@ export class WorkersService {
     });
   }
 
+  /** Uploads the profile photo (replacing any previous one) — its own request, so the body stays small for Vercel. */
+  async setProfilePhoto(accountId: string, file: Express.Multer.File | undefined): Promise<WorkerProfile> {
+    if (!file) throw AppError.badRequest('A photo is required.', 'PHOTO_REQUIRED');
+    if (!(await this.repository.findByAccountId(accountId))) {
+      // uploadToCloudinary would normally remove the temp file; it won't run here.
+      fs.promises.unlink(file.path).catch(() => {});
+      throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
+    }
+    const uploaded = await uploadToCloudinary(file.path, PROFILE_PHOTO_FOLDER);
+    const result = await this.repository.setProfilePhoto(accountId, uploaded.url);
+    if (!result) {
+      await deletePhotosFromCloudinary([uploaded.url]);
+      throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
+    }
+    if (result.previousUrl) await deletePhotosFromCloudinary([result.previousUrl]);
+    return result.profile;
+  }
+
+  async removeProfilePhoto(accountId: string): Promise<WorkerProfile> {
+    const result = await this.repository.setProfilePhoto(accountId, null);
+    if (!result) throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
+    if (result.previousUrl) await deletePhotosFromCloudinary([result.previousUrl]);
+    return result.profile;
+  }
+
   async deleteProfile(accountId: string): Promise<void> {
     const existing = await this.repository.findByAccountId(accountId);
     if (!existing) {
       throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
     }
-    await deletePhotosFromCloudinary(existing.portfolioPhotoUrls);
+    await deletePhotosFromCloudinary([
+      ...existing.portfolioPhotoUrls,
+      ...(existing.profilePhotoUrl ? [existing.profilePhotoUrl] : []),
+    ]);
     await this.repository.remove(accountId);
   }
 
@@ -179,7 +211,10 @@ export class WorkersService {
   async adminDeleteForAccount(accountId: string): Promise<boolean> {
     const existing = await this.repository.findByAccountId(accountId);
     if (!existing) return false;
-    await deletePhotosFromCloudinary(existing.portfolioPhotoUrls);
+    await deletePhotosFromCloudinary([
+      ...existing.portfolioPhotoUrls,
+      ...(existing.profilePhotoUrl ? [existing.profilePhotoUrl] : []),
+    ]);
     await this.repository.remove(accountId);
     return true;
   }

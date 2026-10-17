@@ -138,9 +138,13 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
         onBack={onClose}
         backLabel={t('common.cancel')}
         avatar={
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
-            <Text style={styles.compactInitials}>{initialsOf(w.accountFullName)}</Text>
-          </LinearGradient>
+          w.profilePhotoUrl ? (
+            <SmartImage source={{ uri: w.profilePhotoUrl }} style={styles.compactAvatar} />
+          ) : (
+            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
+              <Text style={styles.compactInitials}>{initialsOf(w.accountFullName)}</Text>
+            </LinearGradient>
+          )
         }
         title={firstName(w.accountFullName)}
         subtitle={distance}
@@ -180,8 +184,8 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
         onBack={onClose}
         backLabel={t('common.cancel')}
         avatar={
-          b.shopPhotoUrls[0] ? (
-            <SmartImage source={{ uri: b.shopPhotoUrls[0] }} style={styles.compactAvatar} />
+          (b.shopPhotoUrls[0] ?? b.profilePhotoUrl) ? (
+            <SmartImage source={{ uri: b.shopPhotoUrls[0] ?? b.profilePhotoUrl }} style={styles.compactAvatar} />
           ) : (
             <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
               <FontAwesome6 name="store" size={19} color="#FFFFFF" solid />
@@ -199,7 +203,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
           <VerificationBadge status={b.verificationStatus} />
         </View>
         {photos.length > 0 ? (
-          renderGallery()
+          <View style={styles.shopGallery}>{renderGallery()}</View>
         ) : (
           <View style={styles.heroPlaceholderWrap}>
             <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroPlaceholder}>
@@ -211,14 +215,19 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
           <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('nearbySearch.detailCategoriesLabel')}</Text>
           <View style={styles.tagRow}>
             {tagLabels.map((label) => (
-              <View key={label} style={[styles.tag, { backgroundColor: `${colors.primary}14` }]}>
-                <Text style={[styles.tagText, { color: colors.primary }]}>{label}</Text>
-              </View>
+              <LinearGradient key={label} colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.tag}>
+                <Text style={[styles.tagText, { color: '#FFFFFF' }]}>{label}</Text>
+              </LinearGradient>
             ))}
           </View>
         </View>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {renderInfoRow('truck', t(b.deliveryAvailable ? 'bazaar.deliveryAvailableYes' : 'bazaar.deliveryAvailableNo'))}
+          {renderInfoRow(
+            'truck',
+            b.deliveryAvailable
+              ? t('businessProfile.deliveryCharges', { min: b.deliveryMinCharge ?? 0, perKm: b.deliveryPricePerKm ?? 0 })
+              : t('bazaar.deliveryAvailableNo'),
+          )}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           {renderInfoRow('location-dot', formatAddress(b))}
         </View>
@@ -294,7 +303,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   compactInitials: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 17 },
-  shopFacts: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 },
+  // The first card under the compact header: no top margin of its own (the scroll already
+  // clears the header); the gap goes below it, before the shop's photos.
+  shopFacts: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 0,
+  },
+  shopGallery: { marginTop: 20 },
   shopAvatar: { width: 84, height: 84, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   shopName: { fontFamily: fonts.semiBold, fontSize: 21, lineHeight: 28, marginTop: 12, textAlign: 'center' },
   shopMeta: { ...typography.caption, marginTop: 2 },
@@ -355,7 +374,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.semiBold,
     fontSize: 11,
   },
-  heroPlaceholderWrap: { alignItems: 'center', marginBottom: 4 },
+  // Space between the rating / verified card and the shop's photos below it.
+  heroPlaceholderWrap: { alignItems: 'center', marginTop: 20, marginBottom: 4 },
   heroPlaceholder: {
     width: 96,
     height: 96,

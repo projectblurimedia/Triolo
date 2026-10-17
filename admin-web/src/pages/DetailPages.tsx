@@ -338,7 +338,7 @@ export function AccountDetailPage() {
                       <div className="row-main">
                         <div className="row-title">{skillsLabel(workerProfile.skillCategories)}</div>
                         <div className="row-sub">
-                          {workerProfile.experienceYears} yr · {workerProfile.city}
+                          {workerProfile.experienceYears} yr · {formatAddress(workerProfile)}
                           {workerProfile.ratingCount ? ` · ★ ${workerProfile.ratingAverage}` : ''}
                         </div>
                       </div>
@@ -358,14 +358,14 @@ export function AccountDetailPage() {
                     <Link to={`/shops/${businessProfile.id}`} className="row" style={{ padding: '4px 0', borderBottom: 0 }}>
                       <Avatar
                         name={businessProfile.shopName}
-                        photo={businessProfile.shopPhotoUrls[0]}
+                        photo={businessProfile.shopPhotoUrls[0] ?? businessProfile.profilePhotoUrl}
                         square
                         gradient="linear-gradient(135deg,#16a34a,#4ade80)"
                       />
                       <div className="row-main">
                         <div className="row-title">{businessProfile.shopName}</div>
                         <div className="row-sub">
-                          {businessProfile.shopCategories.map(shopCategoryLabel).join(', ')} · {businessProfile.city}
+                          {businessProfile.shopCategories.map(shopCategoryLabel).join(', ')} · {formatAddress(businessProfile)}
                         </div>
                       </div>
                       <Badge tone={verificationStatus(businessProfile.verificationStatus).tone}>
@@ -482,7 +482,7 @@ export function WorkerDetailPage() {
           return (
             <>
               <div className="hero">
-                <Avatar name={worker.accountFullName} />
+                <Avatar name={worker.accountFullName} photo={worker.profilePhotoUrl ?? undefined} />
                 <div className="hero-text">
                   <h2>{worker.accountFullName}</h2>
                   <p>{skillsLabel(worker.skillCategories)}</p>
@@ -586,7 +586,7 @@ export function ShopDetailPage() {
           return (
             <>
               <div className="hero" style={{ background: 'linear-gradient(135deg,#0055d3,#16a34a)' }}>
-                <Avatar name={shop.shopName} photo={shop.shopPhotoUrls[0]} />
+                <Avatar name={shop.shopName} photo={shop.shopPhotoUrls[0] ?? shop.profilePhotoUrl} />
                 <div className="hero-text">
                   <h2>{shop.shopName}</h2>
                   <p>
@@ -645,7 +645,9 @@ export function ShopDetailPage() {
                       {shop.otherCategoryDescription ? ` (${shop.otherCategoryDescription})` : ''}
                     </InfoRow>
                     <InfoRow icon={faTruck} label="Delivery">
-                      {shop.deliveryAvailable ? `Yes — ${rupees(shop.deliveryPricePerKm)} per km` : 'Pickup only'}
+                      {shop.deliveryAvailable
+                        ? `Yes — ${rupees(shop.deliveryPricePerKm)} per km, minimum ${rupees(shop.deliveryMinCharge)}`
+                        : 'Pickup only'}
                     </InfoRow>
                     <InfoRow icon={faLocationDot} label="Shop address">
                       {formatAddress(shop)}

@@ -4,7 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { PhoneVerification } from '@/components/PhoneVerification';
 import { JobPostForm } from '@/components/JobPostForm';
-import { typography, useThemeColors } from '@/theme';
+import { jobSeekerService } from '@/services/jobSeekerService';
+import { showToast } from '@/state/toastStore';
+import { InfoTipsButton } from '@/components/InfoTipsButton';
+
 import { useAuthStore } from '@/state/authStore';
 import { KeyboardAwareView } from '@/components/KeyboardAwareView';
 
@@ -16,7 +19,6 @@ import { KeyboardAwareView } from '@/components/KeyboardAwareView';
  */
 export function RegisterJobSeekerScreen() {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
   const setCompletingRegistration = useAuthStore((state) => state.setCompletingRegistration);
   const [fullName, setFullName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
@@ -32,7 +34,15 @@ export function RegisterJobSeekerScreen() {
     <ScreenContainer edges={['left', 'right', 'bottom']}>
       <KeyboardAwareView>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('jobPost.subtitle')}</Text>
+          <InfoTipsButton
+            title={t('infoTips.jobTitle')}
+            tips={[
+              { icon: 'user-tie', text: t('jobPost.subtitle') },
+              { icon: 'camera', text: t('jobPost.photoHint') },
+              { icon: 'mobile-screen-button', text: t('auth.verifyToSubmitHint') },
+              { icon: 'location-dot', text: t('infoTips.location') },
+            ]}
+          />
           <JobPostForm
             header={
               <PhoneVerification
@@ -41,11 +51,24 @@ export function RegisterJobSeekerScreen() {
                 mobileNumber={mobileNumber}
                 onMobileNumberChange={setMobileNumber}
                 verified={verified}
-                onVerified={() => setVerified(true)}
+                onVerified={() => {
+                  setVerified(true);
+                  // One account per number: if this one already has this profile, there is nothing to
+                  // register — they are signed in, so open the app.
+                  jobSeekerService
+                    .getMine()
+                    .then((existing) => {
+                      if (!existing) return;
+                      showToast({ variant: 'info', title: t('auth.alreadyJobPost') });
+                      setCompletingRegistration(false);
+                    })
+                    .catch(() => undefined);
+                }}
               />
             }
+            displayName={fullName}
+            showPhotoHint={false}
             locked={!verified}
-            lockedHint={t('auth.verifyToSubmitHint')}
             onSaved={() => setCompletingRegistration(false)}
           />
         </ScrollView>
@@ -56,5 +79,4 @@ export function RegisterJobSeekerScreen() {
 
 const styles = StyleSheet.create({
   body: { paddingBottom: 40 },
-  subtitle: { ...typography.body, marginBottom: 18 },
 });

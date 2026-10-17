@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import { InfoTips } from '@/components/InfoTips';
 import { PhoneVerification } from '@/components/PhoneVerification';
 import { CategoryChips } from '@/components/CategoryChips';
-import { AddressField, AddressValue, EMPTY_ADDRESS } from '@/components/AddressField';
+import { LocationField } from '@/components/LocationField';
+import { ProfilePhotoField } from '@/components/ProfilePhotoField';
+import { PlaceValue } from '@/utils/place';
 import { PhotoUpload } from '@/components/PhotoUpload';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -48,11 +51,13 @@ export function RegisterBusinessPage() {
   const [checkingProfile, setCheckingProfile] = useState(false);
   const [existingProfile, setExistingProfile] = useState<BusinessProfile | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   const [shopName, setShopName] = useState('');
   const [shopCategories, setShopCategories] = useState<string[]>([]);
   const [otherEntries, setOtherEntries] = useState<string[]>([]);
-  const [address, setAddress] = useState<AddressValue>(EMPTY_ADDRESS);
+  const [place, setPlace] = useState<PlaceValue | null>(null);
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
   const [deliveryPricePerKm, setDeliveryPricePerKm] = useState('');
@@ -102,17 +107,19 @@ export function RegisterBusinessPage() {
   const handleSubmit = async () => {
     setError(null);
     const includesOther = otherEntries.length > 0;
-    if (
-      !shopName.trim() ||
-      (shopCategories.length === 0 && !includesOther) ||
-      !address.city.trim() ||
-      !address.district.trim() ||
-      !address.state.trim() ||
-      !/^[0-9]{6}$/.test(address.pincode) ||
-      deliveryAvailable === null ||
-      (deliveryAvailable && !deliveryPricePerKm.trim())
-    ) {
-      setError('Please fill in all required fields.');
+    const problem = !shopName.trim()
+      ? "Enter your shop's name."
+      : shopCategories.length === 0 && !includesOther
+        ? 'Choose at least one shop category.'
+        : !place
+          ? 'Set your location — use your current location or select it on the map.'
+          : deliveryAvailable === null
+            ? 'Tell us whether you offer delivery.'
+            : deliveryAvailable && !(Number(deliveryPricePerKm) > 0)
+              ? 'Enter your delivery price per km.'
+              : null;
+    if (problem || !place || deliveryAvailable === null) {
+      setError(problem);
       return;
     }
     setSubmitting(true);
@@ -121,17 +128,19 @@ export function RegisterBusinessPage() {
         shopName,
         shopCategories: includesOther ? [...shopCategories, 'other'] : shopCategories,
         otherCategoryDescription: includesOther ? otherEntries.join(', ') : undefined,
-        latitude: address.latitude,
-        longitude: address.longitude,
-        area: address.area.trim() || undefined,
-        city: address.city.trim(),
-        district: address.district.trim(),
-        state: address.state.trim(),
-        pincode: address.pincode,
+        place,
         deliveryAvailable,
         deliveryPricePerKm: deliveryAvailable ? Number(deliveryPricePerKm) : undefined,
         shopPhotos: photos,
       });
+      if (profilePhoto) {
+        try {
+          await businessesService.uploadProfilePhoto(profilePhoto);
+        } catch {
+          // The profile is saved; the photo can be added again from the Partner app.
+          setPhotoFailed(true);
+        }
+      }
       setSubmitted(true);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -143,10 +152,15 @@ export function RegisterBusinessPage() {
   if (submitted) {
     return (
       <div className="page">
-        <PageHeader title="Business Registration" backTo="/" />
+        <PageHeader title="Business Registration" subtitle="Get orders from customers near you" backTo="/" />
         <div className="body">
           <p>✅ Your shop details are submitted for verification.</p>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>We'll notify you once approved.</p>
+          {photoFailed ? (
+            <p style={{ fontSize: 13, color: 'var(--color-error)' }}>
+              Your photo didn't upload. You can add it later from the Triolo Partner app.
+            </p>
+          ) : null}
         </div>
       </div>
     );
@@ -154,7 +168,7 @@ export function RegisterBusinessPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Business Registration" backTo="/" />
+      <PageHeader title="Business Registration" subtitle="Get orders from customers near you" backTo="/" />
       <div className="body">
         <form
           onSubmit={(e) => {
@@ -162,6 +176,29 @@ export function RegisterBusinessPage() {
             if (verified && !existingProfile) handleSubmit();
           }}
         >
+          {!existingProfile ? (
+            <InfoTips
+              title="About shop registration"
+              tips={[
+                'Register your shop to get discovered by customers nearby.',
+                'A clear profile photo helps customers trust you.',
+                'Your location is picked with GPS or on the map. Only your village or town name is shown to others.',
+                'Verify your mobile number to enable Register.',
+                'Our team checks new profiles. Once approved, customers near you can find you.',
+                'Delivery is charged per km. Anything under 1 km is charged as 1 km.',
+              ]}
+            />
+          ) : null}
+          {!existingProfile ? (
+            <ProfilePhotoField
+              file={profilePhoto}
+              name={fullName}
+              title="Your photo (shopkeeper)"
+              hint="A clear photo of you, the shop owner. Add pictures of the shop below."
+              onChange={setProfilePhoto}
+            />
+          ) : null}
+
           <PhoneVerification
             fullName={fullName}
             onFullNameChange={setFullName}
@@ -189,7 +226,7 @@ export function RegisterBusinessPage() {
                 </dd>
                 <dt style={{ color: 'var(--color-text-muted)' }}>Delivery</dt>
                 <dd style={{ margin: '2px 0 12px' }}>
-                  {existingProfile.deliveryAvailable ? `Yes — ₹${existingProfile.deliveryPricePerKm}/km` : 'No'}
+                  {existingProfile.deliveryAvailable ? `Yes — ₹${existingProfile.deliveryPricePerKm ?? 0}/km` : 'No'}
                 </dd>
                 <dt style={{ color: 'var(--color-text-muted)' }}>Location</dt>
                 <dd style={{ margin: '2px 0 0' }}>{formatAddress(existingProfile)}</dd>
@@ -216,44 +253,44 @@ export function RegisterBusinessPage() {
                 otherEntries={otherEntries}
                 onOtherEntriesChange={setOtherEntries}
               />
-              <AddressField value={address} onChange={setAddress} />
+              <LocationField label="Shop location" value={place} onChange={setPlace} />
               <PhotoUpload label="Shop Photos (optional)" files={photos} onChange={setPhotos} />
 
               <label style={{ display: 'block', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
                 Do you offer delivery?
               </label>
-              <div className="chip-row">
-                <button
-                  type="button"
-                  className={`chip ${deliveryAvailable === true ? 'chip--active' : ''}`}
-                  onClick={() => setDeliveryAvailable(true)}
-                >
-                  Yes
-                </button>
-                <button
-                  type="button"
-                  className={`chip ${deliveryAvailable === false ? 'chip--active' : ''}`}
-                  onClick={() => setDeliveryAvailable(false)}
-                >
-                  No
-                </button>
-              </div>
-              {deliveryAvailable ? (
-                <div className="field">
-                  <label>Delivery Price per KM (₹)</label>
-                  <input value={deliveryPricePerKm} onChange={(e) => setDeliveryPricePerKm(e.target.value)} inputMode="decimal" />
+              <div className="delivery-row">
+                <div className="chip-row">
+                  <button
+                    type="button"
+                    className={`chip ${deliveryAvailable === true ? 'chip--active' : ''}`}
+                    onClick={() => setDeliveryAvailable(true)}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip ${deliveryAvailable === false ? 'chip--active' : ''}`}
+                    onClick={() => setDeliveryAvailable(false)}
+                  >
+                    No
+                  </button>
                 </div>
-              ) : null}
+                {deliveryAvailable ? (
+                  <input
+                    value={deliveryPricePerKm}
+                    onChange={(e) => setDeliveryPricePerKm(e.target.value.replace(/[^0-9.]/g, ''))}
+                    inputMode="decimal"
+                    placeholder="₹ per km"
+                    aria-label="Price per km (₹)"
+                  />
+                ) : null}
+              </div>
 
               {error ? <p className="error-text">{error}</p> : null}
               <button type="submit" className="button" disabled={!verified || submitting}>
-                {submitting ? <LoadingSpinner /> : 'Submit'}
+                {submitting ? <LoadingSpinner /> : 'Register'}
               </button>
-              {!verified ? (
-                <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                  Verify your mobile number above to enable Submit.
-                </p>
-              ) : null}
             </>
           ) : null}
         </form>

@@ -35,3 +35,11 @@ export interface LogoutDto {
 export interface UpdateLanguageDto {
   preferredLanguage: PreferredLanguage;
 }
+
+export interface UpdateProfileDto {
+  fullName?: string;
+  email?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  locationAddress?: string | null;
+}

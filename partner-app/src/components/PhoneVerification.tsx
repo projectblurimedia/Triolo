@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { showToast } from '@/state/toastStore';
 import { TextField } from './TextField';
 import { Button } from './Button';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -20,6 +21,14 @@ interface PhoneVerificationProps {
   onMobileNumberChange: (value: string) => void;
   verified: boolean;
   onVerified: () => void;
+  /**
+   * The customer app's Register: only a brand-new number may continue. A number that already has
+   * a Triolo account (customer, worker or shop — it is one account for both apps) is told to log
+   * in instead, with `onLoginInstead` as the way there. The Partner app leaves this off: an
+   * existing account there signs in and adds a worker/shop profile to itself.
+   */
+  newAccountsOnly?: boolean;
+  onLoginInstead?: () => void;
 }
 
 /**
@@ -57,6 +66,8 @@ export function PhoneVerification({
   onMobileNumberChange,
   verified,
   onVerified,
+  newAccountsOnly = false,
+  onLoginInstead,
 }: PhoneVerificationProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
@@ -64,24 +75,60 @@ export function PhoneVerification({
   const language = useSettingsStore((s) => s.language);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
+  const otpRef = useRef<TextInput>(null);
+
+  // After a wrong code: clear it and bring the keyboard back so it can be typed again. On
+  // Android, focusing a field that still counts as focused doesn't reopen the keyboard, so
+  // let go of it first.
+  const retypeOtp = () => {
+    setOtp('');
+    otpRef.current?.blur();
+    setTimeout(() => otpRef.current?.focus(), 80);
+  };
   const [mode, setMode] = useState<'login' | 'registration' | null>(null);
   const [sending, setSending] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
 
   const sendOtp = async () => {
     setError(null);
-    if (!fullName.trim() || !mobileNumber.trim()) {
-      setError(t('errors.VALIDATION_ERROR'));
+    // The number comes first; a name is only needed to create a new account (an existing one
+    // just signs in), so ask for it only then — with a message that says exactly what's missing.
+    if (!/^[6-9][0-9]{9}$/.test(mobileNumber.trim())) {
+      setError(t('auth.mobileInvalid'));
       return;
     }
+    const nameMissing = fullName.trim().length < 2;
+    if (newAccountsOnly && nameMissing) {
+      setError(t('auth.nameBeforeVerify'));
+      return;
+    }
+    setAlreadyRegistered(false);
     setSending(true);
+    if (newAccountsOnly) {
+      try {
+        await authService.requestRegistrationOtp({ fullName, mobileNumber, preferredLanguage: language });
+        setMode('registration');
+        setOtpSent(true);
+      } catch (err) {
+        if (err instanceof ApiError && err.code === 'MOBILE_ALREADY_REGISTERED') setAlreadyRegistered(true);
+        else setError(getLocalizedErrorMessage(err, t));
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
     try {
       await authService.requestLoginOtp({ mobileNumber });
       setMode('login');
       setOtpSent(true);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'ACCOUNT_NOT_FOUND') {
+        if (nameMissing) {
+          setError(t('auth.nameForNewAccount'));
+          return;
+        }
         try {
           await authService.requestRegistrationOtp({ fullName, mobileNumber, preferredLanguage: language });
           setMode('registration');
@@ -99,8 +146,8 @@ export function PhoneVerification({
 
   const confirmOtp = async () => {
     setError(null);
-    if (!otp.trim()) {
-      setError(t('errors.VALIDATION_ERROR'));
+    if (!/^[0-9]{6}$/.test(otp.trim())) {
+      setError(t('formErrors.otp'));
       return;
     }
     setConfirming(true);
@@ -113,6 +160,7 @@ export function PhoneVerification({
       onVerified();
     } catch (err) {
       setError(getLocalizedErrorMessage(err, t));
+      retypeOtp();
     } finally {
       setConfirming(false);
     }
@@ -131,6 +179,8 @@ export function PhoneVerification({
         label={t('auth.fullNameLabel')}
         value={fullName}
         onChangeText={onFullNameChange}
+        importantForAutofill="no"
+        placeholder={t('auth.fullNamePlaceholder')}
         editable={!otpSent && !verified}
       />
 
@@ -148,6 +198,8 @@ export function PhoneVerification({
             }
             value={mobileNumber}
             onChangeText={onMobileNumberChange}
+            importantForAutofill="no"
+            placeholder={t('auth.mobilePlaceholder')}
             keyboardType="number-pad"
             maxLength={10}
             editable={!otpSent && !verified}
@@ -156,7 +208,11 @@ export function PhoneVerification({
         {!verified && !otpSent ? (
           <Pressable onPress={sendOtp} disabled={sending} accessibilityLabel={t('auth.verifyMobileNumber')}>
             <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.verifyButton}>
-              {sending ? <LoadingIndicator size={16} color={colors.white} /> : <Text style={styles.verifyButtonText}>{t('auth.verify')}</Text>}
+              {sending ? (
+                <LoadingIndicator size={16} color={colors.white} />
+              ) : (
+                <Text style={styles.verifyButtonText}>{t('auth.verify')}</Text>
+              )}
             </LinearGradient>
           </Pressable>
         ) : null}
@@ -166,6 +222,7 @@ export function PhoneVerification({
         <>
           <TextField
             label={t('auth.otpSentLabel', { mobileNumber })}
+            ref={otpRef}
             value={otp}
             onChangeText={setOtp}
             keyboardType="number-pad"
@@ -177,13 +234,34 @@ export function PhoneVerification({
               <Button label={t('auth.confirmOtp')} onPress={confirmOtp} loading={confirming} />
             </View>
             <View style={styles.otpButton}>
-              <Button label={t('auth.changeNumber')} onPress={changeNumber} disabled={confirming} gradient={['#9CA3AF', '#6B7280']} />
+              <Pressable
+                onPress={changeNumber}
+                disabled={confirming}
+                style={[styles.outlineButton, { borderColor: colors.primary, opacity: confirming ? 0.5 : 1 }]}
+              >
+                <FontAwesome6 name="pen" size={12} color={colors.primary} solid />
+                <Text style={[styles.outlineText, { color: colors.primary }]}>{t('auth.changeNumber')}</Text>
+              </Pressable>
             </View>
           </View>
         </>
       ) : null}
 
       {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
+      {alreadyRegistered ? (
+        <View style={[styles.notice, { borderColor: `${colors.primary}40`, backgroundColor: `${colors.primary}0D` }]}>
+          <FontAwesome6 name="circle-info" size={14} color={colors.primary} solid />
+          <Text style={[styles.noticeText, { color: colors.text }]}>
+            {t('auth.alreadyRegisteredLogin')}
+            {onLoginInstead ? (
+              <Text style={[styles.noticeLink, { color: colors.primary }]} onPress={onLoginInstead}>
+                {' '}
+                {t('auth.login')}
+              </Text>
+            ) : null}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -200,4 +278,25 @@ const styles = StyleSheet.create({
   otpButtonRow: { flexDirection: 'row', gap: 10 },
   otpButton: { flex: 1 },
   error: { ...typography.caption, marginBottom: 12 },
+  outlineButton: {
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  outlineText: { ...typography.body, fontFamily: fonts.semiBold, includeFontPadding: false },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  noticeText: { ...typography.caption, fontSize: 13, lineHeight: 19, flex: 1 },
+  noticeLink: { fontFamily: fonts.semiBold },
 });

@@ -290,8 +290,16 @@ export class OrdersService {
   }
 }
 
-/** The shop's price per km × distance, rounded to whole rupees (0 if the shop set no price). */
-export function deliveryCharge(shop: Pick<BusinessProfile, 'deliveryPricePerKm'>, distance: number): number {
+/**
+ * Delivery: the shop's price per km × distance in whole rupees, but never less than the price of
+ * 1 km — a customer 300 m away pays for 1 km, one 2 km away pays 2 × the price. A larger
+ * minimum a shop saved earlier still applies. 0 when the shop set no price.
+ */
+export function deliveryCharge(
+  shop: Pick<BusinessProfile, 'deliveryPricePerKm' | 'deliveryMinCharge'>,
+  distance: number,
+): number {
   const perKm = shop.deliveryPricePerKm ?? 0;
-  return Math.round((perKm * distance) / 1000);
+  const byDistance = Math.round((perKm * distance) / 1000);
+  return Math.max(byDistance, Math.round(Math.max(shop.deliveryMinCharge ?? 0, perKm)));
 }

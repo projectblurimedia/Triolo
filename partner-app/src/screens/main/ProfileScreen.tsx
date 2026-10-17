@@ -16,6 +16,7 @@ import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { MainStackParamList, MainTabParamList } from '@/navigation/types';
 import { JobPostCard } from '@/components/JobPostCard';
+import { SmartImage } from '@/components/SmartImage';
 import { useMyJobPost } from '@/hooks/useJobPost';
 
 type Props = CompositeScreenProps<BottomTabScreenProps<MainTabParamList, 'Profile'>, NativeStackScreenProps<MainStackParamList>>;
@@ -110,8 +111,17 @@ export function ProfileScreen({ navigation }: Props) {
           icon="screwdriver-wrench"
           title={t('mainTabs.Profile.workerTitle')}
           profile={workerProfile.data}
+          photoUrl={worker?.profilePhotoUrl ?? worker?.portfolioPhotoUrls[0]}
+          name={account?.fullName}
           quickFact={
-            workerProfile.data ? t('mainTabs.Profile.workerQuickFact', { count: workerProfile.data.experienceYears }) : undefined
+            worker
+              ? [
+                  ...worker.skillCategories.filter((key) => key !== 'other').map((key) => t(`workerProfile.skills.${key}`)),
+                  ...(worker.otherSkillDescription ? [worker.otherSkillDescription] : []),
+                ].join(', ') +
+                ' · ' +
+                t('mainTabs.Profile.workerQuickFact', { count: worker.experienceYears })
+              : undefined
           }
           addLabel={t('mainTabs.Profile.addWorker')}
           onView={() => navigation.navigate('MyInfo', { capability: 'worker' })}
@@ -122,14 +132,16 @@ export function ProfileScreen({ navigation }: Props) {
           icon="store"
           title={t('mainTabs.Profile.businessTitle')}
           profile={businessProfile.data}
-          quickFact={businessProfile.data?.shopName}
+          photoUrl={shop?.profilePhotoUrl ?? shop?.shopPhotoUrls[0]}
+          name={shop?.shopName}
+          quickFact={shop && account ? t('mainTabs.Profile.ownerLine', { name: account.fullName }) : undefined}
           addLabel={t('mainTabs.Profile.addBusiness')}
           onView={() => navigation.navigate('MyInfo', { capability: 'business' })}
           onAdd={() => navigation.navigate('BusinessRegistration')}
           colors={colors}
         />
 
-        <JobPostCard post={jobPost.data} onPress={() => navigation.navigate('JobPost')} />
+        <JobPostCard post={jobPost.data} name={account?.fullName} onPress={() => navigation.navigate('JobPost')} />
 
         {worker ? <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} /> : null}
         {shop ? (
@@ -156,6 +168,10 @@ interface CapabilityRowProps {
   icon: React.ComponentProps<typeof FontAwesome6>['name'];
   title: string;
   profile: { verificationStatus: string } | null | undefined;
+  /** This profile's own photo (worker face / shop logo); the icon shows when there is none. */
+  photoUrl?: string | null;
+  /** Who or what this profile is: the worker's name, or the shop's name. */
+  name?: string;
   quickFact?: string;
   addLabel: string;
   onView: () => void;
@@ -163,16 +179,23 @@ interface CapabilityRowProps {
   colors: ReturnType<typeof useThemeColors>['colors'];
 }
 
-function CapabilityRow({ icon, title, profile, quickFact, addLabel, onView, onAdd, colors }: CapabilityRowProps) {
+function CapabilityRow({ icon, title, profile, photoUrl, name, quickFact, addLabel, onView, onAdd, colors }: CapabilityRowProps) {
   return (
     <Pressable style={[styles.card, { backgroundColor: colors.surface }]} onPress={profile ? onView : onAdd}>
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cardIcon}>
-        <FontAwesome6 name={icon} size={18} color="#FFFFFF" solid />
-      </LinearGradient>
+      {profile && photoUrl ? (
+        <SmartImage source={{ uri: photoUrl }} style={styles.cardPhoto} />
+      ) : (
+        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cardIcon}>
+          <FontAwesome6 name={icon} size={18} color="#FFFFFF" solid />
+        </LinearGradient>
+      )}
       <View style={styles.cardText}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
         {profile ? (
           <>
+            <Text style={[styles.cardCaption, { color: colors.primary }]}>{title}</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+              {name ?? title}
+            </Text>
             {quickFact ? (
               <Text style={[styles.cardQuickFact, { color: colors.textMuted }]} numberOfLines={1}>
                 {quickFact}
@@ -181,7 +204,10 @@ function CapabilityRow({ icon, title, profile, quickFact, addLabel, onView, onAd
             <VerificationBadge status={profile.verificationStatus} />
           </>
         ) : (
-          <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>{addLabel}</Text>
+          <>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>{addLabel}</Text>
+          </>
         )}
       </View>
       <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
@@ -252,6 +278,8 @@ const styles = StyleSheet.create({
     ...CARD_SHADOW,
   },
   cardIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  cardPhoto: { width: 52, height: 52, borderRadius: 26, marginRight: 14 },
+  cardCaption: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, letterSpacing: 0.3 },
   cardText: { flex: 1, marginRight: 10 },
   cardTitle: { ...typography.subheading, fontFamily: fonts.semiBold },
   cardQuickFact: { ...typography.caption, marginTop: 3, marginBottom: 3 },

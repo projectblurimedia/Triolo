@@ -1,3 +1,4 @@
+import { syncProfilePhoto } from './profilePhotoSync';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { workersService, CreateWorkerProfileParams, UpdateWorkerProfileParams } from '@/services/workersService';
 
@@ -10,7 +11,11 @@ export function useMyWorkerProfile() {
 export function useCreateWorkerProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: CreateWorkerProfileParams) => workersService.createProfile(params),
+    mutationFn: async (params: CreateWorkerProfileParams) => {
+      const saved = await workersService.createProfile(params);
+      await syncProfilePhoto(params.profilePhoto, workersService.uploadProfilePhoto, workersService.removeProfilePhoto);
+      return saved;
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: WORKER_PROFILE_QUERY_KEY }),
   });
 }
@@ -18,7 +23,11 @@ export function useCreateWorkerProfile() {
 export function useUpdateWorkerProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: UpdateWorkerProfileParams) => workersService.updateProfile(params),
+    mutationFn: async (params: UpdateWorkerProfileParams) => {
+      const saved = await workersService.updateProfile(params);
+      await syncProfilePhoto(params.profilePhoto, workersService.uploadProfilePhoto, workersService.removeProfilePhoto);
+      return saved;
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: WORKER_PROFILE_QUERY_KEY }),
   });
 }
