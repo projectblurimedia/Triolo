@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import * as Notifications from 'expo-notifications';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -25,6 +26,7 @@ import { ApiError } from '@/services/apiClient';
 import { formatDistance } from '@/utils/formatDistance';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { FindJobsButton } from '@/components/FindJobsButton';
+import { LocationNeededCard } from '@/components/LocationNeededCard';
 
 type Tab = 'requests' | 'active' | 'history';
 type HistoryEntry =
@@ -123,7 +125,7 @@ export function BookingsScreen() {
         showToast({
           variant: alreadyTaken ? 'info' : 'error',
           title: t(alreadyTaken ? 'bookings.takenToastTitle' : 'common.errorTitle'),
-          message: t(alreadyTaken ? 'bookings.takenToastMessage' : 'errors.generic'),
+          message: alreadyTaken ? t('bookings.takenToastMessage') : getLocalizedErrorMessage(err, t),
         });
         // A generic error leaves the offer genuinely still open (worth retrying), but
         // "already taken" is final — clear the matching system notification either way
@@ -367,6 +369,8 @@ export function BookingsScreen() {
           );
         })}
       </View>
+
+      <LocationNeededCard />
 
       {loading ? (
         <View style={styles.centerWrap}>

@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
+import { showAdBefore } from './Ads';
 import { LiveMap, MapPoint } from './LiveMap';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ToastHost } from './ToastHost';
@@ -441,7 +442,10 @@ export function JobTrackingModal() {
     }
     if (j.status === 'arrived') return renderPinEntry(j);
     if (j.status === 'in_progress') {
-      return <Button label={t('job.markWorkDone')} onPress={() => setConfirmDone(true)} gradient={DONE_GRADIENT} />;
+      // A local business's ad first (when one is running nearby), then the confirmation.
+      return (
+        <Button label={t('job.markWorkDone')} onPress={() => showAdBefore(() => setConfirmDone(true))} gradient={DONE_GRADIENT} />
+      );
     }
     if (j.status === 'work_done') {
       return <Text style={[styles.waiting, { color: colors.textMuted }]}>{t('job.waitingForCustomer')}</Text>;

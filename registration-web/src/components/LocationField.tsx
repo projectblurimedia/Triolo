@@ -12,6 +12,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { LoadingSpinner } from './LoadingSpinner';
 import { PlaceValue, placeFromCoords } from '@/utils/place';
+import { currentPosition, locationErrorMessage } from '@/utils/geolocation';
 
 interface LocationFieldProps {
   label: string;
@@ -23,16 +24,6 @@ interface LocationFieldProps {
 const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 // Andhra Pradesh / Telangana, the launch region — only when nothing better is known.
 const FALLBACK = { latitude: 16.9, longitude: 80.4, zoom: 6 };
-
-function currentPosition(): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('unsupported'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 });
-  });
-}
 
 /**
  * Where you are: "Use my current location" (browser GPS) or "Select on map" — no typed address.
@@ -50,8 +41,8 @@ export function LocationField({ label, value, onChange }: LocationFieldProps) {
     try {
       const position = await currentPosition();
       onChange(await placeFromCoords(position.coords.latitude, position.coords.longitude));
-    } catch {
-      setMessage("Couldn't get your location. Allow location access and try again, or select it on the map.");
+    } catch (err) {
+      setMessage(locationErrorMessage(err));
     } finally {
       setDetecting(false);
     }
@@ -156,7 +147,10 @@ function MapPicker({ initial, onClose, onPick }: MapPickerProps) {
         if (id === lookupId.current) setPreview(place);
       });
     };
+    const resizer = new ResizeObserver(() => map.resize());
+    resizer.observe(containerRef.current);
     map.on('load', () => {
+      map.resize();
       setReady(true);
       nameCenter();
     });
@@ -181,6 +175,7 @@ function MapPicker({ initial, onClose, onPick }: MapPickerProps) {
     }
     return () => {
       clearTimeout(timer);
+      resizer.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -191,8 +186,8 @@ function MapPicker({ initial, onClose, onPick }: MapPickerProps) {
     try {
       const position = await currentPosition();
       mapRef.current?.flyTo({ center: [position.coords.longitude, position.coords.latitude], zoom: 16 });
-    } catch {
-      alert("Couldn't get your location. Allow location access in your browser and try again.");
+    } catch (err) {
+      alert(locationErrorMessage(err));
     } finally {
       setLocating(false);
     }

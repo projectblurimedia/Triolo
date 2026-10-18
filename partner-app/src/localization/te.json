@@ -239,7 +239,16 @@
     "findingPlace": "ప్రదేశం పేరు వెతుకుతోంది…",
     "confirmPlace": "లొకేషన్ నిర్ధారించండి",
     "workerPlaceLabel": "మీరు ఎక్కడి నుండి పని చేస్తారు?",
-    "shopPlaceLabel": "షాప్ లొకేషన్"
+    "shopPlaceLabel": "షాప్ లొకేషన్",
+    "disabledTitle": "లొకేషన్ ఆఫ్‌లో ఉంది",
+    "neededTitle": "లొకేషన్‌కు అనుమతి ఇవ్వండి",
+    "errorTitle": "మీ లొకేషన్ కనుగొనలేకపోయాం",
+    "errorMessage": "లొకేషన్ ఆన్‌లో ఉందో చూసి, మళ్ళీ ప్రయత్నించండి.",
+    "partnerNeededMessage": "మీ దగ్గరి పని అభ్యర్థనలు పొందడానికి, ఏ పనినైనా అంగీకరించడానికి లేదా చేయడానికి లొకేషన్ ఆన్ చేయండి.",
+    "deniedForeverMessage": "Triolo Partner కి లొకేషన్ అనుమతి ఆఫ్‌లో ఉంది. మీ దగ్గరి పనులు పొందడానికి సెట్టింగ్స్‌లో అనుమతించండి.",
+    "turnOn": "లొకేషన్ ఆన్ చేయండి",
+    "openSettings": "సెట్టింగ్స్ తెరవండి",
+    "acceptNeedsLocation": "లొకేషన్ ఆన్ చేసి, ఈ పనిని అంగీకరించడానికి యాప్ తెరవండి."
   },
   "imagePicker": {
     "permissionDeniedTitle": "ఫోటో యాక్సెస్ అవసరం",
@@ -377,7 +386,8 @@
     "standingReason": "కారణం: {{reason}}",
     "suspendedTitle": "ఖాతా సస్పెండ్ చేయబడింది",
     "bannedTitle": "ఖాతా నిషేధించబడింది",
-    "validationFields": "దయచేసి చూడండి: {{fields}}."
+    "validationFields": "దయచేసి చూడండి: {{fields}}.",
+    "LOCATION_REQUIRED": "ఇది చేయడానికి లొకేషన్ ఆన్ చేయండి."
   },
   "problems": {
     "myJobsTitle": "నా పనులు",
@@ -842,5 +852,21 @@
     "description": "మీ గురించి",
     "quotationAmount": "ధర అంచనా",
     "other": "కొన్ని వివరాలు"
+  },
+  "ads": {
+    "tag": "ప్రాయోజితం",
+    "viewDetails": "వివరాలు చూడండి",
+    "by": "{{name}} అందిస్తోంది",
+    "validTill": "{{date}} వరకు",
+    "call": "{{name}}కి కాల్ చేయండి",
+    "mute": "శబ్దం ఆపండి",
+    "unmute": "శబ్దం వినండి",
+    "openLink": "లింక్ తెరవండి",
+    "callShort": "కాల్ చేయండి",
+    "photos": "ఫోటోలు ({{count}})",
+    "tapToOpenLink": "లింక్ తెరవడానికి ఫోటోపై నొక్కండి",
+    "visit": "చూడండి",
+    "continue": "కొనసాగించండి",
+    "closeAfter": "{{count}} సెకన్లలో మూసివేయవచ్చు"
   }
 }

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { requireLocation } from '@/utils/requireLocation';
 import { problemsService } from '@/services/problemsService';
 import { MY_JOBS_QUERY_KEY } from './useJobs';
 
@@ -40,7 +41,10 @@ function useInvalidateProblems() {
 export function useAcceptProblem() {
   const invalidate = useInvalidateProblems();
   return useMutation({
-    mutationFn: (problemId: string) => problemsService.accept(problemId),
+    mutationFn: async (problemId: string) => {
+      await requireLocation();
+      return problemsService.accept(problemId);
+    },
     // Settled, not success — a lost race (409) also means the list is stale.
     onSettled: invalidate,
   });
@@ -49,7 +53,10 @@ export function useAcceptProblem() {
 export function useMarkWorkDone() {
   const invalidate = useInvalidateProblems();
   return useMutation({
-    mutationFn: (problemId: string) => problemsService.markWorkDone(problemId),
+    mutationFn: async (problemId: string) => {
+      await requireLocation();
+      return problemsService.markWorkDone(problemId);
+    },
     onSettled: invalidate,
   });
 }

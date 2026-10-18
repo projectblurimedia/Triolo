@@ -11,10 +11,7 @@ function ensureConfigured(): void {
     return;
   }
   if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
-    throw AppError.badRequest(
-      'Image uploads are not configured on this server yet.',
-      'CLOUDINARY_NOT_CONFIGURED',
-    );
+    throw AppError.badRequest('Image uploads are not configured on this server yet.', 'CLOUDINARY_NOT_CONFIGURED');
   }
   cloudinary.config({
     cloud_name: env.cloudinary.cloudName,
@@ -64,6 +61,15 @@ export function extractPublicIdFromUrl(url: string): string | null {
  * profile update/delete from succeeding.
  */
 export async function deletePhotosFromCloudinary(urls: string[]): Promise<void> {
+  await deleteFromCloudinary(urls, 'image');
+}
+
+/** Same as deletePhotosFromCloudinary, for videos (Cloudinary keeps them separately). */
+export async function deleteVideosFromCloudinary(urls: string[]): Promise<void> {
+  await deleteFromCloudinary(urls, 'video');
+}
+
+async function deleteFromCloudinary(urls: string[], resourceType: 'image' | 'video'): Promise<void> {
   if (urls.length === 0) {
     return;
   }
@@ -79,9 +85,117 @@ export async function deletePhotosFromCloudinary(urls: string[]): Promise<void> 
       continue;
     }
     try {
-      await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
     } catch (err) {
       logger.warn({ err, publicId }, 'Failed to delete Cloudinary asset');
     }
   }
+}
+
+export interface SignedUpload {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
+  resourceType: 'image' | 'video';
+  /** Extra signed upload fields the client must send as-is (e.g. `eager` for videos). */
+  extra: Record<string, string>;
+}
+
+/**
+ * The lighter copy of an ad video the apps play: at most 720 px wide, quality chosen by
+ * Cloudinary, H.264 MP4 (plays everywhere). Prepared right after upload (`eager`), so the
+ * first viewer doesn't wait for it.
+ */
+const PLAYBACK_VIDEO = 'c_limit,q_auto,vc_h264,w_720';
+/** Ad images for phones: at most 1080 px wide, best format and quality for each phone. */
+const PLAYBACK_IMAGE = 'c_limit,f_auto,q_auto,w_1080';
+
+/** The phone-friendly version of one of our Cloudinary files (other URLs are returned as-is). */
+export function playbackUrl(url: string | null, resourceType: 'image' | 'video'): string | null {
+  if (!url) return url;
+  const marker = `/${resourceType}/upload/`;
+  const at = url.indexOf(marker);
+  if (at < 0) return url;
+  const transformation = resourceType === 'video' ? PLAYBACK_VIDEO : PLAYBACK_IMAGE;
+  const rest = url.slice(at + marker.length);
+  const withFormat = resourceType === 'video' ? rest.replace(/\.[a-zA-Z0-9]+$/, '.mp4') : rest;
+  return `${url.slice(0, at + marker.length)}${transformation}/${withFormat}`;
+}
+
+/**
+ * Lets a trusted client (the admin website) upload one file straight to Cloudinary. Needed
+ * for videos: Vercel rejects request bodies over 4.5 MB, so they can't pass through this
+ * server. The signature only allows uploads into `folder`, and expires after an hour.
+ */
+export function signDirectUpload(folder: string, resourceType: 'image' | 'video'): SignedUpload {
+  ensureConfigured();
+  const timestamp = Math.round(Date.now() / 1000);
+  // Videos: have Cloudinary prepare the phone-friendly copy straight away, in the background.
+  const extra: Record<string, string> = resourceType === 'video' ? { eager: `${PLAYBACK_VIDEO}/mp4`, eager_async: 'true' } : {};
+  const signature = cloudinary.utils.api_sign_request({ folder, timestamp, ...extra }, env.cloudinary.apiSecret);
+  return {
+    cloudName: env.cloudinary.cloudName,
+    apiKey: env.cloudinary.apiKey,
+    timestamp,
+    signature,
+    folder,
+    resourceType,
+    extra,
+  };
+}
+
+/** Every file of this kind in a folder (public id and upload time), for clean-ups. */
+export async function listCloudinaryFiles(
+  prefix: string,
+  resourceType: 'image' | 'video',
+): Promise<{ publicId: string; createdAt: string }[]> {
+  ensureConfigured();
+  const files: { publicId: string; createdAt: string }[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await cloudinary.api.resources({
+      type: 'upload',
+      resource_type: resourceType,
+      prefix,
+      max_results: 500,
+      next_cursor: cursor,
+    });
+    for (const file of page.resources) files.push({ publicId: file.public_id, createdAt: file.created_at });
+    cursor = page.next_cursor;
+  } while (cursor);
+  return files;
+}
+
+/** Deletes files by public id (best effort, like the URL-based deletes). */
+export async function deleteCloudinaryIds(publicIds: string[], resourceType: 'image' | 'video'): Promise<void> {
+  for (const publicId of publicIds) {
+    try {
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
+    } catch (err) {
+      logger.warn({ err, publicId }, 'Failed to delete Cloudinary asset');
+    }
+  }
+}
+
+/** A video's length in seconds, read from Cloudinary (null if it can't be found). */
+export async function videoDurationSeconds(url: string): Promise<number | null> {
+  ensureConfigured();
+  const publicId = extractPublicIdFromUrl(url);
+  if (!publicId) return null;
+  try {
+    // A video's length is only included when its media details are asked for.
+    const resource = await cloudinary.api.resource(publicId, { resource_type: 'video', media_metadata: true });
+    return typeof resource.duration === 'number' ? Math.round(resource.duration * 10) / 10 : null;
+  } catch (err) {
+    logger.warn({ err, publicId }, 'Could not read the video length');
+    return null;
+  }
+}
+
+/** Whether `url` is a file of ours, of this kind, inside `folder` (never trust a client's URL blindly). */
+export function isOwnCloudinaryUrl(url: string, folder: string, resourceType: 'image' | 'video'): boolean {
+  const prefix = `https://res.cloudinary.com/${env.cloudinary.cloudName}/${resourceType}/upload/`;
+  return url.startsWith(prefix) && url.includes(`/${folder}/`);
 }

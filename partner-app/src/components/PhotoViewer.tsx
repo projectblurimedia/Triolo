@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, FlatList, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Dimensions,
+  FlatList,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +21,10 @@ interface PhotoViewerProps {
   /** Index of the photo to open on; null keeps the viewer closed. */
   startIndex: number | null;
   onClose: () => void;
+  /** Tapping a photo (an ad's photo opens the ad's link). Nothing happens without it. */
+  onPhotoPress?: (index: number) => void;
+  /** A short line shown above the dots, e.g. "Tap the photo to open the link". */
+  hint?: string;
 }
 
 /**
@@ -18,7 +32,7 @@ interface PhotoViewerProps {
  * whole (contain, never cropped) on black, with a "2 / 5" counter and dots. Copied in
  * user-app and partner-app — keep the two in sync.
  */
-export function PhotoViewer({ photos, startIndex, onClose }: PhotoViewerProps) {
+export function PhotoViewer({ photos, startIndex, onClose, onPhotoPress, hint }: PhotoViewerProps) {
   const insets = useSafeAreaInsets();
   const { width, height } = Dimensions.get('window');
   const listRef = useRef<FlatList<string>>(null);
@@ -48,10 +62,10 @@ export function PhotoViewer({ photos, startIndex, onClose }: PhotoViewerProps) {
           initialScrollIndex={startIndex ?? 0}
           getItemLayout={(_, position) => ({ length: width, offset: width * position, index: position })}
           onMomentumScrollEnd={onScrollEnd}
-          renderItem={({ item }) => (
-            <View style={{ width, height }}>
+          renderItem={({ item, index: position }) => (
+            <Pressable style={{ width, height }} onPress={() => onPhotoPress?.(position)} disabled={!onPhotoPress}>
               <SmartImage source={{ uri: item }} style={styles.image} resizeMode="contain" />
-            </View>
+            </Pressable>
           )}
         />
 
@@ -63,6 +77,12 @@ export function PhotoViewer({ photos, startIndex, onClose }: PhotoViewerProps) {
             <FontAwesome6 name="xmark" size={18} color="#FFFFFF" solid />
           </Pressable>
         </View>
+
+        {hint ? (
+          <Text style={[styles.hint, { bottom: insets.bottom + (photos.length > 1 ? 52 : 28) }]} pointerEvents="none">
+            {hint}
+          </Text>
+        ) : null}
 
         {photos.length > 1 ? (
           <View style={[styles.dots, { bottom: insets.bottom + 28 }]}>
@@ -103,11 +123,22 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   dots: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 7 },
+  hint: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.85)',
+    fontFamily: fonts.medium,
+    fontSize: 13,
+  },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' },
   dotActive: { width: 20, backgroundColor: '#FFFFFF' },
 });

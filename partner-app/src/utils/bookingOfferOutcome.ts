@@ -3,8 +3,9 @@ import { ApiError } from '@/services/apiClient';
 import { bookingOffersService } from '@/services/bookingOffersService';
 import i18n from '@/localization/i18n';
 import { BOOKING_OFFER_CHANNEL } from '@/constants/bookingNotifications';
+import { isLocationOn } from './requireLocation';
 
-export type OfferOutcome = 'accepted' | 'declined' | 'already_taken' | 'error';
+export type OfferOutcome = 'accepted' | 'declined' | 'already_taken' | 'location_off' | 'error';
 
 /**
  * Plain (non-React) accept/decline attempts, callable from anywhere — including
@@ -15,6 +16,9 @@ export type OfferOutcome = 'accepted' | 'declined' | 'already_taken' | 'error';
  * generic "Something Went Wrong" instead of the actual, clear reason.
  */
 export async function attemptAccept(bookingRequestId: string): Promise<OfferOutcome> {
+  // Like every partner action, taking a job needs location on. From a notification button
+  // there's no way to show the "turn on location" dialog, so just say so.
+  if (!(await isLocationOn())) return 'location_off';
   try {
     await bookingOffersService.accept(bookingRequestId);
     return 'accepted';
@@ -57,7 +61,9 @@ export async function updateOfferNotification(bookingRequestId: string, outcome:
       ? { title: i18n.t('bookings.acceptedToastTitle'), body: i18n.t('bookings.acceptedToastMessage') }
       : outcome === 'already_taken'
         ? { title: i18n.t('bookings.takenToastTitle'), body: i18n.t('bookings.takenToastMessage') }
-        : { title: i18n.t('bookings.declinedToastTitle') };
+        : outcome === 'location_off'
+          ? { title: i18n.t('location.disabledTitle'), body: i18n.t('location.acceptNeedsLocation') }
+          : { title: i18n.t('bookings.declinedToastTitle') };
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: bookingRequestId,

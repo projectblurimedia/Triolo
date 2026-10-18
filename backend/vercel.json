@@ -1,6 +1,15 @@
 {
   "buildCommand": "npm run build",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/ads/cron/cleanup",
+      "schedule": "30 0 * * *"
+    }
   ]
 }

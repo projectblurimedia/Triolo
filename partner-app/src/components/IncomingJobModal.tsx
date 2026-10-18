@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Vibration } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import * as Notifications from 'expo-notifications';
 import { useQueryClient } from '@tanstack/react-query';
 import { IncomingRequestScreen } from './IncomingRequestScreen';
@@ -126,7 +127,7 @@ export function IncomingJobModal() {
         showToast({
           variant: alreadyTaken ? 'info' : 'error',
           title: t(alreadyTaken ? 'bookings.takenToastTitle' : 'common.errorTitle'),
-          message: t(alreadyTaken ? 'bookings.takenToastMessage' : 'errors.generic'),
+          message: alreadyTaken ? t('bookings.takenToastMessage') : getLocalizedErrorMessage(err, t),
         });
         if (alreadyTaken) {
           Notifications.dismissNotificationAsync(offer.bookingRequestId).catch(() => {});

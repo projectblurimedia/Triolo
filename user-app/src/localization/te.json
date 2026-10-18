@@ -544,7 +544,8 @@
     "standingReason": "కారణం: {{reason}}",
     "suspendedTitle": "ఖాతా సస్పెండ్ చేయబడింది",
     "bannedTitle": "ఖాతా నిషేధించబడింది",
-    "validationFields": "దయచేసి చూడండి: {{fields}}."
+    "validationFields": "దయచేసి చూడండి: {{fields}}.",
+    "LOCATION_REQUIRED": "ఇది చేయడానికి లొకేషన్ ఆన్ చేయండి."
   },
   "problemForm": {
     "photosLabel": "సమస్య ఫోటోలు (గరిష్టంగా 5)",
@@ -1075,6 +1076,28 @@
     "create": "లిస్ట్ తయారు చేయండి",
     "untitled": "నా లిస్ట్",
     "itemCount_one": "{{count}} వస్తువు",
-    "itemCount_other": "{{count}} వస్తువులు"
+    "itemCount_other": "{{count}} వస్తువులు",
+    "emptyTitle": "ఇంకా జాబితాలు లేవు",
+    "next": "దుకాణాన్ని ఎంచుకోండి",
+    "newList": "కొత్త జాబితా చేయండి",
+    "stepPick": "జాబితా ఎంచుకోండి",
+    "stepShop": "దుకాణం ఎంచుకోండి",
+    "more": "+{{count}} మరిన్ని"
+  },
+  "ads": {
+    "tag": "ప్రాయోజితం",
+    "viewDetails": "వివరాలు చూడండి",
+    "by": "{{name}} అందిస్తోంది",
+    "validTill": "{{date}} వరకు",
+    "call": "{{name}}కి కాల్ చేయండి",
+    "mute": "శబ్దం ఆపండి",
+    "unmute": "శబ్దం వినండి",
+    "openLink": "లింక్ తెరవండి",
+    "callShort": "కాల్ చేయండి",
+    "photos": "ఫోటోలు ({{count}})",
+    "tapToOpenLink": "లింక్ తెరవడానికి ఫోటోపై నొక్కండి",
+    "visit": "చూడండి",
+    "continue": "కొనసాగించండి",
+    "closeAfter": "{{count}} సెకన్లలో మూసివేయవచ్చు"
   }
 }

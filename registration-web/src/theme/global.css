@@ -397,9 +397,13 @@ a {
   flex: 1;
 }
 
-.map-picker__canvas {
+/* Stronger than MapLibre's own `.maplibregl-map { position: relative }`, which otherwise
+   collapses the map to zero height (only the place name showed). */
+.map-picker__map .map-picker__canvas {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .map-picker__overlay {

@@ -63,7 +63,13 @@
           "color": "#0055D3"
         }
       ],
-      "expo-task-manager"
+      "expo-task-manager",
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false
+        }
+      ]
     ],
     "extra": {
       "eas": {

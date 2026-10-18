@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import i18n from '@/localization/i18n';
 import { Platform, Vibration } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
@@ -56,6 +57,8 @@ async function handleOfferAction(actionIdentifier: string, bookingRequestId: str
       showToast({ variant: 'success', title: labels.accepted, message: labels.acceptedMessage });
     } else if (outcome === 'already_taken') {
       showToast({ variant: 'info', title: labels.taken, message: labels.takenMessage });
+    } else if (outcome === 'location_off') {
+      showToast({ variant: 'error', title: i18n.t('location.disabledTitle'), message: i18n.t('location.acceptNeedsLocation') });
     } else {
       showToast({ variant: 'error', title: labels.error });
     }

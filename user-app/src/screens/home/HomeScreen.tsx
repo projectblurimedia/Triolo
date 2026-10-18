@@ -22,6 +22,7 @@ import { useMyProblems } from '@/hooks/useProblems';
 import { useMyBookings } from '@/hooks/useBookings';
 import { useMyOrders } from '@/hooks/useOrders';
 import { ContinueSteps } from '@/components/ContinueSteps';
+import { showAdBefore } from '@/components/Ads';
 import { WorkerNearbyResult, workersService } from '@/services/workersService';
 import { BusinessNearbyResult, businessesService } from '@/services/businessesService';
 import { NearbySearchMode } from '@/utils/nearbyResult';
@@ -126,12 +127,14 @@ export function HomeScreen() {
     businessesService.recordView(shop.id).catch(() => {});
   };
 
-  const handleQuickAction = (key: (typeof QUICK_ACTIONS)[number]['key']) => {
-    if (key === 'quickBook') setQuickBookVisible(true);
-    else if (key === 'postProblem') setProblemFormVisible(true);
-    else if (key === 'hireStaff') setHireStaffVisible(true);
-    else setChooseListVisible(true);
-  };
+  // A local business's ad first (when one is running nearby and the admin has it on), then the action.
+  const handleQuickAction = (key: (typeof QUICK_ACTIONS)[number]['key']) =>
+    showAdBefore(() => {
+      if (key === 'quickBook') setQuickBookVisible(true);
+      else if (key === 'postProblem') setProblemFormVisible(true);
+      else if (key === 'hireStaff') setHireStaffVisible(true);
+      else setChooseListVisible(true);
+    });
 
   const renderSectionHeader = (title: string, onSeeAll?: () => void) => (
     <View style={styles.sectionHeader}>

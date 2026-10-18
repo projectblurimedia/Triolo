@@ -10,6 +10,7 @@ import { bookingOffersService, PendingOffer } from '@/services/bookingOffersServ
 import { BOOKING_OFFERS_QUERY_KEY } from '@/hooks/useBookingOffers';
 import { NEARBY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
 import { showToast } from '@/state/toastStore';
+import { requireLocation } from '@/utils/requireLocation';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
@@ -49,7 +50,10 @@ export function FindJobsButton({
   const { colors } = useThemeColors();
   const queryClient = useQueryClient();
   const search = useMutation({
-    mutationFn: async () => bookingOffersService.search(await currentPosition()),
+    mutationFn: async () => {
+      await requireLocation();
+      return bookingOffersService.search(await currentPosition());
+    },
     onSuccess: (offers) => {
       queryClient.setQueryData(BOOKING_OFFERS_QUERY_KEY, offers);
       queryClient.invalidateQueries({ queryKey: NEARBY_PROBLEMS_QUERY_KEY });

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
+import { showAdBefore } from './Ads';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ToastHost } from './ToastHost';
 import { useShopOrder, useShopOrderAction } from '@/hooks/useShopOrders';
@@ -500,7 +501,8 @@ export function ShopOrderModal() {
       <View style={styles.fullWidth}>
         <Button
           label={t('shopOrders.verifyPin')}
-          onPress={() => handleVerifyPin(o)}
+          // Handover finishes the order: a local business's ad first (when one is running nearby).
+          onPress={() => showAdBefore(() => handleVerifyPin(o))}
           loading={verifyPin.isPending}
           disabled={pin.length !== 4}
         />

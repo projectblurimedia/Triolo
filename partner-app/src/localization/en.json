@@ -239,7 +239,16 @@
     "findingPlace": "Finding place name…",
     "confirmPlace": "Confirm Location",
     "workerPlaceLabel": "Where do you work from?",
-    "shopPlaceLabel": "Shop location"
+    "shopPlaceLabel": "Shop location",
+    "disabledTitle": "Location is turned off",
+    "neededTitle": "Allow location",
+    "errorTitle": "Couldn't find your location",
+    "errorMessage": "Check that location is turned on, then try again.",
+    "partnerNeededMessage": "Turn on location to get job requests near you and to accept or do any job.",
+    "deniedForeverMessage": "Location permission is off for Triolo Partner. Allow it in Settings to get jobs near you.",
+    "turnOn": "Turn On Location",
+    "openSettings": "Open Settings",
+    "acceptNeedsLocation": "Turn on location, then open the app to accept this job."
   },
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",
@@ -377,7 +386,8 @@
     "standingReason": "Reason: {{reason}}",
     "suspendedTitle": "Account Suspended",
     "bannedTitle": "Account Banned",
-    "validationFields": "Please check: {{fields}}."
+    "validationFields": "Please check: {{fields}}.",
+    "LOCATION_REQUIRED": "Turn on location to do this."
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -842,5 +852,21 @@
     "description": "About you",
     "quotationAmount": "Quotation",
     "other": "Some details"
+  },
+  "ads": {
+    "tag": "Sponsored",
+    "viewDetails": "View details",
+    "by": "By {{name}}",
+    "validTill": "Valid till {{date}}",
+    "call": "Call {{name}}",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "openLink": "Open Link",
+    "callShort": "Call",
+    "photos": "Photos ({{count}})",
+    "tapToOpenLink": "Tap the photo to open the link",
+    "visit": "Visit",
+    "continue": "Continue",
+    "closeAfter": "You can close this in {{count}} s"
   }
 }

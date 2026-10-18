@@ -14,7 +14,8 @@
     "test:watch": "jest --watch",
     "migrate": "tsx scripts/migrate.ts",
     "seed:admin": "tsx scripts/seedAdmin.ts",
-    "seed:test-listings": "tsx scripts/seedTestListings.ts"
+    "seed:test-listings": "tsx scripts/seedTestListings.ts",
+    "cleanup:cloudinary": "tsx scripts/cleanupCloudinary.ts"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

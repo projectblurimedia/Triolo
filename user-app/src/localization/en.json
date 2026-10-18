@@ -544,7 +544,8 @@
     "standingReason": "Reason: {{reason}}",
     "suspendedTitle": "Account Suspended",
     "bannedTitle": "Account Banned",
-    "validationFields": "Please check: {{fields}}."
+    "validationFields": "Please check: {{fields}}.",
+    "LOCATION_REQUIRED": "Turn on location to do this."
   },
   "problemForm": {
     "photosLabel": "Photos of the problem (up to 5)",
@@ -1075,6 +1076,28 @@
     "create": "Make a List",
     "untitled": "My list",
     "itemCount_one": "{{count}} item",
-    "itemCount_other": "{{count}} items"
+    "itemCount_other": "{{count}} items",
+    "emptyTitle": "No lists yet",
+    "next": "Choose a Shop",
+    "newList": "Make a New List",
+    "stepPick": "Pick a list",
+    "stepShop": "Choose a shop",
+    "more": "+{{count}} more"
+  },
+  "ads": {
+    "tag": "Sponsored",
+    "viewDetails": "View details",
+    "by": "By {{name}}",
+    "validTill": "Valid till {{date}}",
+    "call": "Call {{name}}",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "openLink": "Open Link",
+    "callShort": "Call",
+    "photos": "Photos ({{count}})",
+    "tapToOpenLink": "Tap the photo to open the link",
+    "visit": "Visit",
+    "continue": "Continue",
+    "closeAfter": "You can close this in {{count}} s"
   }
 }

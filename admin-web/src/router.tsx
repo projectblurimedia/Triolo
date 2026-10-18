@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, useParams } from 'react-router-dom';
 import { RequireAdmin } from '@/components/RequireAdmin';
 import { Layout } from '@/components/Layout';
 import { LoginPage } from '@/pages/LoginPage';
+import { AdDetailPage, AdEditPage, AdNewPage, AdsPage } from '@/pages/AdsPages';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { AccountsPage, BookingsPage, JobPostsPage, OrdersPage, ProblemsPage, ShopsPage, WorkersPage } from '@/pages/ListPages';
 import {
@@ -48,6 +49,10 @@ export const router = createBrowserRouter([
       { path: 'orders/:id', element: <OrderDetailPage /> },
       { path: 'job-posts', element: <JobPostsPage /> },
       { path: 'job-posts/:id', element: <JobPostDetailPage /> },
+      { path: 'ads', element: <AdsPage /> },
+      { path: 'ads/new', element: <AdNewPage /> },
+      { path: 'ads/:id', element: <AdDetailPage /> },
+      { path: 'ads/:id/edit', element: <AdEditPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

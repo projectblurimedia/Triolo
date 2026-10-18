@@ -13,6 +13,8 @@
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^3.5.0",
+    "jspdf": "^2.5.2",
+    "maplibre-gl": "^4.7.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-router-dom": "^6.28.0",

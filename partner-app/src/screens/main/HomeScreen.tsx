@@ -11,6 +11,8 @@ import { ShopHomeSection } from '@/components/ShopHomeSection';
 import { JobPostHomeSection } from '@/components/JobPostHomeSection';
 import { useMyJobPost } from '@/hooks/useJobPost';
 import { ContinueSteps } from '@/components/ContinueSteps';
+import { showAdBefore } from '@/components/Ads';
+import { LocationNeededCard } from '@/components/LocationNeededCard';
 import { FindJobsButton } from '@/components/FindJobsButton';
 import { navigateToBookings } from '@/navigation/navigationRef';
 import { useQueryClient } from '@tanstack/react-query';
@@ -218,7 +220,11 @@ export function HomeScreen() {
           ) : isWorkDone ? (
             <Text style={[styles.waitingText, { color: colors.textMuted }]}>{t('problems.waitingForCustomer')}</Text>
           ) : (
-            <Button label={t('problems.markWorkDone')} onPress={() => setConfirmDoneFor(job)} gradient={DONE_GRADIENT} />
+            <Button
+              label={t('problems.markWorkDone')}
+              onPress={() => showAdBefore(() => setConfirmDoneFor(job))}
+              gradient={DONE_GRADIENT}
+            />
           )}
         </View>
       </Pressable>
@@ -370,6 +376,9 @@ export function HomeScreen() {
               {t('mainTabs.Home.greeting', { name: account.fullName })}
             </Text>
           ) : null}
+
+          {/* Location off: say so first — nothing works without it. */}
+          <LocationNeededCard />
 
           <ContinueSteps isShop={isVerifiedShop} />
 

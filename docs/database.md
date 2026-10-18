@@ -238,6 +238,17 @@ The same migration added `business_profiles.rating_sum/rating_count` (shop ratin
 
 Partial index `(category) WHERE is_active`. No admin review: a post is live as soon as it's saved.
 
+### Ads (Ads module — migration `0029`)
+
+- `ad_settings` — one row (`id = 1`): `ads_enabled` (master switch, starts off), `launch_user`, `launch_partner`, `home_user`, `home_partner`.
+- `ads` — `bill_number` (from `ad_bill_number_seq`, never reused), `advertiser_name`, `advertiser_phone`, `title`, `description`, `image_url`, `contact_phone`, `location_text`, `plan_days` (1/3/7/30), `amount` (₹ as charged), `payment_method`, `start_date`/`end_date` (inclusive, India calendar), `impressions`, `clicks`, `deleted_at` (soft delete — history and bill stay).
+- `ad_daily_stats` — `(ad_id, day)` views and opens per day; the fair rotation picks the running ad with the fewest views today.
+- Migration `0034`: `ads.orientation` (`vertical`/`horizontal`), `ads.display_seconds` (3–30, default 5), `ads.video_seconds` (≤30.5); one piece of media per ad (`ads_one_media`); `ad_settings.home_*` renamed `action_*` (ads before key actions — the Home card is gone).
+- Migration `0033`: `ads.link_url` (optional web link).
+- Migration `0032`: `ads.image_urls TEXT[]` (≤4, replaces `image_url`), `ads.video_url`, `ads.media_cleared_at` (set when an ended/deleted ad's media was removed from Cloudinary).
+- Migration `0031`: `ad_settings.plan_prices` JSONB (`{"1":20,"3":50,"7":100,"30":300}` by default), set by the admin; `ads.amount` keeps what each ad was booked at.
+- Migration `0030`: `ads.latitude`, `ads.longitude` (the ad's place), `ads.radius_km` (default 5); `contact_phone` dropped (copied into `advertiser_phone` first) — the Call button uses the business phone.
+
 ### Account photo (migration `0028`)
 
 `accounts.profile_photo_url` — a customer's own photo (user-app registration and Edit Profile). Worker and shop photos stay on their own profiles.

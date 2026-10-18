@@ -14,7 +14,7 @@
       "package": "com.projectblurimedia.triolo",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#001B57",
+        "backgroundColor": "#001850",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -62,13 +62,21 @@
         {
           "microphonePermission": "Triolo uses your microphone to let you build your Prepare List by voice.",
           "speechRecognitionPermission": "Triolo uses speech recognition to turn what you say into list items.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
         }
       ],
       [
         "expo-notifications",
         {
           "color": "#0055D3"
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false
         }
       ]
     ],

@@ -20,6 +20,7 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
+import { AdActionHost, AdLaunchBanner } from '@/components/Ads';
 import { PortalHost } from '@/components/Portal';
 import { IncomingJobModal } from '@/components/IncomingJobModal';
 import { IncomingOrderModal } from '@/components/IncomingOrderModal';
@@ -27,6 +28,7 @@ import { JobTrackingModal } from '@/components/JobTrackingModal';
 import { ShopOrderModal } from '@/components/ShopOrderModal';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
+import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
@@ -61,6 +63,8 @@ export default function App() {
   });
   const { colors, isDark } = useThemeColors();
   const isLoggingOut = useAuthStore((state) => state.isLoggingOut);
+  // A new job request always wins over the app-open ad.
+  const offerOnScreen = usePendingOfferStore((state) => state.focusedBookingRequestId !== null);
 
   // Real push notifications (device registration) — see the hook's own doc comment for why
   // this stays a harmless no-op until the app is built with real Firebase/FCM config.
@@ -176,6 +180,10 @@ export default function App() {
         {/* The worker's live Quick Book job screen — opened from anywhere via jobFocusStore. */}
         <JobTrackingModal />
         <ShopOrderModal />
+        {/* A local business's ad when the app opens (if the admin has it on). */}
+        <AdLaunchBanner hold={offerOnScreen} />
+        {/* A local business's ad before a key action (see showAdBefore). */}
+        <AdActionHost />
         <ToastHost />
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}

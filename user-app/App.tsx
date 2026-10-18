@@ -20,6 +20,7 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
+import { AdActionHost, AdLaunchBanner } from '@/components/Ads';
 import { PortalHost } from '@/components/Portal';
 import { BookingTrackingModal } from '@/components/BookingTrackingModal';
 import { OrderTrackingModal } from '@/components/OrderTrackingModal';
@@ -165,6 +166,10 @@ export default function App() {
         {/* Quick Book's live tracking screen — opened from anywhere via bookingTrackerStore. */}
         <BookingTrackingModal />
         <OrderTrackingModal />
+        {/* A local business's ad when the app opens (if the admin has it on). */}
+        <AdLaunchBanner />
+        {/* A local business's ad before a key action (see showAdBefore). */}
+        <AdActionHost />
         <ToastHost />
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}

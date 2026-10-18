@@ -1,0 +1,1056 @@
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faBullhorn,
+  faCircleCheck,
+  faCalendarDays,
+  faEye,
+  faFilePdf,
+  faHandPointer,
+  faImage,
+  faLink,
+  faLocationDot,
+  faPen,
+  faPhone,
+  faPlus,
+  faReceipt,
+  faStore,
+  faTrash,
+  faVideo,
+  faXmark,
+} from '@fortawesome/free-solid-svg-icons';
+import { Topbar } from '@/components/Layout';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import {
+  Badge,
+  BackLink,
+  Empty,
+  ErrorState,
+  InfoRow,
+  Loading,
+  Notice,
+  Pager,
+  SearchBox,
+  Segment,
+  Spinner,
+} from '@/components/ui';
+import { useApi } from '@/hooks/useApi';
+import {
+  AD_MAX_IMAGE_MB,
+  AD_MAX_VIDEO_SECONDS,
+  AD_MAX_VIDEO_MB,
+  AD_MAX_VIDEO_MB_SHRINKABLE,
+  AD_PLANS,
+  Ad,
+  AdOrientation,
+  AdPaymentMethod,
+  AdPlanDays,
+  AdPlanPrices,
+  AdSettings,
+  AdStatus,
+  SaveAd,
+  adsApi,
+  planLabel,
+  uploadAdFile,
+} from '@/services/adsApi';
+import { getErrorMessage } from '@/services/errorMessages';
+import { PlaceField } from '@/components/PlaceField';
+import { PlaceValue } from '@/utils/place';
+import { showToast } from '@/state/toastStore';
+import { billNumber, dayLabel, downloadAdBill } from '@/utils/adBill';
+import { canShrinkVideo, shrinkVideo, SHRINK_ABOVE_BYTES } from '@/utils/shrinkVideo';
+import { rupees, timeAgo, Tone } from '@/utils/format';
+
+/** One piece of an ad's media in the form: already on the ad (url) or newly picked (file + local preview url). */
+interface MediaItem {
+  url: string;
+  file?: File;
+}
+
+const STATUS: Record<AdStatus, { label: string; tone: Tone }> = {
+  running: { label: 'Running', tone: 'success' },
+  scheduled: { label: 'Scheduled', tone: 'info' },
+  ended: { label: 'Ended', tone: 'muted' },
+  deleted: { label: 'Deleted', tone: 'error' },
+};
+
+const PAYMENT_LABEL: Record<AdPaymentMethod, string> = { cash: 'Cash', upi: 'UPI', other: 'Other' };
+
+const LIMIT = 20;
+
+/** Today's date in India as YYYY-MM-DD (ads run by the India calendar day). */
+function todayInIndia(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+}
+
+/** Last day of a plan starting on `start` (inclusive). */
+function endDateFor(start: string, days: number): string {
+  const date = new Date(`${start}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (value: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      className={`switch${checked ? ' on' : ''}`}
+      onClick={() => onChange(!checked)}
+      disabled={disabled}
+    >
+      <span className="switch-knob" />
+    </button>
+  );
+}
+
+// ---------------- Settings card ----------------
+
+function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange: (settings: AdSettings) => void }) {
+  const [saving, setSaving] = useState(false);
+
+  const save = async (changes: Partial<AdSettings>) => {
+    const previous = settings;
+    onChange({ ...settings, ...changes });
+    setSaving(true);
+    try {
+      onChange(await adsApi.saveSettings(changes));
+    } catch (err) {
+      onChange(previous);
+      showToast({ variant: 'error', title: 'Not saved', message: getErrorMessage(err) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const off = !settings.adsEnabled;
+  const rows: { label: string; note: string; launch: keyof AdSettings; action: keyof AdSettings }[] = [
+    {
+      label: 'Customer app (Triolo)',
+      note: 'Before Home quick actions: Quick Book, Order from a Shop, Hire Staff, Post a Problem',
+      launch: 'launchUser',
+      action: 'actionUser',
+    },
+    {
+      label: 'Partner app (Triolo Partner)',
+      note: 'Before marking work done or an order finished',
+      launch: 'launchPartner',
+      action: 'actionPartner',
+    },
+  ];
+
+  return (
+    <div className="glass card">
+      <div className="ad-master">
+        <span className="nav-icon" style={{ background: 'linear-gradient(135deg,#ea580c,#f59e0b)', width: 42, height: 42 }}>
+          <FontAwesomeIcon icon={faBullhorn} />
+        </span>
+        <div style={{ flex: 1 }}>
+          <div className="row-title">Show ads in the apps</div>
+          <div className="row-sub">
+            {off ? 'Off — no ads are shown anywhere.' : 'On — running ads are shown where switched on below.'}
+          </div>
+        </div>
+        {saving ? <Spinner small /> : null}
+        <Switch checked={settings.adsEnabled} onChange={(value) => save({ adsEnabled: value })} />
+      </div>
+      <div className={`ad-places${off ? ' disabled' : ''}`}>
+        <div className="ad-places-head">
+          <span />
+          <span>Full screen when the app opens</span>
+          <span>Full screen before key actions</span>
+        </div>
+        {rows.map((row) => (
+          <div key={row.label} className="ad-places-row">
+            <span className="ad-places-label">
+              {row.label}
+              <small>{row.note}</small>
+            </span>
+            <span>
+              <Switch
+                checked={settings[row.launch] as boolean}
+                disabled={off}
+                onChange={(value) => save({ [row.launch]: value })}
+              />
+            </span>
+            <span>
+              <Switch
+                checked={settings[row.action] as boolean}
+                disabled={off}
+                onChange={(value) => save({ [row.action]: value })}
+              />
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------- Prices ----------------
+
+function AdPricesCard({ prices, onSaved }: { prices: AdPlanPrices; onSaved: (settings: AdSettings) => void }) {
+  const [draft, setDraft] = useState<Record<string, string>>(() =>
+    Object.fromEntries(AD_PLANS.map((plan) => [plan.key, String(prices[plan.key])])),
+  );
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraft(Object.fromEntries(AD_PLANS.map((plan) => [plan.key, String(prices[plan.key])])));
+  }, [prices]);
+
+  const changed = AD_PLANS.some((plan) => Number(draft[plan.key]) !== prices[plan.key]);
+  const valid = AD_PLANS.every((plan) => /^\d{1,6}$/.test(draft[plan.key] ?? ''));
+
+  const save = async () => {
+    if (!valid) {
+      showToast({ variant: 'error', title: 'Check the prices', message: 'Each price must be a whole number of rupees.' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const next = Object.fromEntries(AD_PLANS.map((plan) => [plan.key, Number(draft[plan.key])])) as AdPlanPrices;
+      onSaved(await adsApi.saveSettings({ prices: next }));
+      showToast({
+        variant: 'success',
+        title: 'Prices saved',
+        message: 'They apply to new bookings. Booked ads keep their price.',
+      });
+    } catch (err) {
+      showToast({ variant: 'error', title: 'Not saved', message: getErrorMessage(err) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="glass card">
+      <div className="card-title">
+        <FontAwesomeIcon icon={faReceipt} /> Prices
+      </div>
+      <div className="ad-prices">
+        {AD_PLANS.map((plan) => (
+          <label key={plan.key} className="field">
+            <span>{plan.label}</span>
+            <div className="ad-price-input">
+              <span>₹</span>
+              <input
+                value={draft[plan.key] ?? ''}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, [plan.key]: event.target.value.replace(/[^0-9]/g, '') }))
+                }
+                inputMode="numeric"
+                maxLength={6}
+              />
+            </div>
+          </label>
+        ))}
+      </div>
+      <div className="ad-prices-foot">
+        <span className="muted" style={{ fontSize: 12 }}>
+          New prices apply to new bookings only. Ads already booked keep the price they were booked at.
+        </span>
+        <button className="btn btn-primary btn-sm" onClick={save} disabled={!changed || saving}>
+          {saving ? <Spinner small /> : 'Save Prices'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------- List ----------------
+
+export function AdsPage() {
+  const [status, setStatus] = useState('');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const overview = useApi(() => adsApi.overview(), []);
+  const list = useApi(() => adsApi.list({ status, q, page, limit: LIMIT }), [status, q, page]);
+  const counts = overview.data?.counts;
+
+  return (
+    <>
+      <Topbar
+        title="Ads"
+        subtitle="local businesses' ads in both apps"
+        actions={
+          <Link to="/ads/new" className="btn btn-primary">
+            <FontAwesomeIcon icon={faPlus} /> Book New Ad
+          </Link>
+        }
+      />
+
+      {overview.loading ? (
+        <Loading />
+      ) : overview.error || !overview.data ? (
+        <ErrorState error={overview.error} onRetry={overview.reload} />
+      ) : (
+        <>
+          <AdSettingsCard
+            settings={overview.data.settings}
+            onChange={(settings) => overview.setData((current) => (current ? { ...current, settings } : current))}
+          />
+          <AdPricesCard
+            prices={overview.data.settings.prices}
+            onSaved={(settings) =>
+              overview.setData((current) => (current ? { ...current, settings, prices: settings.prices } : current))
+            }
+          />
+          <div className="stats ad-stats">
+            <div className="stat glass">
+              <span className="stat-value">{overview.data.counts.running}</span>
+              <span className="stat-label">Running now</span>
+            </div>
+            <div className="stat glass">
+              <span className="stat-value">{overview.data.counts.scheduled}</span>
+              <span className="stat-label">Starting later</span>
+            </div>
+            <div className="stat glass">
+              <span className="stat-value">{rupees(overview.data.revenueThisMonth)}</span>
+              <span className="stat-label">Booked this month</span>
+            </div>
+            <div className="stat glass">
+              <span className="stat-value">{rupees(overview.data.revenueTotal)}</span>
+              <span className="stat-label">Booked in total</span>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="toolbar" style={{ marginTop: 20 }}>
+        <SearchBox
+          value={q}
+          onChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+          placeholder="Search business, title or bill number"
+        />
+        <Segment
+          value={status}
+          onChange={(value) => {
+            setStatus(value);
+            setPage(1);
+          }}
+          options={[
+            { value: '', label: 'All' },
+            { value: 'running', label: 'Running', count: counts?.running },
+            { value: 'scheduled', label: 'Scheduled', count: counts?.scheduled },
+            { value: 'ended', label: 'Ended' },
+            { value: 'deleted', label: 'Deleted' },
+          ]}
+        />
+      </div>
+
+      {list.loading ? (
+        <Loading />
+      ) : list.error || !list.data ? (
+        <ErrorState error={list.error} onRetry={list.reload} />
+      ) : (
+        <div className="glass list">
+          {list.data.items.length === 0 ? (
+            <Empty icon={faBullhorn} title="No ads here" message="Book an ad when a business pays you." />
+          ) : (
+            list.data.items.map((ad) => (
+              <Link key={ad.id} to={`/ads/${ad.id}`} className="row">
+                {ad.imageUrls[0] ? (
+                  <span className="thumb">
+                    <img src={ad.imageUrls[0]} alt="" loading="lazy" />
+                  </span>
+                ) : (
+                  <span
+                    className="nav-icon"
+                    style={{ background: 'linear-gradient(135deg,#ea580c,#f59e0b)', width: 44, height: 44 }}
+                  >
+                    <FontAwesomeIcon icon={faBullhorn} />
+                  </span>
+                )}
+                <div className="row-main">
+                  <div className="row-title">{ad.title}</div>
+                  <div className="row-sub">
+                    {ad.advertiserName} · {planLabel(ad.planDays)} · {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
+                  </div>
+                </div>
+                <div className="row-side">
+                  <Badge tone={STATUS[ad.status].tone}>{STATUS[ad.status].label}</Badge>
+                  <span className="row-meta">
+                    {rupees(ad.amount)} · {ad.impressions.toLocaleString('en-IN')} views
+                  </span>
+                </div>
+              </Link>
+            ))
+          )}
+          <Pager page={list.data.page} limit={list.data.limit} total={list.data.total} onPage={setPage} />
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------------- Book / edit ----------------
+
+type AdFormValues = Omit<SaveAd, 'latitude' | 'longitude' | 'locationText'>;
+
+const EMPTY_FORM: AdFormValues = {
+  advertiserName: '',
+  advertiserPhone: '',
+  linkUrl: '',
+  orientation: 'vertical',
+  displaySeconds: 5,
+  planDays: 7,
+  paymentMethod: 'cash',
+  startDate: todayInIndia(),
+};
+
+/** People see an ad only within this distance of its place (same as the backend). */
+const AD_RADIUS_KM = 5;
+
+/** Progress of a newly picked file being made smaller and uploaded (`share` is this step's 0–1). */
+interface MediaStatus {
+  step: string | null;
+  text: string;
+  share: number;
+  state: 'working' | 'ready' | 'failed';
+}
+
+/** The ad's one piece of media in the form: already on the ad (url) or newly picked (file). */
+interface MediaPick {
+  kind: 'image' | 'video';
+  url: string;
+  file?: File;
+  seconds?: number | null;
+}
+
+/** Size (and a video's length) of a picked file, read in the browser before uploading. */
+function readMediaInfo(file: File): Promise<{ kind: 'image' | 'video'; width: number; height: number; seconds: number | null }> {
+  const url = URL.createObjectURL(file);
+  return new Promise((resolve, reject) => {
+    if (file.type.startsWith('image/')) {
+      const image = new Image();
+      image.onload = () => {
+        resolve({ kind: 'image', width: image.naturalWidth, height: image.naturalHeight, seconds: null });
+        URL.revokeObjectURL(url);
+      };
+      image.onerror = () => reject(new Error('That image could not be read.'));
+      image.src = url;
+      return;
+    }
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      resolve({ kind: 'video', width: video.videoWidth, height: video.videoHeight, seconds: video.duration });
+      URL.revokeObjectURL(url);
+    };
+    video.onerror = () => reject(new Error('That video could not be read. MP4 works best.'));
+    video.src = url;
+  });
+}
+
+const FORMATS: { value: AdOrientation; label: string; sub: string }[] = [
+  { value: 'vertical', label: 'Vertical', sub: 'Reel / poster · 9:16' },
+  { value: 'horizontal', label: 'Horizontal', sub: 'Wide · 16:9' },
+];
+
+function AdForm({ ad }: { ad?: Ad }) {
+  const navigate = useNavigate();
+  const [form, setForm] = useState<AdFormValues>(() =>
+    ad
+      ? {
+          advertiserName: ad.advertiserName,
+          advertiserPhone: ad.advertiserPhone ?? '',
+          linkUrl: ad.linkUrl ?? '',
+          orientation: ad.orientation,
+          displaySeconds: ad.displaySeconds,
+          planDays: ad.planDays,
+          paymentMethod: ad.paymentMethod,
+          startDate: ad.startDate,
+        }
+      : { ...EMPTY_FORM, startDate: todayInIndia() },
+  );
+  // Where the ad is shown: a GPS point or a map pin, never typed.
+  const [place, setPlace] = useState<PlaceValue | null>(() =>
+    ad && ad.latitude != null && ad.longitude != null
+      ? { latitude: ad.latitude, longitude: ad.longitude, locationName: ad.locationText ?? 'Pinned location' }
+      : null,
+  );
+  const [media, setMedia] = useState<MediaPick | null>(() =>
+    ad?.videoUrl
+      ? { kind: 'video', url: ad.videoUrl, seconds: ad.videoSeconds }
+      : ad?.imageUrls[0]
+        ? { kind: 'image', url: ad.imageUrls[0] }
+        : null,
+  );
+  const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [error, setError] = useState('');
+  // A newly picked file starts shrinking (big videos) and uploading straight away, in the
+  // background, while the rest of the form is filled in. `upload` is that work for the
+  // current pick; a newer pick or a removal makes older work's result unused.
+  const upload = useRef<{ file: File; promise: Promise<string> } | null>(null);
+  const [mediaStatus, setMediaStatus] = useState<MediaStatus | null>(null);
+  // The file is still being made smaller / uploaded: the ad can't be saved yet.
+  const mediaBusy = !!media?.file && mediaStatus?.state === 'working';
+
+  const startUpload = (file: File, kind: 'image' | 'video', originalSeconds: number | null = null) => {
+    const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
+    const isCurrent = () => upload.current?.file === file;
+    // Each step has its own bar, so the bar and the % shown always agree.
+    const status = (next: MediaStatus) => {
+      if (isCurrent()) setMediaStatus(next);
+    };
+    const willShrink = kind === 'video' && file.size > SHRINK_ABOVE_BYTES && canShrinkVideo();
+    const steps = willShrink ? 2 : 1;
+    const send = (toSend: File, step: number, stepCount: number, title: string) =>
+      uploadAdFile(toSend, kind, (share, sent, total) =>
+        status({
+          step: stepCount > 1 ? `Step ${step} of ${stepCount}` : null,
+          text:
+            share < 1
+              ? `${title} — ${Math.round(share * 100)}% (${mb(sent)} of ${mb(total)} MB)`
+              : `${title} — done, Cloudinary is saving it…`,
+          share,
+          state: 'working',
+        }),
+      );
+    const promise = (async () => {
+      let toSend = file;
+      if (willShrink) {
+        const shrinking = (share: number) =>
+          status({
+            step: `Step 1 of ${steps}`,
+            text: `Making the video smaller for a faster upload — ${Math.round(share * 100)}%`,
+            share,
+            state: 'working',
+          });
+        shrinking(0);
+        toSend = await shrinkVideo(file, shrinking);
+      }
+      if (toSend === file) {
+        const { url } = await send(file, steps, steps, `Uploading the ${kind}`);
+        status({ step: null, text: `Ready — ${mb(file.size)} MB uploaded`, share: 1, state: 'ready' });
+        return url;
+      }
+      const small = await send(toSend, 2, steps, `Uploading the smaller video (${mb(file.size)} → ${mb(toSend.size)} MB)`);
+      // Safety net: if the smaller copy's real length (as Cloudinary measured it) isn't the
+      // original's, it's not trusted — the original goes up instead (slower, but always right).
+      if (originalSeconds && (small.seconds === null || Math.abs(small.seconds - originalSeconds) > 2)) {
+        const { url } = await send(file, 3, 3, 'Uploading the original video instead');
+        status({ step: null, text: `Ready — ${mb(file.size)} MB uploaded`, share: 1, state: 'ready' });
+        return url;
+      }
+      status({
+        step: null,
+        text: `Ready — made smaller ${mb(file.size)} MB → ${mb(toSend.size)} MB and uploaded`,
+        share: 1,
+        state: 'ready',
+      });
+      return small.url;
+    })();
+    promise.catch((err) =>
+      status({ step: null, text: err instanceof Error ? err.message : 'Upload failed', share: 0, state: 'failed' }),
+    );
+    upload.current = { file, promise };
+  };
+
+  const pricing = useApi(() => adsApi.overview().then((overview) => overview.settings.prices), []);
+  const priceOf = (days: AdPlanDays) => pricing.data?.[String(days) as keyof AdPlanPrices];
+  // An edited ad keeps the amount it was booked at, unless its plan is changed.
+  const keepsBookedAmount = !!ad && ad.planDays === form.planDays;
+  const price = keepsBookedAmount ? ad.amount : priceOf(form.planDays);
+  const set = <K extends keyof AdFormValues>(key: K, value: AdFormValues[K]) =>
+    setForm((current) => ({ ...current, [key]: value }));
+
+  const pickMedia = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) return setError('Choose an image (JPG / PNG) or a video (MP4).');
+    if (isImage && file.size > AD_MAX_IMAGE_MB * 1024 * 1024) return setError(`The image must be under ${AD_MAX_IMAGE_MB} MB.`);
+    // Big videos are shrunk in the browser before upload; without that, Cloudinary's own limit applies.
+    const videoLimitMb = canShrinkVideo() ? AD_MAX_VIDEO_MB_SHRINKABLE : AD_MAX_VIDEO_MB;
+    if (isVideo && file.size > videoLimitMb * 1024 * 1024) return setError(`The video must be under ${videoLimitMb} MB.`);
+    try {
+      const info = await readMediaInfo(file);
+      if (info.kind === 'video' && (info.seconds ?? 0) > AD_MAX_VIDEO_SECONDS + 1) {
+        return setError(
+          `That video is ${Math.round(info.seconds ?? 0)} seconds. Ads can be at most ${AD_MAX_VIDEO_SECONDS} seconds.`,
+        );
+      }
+      setError('');
+      if (media?.file) URL.revokeObjectURL(media.url);
+      setMedia({ kind: info.kind, url: URL.createObjectURL(file), file, seconds: info.seconds });
+      startUpload(file, info.kind, info.seconds);
+      // Taller than wide → vertical, else horizontal (can still be changed below).
+      if (info.width && info.height) set('orientation', info.height > info.width ? 'vertical' : 'horizontal');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That file could not be read.');
+    }
+  };
+
+  /**
+   * Uploads a newly picked file straight to Cloudinary (first, so the ad is only booked once
+   * its image / video is safely up) and returns what to send with the ad: the new file's
+   * address, or nothing when the media didn't change.
+   */
+  const uploadMedia = async (): Promise<{ imageUrl?: string | null; videoUrl?: string | null }> => {
+    if (!media) return {};
+    if (!media.file) {
+      const current = ad?.videoUrl ?? ad?.imageUrls[0] ?? null;
+      if (media.url === current) return {};
+      return media.kind === 'image' ? { imageUrl: media.url } : { videoUrl: media.url };
+    }
+    // Usually already done in the background; otherwise wait for it (or retry a failed one).
+    if (upload.current?.file !== media.file || mediaStatus?.state === 'failed') {
+      startUpload(media.file, media.kind, media.seconds ?? null);
+    }
+    setProgress(`Waiting for the ${media.kind} to finish uploading…`);
+    const url = await (upload.current as { promise: Promise<string> }).promise;
+    return media.kind === 'image' ? { imageUrl: url } : { videoUrl: url };
+  };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (form.advertiserName.trim().length < 2) return setError('Enter the business name.');
+    if (!media) return setError('Add the ad: one image or one video.');
+    if (!place) return setError('Set where the ad is: use the current location or select it on the map.');
+    if (!form.startDate) return setError('Choose a start date.');
+    setError('');
+    setSaving(true);
+    try {
+      // The file goes up first; the ad (with it) is then saved in one step, so it's never
+      // booked without its image / video.
+      const uploaded = await uploadMedia();
+      setProgress('Saving the ad…');
+      const body: SaveAd = {
+        ...form,
+        ...uploaded,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        locationText: place.locationName,
+      };
+      const saved = ad ? await adsApi.update(ad.id, body) : await adsApi.create(body);
+      showToast({
+        variant: 'success',
+        title: ad ? 'Ad updated' : `Ad booked — bill ${billNumber(saved)}`,
+        message: ad ? undefined : 'Download the bill from the ad page.',
+      });
+      navigate(`/ads/${saved.id}`, { replace: true });
+    } catch (err) {
+      setError(err instanceof Error && !(err as { statusCode?: number }).statusCode ? err.message : getErrorMessage(err));
+    } finally {
+      setSaving(false);
+      setProgress('');
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="grid-2">
+      <div className="glass card">
+        <div className="card-title">
+          <FontAwesomeIcon icon={faStore} /> Who is advertising
+        </div>
+        <label className="field">
+          <span>Business name *</span>
+          <input
+            value={form.advertiserName}
+            onChange={(e) => set('advertiserName', e.target.value)}
+            maxLength={80}
+            placeholder="e.g. Sri Sai Textiles"
+          />
+        </label>
+        <label className="field">
+          <span>Business phone (optional — on the bill)</span>
+          <input
+            value={form.advertiserPhone}
+            onChange={(e) => set('advertiserPhone', e.target.value)}
+            inputMode="tel"
+            maxLength={15}
+            placeholder="Mobile number"
+          />
+        </label>
+
+        <div className="card-title" style={{ marginTop: 10 }}>
+          <FontAwesomeIcon icon={faBullhorn} /> The ad
+        </div>
+        <div className="field">
+          <span>Format</span>
+          <div className="ad-formats">
+            {FORMATS.map((format) => (
+              <button
+                key={format.value}
+                type="button"
+                className={`ad-format${form.orientation === format.value ? ' active' : ''}`}
+                onClick={() => set('orientation', format.value)}
+              >
+                <span className={`ad-format-shape ${format.value}`} />
+                <strong>{format.label}</strong>
+                <span>{format.sub}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <span>Image or video * (one)</span>
+          <div className="ad-image-pick">
+            {media ? (
+              <div className={`ad-frame ${form.orientation}`}>
+                {media.kind === 'video' ? <video src={media.url} muted controls playsInline /> : <img src={media.url} alt="" />}
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="Remove"
+                  onClick={() => {
+                    if (media.file) URL.revokeObjectURL(media.url);
+                    setMedia(null);
+                    upload.current = null;
+                    setMediaStatus(null);
+                  }}
+                >
+                  <FontAwesomeIcon icon={faXmark} />
+                </button>
+              </div>
+            ) : null}
+            {media?.file && mediaStatus ? (
+              <div className={`ad-upload ad-upload-${mediaStatus.state}`}>
+                {mediaStatus.step ? <div className="ad-upload-step">{mediaStatus.step}</div> : null}
+                <div className="ad-upload-text">
+                  {mediaStatus.state === 'working' ? <Spinner small /> : null}
+                  {mediaStatus.state === 'ready' ? <FontAwesomeIcon icon={faCircleCheck} /> : null}
+                  <span>{mediaStatus.text}</span>
+                </div>
+                {mediaStatus.state === 'working' ? (
+                  <div className="ad-upload-track">
+                    <div className="ad-upload-fill" style={{ width: `${Math.round(mediaStatus.share * 100)}%` }} />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <label className="btn btn-ghost">
+              <FontAwesomeIcon icon={media?.kind === 'video' ? faVideo : faImage} /> {media ? 'Change' : 'Choose image or video'}
+              <input type="file" accept="image/*,video/*" onChange={pickMedia} hidden />
+            </label>
+            <span className="muted" style={{ fontSize: 12 }}>
+              Image: JPG / PNG up to {AD_MAX_IMAGE_MB} MB. Video: up to {AD_MAX_VIDEO_SECONDS} seconds — big videos are made
+              smaller here first, so they upload fast (keep this tab open until it says Ready). It starts as soon as you choose
+              the file. The format is picked from its shape — change it above if needed.
+            </span>
+          </div>
+        </div>
+        {media?.kind === 'video' ? (
+          <p className="muted" style={{ fontSize: 13, margin: '-4px 0 14px' }}>
+            Shows for the whole video{media.seconds ? ` (${Math.round(media.seconds)} seconds)` : ''}, then it can be closed.
+          </p>
+        ) : (
+          <label className="field">
+            <span>Show the image for (seconds) — then it can be closed</span>
+            <input
+              type="number"
+              min={3}
+              max={30}
+              value={form.displaySeconds}
+              onChange={(e) => set('displaySeconds', Math.max(3, Math.min(30, Math.round(Number(e.target.value) || 5))))}
+            />
+          </label>
+        )}
+        <label className="field">
+          <span>Link (optional) — opens when people tap the ad</span>
+          <input
+            value={form.linkUrl}
+            onChange={(e) => set('linkUrl', e.target.value)}
+            inputMode="url"
+            maxLength={500}
+            placeholder="e.g. sritextiles.com or a WhatsApp / Instagram / Maps link"
+          />
+        </label>
+        <PlaceField
+          label="Where to show the ad *"
+          hint={`Shown only to people within ${AD_RADIUS_KM} km of this place.`}
+          value={place}
+          onChange={setPlace}
+        />
+      </div>
+
+      <div className="glass card">
+        <div className="card-title">
+          <FontAwesomeIcon icon={faReceipt} /> Booking
+        </div>
+        <div className="field">
+          <span>How long</span>
+          <div className="ad-plans">
+            {AD_PLANS.map((plan) => (
+              <button
+                key={plan.days}
+                type="button"
+                className={`ad-plan${form.planDays === plan.days ? ' active' : ''}`}
+                onClick={() => set('planDays', plan.days as AdPlanDays)}
+              >
+                <strong>{plan.label}</strong>
+                <span>{priceOf(plan.days) === undefined ? '…' : rupees(priceOf(plan.days))}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className="field">
+          <span>Starts on</span>
+          <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} />
+        </label>
+        <div className="field">
+          <span>Paid by</span>
+          <div className="chips">
+            {(['cash', 'upi', 'other'] as AdPaymentMethod[]).map((method) => (
+              <button
+                key={method}
+                type="button"
+                className={`chip${form.paymentMethod === method ? ' active' : ''}`}
+                onClick={() => set('paymentMethod', method)}
+              >
+                {PAYMENT_LABEL[method]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="ad-total">
+          <div>
+            <div className="muted" style={{ fontSize: 13 }}>
+              Runs {form.startDate ? `${dayLabel(form.startDate)} – ${dayLabel(endDateFor(form.startDate, form.planDays))}` : '—'}
+            </div>
+            <div className="ad-total-amount">{price === undefined ? '…' : rupees(price)}</div>
+            {keepsBookedAmount ? (
+              <div className="muted" style={{ fontSize: 12 }}>
+                Booked price — kept even if prices change
+              </div>
+            ) : null}
+          </div>
+          <button className="btn btn-primary" type="submit" disabled={saving || mediaBusy}>
+            {saving ? <Spinner small /> : ad ? 'Save Changes' : 'Book Ad'}
+          </button>
+          {mediaBusy && !saving ? (
+            <div className="muted" style={{ fontSize: 13, width: '100%', textAlign: 'right' }}>
+              Wait until the {media?.kind} says Ready.
+            </div>
+          ) : null}
+          {progress ? (
+            <div className="muted" style={{ fontSize: 13, width: '100%', textAlign: 'right' }}>
+              {progress}
+            </div>
+          ) : null}
+        </div>
+        {error ? (
+          <div style={{ marginTop: 12 }}>
+            <Notice tone="error" icon={faXmark}>
+              {error}
+            </Notice>
+          </div>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
+export function AdNewPage() {
+  return (
+    <>
+      <Topbar title="Book New Ad" subtitle="after the business has paid" />
+      <BackLink to="/ads" label="All ads" />
+      <AdForm />
+    </>
+  );
+}
+
+export function AdEditPage() {
+  const { id = '' } = useParams();
+  const { data, error, loading, reload } = useApi(() => adsApi.get(id), [id]);
+  return (
+    <>
+      <Topbar title="Edit Ad" subtitle={data ? billNumber(data) : 'change the ad or its booking'} />
+      <BackLink to={`/ads/${id}`} label="Back to the ad" />
+      {loading ? (
+        <Loading />
+      ) : error || !data ? (
+        <ErrorState error={error} onRetry={reload} />
+      ) : data.status === 'deleted' ? (
+        <Notice tone="error" icon={faTrash}>
+          This ad was deleted, so it can't be changed. Its bill is still in the history.
+        </Notice>
+      ) : (
+        <AdForm ad={data} />
+      )}
+    </>
+  );
+}
+
+// ---------------- One ad ----------------
+
+export function AdDetailPage() {
+  const { id = '' } = useParams();
+  const navigate = useNavigate();
+  const { data: ad, error, loading, reload, setData } = useApi(() => adsApi.get(id), [id]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  if (loading) return <Loading />;
+  if (error || !ad) {
+    return (
+      <>
+        <Topbar title="Ad" />
+        <ErrorState error={error} onRetry={reload} />
+      </>
+    );
+  }
+
+  const status = STATUS[ad.status];
+  const tapRate = ad.impressions ? `${((ad.clicks / ad.impressions) * 100).toFixed(1)}%` : '—';
+
+  return (
+    <>
+      <Topbar
+        title={ad.title}
+        subtitle={`${billNumber(ad)} · ${ad.advertiserName}`}
+        actions={
+          <button className="btn btn-primary" onClick={() => downloadAdBill(ad)}>
+            <FontAwesomeIcon icon={faFilePdf} /> Download Bill
+          </button>
+        }
+      />
+      <BackLink to="/ads" label="All ads" />
+
+      {ad.latitude == null && ad.status !== 'deleted' ? (
+        <div style={{ marginBottom: 16 }}>
+          <Notice tone="warning" icon={faLocationDot}>
+            This ad has no place yet, so nobody sees it. Edit it and set where it is — it shows to people within {ad.radiusKm} km.
+          </Notice>
+        </div>
+      ) : null}
+
+      <div className="grid-2">
+        <div className="glass card">
+          <div className={`ad-preview ad-frame ${ad.orientation}`}>
+            {ad.videoUrl ? (
+              <video src={ad.videoUrl} muted autoPlay loop controls playsInline />
+            ) : ad.imageUrls[0] ? (
+              <img src={ad.imageUrls[0]} alt="" />
+            ) : (
+              <div className="ad-preview-blank">
+                <FontAwesomeIcon icon={faBullhorn} />
+              </div>
+            )}
+            <span className="ad-preview-tag">Ad</span>
+          </div>
+          {!ad.videoUrl && ad.imageUrls.length === 0 && (ad.status === 'ended' || ad.status === 'deleted') ? (
+            <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
+              Its image / video was deleted when the ad {ad.status === 'ended' ? 'ended' : 'was deleted'}.
+            </p>
+          ) : null}
+          <h3 style={{ margin: '14px 0 4px' }}>{ad.advertiserName}</h3>
+          <div className="muted" style={{ fontSize: 13 }}>
+            {ad.orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'} ·{' '}
+            {ad.videoUrl ? `video, ${ad.durationSeconds} s` : `image, shown ${ad.displaySeconds} s`} before it can be closed
+          </div>
+          <div className="info">
+            {ad.advertiserPhone ? (
+              <InfoRow icon={faPhone} label="Business phone">
+                {ad.advertiserPhone}
+              </InfoRow>
+            ) : null}
+            {ad.linkUrl ? (
+              <InfoRow icon={faLink} label="Opens when tapped">
+                <a href={ad.linkUrl} target="_blank" rel="noreferrer">
+                  {ad.linkUrl}
+                </a>
+              </InfoRow>
+            ) : null}
+            <InfoRow icon={faLocationDot} label="Shown to people near">
+              {ad.locationText ?? '—'}
+              {ad.latitude != null ? ` · within ${ad.radiusKm} km` : ''}
+            </InfoRow>
+          </div>
+        </div>
+
+        <div>
+          <div className="glass card">
+            <div className="card-title">
+              <FontAwesomeIcon icon={faReceipt} /> Booking
+              <span className="count">
+                <Badge tone={status.tone}>{status.label}</Badge>
+              </span>
+            </div>
+            <div className="info">
+              <InfoRow icon={faCalendarDays} label={`${planLabel(ad.planDays)} plan`}>
+                {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
+              </InfoRow>
+              <InfoRow icon={faReceipt} label="Paid">
+                {rupees(ad.amount)} by {PAYMENT_LABEL[ad.paymentMethod]} · bill {billNumber(ad)}
+              </InfoRow>
+              <InfoRow icon={faStore} label="Billed to">
+                {ad.advertiserName}
+                {ad.advertiserPhone ? ` · ${ad.advertiserPhone}` : ''}
+              </InfoRow>
+            </div>
+            <div className="row-meta" style={{ marginTop: 6 }}>
+              Booked {timeAgo(ad.createdAt)}
+              {ad.deletedAt ? ` · deleted ${timeAgo(ad.deletedAt)}` : ''}
+            </div>
+          </div>
+
+          <div className="glass card">
+            <div className="card-title">
+              <FontAwesomeIcon icon={faEye} /> How it's doing
+            </div>
+            <div className="ad-numbers">
+              <div>
+                <strong>{ad.impressions.toLocaleString('en-IN')}</strong>
+                <span>
+                  <FontAwesomeIcon icon={faEye} /> Views
+                </span>
+              </div>
+              <div>
+                <strong>{ad.clicks.toLocaleString('en-IN')}</strong>
+                <span>
+                  <FontAwesomeIcon icon={faHandPointer} /> Opens
+                </span>
+              </div>
+              <div>
+                <strong>{tapRate}</strong>
+                <span>Open rate</span>
+              </div>
+            </div>
+          </div>
+
+          {ad.status !== 'deleted' ? (
+            <div className="glass card actions">
+              <Link to={`/ads/${ad.id}/edit`} className="btn btn-ghost">
+                <FontAwesomeIcon icon={faPen} /> Edit
+              </Link>
+              <button className="btn btn-danger" onClick={() => setConfirmDelete(true)}>
+                <FontAwesomeIcon icon={faTrash} /> Delete
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <ConfirmModal
+        open={confirmDelete}
+        icon={faTrash}
+        tone="danger"
+        title="Delete this ad?"
+        message="It stops showing in the apps straight away. It stays in the history with its bill."
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          try {
+            setData(await adsApi.remove(ad.id));
+            setConfirmDelete(false);
+            showToast({ variant: 'success', title: 'Ad deleted', message: 'It is no longer shown.' });
+            navigate('/ads');
+          } catch (err) {
+            showToast({ variant: 'error', title: 'Not deleted', message: getErrorMessage(err) });
+          }
+        }}
+        onClose={() => setConfirmDelete(false)}
+      />
+    </>
+  );
+}

@@ -6,6 +6,7 @@ import {
   faBars,
   faBolt,
   faBriefcase,
+  faBullhorn,
   faChartPie,
   faClipboardList,
   faRightFromBracket,
@@ -86,6 +87,10 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Hire Staff',
     items: [{ to: '/job-posts', label: 'Job Posts', icon: faBriefcase, gradient: 'linear-gradient(135deg,#4338ca,#c026d3)' }],
+  },
+  {
+    title: 'Promotions',
+    items: [{ to: '/ads', label: 'Ads', icon: faBullhorn, gradient: 'linear-gradient(135deg,#ea580c,#f59e0b)' }],
   },
 ];
 
