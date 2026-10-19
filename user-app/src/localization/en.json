@@ -1098,6 +1098,7 @@
     "tapToOpenLink": "Tap the photo to open the link",
     "visit": "Visit",
     "continue": "Continue",
-    "closeAfter": "You can close this in {{count}} s"
+    "closeAfter": "You can close this in {{count}} s",
+    "loading": "Loading the ad…"
   }
 }

@@ -8,6 +8,7 @@ import { fonts, typography, useThemeColors } from '@/theme';
 import { PlaceValue, placeFromCoords } from '@/utils/place';
 import { ensureLocation } from '@/state/locationStore';
 import { showToast } from '@/state/toastStore';
+import { askForLocation } from '@/utils/ensureLocationOn';
 
 interface LocationFieldProps {
   label?: string;
@@ -27,6 +28,7 @@ export function LocationField({ label, value, onChange }: LocationFieldProps) {
   const [mapOpen, setMapOpen] = useState(false);
 
   const useCurrent = async () => {
+    if (detecting || !(await askForLocation())) return;
     setDetecting(true);
     try {
       // The app's one location gate: turns location on / asks for permission, never a stale fix.

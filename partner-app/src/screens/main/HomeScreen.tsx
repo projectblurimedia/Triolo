@@ -11,6 +11,7 @@ import { ShopHomeSection } from '@/components/ShopHomeSection';
 import { JobPostHomeSection } from '@/components/JobPostHomeSection';
 import { useMyJobPost } from '@/hooks/useJobPost';
 import { ContinueSteps } from '@/components/ContinueSteps';
+import { withLocation } from '@/utils/ensureLocationOn';
 import { showAdBefore } from '@/components/Ads';
 import { LocationNeededCard } from '@/components/LocationNeededCard';
 import { FindJobsButton } from '@/components/FindJobsButton';
@@ -222,7 +223,7 @@ export function HomeScreen() {
           ) : (
             <Button
               label={t('problems.markWorkDone')}
-              onPress={() => showAdBefore(() => setConfirmDoneFor(job))}
+              onPress={() => withLocation(() => showAdBefore(() => setConfirmDoneFor(job)))}
               gradient={DONE_GRADIENT}
             />
           )}

@@ -7,6 +7,7 @@ import { SendListModal } from './SendListModal';
 import { MyOrdersModal } from './MyOrdersModal';
 import { FavoritesModal } from './FavoritesModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { withLocation } from '@/utils/ensureLocationOn';
 
 interface BazaarMenuDrawerProps {
   visible: boolean;
@@ -61,7 +62,7 @@ export function BazaarMenuDrawer({ visible, onClose }: BazaarMenuDrawerProps) {
           subtitle={t('bazaarMenu.quickOrderSubtitle')}
           onPress={() => {
             onClose();
-            setActiveItem('quickOrder');
+            withLocation(() => setActiveItem('quickOrder'));
           }}
         />
 

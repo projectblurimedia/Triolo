@@ -8,7 +8,8 @@ import { Button } from './Button';
 import { useListStore } from '@/state/listStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
-const LIST_GRADIENT = ['#DB2777', '#F472B6'] as const;
+// The app's own blue, like every other screen's icons.
+const LIST_GRADIENT = headerGradient;
 const PREVIEW_ITEMS = 3;
 
 interface ChooseListModalProps {

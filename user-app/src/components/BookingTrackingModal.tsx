@@ -31,6 +31,7 @@ import { callPhone, distanceBetween } from '@/utils/tripLinks';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BlurScope } from './Glass';
+import { askForLocation } from '@/utils/ensureLocationOn';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -125,6 +126,7 @@ export function BookingTrackingModal() {
   // (location must be on, like every Quick Book).
   const handleBookAgain = async () => {
     if (!booking || rebooking) return;
+    if (!(await askForLocation())) return;
     setRebooking(true);
     try {
       const here = await ensureLocation();

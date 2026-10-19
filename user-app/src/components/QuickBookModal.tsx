@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +17,8 @@ import { bookingQueryKey } from '@/hooks/useBookings';
 import { showToast } from '@/state/toastStore';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { ensureLocation } from '@/state/locationStore';
+import { askForLocation } from '@/utils/ensureLocationOn';
+import { adThen } from './Ads';
 
 interface QuickBookModalProps {
   visible: boolean;
@@ -65,6 +67,8 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
   const insets = useSafeAreaInsets();
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  // Asking for location / showing the ad: a second tap must not start a second booking.
+  const preparing = useRef(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -82,7 +86,16 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
   };
 
   const handleBookNearby = async () => {
-    if (selectedSkills.length === 0 || submitting) return;
+    if (selectedSkills.length === 0 || submitting || preparing.current) return;
+    preparing.current = true;
+    try {
+      // Location first — before anything else — so nothing starts that would only stop. Then a
+      // local business's ad (when one is running nearby), and only then the search.
+      if (!(await askForLocation())) return;
+      await adThen();
+    } finally {
+      preparing.current = false;
+    }
     setSubmitting(true);
     try {
       // Location must really be ON: Android still hands out a last-known position with location

@@ -12,6 +12,7 @@ import { colors as brandColors, fonts, headerGradient, typography, useThemeColor
 import { COMPACT_AVATAR_SIZE, GlassProfileLayout } from './GlassHero';
 import { firstName } from '@/utils/firstName';
 import { SmartImage } from './SmartImage';
+import { showAdBefore } from './Ads';
 
 const CALL_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const PHOTO_SIZE = 104;
@@ -158,7 +159,7 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                 </Text>
               </View>
               <Pressable
-                onPress={() => callPhone(person.mobileNumber)}
+                onPress={() => showAdBefore(() => callPhone(person.mobileNumber))}
                 accessibilityLabel={`${t('hireStaff.call')} ${person.fullName}`}
               >
                 <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>

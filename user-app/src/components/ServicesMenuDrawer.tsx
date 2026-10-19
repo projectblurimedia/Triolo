@@ -9,6 +9,7 @@ import { YourProblemsModal } from './YourProblemsModal';
 import { MyBookingsModal } from './MyBookingsModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { HireStaffModal } from './HireStaffModal';
+import { withLocation } from '@/utils/ensureLocationOn';
 
 interface ServicesMenuDrawerProps {
   visible: boolean;
@@ -72,7 +73,7 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
           subtitle={t('servicesMenu.quickBookSubtitle')}
           onPress={() => {
             onClose();
-            setActiveItem('quickBook');
+            withLocation(() => setActiveItem('quickBook'));
           }}
         />
         <DrawerMenuItem
@@ -92,7 +93,7 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
           subtitle={t('hireStaff.menuSubtitle')}
           onPress={() => {
             onClose();
-            setActiveItem('hireStaff');
+            withLocation(() => setActiveItem('hireStaff'));
           }}
         />
 

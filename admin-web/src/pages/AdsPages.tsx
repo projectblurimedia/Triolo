@@ -40,7 +40,6 @@ import {
   AD_MAX_IMAGE_MB,
   AD_MAX_VIDEO_SECONDS,
   AD_MAX_VIDEO_MB,
-  AD_MAX_VIDEO_MB_SHRINKABLE,
   AD_PLANS,
   Ad,
   AdOrientation,
@@ -59,7 +58,6 @@ import { PlaceField } from '@/components/PlaceField';
 import { PlaceValue } from '@/utils/place';
 import { showToast } from '@/state/toastStore';
 import { billNumber, dayLabel, downloadAdBill } from '@/utils/adBill';
-import { canShrinkVideo, shrinkVideo, SHRINK_ABOVE_BYTES } from '@/utils/shrinkVideo';
 import { rupees, timeAgo, Tone } from '@/utils/format';
 
 /** One piece of an ad's media in the form: already on the ad (url) or newly picked (file + local preview url). */
@@ -485,68 +483,39 @@ function AdForm({ ad }: { ad?: Ad }) {
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
-  // A newly picked file starts shrinking (big videos) and uploading straight away, in the
-  // background, while the rest of the form is filled in. `upload` is that work for the
-  // current pick; a newer pick or a removal makes older work's result unused.
+  // A picked file is only previewed (so it can be watched and changed freely); it's made
+  // smaller (big videos) and uploaded only when the ad is saved. `upload` is that work.
   const upload = useRef<{ file: File; promise: Promise<string> } | null>(null);
   const [mediaStatus, setMediaStatus] = useState<MediaStatus | null>(null);
-  // The file is still being made smaller / uploaded: the ad can't be saved yet.
-  const mediaBusy = !!media?.file && mediaStatus?.state === 'working';
 
-  const startUpload = (file: File, kind: 'image' | 'video', originalSeconds: number | null = null) => {
+  const startUpload = (file: File, kind: 'image' | 'video') => {
     const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
     const isCurrent = () => upload.current?.file === file;
-    // Each step has its own bar, so the bar and the % shown always agree.
     const status = (next: MediaStatus) => {
       if (isCurrent()) setMediaStatus(next);
     };
-    const willShrink = kind === 'video' && file.size > SHRINK_ABOVE_BYTES && canShrinkVideo();
-    const steps = willShrink ? 2 : 1;
-    const send = (toSend: File, step: number, stepCount: number, title: string) =>
-      uploadAdFile(toSend, kind, (share, sent, total) =>
+    // The file goes up exactly as it is — it's never re-encoded in the browser (that made
+    // videos stutter or play in slow motion). Cloudinary makes the phone copy from it.
+    const promise = (async () => {
+      status({ step: null, text: `Uploading the ${kind} — 0% (0 of ${mb(file.size)} MB)`, share: 0, state: 'working' });
+      const { url } = await uploadAdFile(file, kind, (share, sent, total) =>
         status({
-          step: stepCount > 1 ? `Step ${step} of ${stepCount}` : null,
+          step: null,
           text:
             share < 1
-              ? `${title} — ${Math.round(share * 100)}% (${mb(sent)} of ${mb(total)} MB)`
-              : `${title} — done, Cloudinary is saving it…`,
+              ? `Uploading the ${kind} — ${Math.round(share * 100)}% (${mb(sent)} of ${mb(total)} MB)`
+              : `Uploaded — Cloudinary is preparing the ${kind}…`,
           share,
           state: 'working',
         }),
       );
-    const promise = (async () => {
-      let toSend = file;
-      if (willShrink) {
-        const shrinking = (share: number) =>
-          status({
-            step: `Step 1 of ${steps}`,
-            text: `Making the video smaller for a faster upload — ${Math.round(share * 100)}%`,
-            share,
-            state: 'working',
-          });
-        shrinking(0);
-        toSend = await shrinkVideo(file, shrinking);
-      }
-      if (toSend === file) {
-        const { url } = await send(file, steps, steps, `Uploading the ${kind}`);
-        status({ step: null, text: `Ready — ${mb(file.size)} MB uploaded`, share: 1, state: 'ready' });
-        return url;
-      }
-      const small = await send(toSend, 2, steps, `Uploading the smaller video (${mb(file.size)} → ${mb(toSend.size)} MB)`);
-      // Safety net: if the smaller copy's real length (as Cloudinary measured it) isn't the
-      // original's, it's not trusted — the original goes up instead (slower, but always right).
-      if (originalSeconds && (small.seconds === null || Math.abs(small.seconds - originalSeconds) > 2)) {
-        const { url } = await send(file, 3, 3, 'Uploading the original video instead');
-        status({ step: null, text: `Ready — ${mb(file.size)} MB uploaded`, share: 1, state: 'ready' });
-        return url;
-      }
       status({
         step: null,
-        text: `Ready — made smaller ${mb(file.size)} MB → ${mb(toSend.size)} MB and uploaded`,
+        text: `${kind === 'video' ? 'Video' : 'Image'} uploaded (${mb(file.size)} MB)`,
         share: 1,
         state: 'ready',
       });
-      return small.url;
+      return url;
     })();
     promise.catch((err) =>
       status({ step: null, text: err instanceof Error ? err.message : 'Upload failed', share: 0, state: 'failed' }),
@@ -570,9 +539,7 @@ function AdForm({ ad }: { ad?: Ad }) {
     const isVideo = file.type.startsWith('video/');
     if (!isImage && !isVideo) return setError('Choose an image (JPG / PNG) or a video (MP4).');
     if (isImage && file.size > AD_MAX_IMAGE_MB * 1024 * 1024) return setError(`The image must be under ${AD_MAX_IMAGE_MB} MB.`);
-    // Big videos are shrunk in the browser before upload; without that, Cloudinary's own limit applies.
-    const videoLimitMb = canShrinkVideo() ? AD_MAX_VIDEO_MB_SHRINKABLE : AD_MAX_VIDEO_MB;
-    if (isVideo && file.size > videoLimitMb * 1024 * 1024) return setError(`The video must be under ${videoLimitMb} MB.`);
+    if (isVideo && file.size > AD_MAX_VIDEO_MB * 1024 * 1024) return setError(`The video must be under ${AD_MAX_VIDEO_MB} MB.`);
     try {
       const info = await readMediaInfo(file);
       if (info.kind === 'video' && (info.seconds ?? 0) > AD_MAX_VIDEO_SECONDS + 1) {
@@ -583,7 +550,8 @@ function AdForm({ ad }: { ad?: Ad }) {
       setError('');
       if (media?.file) URL.revokeObjectURL(media.url);
       setMedia({ kind: info.kind, url: URL.createObjectURL(file), file, seconds: info.seconds });
-      startUpload(file, info.kind, info.seconds);
+      upload.current = null;
+      setMediaStatus(null);
       // Taller than wide → vertical, else horizontal (can still be changed below).
       if (info.width && info.height) set('orientation', info.height > info.width ? 'vertical' : 'horizontal');
     } catch (err) {
@@ -603,11 +571,11 @@ function AdForm({ ad }: { ad?: Ad }) {
       if (media.url === current) return {};
       return media.kind === 'image' ? { imageUrl: media.url } : { videoUrl: media.url };
     }
-    // Usually already done in the background; otherwise wait for it (or retry a failed one).
+    // Uploaded only now, on Save / Book. A file already uploaded by an earlier save that then
+    // failed (e.g. a form error) is reused instead of being sent again.
     if (upload.current?.file !== media.file || mediaStatus?.state === 'failed') {
-      startUpload(media.file, media.kind, media.seconds ?? null);
+      startUpload(media.file, media.kind);
     }
-    setProgress(`Waiting for the ${media.kind} to finish uploading…`);
     const url = await (upload.current as { promise: Promise<string> }).promise;
     return media.kind === 'image' ? { imageUrl: url } : { videoUrl: url };
   };
@@ -703,6 +671,7 @@ function AdForm({ ad }: { ad?: Ad }) {
                   type="button"
                   className="icon-btn"
                   aria-label="Remove"
+                  disabled={saving}
                   onClick={() => {
                     if (media.file) URL.revokeObjectURL(media.url);
                     setMedia(null);
@@ -714,29 +683,26 @@ function AdForm({ ad }: { ad?: Ad }) {
                 </button>
               </div>
             ) : null}
-            {media?.file && mediaStatus ? (
-              <div className={`ad-upload ad-upload-${mediaStatus.state}`}>
-                {mediaStatus.step ? <div className="ad-upload-step">{mediaStatus.step}</div> : null}
+            {media?.file && !mediaStatus ? (
+              <div className="ad-upload ad-upload-picked">
                 <div className="ad-upload-text">
-                  {mediaStatus.state === 'working' ? <Spinner small /> : null}
-                  {mediaStatus.state === 'ready' ? <FontAwesomeIcon icon={faCircleCheck} /> : null}
-                  <span>{mediaStatus.text}</span>
+                  <FontAwesomeIcon icon={media.kind === 'video' ? faVideo : faImage} />
+                  <span>
+                    {(media.file.size / 1024 / 1024).toFixed(1)} MB
+                    {media.seconds ? ` · ${Math.round(media.seconds)} seconds` : ''} — not uploaded yet. It goes up when you tap{' '}
+                    {ad ? 'Save Changes' : 'Book Ad'}.
+                  </span>
                 </div>
-                {mediaStatus.state === 'working' ? (
-                  <div className="ad-upload-track">
-                    <div className="ad-upload-fill" style={{ width: `${Math.round(mediaStatus.share * 100)}%` }} />
-                  </div>
-                ) : null}
               </div>
             ) : null}
-            <label className="btn btn-ghost">
+            <label className={`btn btn-ghost${saving ? ' btn-locked' : ''}`} aria-disabled={saving}>
               <FontAwesomeIcon icon={media?.kind === 'video' ? faVideo : faImage} /> {media ? 'Change' : 'Choose image or video'}
-              <input type="file" accept="image/*,video/*" onChange={pickMedia} hidden />
+              <input type="file" accept="image/*,video/*" onChange={pickMedia} disabled={saving} hidden />
             </label>
             <span className="muted" style={{ fontSize: 12 }}>
-              Image: JPG / PNG up to {AD_MAX_IMAGE_MB} MB. Video: up to {AD_MAX_VIDEO_SECONDS} seconds — big videos are made
-              smaller here first, so they upload fast (keep this tab open until it says Ready). It starts as soon as you choose
-              the file. The format is picked from its shape — change it above if needed.
+              Image: JPG / PNG up to {AD_MAX_IMAGE_MB} MB. Video: up to {AD_MAX_VIDEO_SECONDS} seconds and {AD_MAX_VIDEO_MB} MB.
+              Play it here first — nothing is uploaded until you save, and then it goes up exactly as it is (keep this tab open
+              until it finishes). The format is picked from its shape — change it above if needed.
             </span>
           </div>
         </div>
@@ -813,6 +779,21 @@ function AdForm({ ad }: { ad?: Ad }) {
             ))}
           </div>
         </div>
+        {media?.file && mediaStatus ? (
+          <div className={`ad-upload ad-upload-above ad-upload-${mediaStatus.state}`}>
+            <div className="ad-upload-text">
+              {mediaStatus.state === 'working' ? <Spinner small /> : null}
+              {mediaStatus.state === 'ready' ? <FontAwesomeIcon icon={faCircleCheck} /> : null}
+              {mediaStatus.state === 'failed' ? <FontAwesomeIcon icon={faXmark} /> : null}
+              <span>{mediaStatus.text}</span>
+            </div>
+            {mediaStatus.state === 'working' ? (
+              <div className="ad-upload-track">
+                <div className="ad-upload-fill" style={{ width: `${Math.round(mediaStatus.share * 100)}%` }} />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="ad-total">
           <div>
             <div className="muted" style={{ fontSize: 13 }}>
@@ -825,14 +806,9 @@ function AdForm({ ad }: { ad?: Ad }) {
               </div>
             ) : null}
           </div>
-          <button className="btn btn-primary" type="submit" disabled={saving || mediaBusy}>
+          <button className="btn btn-primary" type="submit" disabled={saving}>
             {saving ? <Spinner small /> : ad ? 'Save Changes' : 'Book Ad'}
           </button>
-          {mediaBusy && !saving ? (
-            <div className="muted" style={{ fontSize: 13, width: '100%', textAlign: 'right' }}>
-              Wait until the {media?.kind} says Ready.
-            </div>
-          ) : null}
           {progress ? (
             <div className="muted" style={{ fontSize: 13, width: '100%', textAlign: 'right' }}>
               {progress}

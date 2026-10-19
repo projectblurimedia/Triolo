@@ -14,6 +14,7 @@ import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
 import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
 import { HireStaffModal } from './HireStaffModal';
+import { withLocation } from '@/utils/ensureLocationOn';
 
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
@@ -55,7 +56,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
       subtitle: t('homeMenu.nearbyWorkersSubtitle'),
       onPress: () => {
         onClose();
-        setNearbySearchMode('worker');
+        withLocation(() => setNearbySearchMode('worker'));
       },
     },
     {
@@ -66,7 +67,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
       subtitle: t('homeMenu.nearbyShopsSubtitle'),
       onPress: () => {
         onClose();
-        setNearbySearchMode('business');
+        withLocation(() => setNearbySearchMode('business'));
       },
     },
     {
@@ -77,7 +78,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
       subtitle: t('hireStaff.menuSubtitle'),
       onPress: () => {
         onClose();
-        setHireStaffVisible(true);
+        withLocation(() => setHireStaffVisible(true));
       },
     },
   ];

@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { requireLocation } from '@/utils/requireLocation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocationGatedMutation } from './useLocationGatedMutation';
 import { ACTIVE_SHOP_STATUSES, NEW_ORDER_STATUSES, shopOrdersService } from '@/services/shopOrdersService';
 import { useAuthStore } from '@/state/authStore';
 
@@ -35,12 +35,9 @@ export function useShopOrder(id: string | null) {
 /** Any shop step (accept, save items, packed, ready, verify PIN, cancel) — refreshes the order and list after. */
 export function useShopOrderAction<TArgs extends { id: string }, TResult = unknown>(action: (args: TArgs) => Promise<TResult>) {
   const queryClient = useQueryClient();
-  return useMutation({
-    // Location must be on for every partner action, shop orders included.
-    mutationFn: async (args: TArgs) => {
-      await requireLocation();
-      return action(args);
-    },
+  // Location must be on for every partner action, shop orders included (asked for first).
+  return useLocationGatedMutation({
+    mutationFn: (args: TArgs) => action(args),
     onSettled: (_data, _error, args) =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: shopOrderQueryKey(args.id) }),

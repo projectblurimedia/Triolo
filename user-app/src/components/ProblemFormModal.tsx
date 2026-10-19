@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -17,6 +17,8 @@ import { MY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
 import { showToast } from '@/state/toastStore';
 import { ensureLocation } from '@/state/locationStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
+import { askForLocation } from '@/utils/ensureLocationOn';
+import { adThen } from './Ads';
 
 interface ProblemFormModalProps {
   visible: boolean;
@@ -91,8 +93,20 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
     }
   };
 
+  // Asking for location / showing the ad: a second tap must not post twice.
+  const preparing = useRef(false);
+
   const handleSubmit = async () => {
-    if (!canSubmit || submitting) return;
+    if (!canSubmit || submitting || preparing.current) return;
+    preparing.current = true;
+    try {
+      // Location first, before the saving spinner; a new post shows a local business's ad
+      // (when one is running) before it goes out. Edits don't.
+      if (!(await askForLocation())) return;
+      if (!isEditMode) await adThen();
+    } finally {
+      preparing.current = false;
+    }
     setSubmitting(true);
 
     // Every task needs location on (the picked point is what workers navigate to).

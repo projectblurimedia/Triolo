@@ -22,7 +22,6 @@ import { useMyProblems } from '@/hooks/useProblems';
 import { useMyBookings } from '@/hooks/useBookings';
 import { useMyOrders } from '@/hooks/useOrders';
 import { ContinueSteps } from '@/components/ContinueSteps';
-import { showAdBefore } from '@/components/Ads';
 import { WorkerNearbyResult, workersService } from '@/services/workersService';
 import { BusinessNearbyResult, businessesService } from '@/services/businessesService';
 import { NearbySearchMode } from '@/utils/nearbyResult';
@@ -33,6 +32,7 @@ import { PullToRefresh } from '@/components/PullToRefresh';
 import { HireStaffModal } from '@/components/HireStaffModal';
 import { ChooseListModal } from '@/components/ChooseListModal';
 import { SendListModal } from '@/components/SendListModal';
+import { withLocation } from '@/utils/ensureLocationOn';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -127,9 +127,10 @@ export function HomeScreen() {
     businessesService.recordView(shop.id).catch(() => {});
   };
 
-  // A local business's ad first (when one is running nearby and the admin has it on), then the action.
+  // Every quick action works from where you are, so location is asked for before the screen
+  // opens. Ads come later, on each screen's final button (Book Nearby, Send, Post, Call).
   const handleQuickAction = (key: (typeof QUICK_ACTIONS)[number]['key']) =>
-    showAdBefore(() => {
+    withLocation(() => {
       if (key === 'quickBook') setQuickBookVisible(true);
       else if (key === 'postProblem') setProblemFormVisible(true);
       else if (key === 'hireStaff') setHireStaffVisible(true);

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { bookingOffersService } from '@/services/bookingOffersService';
 import { useAuthStore } from '@/state/authStore';
-import { requireLocation } from '@/utils/requireLocation';
+import { useLocationGatedMutation } from './useLocationGatedMutation';
 
 export const BOOKING_OFFERS_QUERY_KEY = ['bookingOffers'];
 // Push delivery (see usePushNotifications.ts) is what makes a new offer, or a job going to
@@ -27,12 +27,9 @@ export function useBookingOffers() {
 
 export function useAcceptBookingOffer() {
   const queryClient = useQueryClient();
-  return useMutation({
-    // Location must be on to take a job (as for every partner action).
-    mutationFn: async (bookingRequestId: string) => {
-      await requireLocation();
-      return bookingOffersService.accept(bookingRequestId);
-    },
+  // Location must be on to take a job (as for every partner action) — asked for first.
+  return useLocationGatedMutation({
+    mutationFn: (bookingRequestId: string) => bookingOffersService.accept(bookingRequestId),
     onSettled: () => queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY }),
   });
 }

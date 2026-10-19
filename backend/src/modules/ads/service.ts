@@ -193,9 +193,9 @@ export class AdsService {
   }
 
   /**
-   * Files in the ads folder that no ad uses — the admin website uploads a file as soon as
-   * it's chosen, so a changed or abandoned choice leaves one behind. Deleted once they're a
-   * day old (newer ones may still be about to be saved with an ad).
+   * Files in the ads folder that no ad uses — e.g. an upload whose save then failed, or a
+   * browser closed mid-save. Deleted once they're a day old (newer ones may still be about to
+   * be saved with an ad).
    */
   async cleanupUnusedUploads(minAgeHours = 24): Promise<number> {
     const used = new Set((await this.repository.allMediaUrls()).map((url) => extractPublicIdFromUrl(url)).filter(Boolean));

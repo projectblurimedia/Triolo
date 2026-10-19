@@ -2235,3 +2235,20 @@ a.row:hover {
   color: var(--primary);
   margin-bottom: 4px;
 }
+
+/* A picked ad file that isn't uploaded yet (it goes up on Save / Book). */
+.ad-upload-picked {
+  color: var(--muted, inherit);
+}
+
+/* The Change button while the ad is being saved. */
+.btn-locked {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* The ad's upload progress, shown just above Book Ad / Save Changes. */
+.ad-upload-above {
+  max-width: none;
+  margin-bottom: 12px;
+}

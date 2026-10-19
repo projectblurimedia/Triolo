@@ -25,6 +25,7 @@ import { formatRupees } from '@/services/ordersService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { callPhone } from '@/utils/tripLinks';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { showAdBefore } from './Ads';
 
 const CALL_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -178,7 +179,10 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
               {item.mobileNumber}
             </Text>
           </View>
-          <Pressable onPress={() => callPhone(item.mobileNumber)} accessibilityLabel={`${t('hireStaff.call')} ${item.fullName}`}>
+          <Pressable
+            onPress={() => showAdBefore(() => callPhone(item.mobileNumber))}
+            accessibilityLabel={`${t('hireStaff.call')} ${item.fullName}`}
+          >
             <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>
               <FontAwesome6 name="phone" size={13} color="#FFFFFF" solid />
               <Text style={styles.callText}>{t('hireStaff.call')}</Text>

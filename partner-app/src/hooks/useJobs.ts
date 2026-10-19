@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { requireLocation } from '@/utils/requireLocation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocationGatedMutation } from './useLocationGatedMutation';
 import { ACTIVE_JOB_STATUSES, jobsService } from '@/services/jobsService';
 import { useAuthStore } from '@/state/authStore';
 
@@ -36,12 +36,9 @@ export function useMyJobs() {
 /** A trip step (start / arrive / verify PIN / work done) that refreshes the job afterwards. */
 export function useJobAction<TArgs extends { id: string }>(action: (args: TArgs) => Promise<unknown>) {
   const queryClient = useQueryClient();
-  return useMutation({
-    // Location must be on for every step of a job.
-    mutationFn: async (args: TArgs) => {
-      await requireLocation();
-      return action(args);
-    },
+  // Location must be on for every step of a job (asked for before the spinner starts).
+  return useLocationGatedMutation({
+    mutationFn: (args: TArgs) => action(args),
     onSettled: (_data, _error, args) =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: jobQueryKey(args.id) }),

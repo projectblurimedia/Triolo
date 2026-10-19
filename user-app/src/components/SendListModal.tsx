@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -26,6 +26,8 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { openNewList } from '@/navigation/navigationRef';
+import { askForLocation } from '@/utils/ensureLocationOn';
+import { adThen } from './Ads';
 
 interface SendListModalProps {
   visible: boolean;
@@ -122,8 +124,19 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
     if (!shop.deliveryAvailable) setFulfillment('pickup');
   };
 
+  // Asking for location / showing the ad: a second tap must not send the list twice.
+  const preparing = useRef(false);
+
   const handleSend = async () => {
-    if (!selected || sending) return;
+    if (!selected || sending || preparing.current) return;
+    preparing.current = true;
+    try {
+      // Location first, then a local business's ad (when one is running), then the order goes.
+      if (!(await askForLocation())) return;
+      await adThen();
+    } finally {
+      preparing.current = false;
+    }
     setSending(true);
     try {
       const here = await ensureLocation();

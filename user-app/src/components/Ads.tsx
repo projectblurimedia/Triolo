@@ -1,5 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import {
+  Animated,
+  AppState,
+  Easing,
+  Image,
+  Linking,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +23,7 @@ import { Ad, adsService } from '@/services/adsService';
 import { useAuthStore } from '@/state/authStore';
 import { useLocationStore } from '@/state/locationStore';
 import { fonts, headerGradient, typography } from '@/theme';
+import { LoadingIndicator } from './LoadingIndicator';
 import { SmartImage } from './SmartImage';
 
 /*
@@ -18,17 +32,61 @@ import { SmartImage } from './SmartImage';
  * Local businesses' ads, booked by the Triolo admin: one image or one video, vertical (a reel
  * or poster, 9:16) or horizontal (16:9), with an optional link. Shown full screen:
  *  - once when the app opens (`AdLaunchBanner`), and
- *  - before key actions (`showAdBefore`: the customer app's quick actions; the partner app's
- *    Mark Work Done and order handover), the action going ahead once the ad is closed.
+ *  - before key actions (`showAdBefore` / `adThen`: the customer app's final buttons — Book
+ *    Nearby, sending a list, posting a problem, calling staff; the partner app's Mark Work Done
+ *    and order handover), the action going ahead once the ad is closed.
  * An ad can only be closed after its time — an image's set seconds, or the whole video — and
  * a progress bar shows how long is left. Tapping it (or Visit) opens its link, if it has one. Ads are local,
  * so nothing is asked for until the device location is known; each is admin-switchable.
+ *
+ * The time only runs while the app is on screen: in the background (or while the ad's link is
+ * open) the timer, the bar and the video all pause, and carry on when the person comes back —
+ * so leaving the app is never a way round watching it.
  */
 
 // How long a key action waits for an ad before going ahead without one.
 const ACTION_AD_WAIT_MS = 2500;
 // If the picture / video hasn't started by then, the timer starts anyway.
 const MEDIA_START_FALLBACK_MS = 8000;
+// The launch ad is asked for with the last known place straight away (not after a fresh GPS
+// fix). If the fresh fix then turns out to be this far away, that ad is dropped for a nearer one.
+const LAUNCH_COORDS_KEY = 'triolo-ad-coords';
+const MOVED_TOO_FAR_KM = 3;
+// A picture gets this long to load before the ad shows, so it doesn't open on a blank card.
+const IMAGE_PRELOAD_MS = 1500;
+
+type Coords = { latitude: number; longitude: number };
+
+function distanceKm(a: Coords, b: Coords): number {
+  const rad = Math.PI / 180;
+  const dLat = (b.latitude - a.latitude) * rad;
+  const dLng = (b.longitude - a.longitude) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** Whether the app is on screen (not in the background, not behind another app). */
+function useAppActive(): boolean {
+  const [active, setActive] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => setActive(state === 'active'));
+    return () => subscription.remove();
+  }, []);
+  return active;
+}
+
+/** Waits (briefly) for a picture ad's image, so it opens already drawn. */
+function preload(ad: Ad): Promise<void> {
+  const url = ad.videoUrl ? null : (ad.imageUrl ?? ad.imageUrls?.[0] ?? null);
+  if (!url) return Promise.resolve();
+  return Promise.race([
+    Image.prefetch(url).then(
+      () => undefined,
+      () => undefined,
+    ),
+    new Promise<void>((resolve) => setTimeout(resolve, IMAGE_PRELOAD_MS)),
+  ]);
+}
 
 /** The device position once it's known (location on and allowed), else null. */
 function readyCoords(state: ReturnType<typeof useLocationStore.getState>) {
@@ -63,7 +121,9 @@ function send(m){window.ReactNativeWebView&&window.ReactNativeWebView.postMessag
 var started=false;v.addEventListener('playing',function(){if(!started){started=true;send('playing')}});
 v.addEventListener('error',function(){send('error')});
 var p=v.play();if(p&&p.catch)p.catch(function(){send('error')});
-window.__cmd=function(c){if(c==='mute')v.muted=true;else if(c==='unmute'){v.muted=false;v.volume=1;if(v.paused)v.play()}};
+var held=false;
+window.__cmd=function(c){if(c==='mute')v.muted=true;else if(c==='unmute'){v.muted=false;v.volume=1;if(v.paused&&!held)v.play()}
+else if(c==='pause'){held=true;v.pause()}else if(c==='play'){held=false;v.play()}};
 </script></body></html>`;
 }
 
@@ -72,12 +132,15 @@ function AdVideo({
   width,
   height,
   muted,
+  paused,
   onStart,
 }: {
   url: string;
   width: number;
   height: number;
   muted: boolean;
+  /** The app is in the background: the video stops until it's back. */
+  paused: boolean;
   /** It started playing (or failed) — the ad's timer can run. */
   onStart: () => void;
 }) {
@@ -88,6 +151,10 @@ function AdVideo({
   useEffect(() => {
     if (loaded.current) webview.current?.injectJavaScript(`window.__cmd&&window.__cmd('${muted ? 'mute' : 'unmute'}');true;`);
   }, [muted]);
+
+  useEffect(() => {
+    if (loaded.current) webview.current?.injectJavaScript(`window.__cmd&&window.__cmd('${paused ? 'pause' : 'play'}');true;`);
+  }, [paused]);
 
   return (
     // Touches go to the ad around it (open its link), never to the video.
@@ -103,6 +170,7 @@ function AdVideo({
         scrollEnabled={false}
         onLoadEnd={() => {
           loaded.current = true;
+          if (paused) webview.current?.injectJavaScript(`window.__cmd&&window.__cmd('pause');true;`);
         }}
         onMessage={(event) => {
           if (event.nativeEvent.data === 'playing' || event.nativeEvent.data === 'error') onStart();
@@ -127,6 +195,9 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
   const [done, setDone] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(ad.durationSeconds);
   const progress = useRef(new Animated.Value(0)).current;
+  const active = useAppActive();
+  // Milliseconds of the ad already watched (kept while the app is in the background).
+  const watched = useRef(0);
   const vertical = ad.orientation === 'vertical';
   const imageUrl = ad.imageUrl ?? ad.imageUrls?.[0] ?? null;
 
@@ -137,31 +208,44 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
 
   const start = () => setStarted(true);
 
-  // Never wait forever for slow media: the timer starts on its own after a while.
+  // Never wait forever for slow media: the timer starts on its own after a while (on screen).
   useEffect(() => {
+    if (started || !active) return;
     const timer = setTimeout(start, MEDIA_START_FALLBACK_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [started, active]);
 
-  // The countdown, and the bar filling over the ad's time.
+  // The countdown and the bar, running only while the app is on screen: going to the
+  // background pauses them where they are, coming back carries on from there.
   useEffect(() => {
-    if (!started) return;
-    const total = Math.max(1, ad.durationSeconds);
-    Animated.timing(progress, { toValue: 1, duration: total * 1000, easing: Easing.linear, useNativeDriver: false }).start();
+    if (!started || done || !active) return;
+    const total = Math.max(1, ad.durationSeconds) * 1000;
+    const before = watched.current;
     const begun = Date.now();
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: Math.max(0, total - before),
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
     const tick = setInterval(() => {
-      const left = Math.max(0, Math.ceil(total - (Date.now() - begun) / 1000));
-      setSecondsLeft(left);
-      if (left === 0) {
+      const seen = before + (Date.now() - begun);
+      setSecondsLeft(Math.max(0, Math.ceil((total - seen) / 1000)));
+      if (seen >= total) {
         clearInterval(tick);
+        progress.setValue(1);
         setDone(true);
       }
     }, 250);
-    return () => clearInterval(tick);
-  }, [started, ad.durationSeconds, progress]);
+    return () => {
+      clearInterval(tick);
+      watched.current = Math.min(total, before + (Date.now() - begun));
+      progress.stopAnimation();
+    };
+  }, [started, done, active, ad.durationSeconds, progress]);
 
   const media = ad.videoUrl ? (
-    <AdVideo url={ad.videoUrl} width={cardWidth} height={cardHeight} muted={muted} onStart={start} />
+    <AdVideo url={ad.videoUrl} width={cardWidth} height={cardHeight} muted={muted} paused={!active} onStart={start} />
   ) : imageUrl ? (
     <View style={{ width: cardWidth, height: cardHeight }}>
       <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={22} />
@@ -256,6 +340,12 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
             >
               {media}
             </Pressable>
+            {!started ? (
+              <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
+                <LoadingIndicator size={34} dotSize={6} />
+                <Text style={styles.loadingText}>{t('ads.loading')}</Text>
+              </View>
+            ) : null}
             {ad.videoUrl ? (
               <Pressable
                 onPress={() => setMuted((value) => !value)}
@@ -309,23 +399,57 @@ export function AdLaunchBanner({ hold = false }: { hold?: boolean }) {
   const coords = useReadyCoords();
   const [ad, setAd] = useState<Ad | null>(null);
   const [closed, setClosed] = useState(false);
-  // A ref, not state: changing state here re-ran the effect, whose cleanup cancelled the timer.
+  // Refs, not state: changing state here re-ran the effects, whose cleanups cancelled the work.
   const requested = useRef(false);
+  const askedFrom = useRef<Coords | null>(null);
 
-  // Once per app launch, as soon as the user is signed in and their location is known.
-  useEffect(() => {
-    if (!signedIn || !coords || requested.current) return;
+  const fetchAd = (here: Coords) => {
     requested.current = true;
-    const here = coords;
-    setTimeout(() => {
-      adsService
-        .serve('launch', here)
-        .then(setAd)
-        .catch(() => undefined);
-    }, 700);
-  }, [signedIn, coords]);
+    askedFrom.current = here;
+    adsService
+      .serve('launch', here)
+      .then(async (next) => {
+        if (next) await preload(next);
+        // A newer request (the person had moved) replaced this one.
+        if (askedFrom.current === here) setAd(next);
+      })
+      .catch(() => undefined);
+  };
 
-  if (!ad || closed || !signedIn || hold) return null;
+  // Faster start: as soon as the person is signed in, ask with the place where the app was
+  // last used, while the phone gets a fresh fix in parallel (also started here, so it doesn't
+  // wait for a screen to ask for it).
+  useEffect(() => {
+    if (!signedIn || requested.current) return;
+    const store = useLocationStore.getState();
+    if (store.status === 'idle') store.refresh().catch(() => undefined);
+    AsyncStorage.getItem(LAUNCH_COORDS_KEY)
+      .then((saved) => {
+        if (!saved || requested.current) return;
+        const last = JSON.parse(saved) as Coords;
+        if (typeof last.latitude === 'number' && typeof last.longitude === 'number') fetchAd(last);
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedIn]);
+
+  // The fresh fix: remembered for next time; asks now if nothing was asked yet, or again if the
+  // person is now far from where the first ad was picked for.
+  useEffect(() => {
+    if (!coords) return;
+    AsyncStorage.setItem(LAUNCH_COORDS_KEY, JSON.stringify(coords)).catch(() => undefined);
+    if (!signedIn || closed) return;
+    if (!requested.current) {
+      fetchAd(coords);
+    } else if (askedFrom.current && distanceKm(askedFrom.current, coords) > MOVED_TOO_FAR_KM) {
+      setAd(null);
+      fetchAd(coords);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedIn, coords?.latitude, coords?.longitude]);
+
+  // Shown only once location is confirmed on (like every ad), even if it was fetched before.
+  if (!ad || !coords || closed || !signedIn || hold) return null;
   return <AdPlayer ad={ad} mode="launch" onClose={() => setClosed(true)} />;
 }
 
@@ -345,9 +469,24 @@ let actionPending = false;
  * action just goes ahead.
  */
 export function showAdBefore(action: () => void): void {
-  const here = readyCoords(useLocationStore.getState());
-  if (!here || actionPending || useActionAd.getState().ad) {
+  if (actionPending || useActionAd.getState().ad) {
     action();
+    return;
+  }
+  const here = readyCoords(useLocationStore.getState());
+  if (!here) {
+    // Location was only just turned on: give the shared position a moment (within the same
+    // short budget) instead of skipping the ad.
+    actionPending = true;
+    const store = useLocationStore.getState();
+    Promise.race([store.refresh(), new Promise((resolve) => setTimeout(resolve, ACTION_AD_WAIT_MS))])
+      .catch(() => undefined)
+      .then(() => {
+        actionPending = false;
+        const now = readyCoords(useLocationStore.getState());
+        if (now) showAdBefore(action);
+        else action();
+      });
     return;
   }
   actionPending = true;
@@ -376,6 +515,11 @@ export function showAdBefore(action: () => void): void {
       clearTimeout(waited);
       goAhead();
     });
+}
+
+/** `showAdBefore` as a promise: resolves once the ad (if there was one) is closed. */
+export function adThen(): Promise<void> {
+  return new Promise((resolve) => showAdBefore(resolve));
 }
 
 /** Mounted once at the app root: shows the ad `showAdBefore` found, then runs the action. */
@@ -496,4 +640,5 @@ const styles = StyleSheet.create({
   },
   continueText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
   waitText: { ...typography.caption, color: 'rgba(255,255,255,0.7)' },
+  loadingText: { ...typography.caption, color: 'rgba(255,255,255,0.75)', marginTop: 10 },
 });

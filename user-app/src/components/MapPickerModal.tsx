@@ -13,6 +13,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PlaceValue, placeFromCoords } from '@/utils/place';
 import { ensureLocation } from '@/state/locationStore';
 import { showToast } from '@/state/toastStore';
+import { askForLocation } from '@/utils/ensureLocationOn';
 
 interface MapPickerModalProps {
   visible: boolean;
@@ -150,6 +151,7 @@ export function MapPickerModal({ visible, initial, onClose, onPick }: MapPickerM
   };
 
   const goToMyLocation = async () => {
+    if (!(await askForLocation())) return;
     setLocating(true);
     try {
       const fix = await ensureLocation();

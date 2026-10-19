@@ -35,7 +35,7 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { callPhone, distanceBetween, openDirections } from '@/utils/tripLinks';
 import { formatDistance } from '@/utils/formatDistance';
-import { ensureLocationOn } from '@/utils/ensureLocationOn';
+import { ensureLocationOn, withLocation } from '@/utils/ensureLocationOn';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
@@ -444,7 +444,11 @@ export function JobTrackingModal() {
     if (j.status === 'in_progress') {
       // A local business's ad first (when one is running nearby), then the confirmation.
       return (
-        <Button label={t('job.markWorkDone')} onPress={() => showAdBefore(() => setConfirmDone(true))} gradient={DONE_GRADIENT} />
+        <Button
+          label={t('job.markWorkDone')}
+          onPress={() => withLocation(() => showAdBefore(() => setConfirmDone(true)))}
+          gradient={DONE_GRADIENT}
+        />
       );
     }
     if (j.status === 'work_done') {

@@ -248,7 +248,9 @@
     "deniedForeverMessage": "Location permission is off for Triolo Partner. Allow it in Settings to get jobs near you.",
     "turnOn": "Turn On Location",
     "openSettings": "Open Settings",
-    "acceptNeedsLocation": "Turn on location, then open the app to accept this job."
+    "acceptNeedsLocation": "Turn on location, then open the app to accept this job.",
+    "requiredTitle": "Turn On Location",
+    "requiredMessage": "Location must be on to do this."
   },
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",
@@ -867,6 +869,7 @@
     "tapToOpenLink": "Tap the photo to open the link",
     "visit": "Visit",
     "continue": "Continue",
-    "closeAfter": "You can close this in {{count}} s"
+    "closeAfter": "You can close this in {{count}} s",
+    "loading": "Loading the ad…"
   }
 }

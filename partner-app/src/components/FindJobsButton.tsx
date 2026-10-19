@@ -4,13 +4,13 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { LoadingIndicator } from './LoadingIndicator';
 import { bookingOffersService, PendingOffer } from '@/services/bookingOffersService';
 import { BOOKING_OFFERS_QUERY_KEY } from '@/hooks/useBookingOffers';
 import { NEARBY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
 import { showToast } from '@/state/toastStore';
-import { requireLocation } from '@/utils/requireLocation';
+import { useLocationGatedMutation } from '@/hooks/useLocationGatedMutation';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
@@ -49,11 +49,9 @@ export function FindJobsButton({
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const queryClient = useQueryClient();
-  const search = useMutation({
-    mutationFn: async () => {
-      await requireLocation();
-      return bookingOffersService.search(await currentPosition());
-    },
+  // Location is asked for before the spinner starts.
+  const search = useLocationGatedMutation({
+    mutationFn: async (_: void) => bookingOffersService.search(await currentPosition()),
     onSuccess: (offers) => {
       queryClient.setQueryData(BOOKING_OFFERS_QUERY_KEY, offers);
       queryClient.invalidateQueries({ queryKey: NEARBY_PROBLEMS_QUERY_KEY });

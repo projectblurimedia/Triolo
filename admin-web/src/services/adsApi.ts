@@ -125,9 +125,8 @@ export const adsApi = {
 
 export const AD_MAX_VIDEO_SECONDS = 30;
 export const AD_MAX_IMAGE_MB = 10;
-/** Cloudinary takes videos up to 100 MB; bigger ones are fine when the browser can shrink them first. */
+/** Cloudinary takes videos up to 100 MB. */
 export const AD_MAX_VIDEO_MB = 100;
-export const AD_MAX_VIDEO_MB_SHRINKABLE = 500;
 
 interface SignedUpload {
   cloudName: string;
@@ -140,9 +139,45 @@ interface SignedUpload {
   extra?: Record<string, string>;
 }
 
+// Big files go up in pieces: each piece is retried on its own if the line drops, so a weak
+// connection can't break or restart the whole upload. Cloudinary joins them into the exact
+// original file (pieces must be at least 5 MB, except the last).
+const CHUNK_BYTES = 6 * 1024 * 1024;
+const CHUNK_TRIES = 4;
+
+type CloudinaryResult = { secure_url?: string; duration?: number; done?: boolean; error?: { message?: string } };
+
+function sendPart(
+  url: string,
+  form: FormData,
+  headers: Record<string, string>,
+  onSent: (loaded: number) => void,
+): Promise<CloudinaryResult> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    for (const [key, value] of Object.entries(headers)) xhr.setRequestHeader(key, value);
+    xhr.upload.onprogress = (event) => onSent(event.loaded);
+    xhr.onload = () => {
+      let body: CloudinaryResult = {};
+      try {
+        body = JSON.parse(xhr.responseText) as CloudinaryResult;
+      } catch {
+        // Not JSON — treated as a failure below.
+      }
+      if (xhr.status < 300) resolve(body);
+      else reject(Object.assign(new Error(body.error?.message ?? 'Upload failed'), { retryable: xhr.status >= 500 }));
+    };
+    xhr.onerror = () => reject(Object.assign(new Error('Upload failed — check the internet connection.'), { retryable: true }));
+    xhr.send(form);
+  });
+}
+
 /**
- * Uploads one file straight from the browser to Cloudinary, with a signed permission from our
- * server (videos are far over the server's 4.5 MB request limit). Resolves to the file's URL (and a video's length).
+ * Uploads one file straight from the browser to Cloudinary, exactly as it is (never re-encoded
+ * here — Cloudinary makes the phone copy from the original), with a signed permission from our
+ * server (videos are far over the server's 4.5 MB request limit). Resolves to the file's URL
+ * (and a video's length, as Cloudinary measured it).
  */
 export async function uploadAdFile(
   file: File,
@@ -150,30 +185,40 @@ export async function uploadAdFile(
   onProgress?: (share: number, sentBytes: number, totalBytes: number) => void,
 ): Promise<{ url: string; seconds: number | null }> {
   const signed = await apiClient.post<SignedUpload>('/admin/ads/upload-signature', { kind }, true);
-  const form = new FormData();
-  form.append('file', file);
-  form.append('api_key', signed.apiKey);
-  form.append('timestamp', String(signed.timestamp));
-  form.append('signature', signed.signature);
-  form.append('folder', signed.folder);
-  for (const [key, value] of Object.entries(signed.extra ?? {})) form.append(key, value);
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `https://api.cloudinary.com/v1_1/${signed.cloudName}/${signed.resourceType}/upload`);
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress?.(event.loaded / event.total, event.loaded, event.total);
-    };
-    xhr.onload = () => {
+  const endpoint = `https://api.cloudinary.com/v1_1/${signed.cloudName}/${signed.resourceType}/upload`;
+  const formFor = (part: Blob) => {
+    const form = new FormData();
+    form.append('file', part, file.name);
+    form.append('api_key', signed.apiKey);
+    form.append('timestamp', String(signed.timestamp));
+    form.append('signature', signed.signature);
+    form.append('folder', signed.folder);
+    for (const [key, value] of Object.entries(signed.extra ?? {})) form.append(key, value);
+    return form;
+  };
+  const total = file.size;
+  const report = (sent: number) => onProgress?.(Math.min(1, sent / total), Math.min(sent, total), total);
+  const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let result: CloudinaryResult = {};
+
+  for (let start = 0; start < total || start === 0; start += CHUNK_BYTES) {
+    const end = Math.min(start + CHUNK_BYTES, total);
+    const headers: Record<string, string> =
+      total > CHUNK_BYTES ? { 'X-Unique-Upload-Id': uploadId, 'Content-Range': `bytes ${start}-${end - 1}/${total}` } : {};
+    for (let attempt = 1; ; attempt += 1) {
       try {
-        const body = JSON.parse(xhr.responseText) as { secure_url?: string; duration?: number; error?: { message?: string } };
-        // A video's real length, as Cloudinary measured it.
-        if (xhr.status < 300 && body.secure_url) resolve({ url: body.secure_url, seconds: body.duration ?? null });
-        else reject(new Error(body.error?.message ?? 'Upload failed'));
-      } catch {
-        reject(new Error('Upload failed'));
+        result = await sendPart(endpoint, formFor(file.slice(start, end)), headers, (loaded) =>
+          report(start + Math.min(loaded, end - start)),
+        );
+        break;
+      } catch (err) {
+        if (attempt >= CHUNK_TRIES || !(err as { retryable?: boolean }).retryable) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
       }
-    };
-    xhr.onerror = () => reject(new Error('Upload failed — check the internet connection.'));
-    xhr.send(form);
-  });
+    }
+    report(end);
+    if (end >= total) break;
+  }
+  if (!result.secure_url) throw new Error(result.error?.message ?? 'Upload failed');
+  return { url: result.secure_url, seconds: result.duration ?? null };
 }
