@@ -13,6 +13,15 @@ export const createQuickBookingSchema = z.object({
   locationAddress: z.string().trim().max(300).optional(),
 });
 
+/** Booking one particular worker from their profile. */
+export const createDirectBookingSchema = z.object({
+  workerId: z.string().uuid(),
+  skillCategories: z.array(z.enum(WORKER_SKILL_CATEGORIES as [string, ...string[]])).min(1, 'Select at least one skill'),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  locationAddress: z.string().trim().max(300).optional(),
+});
+
 /** "Find jobs now" — the worker's current position, when the app has it. */
 export const searchOffersSchema = z
   .object({
@@ -33,6 +42,14 @@ export const workerCancelSchema = z.object({ reason: z.string().trim().max(200).
 export const verifyPinSchema = z.object({
   pin: z.string().regex(/^\d{4}$/, 'Enter the 4-digit PIN'),
 });
+
+// A plain cancel sends nothing; cancelling a late worker sends their rating.
+export const cancelBookingSchema = z
+  .object({
+    rating: z.number().int().min(1).max(5).optional(),
+    review: z.string().trim().max(300).optional(),
+  })
+  .default({});
 
 // `.default({})` so finishing without a rating still validates (the app always sends one).
 export const completeBookingSchema = z

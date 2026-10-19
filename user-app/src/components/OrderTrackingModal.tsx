@@ -11,9 +11,14 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { RatingStars, STAR_COLOR } from './RatingStars';
 import { ToastHost } from './ToastHost';
 import { Avatar } from './WorkerMiniCard';
-import { useCancelOrder, useOrder, useRateOrder } from '@/hooks/useOrders';
+import { useCancelOrder, useCancelStalledOrder, useOrder, useRateOrder } from '@/hooks/useOrders';
 import { useOrderTrackerStore } from '@/state/orderTrackerStore';
 import { CUSTOMER_CANCELLABLE, CustomerOrder, formatRupees, OrderItem, OrderStatus } from '@/services/ordersService';
+import { LATE_AFTER_MS, LateNotice, useNow } from './LateNotice';
+import { FinishJobModal } from './FinishJobModal';
+
+// The shop took the order but hasn't handed it over (mirrors the backend's ORDER_LATE_STATUSES).
+const LATE_ORDER_STATUSES: OrderStatus[] = ['accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery'];
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { callPhone, openDirections } from '@/utils/tripLinks';
@@ -59,6 +64,10 @@ export function OrderTrackingModal() {
   const close = useOrderTrackerStore((state) => state.close);
   const { data: order, isLoading, isError, refetch, isRefetching } = useOrder(orderId);
   const cancelOrder = useCancelOrder();
+  // An order the shop hasn't moved on for over an hour: cancel and rate the shop.
+  const cancelStalled = useCancelStalledOrder();
+  const [ratingLate, setRatingLate] = useState(false);
+  const now = useNow();
   const rateOrder = useRateOrder();
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [stars, setStars] = useState(0);
@@ -68,6 +77,22 @@ export function OrderTrackingModal() {
     setStars(0);
     setReview('');
   }, [orderId]);
+
+  const isStalled = (o: CustomerOrder) =>
+    LATE_ORDER_STATUSES.includes(o.status) && !!o.updatedAt && now - new Date(o.updatedAt).getTime() >= LATE_AFTER_MS;
+
+  const handleCancelStalled = (rating: number, reviewText: string) => {
+    if (!orderId) return;
+    cancelStalled.mutate(
+      { id: orderId, rating, review: reviewText },
+      {
+        onSuccess: () => showToast({ variant: 'info', title: t('late.cancelledToast') }),
+        onError: (error) =>
+          showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) }),
+        onSettled: () => setRatingLate(false),
+      },
+    );
+  };
 
   const handleCancel = () => {
     if (!orderId) return;
@@ -117,7 +142,7 @@ export function OrderTrackingModal() {
           </Text>
           {o.cancelReason ? (
             <Text style={[styles.bannerMessage, { color: colors.textMuted }]}>
-              {t('orders.reason', { reason: o.cancelReason })}
+              {t('orders.reason', { reason: o.cancelReason === 'late' ? t('late.orderReason') : o.cancelReason })}
             </Text>
           ) : null}
         </View>
@@ -371,6 +396,14 @@ export function OrderTrackingModal() {
           showsVerticalScrollIndicator={false}
         >
           {renderBanner(order)}
+          {isStalled(order) ? (
+            <LateNotice
+              title={t('late.shopTitle', { shop: order.shop.name })}
+              message={t('late.shopMessage')}
+              actionLabel={t('late.shopAction')}
+              onPress={() => setRatingLate(true)}
+            />
+          ) : null}
           {renderPin(order)}
           {renderRating(order)}
           {renderItems(order)}
@@ -420,6 +453,17 @@ export function OrderTrackingModal() {
           loading={cancelOrder.isPending}
           onConfirm={handleCancel}
           onCancel={() => setConfirmCancel(false)}
+        />
+        <FinishJobModal
+          visible={ratingLate}
+          workerName={order?.shop.name ?? null}
+          loading={cancelStalled.isPending}
+          onConfirm={handleCancelStalled}
+          onCancel={() => setRatingLate(false)}
+          title={t('late.rateShopTitle')}
+          message={t('late.rateShopMessage', { shop: order?.shop.name ?? '' })}
+          rateLabel={t('late.rateShopLabel')}
+          confirmLabel={t('late.cancelAndRate')}
         />
       </BlurScope>
     </Modal>

@@ -12,6 +12,8 @@ import { SaveAdParams } from './interfaces';
 import {
   adListQuerySchema,
   adMediaSchema,
+  reviewAdSchema,
+  selfAdSchema,
   adSettingsSchema,
   saveAdSchema,
   serveQuerySchema,
@@ -23,6 +25,12 @@ const service = new AdsService(new AdsRepository(pool));
 /** The image / video sent along with an ad's details, if any. */
 function mediaOf(body: { imageUrl?: string | null; videoUrl?: string | null }) {
   return { imageUrl: body.imageUrl ?? null, videoUrl: body.videoUrl ?? null };
+}
+
+/** The signed-in business (every self route is behind authenticate). */
+function requireAccountId(req: Request): string {
+  if (!req.account) throw AppError.unauthorized();
+  return req.account.accountId;
 }
 
 function parseQuery<S extends ZodTypeAny>(schema: S, req: Request): z.infer<S> {
@@ -53,6 +61,59 @@ adsRouter.get(
       ),
     );
   }),
+);
+
+// --- Businesses booking their own ads (the Triolo Ads website). Any signed-in account. ---
+
+adsRouter.get(
+  '/self/info',
+  authenticate,
+  asyncHandler(async (_req: Request, res: Response) => ok(res, await service.selfInfo())),
+);
+
+adsRouter.get(
+  '/self',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.listOwned(requireAccountId(req)))),
+);
+
+adsRouter.post(
+  '/self/upload-signature',
+  authenticate,
+  validateBody(uploadSignatureSchema),
+  asyncHandler(async (req: Request, res: Response) => ok(res, service.uploadSignature(req.body.kind))),
+);
+
+adsRouter.post(
+  '/self',
+  authenticate,
+  validateBody(selfAdSchema),
+  asyncHandler(async (req: Request, res: Response) =>
+    created(res, await service.createOwned(requireAccountId(req), req.body, mediaOf(req.body)), 'Ad sent for review'),
+  ),
+);
+
+adsRouter.get(
+  '/self/:id',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.getOwned(requireAccountId(req), req.params.id))),
+);
+
+adsRouter.put(
+  '/self/:id',
+  authenticate,
+  validateBody(selfAdSchema),
+  asyncHandler(async (req: Request, res: Response) =>
+    ok(res, await service.updateOwned(requireAccountId(req), req.params.id, req.body, mediaOf(req.body)), 'Ad sent for review'),
+  ),
+);
+
+adsRouter.delete(
+  '/self/:id',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) =>
+    ok(res, await service.withdrawOwned(requireAccountId(req), req.params.id), 'Ad withdrawn'),
+  ),
 );
 
 adsRouter.post(
@@ -95,6 +156,18 @@ adsAdminRouter.post(
   validateBody(saveAdSchema),
   asyncHandler(async (req: Request, res: Response) =>
     created(res, await service.create(req.body as SaveAdParams, mediaOf(req.body)), 'Ad booked'),
+  ),
+);
+
+adsAdminRouter.post(
+  '/:id/review',
+  validateBody(reviewAdSchema),
+  asyncHandler(async (req: Request, res: Response) =>
+    ok(
+      res,
+      await service.review(req.params.id, req.body.decision, req.body.note),
+      req.body.decision === 'approve' ? 'Ad approved' : 'Ad rejected',
+    ),
   ),
 );
 

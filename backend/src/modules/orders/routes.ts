@@ -10,7 +10,7 @@ import { NotificationsService } from '@/modules/notifications/service';
 import { OrdersController } from './controller';
 import { OrdersRepository } from './repository';
 import { OrdersService } from './service';
-import { createOrderSchema, rateOrderSchema, saveItemsSchema, shopCancelSchema, verifyOrderPinSchema } from './validation';
+import { createOrderSchema, customerCancelSchema, rateOrderSchema, saveItemsSchema, shopCancelSchema, verifyOrderPinSchema } from './validation';
 
 // Own instances over the shared pool — same wiring style as bookings/routes.ts.
 const notificationsService = new NotificationsService(new NotificationsRepository(pool));
@@ -33,7 +33,7 @@ ordersRouter.get('/shop/:id', authenticate, controller.getShop);
 ordersRouter.post('/', authenticate, validateBody(createOrderSchema), controller.create);
 ordersRouter.get('/mine', authenticate, controller.listMine);
 ordersRouter.get('/:id', authenticate, controller.getMine);
-ordersRouter.post('/:id/cancel', authenticate, controller.cancel);
+ordersRouter.post('/:id/cancel', authenticate, validateBody(customerCancelSchema), controller.cancel);
 ordersRouter.post('/:id/rate', authenticate, validateBody(rateOrderSchema), controller.rate);
 
 // Shop steps.

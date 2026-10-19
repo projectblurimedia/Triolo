@@ -53,6 +53,16 @@ export function useCreateOrder() {
   });
 }
 
+/** Cancel an order the shop hasn't moved on for over an hour, rating the shop. */
+export function useCancelStalledOrder() {
+  const invalidate = useInvalidateOrders();
+  return useMutation({
+    mutationFn: ({ id, rating, review }: { id: string; rating: number; review?: string }) =>
+      ordersService.cancel(id, { rating, review }),
+    onSettled: (_data, _error, { id }) => invalidate(id),
+  });
+}
+
 export function useCancelOrder() {
   const invalidate = useInvalidateOrders();
   return useMutation({

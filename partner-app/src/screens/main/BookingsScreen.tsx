@@ -159,6 +159,12 @@ export function BookingsScreen() {
             <Text style={[styles.offerName, { color: colors.text }]} numberOfLines={1}>
               {item.customerFullName}
             </Text>
+            {item.direct ? (
+              <View style={[styles.directTag, { backgroundColor: `${colors.primary}14` }]}>
+                <FontAwesome6 name="user-check" size={10} color={colors.primary} solid />
+                <Text style={[styles.directTagText, { color: colors.primary }]}>{t('bookings.directTag')}</Text>
+              </View>
+            ) : null}
             {item.locationAddress ? (
               <Text style={[styles.entryMeta, { color: colors.textMuted }]} numberOfLines={1}>
                 {item.locationAddress}
@@ -411,6 +417,17 @@ export function BookingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  directTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginVertical: 3,
+  },
+  directTagText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
   modeSwitch: { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 3, marginBottom: 14, gap: 4 },
   modeOption: {
     flex: 1,

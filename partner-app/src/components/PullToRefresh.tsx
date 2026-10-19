@@ -32,6 +32,14 @@ const BUBBLE = 40;
 const MIN_SPIN_MS = 700;
 const DONE_MS = 420;
 const MAX_WAIT_MS = 15000;
+// Until the list is seen resting past the room, it's placed there again every so often (a
+// placement made while something covers the screen — the app-open ad — can be lost).
+const PLACE_RETRY_MS = 400;
+const PLACE_RETRY_FOR_MS = 30000;
+// The list stays invisible until it's been placed past the room (so it never shows a jump up
+// on opening): shown a moment after that placement, or after this at the latest.
+const REVEAL_AFTER_PLACE_MS = 60;
+const REVEAL_AT_LATEST_MS = 700;
 
 type Phase = 'idle' | 'pulling' | 'refreshing' | 'done';
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
@@ -112,7 +120,14 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
   // (in case the platform ignores the starting `contentOffset`).
   const y = useRef(0);
   const dragging = useRef(false);
-  const touched = useRef(false);
+  // The person themselves pulled the room open (only that may refresh or leave it open).
+  const userPull = useRef(false);
+  // The list has been seen resting past the room at least once.
+  const placed = useRef(false);
+  const [revealed, setRevealed] = useState(false);
+  const revealedRef = useRef(false);
+  const contentHeight = useRef(0);
+  const viewport = useRef(0);
   const refreshingRef = useRef(refreshing);
   const onRefreshRef = useRef(onRefresh);
   const mounted = useRef(true);
@@ -147,6 +162,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
   const busy = () => phaseRef.current === 'refreshing' || phaseRef.current === 'done';
 
   const runRefresh = async () => {
+    userPull.current = false;
     setPhaseBoth('refreshing');
     setOpenable(true);
     const startedAt = Date.now();
@@ -169,28 +185,66 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
     if (y.current < ROOM) scrollTo(ROOM, true);
   };
 
-  /** After the finger is off: fully open → refresh; closed → back to idle. */
+  /** After the finger is off: pulled fully open → refresh; closed → back to idle. */
   const settle = () => {
     if (dragging.current || busy()) return;
     if (y.current <= 1) {
-      runRefresh();
+      if (userPull.current) runRefresh();
+      else scrollTo(ROOM, false);
     } else if (y.current >= ROOM - 1) {
       setPhaseBoth('idle');
       setOpenable(false);
+      userPull.current = false;
     }
   };
+
+  /**
+   * The room must never be left showing unless the person pulled it open: if the list comes
+   * to rest inside it any other way (content arriving, the keyboard closing, a layout change),
+   * it's closed again.
+   */
+  const keepClosed = (animated: boolean) => {
+    if (dragging.current || busy() || userPull.current || roomOpenableRef.current) return;
+    if (y.current < ROOM - 0.5) scrollTo(ROOM, animated);
+  };
+
+  const reveal = () => {
+    if (revealedRef.current) return;
+    revealedRef.current = true;
+    if (mounted.current) setRevealed(true);
+  };
+
+  /** Once the content is tall enough to rest past the room, place it there and then show it. */
+  const placeThenReveal = () => {
+    if (revealedRef.current || viewport.current === 0 || contentHeight.current < viewport.current + ROOM - 1) return;
+    scrollTo(ROOM, false);
+    setTimeout(reveal, REVEAL_AFTER_PLACE_MS);
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(reveal, REVEAL_AT_LATEST_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const child = children;
   const props = child.props;
 
   const onScroll = (event: ScrollEvent) => {
     y.current = event.nativeEvent.contentOffset.y;
+    if (y.current >= ROOM - 1) {
+      placed.current = true;
+      reveal();
+    }
     const pulled = Math.max(0, ROOM - y.current);
     pull.setValue(pulled);
     if (dragging.current && !busy()) {
       // Only a finger in the room may open it on letting go.
       setOpenable(y.current < ROOM);
-      if (pulled > 0) setPhaseBoth('pulling');
+      if (pulled > 0) {
+        setPhaseBoth('pulling');
+        userPull.current = true;
+      }
     }
     settle();
     props.onScroll?.(event);
@@ -198,7 +252,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
 
   const onScrollBeginDrag = (event: ScrollEvent) => {
     dragging.current = true;
-    touched.current = true;
+    placed.current = true;
     props.onScrollBeginDrag?.(event);
   };
 
@@ -206,24 +260,45 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
     dragging.current = false;
     y.current = event.nativeEvent.contentOffset.y;
     settle();
+    // A drag that ended inside the room without having pulled it (it was already showing).
+    setTimeout(() => keepClosed(true), 160);
     props.onScrollEndDrag?.(event);
   };
 
   const onMomentumScrollEnd = (event: ScrollEvent) => {
     y.current = event.nativeEvent.contentOffset.y;
     settle();
+    keepClosed(true);
     props.onMomentumScrollEnd?.(event);
   };
 
   const onContentSizeChange = (width: number, height: number) => {
-    // Until the person first touches it, keep the list resting past the room (the content and
-    // the room's minimum height can arrive in any order).
-    if (!touched.current && !busy() && y.current < ROOM - 0.5) scrollTo(ROOM, false);
+    // New content (and the room's minimum height, in any order) must not uncover the room.
+    contentHeight.current = height;
+    keepClosed(false);
+    placeThenReveal();
     props.onContentSizeChange?.(width, height);
   };
 
+  // Keep placing the list past the room until it's seen there (or the person touches it).
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (placed.current || Date.now() - startedAt > PLACE_RETRY_FOR_MS) {
+        clearInterval(timer);
+        return;
+      }
+      keepClosed(false);
+    }, PLACE_RETRY_MS);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onLayout = (event: LayoutChangeEvent) => {
     setViewportHeight(event.nativeEvent.layout.height);
+    viewport.current = event.nativeEvent.layout.height;
+    keepClosed(false);
+    placeThenReveal();
     props.onLayout?.(event);
   };
 
@@ -288,7 +363,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
 
   return (
     <View style={[styles.fill, style]}>
-      {scrollable}
+      <View style={[styles.fill, { opacity: revealed ? 1 : 0 }]}>{scrollable}</View>
       <Animated.View pointerEvents="none" style={[styles.bubbleWrap, { transform: [{ translateY: bubbleY }] }]}>
         <Animated.View
           style={[

@@ -17,6 +17,14 @@ export const AD_MEDIA_FOLDER = 'triolo/ads';
 
 export const AD_PAYMENT_METHODS = ['cash', 'upi', 'other'] as const;
 export type AdPaymentMethod = (typeof AD_PAYMENT_METHODS)[number];
+/** A self-booked ad before payment is recorded (online payment isn't built yet). */
+export type AdPaymentState = AdPaymentMethod | 'pending';
+
+/** How many ads one business may have waiting for review (or rejected) at a time. */
+export const AD_SELF_OPEN_LIMIT = 5;
+
+/** pending = waiting for the admin; only 'approved' ads are ever shown in the apps. */
+export type AdReviewStatus = 'pending' | 'approved' | 'rejected';
 
 export const AD_APPS = ['user', 'partner'] as const;
 export type AdApp = (typeof AD_APPS)[number];
@@ -28,7 +36,8 @@ export type AdApp = (typeof AD_APPS)[number];
 export const AD_PLACEMENTS = ['launch', 'action'] as const;
 export type AdPlacement = (typeof AD_PLACEMENTS)[number];
 
-export type AdStatus = 'scheduled' | 'running' | 'ended' | 'deleted';
+/** in_review / rejected: a self-booked ad not approved (yet); otherwise by its dates. */
+export type AdStatus = 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
 
 export interface AdSettings {
   adsEnabled: boolean;
@@ -77,8 +86,14 @@ export interface Ad extends PublicAd {
   videoSeconds: number | null;
   planDays: AdPlanDays;
   amount: number;
-  paymentMethod: AdPaymentMethod;
+  paymentMethod: AdPaymentState;
   startDate: string;
+  /** The business account that booked it on the Triolo Ads website; null when the admin did. */
+  ownerAccountId: string | null;
+  reviewStatus: AdReviewStatus;
+  /** Why it was rejected (shown to the business). */
+  reviewNote: string | null;
+  reviewedAt: string | null;
   impressions: number;
   clicks: number;
   status: AdStatus;
@@ -101,7 +116,7 @@ export interface SaveAdParams {
   locationText: string;
   linkUrl?: string | null;
   planDays: AdPlanDays;
-  paymentMethod: AdPaymentMethod;
+  paymentMethod: AdPaymentState;
   /** YYYY-MM-DD (India date). */
   startDate: string;
 }

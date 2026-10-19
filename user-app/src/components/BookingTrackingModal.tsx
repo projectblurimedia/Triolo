@@ -15,7 +15,8 @@ import { RatingStars, STAR_COLOR } from './RatingStars';
 import { Avatar } from './WorkerMiniCard';
 import { SKILL_CATEGORIES } from '@/constants/categories';
 import { ToastHost } from './ToastHost';
-import { useBooking, useCancelBooking, useCompleteBooking } from '@/hooks/useBookings';
+import { useBooking, useCancelBooking, useCancelLateBooking, useCompleteBooking } from '@/hooks/useBookings';
+import { LATE_AFTER_MS, LateNotice, useNow } from './LateNotice';
 import { openBookingTracker, useBookingTrackerStore } from '@/state/bookingTrackerStore';
 import { ensureLocation } from '@/state/locationStore';
 import {
@@ -92,6 +93,10 @@ export function BookingTrackingModal() {
   const completeBooking = useCompleteBooking();
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  // A worker over an hour late: cancel and rate them.
+  const cancelLate = useCancelLateBooking();
+  const [ratingLate, setRatingLate] = useState(false);
+  const now = useNow();
   const [rebooking, setRebooking] = useState(false);
 
   const visible = bookingId !== null;
@@ -107,6 +112,24 @@ export function BookingTrackingModal() {
         showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) }),
       onSettled: () => setConfirmCancel(false),
     });
+  };
+
+  const isLate = (b: CustomerBooking) =>
+    (b.status === 'accepted' || b.status === 'on_the_way') &&
+    !!b.acceptedAt &&
+    now - new Date(b.acceptedAt).getTime() >= LATE_AFTER_MS;
+
+  const handleCancelLate = (rating: number, review: string) => {
+    if (!bookingId) return;
+    cancelLate.mutate(
+      { id: bookingId, rating, review },
+      {
+        onSuccess: () => showToast({ variant: 'info', title: t('late.cancelledToast') }),
+        onError: (error) =>
+          showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) }),
+        onSettled: () => setRatingLate(false),
+      },
+    );
   };
 
   const handleFinish = (rating: number, review: string) => {
@@ -178,9 +201,11 @@ export function BookingTrackingModal() {
           <Text style={[styles.bannerMessage, { color: colors.textMuted }]}>
             {b.status === 'cancelled' && b.cancelledBy === 'admin'
               ? t('tracking.adminCancelled')
-              : b.status === 'cancelled' && b.cancelledBy === 'worker'
-                ? t(b.problemPostId ? 'tracking.workerCancelledProblem' : 'tracking.workerCancelled', { name: workerName })
-                : t(`tracking.status.${b.status}.message`, { name: workerName })}
+              : b.status === 'cancelled' && b.cancelledBy === 'worker' && b.directWorker && !b.worker
+                ? t('directBook.declinedMessage', { name: b.directWorker.fullName })
+                : b.status === 'cancelled' && b.cancelledBy === 'worker'
+                  ? t(b.problemPostId ? 'tracking.workerCancelledProblem' : 'tracking.workerCancelled', { name: workerName })
+                  : t(`tracking.status.${b.status}.message`, { name: workerName })}
             {b.status === 'cancelled' && b.cancelledBy === 'admin' && b.cancelReason
               ? ` ${t('tracking.reason', { reason: b.cancelReason })}`
               : ''}
@@ -332,8 +357,17 @@ export function BookingTrackingModal() {
       return (
         <View style={styles.center}>
           <RadarPulse icon={radarIcon} />
-          <Text style={[styles.searchTitle, { color: colors.text }]}>{t('quickBook.searchingTitle')}</Text>
-          <Text style={[styles.searchMessage, { color: colors.textMuted }]}>{t('quickBook.searchingMessage')}</Text>
+          {/* Booked personally: waiting for that one worker, not searching. */}
+          <Text style={[styles.searchTitle, { color: colors.text }]}>
+            {booking.directWorker && !rebooking
+              ? t('directBook.waitingTitle', { name: booking.directWorker.fullName })
+              : t('quickBook.searchingTitle')}
+          </Text>
+          <Text style={[styles.searchMessage, { color: colors.textMuted }]}>
+            {booking.directWorker && !rebooking
+              ? t('directBook.waitingMessage', { name: booking.directWorker.fullName })
+              : t('quickBook.searchingMessage')}
+          </Text>
           <Text style={[styles.searchSkills, { color: colors.primary }]}>{skillLabels}</Text>
           <CancelButton
             label={t('tracking.cancelBooking')}
@@ -351,7 +385,11 @@ export function BookingTrackingModal() {
             <FontAwesome6 name="hourglass-end" size={30} color={brandColors.warning} solid />
           </View>
           <Text style={[styles.searchTitle, { color: colors.text }]}>{t('tracking.status.expired.title')}</Text>
-          <Text style={[styles.searchMessage, { color: colors.textMuted }]}>{t('tracking.status.expired.message')}</Text>
+          <Text style={[styles.searchMessage, { color: colors.textMuted }]}>
+            {booking.directWorker
+              ? t('directBook.expiredMessage', { name: booking.directWorker.fullName })
+              : t('tracking.status.expired.message')}
+          </Text>
           <Text style={[styles.searchSkills, { color: colors.primary }]}>{skillLabels}</Text>
           <View style={styles.retryWrap}>
             <Button label={t('tracking.bookAgain')} onPress={handleBookAgain} loading={rebooking} />
@@ -369,6 +407,14 @@ export function BookingTrackingModal() {
         {onTrip ? <LiveMap customer={jobPoint} worker={workerPoint} height={MAP_HEIGHT} /> : null}
         <ScrollView contentContainerStyle={[styles.panel, { paddingBottom: insets.bottom + 24 }]}>
           {renderStatusBanner(booking)}
+          {isLate(booking) ? (
+            <LateNotice
+              title={t('late.workerTitle', { name: workerName })}
+              message={t('late.workerMessage', { name: workerName })}
+              actionLabel={t('late.workerAction')}
+              onPress={() => setRatingLate(true)}
+            />
+          ) : null}
           {renderPin(booking)}
           {renderWorker(booking)}
           {canFinish ? (
@@ -445,6 +491,16 @@ export function BookingTrackingModal() {
           loading={completeBooking.isPending}
           onConfirm={handleFinish}
           onCancel={() => setFinishing(false)}
+        />
+        <FinishJobModal
+          visible={ratingLate}
+          workerName={booking?.worker?.fullName ?? null}
+          loading={cancelLate.isPending}
+          onConfirm={handleCancelLate}
+          onCancel={() => setRatingLate(false)}
+          title={t('late.rateWorkerTitle')}
+          message={t('late.rateWorkerMessage', { name: workerName })}
+          confirmLabel={t('late.cancelAndRate')}
         />
       </BlurScope>
     </Modal>

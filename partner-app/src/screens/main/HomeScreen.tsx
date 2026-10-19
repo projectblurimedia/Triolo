@@ -11,8 +11,8 @@ import { ShopHomeSection } from '@/components/ShopHomeSection';
 import { JobPostHomeSection } from '@/components/JobPostHomeSection';
 import { useMyJobPost } from '@/hooks/useJobPost';
 import { ContinueSteps } from '@/components/ContinueSteps';
-import { withLocation } from '@/utils/ensureLocationOn';
-import { showAdBefore } from '@/components/Ads';
+import { askForLocation } from '@/utils/ensureLocationOn';
+import { useAdGate } from '@/components/Ads';
 import { LocationNeededCard } from '@/components/LocationNeededCard';
 import { FindJobsButton } from '@/components/FindJobsButton';
 import { navigateToBookings } from '@/navigation/navigationRef';
@@ -54,6 +54,9 @@ const SIDE_LABELS = { shop: 'shopHome.myShop', worker: 'shopHome.myServices', jo
 
 export function HomeScreen() {
   const { t } = useTranslation();
+  // Mark Work Done: location, then a local business's ad while that job's button spins.
+  const { adLoading, waitForAd } = useAdGate();
+  const [adForJob, setAdForJob] = useState<string | null>(null);
   const { colors } = useThemeColors();
   const account = useAuthStore((state) => state.account);
   const workerProfile = useMyWorkerProfile();
@@ -223,7 +226,14 @@ export function HomeScreen() {
           ) : (
             <Button
               label={t('problems.markWorkDone')}
-              onPress={() => withLocation(() => showAdBefore(() => setConfirmDoneFor(job)))}
+              onPress={async () => {
+                if (adLoading || !(await askForLocation())) return;
+                setAdForJob(job.id);
+                const ok = await waitForAd();
+                setAdForJob(null);
+                if (ok) setConfirmDoneFor(job);
+              }}
+              loading={adLoading && adForJob === job.id}
               gradient={DONE_GRADIENT}
             />
           )}

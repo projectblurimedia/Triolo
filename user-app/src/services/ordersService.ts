@@ -63,6 +63,8 @@ export interface CustomerOrder {
   shopRating: number | null;
   shopReview: string | null;
   acceptedAt: string | null;
+  /** Last change by the shop — no change for an hour means the order is stalled. */
+  updatedAt?: string;
   packedAt: string | null;
   readyAt: string | null;
   completedAt: string | null;
@@ -98,7 +100,13 @@ export const ordersService = {
   create: (params: CreateOrderParams) => apiClient.post<CustomerOrder>('/orders', params, true),
   listMine: () => apiClient.get<CustomerOrder[]>('/orders/mine', true),
   get: (orderId: string) => apiClient.get<CustomerOrder>(`/orders/${orderId}`, true),
-  cancel: (orderId: string) => apiClient.post<null>(`/orders/${orderId}/cancel`, undefined, true),
+  /** With a rating: cancelling an order the shop hasn't moved on for over an hour. */
+  cancel: (orderId: string, late?: { rating: number; review?: string }) =>
+    apiClient.post<null>(
+      `/orders/${orderId}/cancel`,
+      late ? { rating: late.rating, review: late.review || undefined } : undefined,
+      true,
+    ),
   rate: (orderId: string, rating: number, review?: string) =>
     apiClient.post<null>(`/orders/${orderId}/rate`, { rating, review: review || undefined }, true),
 };

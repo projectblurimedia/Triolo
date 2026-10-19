@@ -173,8 +173,9 @@ export function IncomingJobModal() {
     <IncomingRequestScreen
       visible={visible}
       onRequestClose={() => !busy && handleDecline()}
-      kicker={t('bookings.newJobKicker')}
-      icon="bolt"
+      // A customer who picked this worker in particular: say so, it's not a broadcast.
+      kicker={t(offer?.direct ? 'bookings.directKicker' : 'bookings.newJobKicker')}
+      icon={offer?.direct ? 'user-check' : 'bolt'}
       state={notFound ? 'gone' : offer ? 'ready' : 'loading'}
       goneTitle={t('bookings.offerGoneTitle')}
       goneMessage={t('bookings.offerGoneMessage')}

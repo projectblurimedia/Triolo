@@ -8,6 +8,8 @@ import {
   ItemUpdate,
   MAX_PIN_ATTEMPTS,
   ORDER_TTL_MINUTES,
+  ORDER_LATE_AFTER_MINUTES,
+  ORDER_LATE_STATUSES,
   OrderTransition,
   PACKING_STATUSES,
   RatedOrder,
@@ -57,6 +59,7 @@ function mapOrder(row: QueryResultRow, items: ShopOrderItem[]): ShopOrder {
     shopRating: row.shop_rating ?? null,
     shopReview: row.shop_review ?? null,
     acceptedAt: row.accepted_at ?? null,
+    updatedAt: row.updated_at,
     packedAt: row.packed_at ?? null,
     readyAt: row.ready_at ?? null,
     completedAt: row.completed_at ?? null,
@@ -188,10 +191,10 @@ export class OrdersRepository {
 
   async findRatedForBusiness(businessId: string, limit: number): Promise<RatedOrder[]> {
     const result = await this.pool.query(
-      `SELECT o.shop_rating, o.shop_review, o.completed_at, a.full_name AS customer_full_name
+      `SELECT o.shop_rating, o.shop_review, COALESCE(o.completed_at, o.cancelled_at) AS completed_at, a.full_name AS customer_full_name
        FROM shop_orders o JOIN accounts a ON a.id = o.account_id
-       WHERE o.business_id = $1 AND o.status = 'completed' AND (o.shop_rating IS NOT NULL OR o.shop_review IS NOT NULL)
-       ORDER BY o.completed_at DESC
+       WHERE o.business_id = $1 AND o.status IN ('completed', 'cancelled') AND (o.shop_rating IS NOT NULL OR o.shop_review IS NOT NULL)
+       ORDER BY COALESCE(o.completed_at, o.cancelled_at) DESC
        LIMIT $2`,
       [businessId, limit],
     );
@@ -215,6 +218,30 @@ export class OrdersRepository {
       [id, accountId, CUSTOMER_CANCELLABLE],
     );
     return this.toTransition(result.rows[0]);
+  }
+
+  /**
+   * The customer cancels an order the shop took but hasn't moved on for ORDER_LATE_AFTER_MINUTES,
+   * rating the shop. Returns the transition and the business to credit, or null.
+   */
+  async cancelStalled(
+    id: string,
+    accountId: string,
+    rating: number,
+    review: string | null,
+  ): Promise<{ transition: OrderTransition; businessId: string } | null> {
+    const result = await this.pool.query(
+      `WITH updated AS (
+         UPDATE shop_orders SET status = 'cancelled', cancelled_by = 'customer', cancelled_at = now(), updated_at = now(),
+           cancel_reason = 'late', shop_rating = $4, shop_review = $5, rated_at = now()
+         WHERE id = $1 AND account_id = $2 AND status = ANY($3::shop_order_status[])
+           AND updated_at <= now() - make_interval(mins => ${ORDER_LATE_AFTER_MINUTES})
+         RETURNING *
+       ) ${NOTIFY_SHOP}`,
+      [id, accountId, ORDER_LATE_STATUSES, rating, review],
+    );
+    const transition = await this.toTransition(result.rows[0]);
+    return transition ? { transition, businessId: result.rows[0].business_id } : null;
   }
 
   /** Once per order, only after it's completed. Returns the business to credit, or null. */

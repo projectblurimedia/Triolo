@@ -34,7 +34,7 @@ const MODAL_HANDOFF_MS = 350;
 const GEOCODE_TIMEOUT_MS = 4000;
 
 /** A readable address for the worker, from the phone's own (free) geocoder — best-effort, never blocks booking. */
-async function addressFor(latitude: number, longitude: number): Promise<string | undefined> {
+export async function addressFor(latitude: number, longitude: number): Promise<string | undefined> {
   try {
     const places = await Promise.race([
       Location.reverseGeocodeAsync({ latitude, longitude }),
@@ -69,7 +69,7 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
   const [submitting, setSubmitting] = useState(false);
   // Asking for location / showing the ad: a second tap must not start a second booking.
   const preparing = useRef(false);
-  const { adLoading, waitForAd } = useAdGate();
+  const { adLoading, waitForAd } = useAdGate(visible);
   const queryClient = useQueryClient();
 
   useEffect(() => {

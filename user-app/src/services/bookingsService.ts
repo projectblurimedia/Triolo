@@ -80,17 +80,37 @@ export interface CustomerBooking {
   worker: BookingWorker | null;
   /** Shown while the worker is on the way / at the door; the worker never receives it. */
   arrivalPin: string | null;
+  /** Set when the customer booked this worker personally (shown while waiting for them). */
+  directWorker?: { fullName: string } | null;
+}
+
+export interface CreateDirectBookingParams {
+  workerId: string;
+  skillCategories: string[];
+  latitude: number;
+  longitude: number;
+  locationAddress?: string;
 }
 
 export const bookingsService = {
   createQuickBooking: (params: CreateQuickBookingParams) =>
     apiClient.post<CreateQuickBookingResult>('/bookings/quick', params, true),
 
+  /** Book one particular worker: only they are asked. */
+  createDirectBooking: (params: CreateDirectBookingParams) =>
+    apiClient.post<{ bookingRequestId: string }>('/bookings/direct', params, true),
+
   getBooking: (bookingRequestId: string) => apiClient.get<CustomerBooking>(`/bookings/${bookingRequestId}`, true),
 
   listMine: () => apiClient.get<CustomerBooking[]>('/bookings/mine', true),
 
-  cancel: (bookingRequestId: string) => apiClient.post<null>(`/bookings/${bookingRequestId}/cancel`, undefined, true),
+  /** With a rating: cancelling a worker who's over an hour late (they get the rating). */
+  cancel: (bookingRequestId: string, late?: { rating: number; review?: string }) =>
+    apiClient.post<null>(
+      `/bookings/${bookingRequestId}/cancel`,
+      late ? { rating: late.rating, review: late.review || undefined } : undefined,
+      true,
+    ),
 
   complete: (bookingRequestId: string, rating: number, review?: string) =>
     apiClient.post<null>(`/bookings/${bookingRequestId}/complete`, { rating, review: review || undefined }, true),

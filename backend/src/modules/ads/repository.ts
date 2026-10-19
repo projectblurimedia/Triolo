@@ -6,6 +6,8 @@ const TODAY = `(now() AT TIME ZONE 'Asia/Kolkata')::date`;
 
 const STATUS_SQL = `CASE
   WHEN a.deleted_at IS NOT NULL THEN 'deleted'
+  WHEN a.review_status = 'pending' THEN 'in_review'
+  WHEN a.review_status = 'rejected' THEN 'rejected'
   WHEN ${TODAY} < a.start_date THEN 'scheduled'
   WHEN ${TODAY} > a.end_date THEN 'ended'
   ELSE 'running' END`;
@@ -49,6 +51,10 @@ function mapAd(row: any): Ad {
     paymentMethod: row.payment_method,
     startDate: row.start_date_text,
     endDate: row.end_date_text,
+    ownerAccountId: row.owner_account_id ?? null,
+    reviewStatus: row.review_status,
+    reviewNote: row.review_note ?? null,
+    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).toISOString() : null,
     impressions: Number(row.impressions),
     clicks: Number(row.clicks),
     status: row.status as AdStatus,
@@ -114,12 +120,18 @@ export class AdsRepository {
     return mapSettings(result.rows[0]);
   }
 
-  async create(params: SaveAdParams, amount: number): Promise<Ad> {
+  /**
+   * Books an ad. With `ownerAccountId` it's a business booking its own ad: it waits for review
+   * and its payment is 'pending'; without it, the admin's booking (approved at once).
+   */
+  async create(params: SaveAdParams, amount: number, ownerAccountId: string | null = null): Promise<Ad> {
     const result = await this.pool.query(
       `WITH inserted AS (
          INSERT INTO ads (advertiser_name, advertiser_phone, title, description, latitude, longitude, location_text,
-                          plan_days, amount, payment_method, start_date, end_date, link_url, orientation, display_seconds)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $11::date + ($8::int - 1), $12, $13, $14)
+                          plan_days, amount, payment_method, start_date, end_date, link_url, orientation, display_seconds,
+                          owner_account_id, review_status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $11::date + ($8::int - 1), $12, $13, $14,
+                 $15, CASE WHEN $15::uuid IS NULL THEN 'approved' ELSE 'pending' END)
          RETURNING *
        )
        SELECT ${AD_COLUMNS} FROM inserted a`,
@@ -138,9 +150,97 @@ export class AdsRepository {
         params.linkUrl ?? null,
         params.orientation,
         params.displaySeconds,
+        ownerAccountId,
       ],
     );
     return mapAd(result.rows[0]);
+  }
+
+  /**
+   * A business editing its own ad while it waits for review or after it was rejected: the
+   * changes go back for review.
+   */
+  async updateOwned(id: string, ownerAccountId: string, params: SaveAdParams, amount: number): Promise<Ad | null> {
+    const result = await this.pool.query(
+      `WITH updated AS (
+         UPDATE ads SET advertiser_name = $3, advertiser_phone = $4, title = $5, description = $6,
+           latitude = $7, longitude = $8, location_text = $9, plan_days = $10, amount = $11,
+           start_date = $12::date, end_date = $12::date + ($10::int - 1), link_url = $13, orientation = $14, display_seconds = $15,
+           review_status = 'pending', review_note = NULL, reviewed_at = NULL, updated_at = now()
+         WHERE id = $1 AND owner_account_id = $2 AND deleted_at IS NULL AND review_status IN ('pending', 'rejected')
+         RETURNING *
+       )
+       SELECT ${AD_COLUMNS} FROM updated a`,
+      [
+        id,
+        ownerAccountId,
+        params.advertiserName,
+        params.advertiserPhone ?? null,
+        params.title,
+        params.description ?? null,
+        params.latitude,
+        params.longitude,
+        params.locationText,
+        params.planDays,
+        amount,
+        params.startDate,
+        params.linkUrl ?? null,
+        params.orientation,
+        params.displaySeconds,
+      ],
+    );
+    return result.rows[0] ? mapAd(result.rows[0]) : null;
+  }
+
+  /** One business's own ads, newest first. */
+  async listOwned(ownerAccountId: string): Promise<Ad[]> {
+    const result = await this.pool.query(
+      `SELECT ${AD_COLUMNS} FROM ads a WHERE a.owner_account_id = $1 ORDER BY a.created_at DESC LIMIT 100`,
+      [ownerAccountId],
+    );
+    return result.rows.map(mapAd);
+  }
+
+  /** Ads this business has waiting for review or rejected (not withdrawn). */
+  async countOpenOwned(ownerAccountId: string): Promise<number> {
+    const result = await this.pool.query(
+      `SELECT count(*)::int AS n FROM ads
+       WHERE owner_account_id = $1 AND deleted_at IS NULL AND review_status IN ('pending', 'rejected')`,
+      [ownerAccountId],
+    );
+    return result.rows[0].n;
+  }
+
+  /** The business takes back an ad that wasn't approved (it stays in their history). */
+  async withdrawOwned(id: string, ownerAccountId: string): Promise<Ad | null> {
+    const result = await this.pool.query(
+      `WITH deleted AS (
+         UPDATE ads SET deleted_at = now(), updated_at = now()
+         WHERE id = $1 AND owner_account_id = $2 AND deleted_at IS NULL AND review_status IN ('pending', 'rejected')
+         RETURNING *
+       )
+       SELECT ${AD_COLUMNS} FROM deleted a`,
+      [id, ownerAccountId],
+    );
+    return result.rows[0] ? mapAd(result.rows[0]) : null;
+  }
+
+  /**
+   * The admin's decision on an ad waiting for review. Approving needs its dates still ahead
+   * (an ad whose end date has passed can't run — the business changes the dates and resubmits).
+   */
+  async review(id: string, decision: 'approve' | 'reject', note: string | null): Promise<Ad | null> {
+    const result = await this.pool.query(
+      `WITH reviewed AS (
+         UPDATE ads SET review_status = $2, review_note = $3, reviewed_at = now(), updated_at = now()
+         WHERE id = $1 AND deleted_at IS NULL AND review_status = 'pending'
+           AND ($2 = 'rejected' OR end_date >= ${TODAY})
+         RETURNING *
+       )
+       SELECT ${AD_COLUMNS} FROM reviewed a`,
+      [id, decision === 'approve' ? 'approved' : 'rejected', note],
+    );
+    return result.rows[0] ? mapAd(result.rows[0]) : null;
   }
 
   /** Edits a live (not deleted) ad; the end date and amount follow the plan. */
@@ -268,20 +368,32 @@ export class AdsRepository {
 
   async summary(): Promise<{ counts: Record<AdStatus, number>; revenueTotal: number; revenueThisMonth: number }> {
     const result = await this.pool.query(
+      // Revenue counts only approved ads whose payment was recorded.
       `SELECT
+         count(*) FILTER (WHERE status = 'in_review')::int AS in_review,
+         count(*) FILTER (WHERE status = 'rejected')::int AS rejected,
          count(*) FILTER (WHERE status = 'running')::int AS running,
          count(*) FILTER (WHERE status = 'scheduled')::int AS scheduled,
          count(*) FILTER (WHERE status = 'ended')::int AS ended,
          count(*) FILTER (WHERE status = 'deleted')::int AS deleted,
-         COALESCE(sum(amount), 0)::int AS revenue_total,
+         COALESCE(sum(amount) FILTER (WHERE paid), 0)::int AS revenue_total,
          COALESCE(sum(amount) FILTER (
-           WHERE date_trunc('month', created_at AT TIME ZONE 'Asia/Kolkata') = date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata')
+           WHERE paid AND date_trunc('month', created_at AT TIME ZONE 'Asia/Kolkata') = date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata')
          ), 0)::int AS revenue_month
-       FROM (SELECT a.amount, a.created_at, ${STATUS_SQL} AS status FROM ads a) s`,
+       FROM (SELECT a.amount, a.created_at, ${STATUS_SQL} AS status,
+               (a.review_status = 'approved' AND a.payment_method != 'pending') AS paid
+             FROM ads a) s`,
     );
     const row = result.rows[0];
     return {
-      counts: { running: row.running, scheduled: row.scheduled, ended: row.ended, deleted: row.deleted },
+      counts: {
+        in_review: row.in_review,
+        rejected: row.rejected,
+        running: row.running,
+        scheduled: row.scheduled,
+        ended: row.ended,
+        deleted: row.deleted,
+      },
       revenueTotal: row.revenue_total,
       revenueThisMonth: row.revenue_month,
     };
@@ -298,7 +410,7 @@ export class AdsRepository {
       `WITH picked AS (
          SELECT a.id FROM ads a
          LEFT JOIN ad_daily_stats s ON s.ad_id = a.id AND s.day = ${TODAY}
-         WHERE a.deleted_at IS NULL AND ${TODAY} BETWEEN a.start_date AND a.end_date
+         WHERE a.deleted_at IS NULL AND a.review_status = 'approved' AND ${TODAY} BETWEEN a.start_date AND a.end_date
            AND a.latitude IS NOT NULL AND ${DISTANCE_SQL} <= a.radius_km * 1000
          ORDER BY (a.id = $1::uuid) ASC NULLS FIRST, COALESCE(s.impressions, 0) ASC, random()
          LIMIT 1

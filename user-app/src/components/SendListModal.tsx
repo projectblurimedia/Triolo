@@ -126,7 +126,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
 
   // Asking for location / showing the ad: a second tap must not send the list twice.
   const preparing = useRef(false);
-  const { adLoading, waitForAd } = useAdGate();
+  const { adLoading, waitForAd } = useAdGate(visible);
 
   const handleSend = async () => {
     if (!selected || sending || preparing.current) return;

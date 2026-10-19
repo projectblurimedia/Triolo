@@ -29,7 +29,6 @@ import { askForLocation } from '@/utils/ensureLocationOn';
 import { useAdGate } from './Ads';
 
 const CALL_GRADIENT = ['#16A34A', '#22C55E'] as const;
-const SEARCH_DEBOUNCE_MS = 350;
 const SKILLS_SHOWN = 4;
 // Tile colours on the intro, one per kind of work in turn (no orange — that's the shop colour).
 const TILE_COLORS = ['#0055D3', '#0D9488', '#7C3AED', '#16A34A', '#DB2777', '#2563EB'];
@@ -59,13 +58,14 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
   const [payPeriod, setPayPeriod] = useState<PayPeriod | null>(null);
   const [sort, setSort] = useState<JobSeekerSort>('distance');
   const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  // The search that's run: set when the search icon or the keyboard's search key is pressed.
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [selected, setSelected] = useState<JobSeeker | null>(null);
   // Whether people are listed yet (after the first search / filter), and whether that's starting.
   const [started, setStarted] = useState(false);
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
-  const { waitForAd } = useAdGate();
+  const { waitForAd } = useAdGate(visible);
 
   // Every opening starts on the intro again.
   useEffect(() => {
@@ -75,7 +75,7 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
     setPayPeriod(null);
     setSort('distance');
     setQuery('');
-    setDebouncedQuery('');
+    setAppliedQuery('');
   }, [visible]);
 
   /** Location first, then the ad, then the list. */
@@ -99,19 +99,14 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
     if (!started) begin();
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  // Typing a search on the intro starts it too.
-  useEffect(() => {
-    if (visible && debouncedQuery && !started) begin();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery]);
+  /** Runs the typed search (the first one also asks for location and shows the ad). */
+  const submitSearch = () => {
+    setAppliedQuery(query.trim());
+    if (!started) begin();
+  };
 
   const results = useQuery({
-    queryKey: ['job-seekers', coords?.latitude, coords?.longitude, category, payPeriod, sort, debouncedQuery],
+    queryKey: ['job-seekers', coords?.latitude, coords?.longitude, category, payPeriod, sort, appliedQuery],
     queryFn: () =>
       jobSeekersService.search({
         latitude: coords!.latitude,
@@ -119,7 +114,7 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
         radiusKm: SERVICES_RADIUS_KM,
         category,
         payPeriod,
-        query: debouncedQuery || undefined,
+        query: appliedQuery || undefined,
         sort,
       }),
     enabled: visible && started && coords !== null,
@@ -385,7 +380,9 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
         {/* Search and filters sit below the header — headers carry only the title. */}
         <View style={styles.filters}>
           <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <FontAwesome6 name="magnifying-glass" size={14} color={colors.textMuted} solid />
+            <Pressable onPress={submitSearch} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.search')}>
+              <FontAwesome6 name="magnifying-glass" size={14} color={colors.primary} solid />
+            </Pressable>
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
               value={query}
@@ -393,11 +390,17 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
               placeholder={t('hireStaff.searchPlaceholder')}
               placeholderTextColor={colors.textMuted}
               returnKeyType="search"
-              onSubmitEditing={() => begin()}
+              onSubmitEditing={submitSearch}
               maxLength={60}
             />
             {query ? (
-              <Pressable onPress={() => setQuery('')} hitSlop={8}>
+              <Pressable
+                onPress={() => {
+                  setQuery('');
+                  setAppliedQuery('');
+                }}
+                hitSlop={8}
+              >
                 <FontAwesome6 name="circle-xmark" size={15} color={colors.textMuted} solid />
               </Pressable>
             ) : null}

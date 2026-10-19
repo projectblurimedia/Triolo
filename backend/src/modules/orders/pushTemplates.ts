@@ -11,6 +11,7 @@ export type OrderEvent =
   | 'completed'
   | 'cancelled_by_shop'
   | 'cancelled_by_customer'
+  | 'cancelled_late'
   | 'cancelled_by_admin';
 
 export interface OrderTemplateValues {
@@ -42,6 +43,10 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
     completed: ({ shop }) => ({ title: 'Order Completed', body: `Thanks for ordering from ${shop}. Rate your experience.` }),
     cancelled_by_shop: ({ shop }) => ({ title: 'Order Cancelled', body: `${shop} cancelled your order.` }),
     cancelled_by_customer: () => ({ title: 'Order Cancelled', body: 'The customer cancelled their order.' }),
+    cancelled_late: () => ({
+      title: 'Order Cancelled',
+      body: 'The customer cancelled because the order made no progress for over an hour, and rated your shop.',
+    }),
     cancelled_by_admin: ({ shop }) => ({
       title: 'Order Cancelled by Triolo',
       body: `Triolo support cancelled the order with ${shop}.`,
@@ -75,6 +80,10 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
     }),
     cancelled_by_shop: ({ shop }) => ({ title: 'ఆర్డర్ రద్దు చేయబడింది', body: `${shop} మీ ఆర్డర్‌ను రద్దు చేసింది.` }),
     cancelled_by_customer: () => ({ title: 'ఆర్డర్ రద్దు చేయబడింది', body: 'కస్టమర్ తమ ఆర్డర్‌ను రద్దు చేశారు.' }),
+    cancelled_late: () => ({
+      title: 'ఆర్డర్ రద్దు చేయబడింది',
+      body: 'ఆర్డర్ గంటకు పైగా ముందుకు సాగనందున కస్టమర్ రద్దు చేసి, మీ షాప్‌కు రేటింగ్ ఇచ్చారు.',
+    }),
     cancelled_by_admin: ({ shop }) => ({
       title: 'ట్రియోలో ఆర్డర్‌ను రద్దు చేసింది',
       body: `${shop}తో ఉన్న ఆర్డర్‌ను ట్రియోలో సపోర్ట్ రద్దు చేసింది.`,

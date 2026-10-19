@@ -8,6 +8,8 @@ export interface PendingOffer {
   /** Shown before accepting; the phone number only comes after. */
   customerFullName: string;
   locationAddress: string | null;
+  /** The customer chose this worker personally (only they were asked). */
+  direct?: boolean;
   createdAt: string;
 }
 

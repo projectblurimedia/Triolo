@@ -199,7 +199,9 @@
     "serviceJobs": "సర్వీస్ పనులు",
     "newJobKicker": "కొత్త పని అభ్యర్థన",
     "awayFromYou": "మీ నుండి దూరం",
-    "respondWithin": "స్పందించడానికి సమయం"
+    "respondWithin": "స్పందించడానికి సమయం",
+    "directKicker": "మిమ్మల్నే బుక్ చేశారు",
+    "directTag": "మిమ్మల్ని బుక్ చేశారు"
   },
   "location": {
     "useCurrent": "నా ప్రస్తుత లొకేషన్ వాడండి",
@@ -662,7 +664,8 @@
     "fulfillmentPickup": "పికప్",
     "later": "తర్వాత",
     "openOrder": "ఆర్డర్ తెరవండి",
-    "respondWithin": "స్పందించడానికి సమయం"
+    "respondWithin": "స్పందించడానికి సమయం",
+    "lateReason": "గంటకు పైగా ముందుకు సాగలేదు"
   },
   "shopHome": {
     "myShop": "నా షాప్",
@@ -773,7 +776,9 @@
     "seeAll": "అన్నీ ({{count}})",
     "itemCount_one": "{{count}} వస్తువు",
     "itemCount_other": "{{count}} వస్తువులు",
-    "pending": "పెండింగ్"
+    "pending": "పెండింగ్",
+    "more": "+{{count}} ఇంకా · అన్నీ చూడటానికి నొక్కండి",
+    "allSubtitle": "{{count}} జరుగుతున్నాయి — కొనసాగించడానికి ఒకదాన్ని నొక్కండి"
   },
   "findJobs": {
     "button": "ఇప్పుడే పనులు వెతకండి",

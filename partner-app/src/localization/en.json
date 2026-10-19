@@ -199,7 +199,9 @@
     "serviceJobs": "Service Jobs",
     "newJobKicker": "NEW JOB REQUEST",
     "awayFromYou": "away from you",
-    "respondWithin": "Respond within"
+    "respondWithin": "Respond within",
+    "directKicker": "BOOKED YOU PERSONALLY",
+    "directTag": "Booked you"
   },
   "location": {
     "useCurrent": "Use My Current Location",
@@ -662,7 +664,8 @@
     "fulfillmentPickup": "Pickup",
     "later": "Later",
     "openOrder": "Open Order",
-    "respondWithin": "Respond within"
+    "respondWithin": "Respond within",
+    "lateReason": "no progress for over an hour"
   },
   "shopHome": {
     "myShop": "My Shop",
@@ -773,7 +776,9 @@
     "seeAll": "See all {{count}}",
     "itemCount_one": "{{count}} item",
     "itemCount_other": "{{count}} items",
-    "pending": "Pending"
+    "pending": "Pending",
+    "more": "+{{count}} more · Tap to see all",
+    "allSubtitle": "{{count}} in progress — tap one to continue"
   },
   "findJobs": {
     "button": "Find Jobs Now",

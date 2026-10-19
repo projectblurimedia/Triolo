@@ -47,6 +47,19 @@ export const ACTIVE_ORDER_STATUSES: ShopOrderStatus[] = [
 
 /** A list the shop doesn't answer within this many minutes ends as 'expired'. */
 export const ORDER_TTL_MINUTES = 30;
+/**
+ * An accepted order with no progress for this long counts as stalled: the customer may then
+ * cancel it and rate the shop (otherwise only a just-placed order can be cancelled).
+ */
+export const ORDER_LATE_AFTER_MINUTES = 60;
+/** Steps a stalled order can be cancelled from (the shop took it but hasn't handed it over). */
+export const ORDER_LATE_STATUSES: ShopOrderStatus[] = [
+  'accepted',
+  'preparing',
+  'packed',
+  'ready_for_pickup',
+  'out_for_delivery',
+];
 export const MAX_PIN_ATTEMPTS = 5;
 export const MAX_ORDER_ITEMS = 100;
 
@@ -87,6 +100,8 @@ export interface ShopOrder {
   declinedAt: Date | null;
   expiredAt: Date | null;
   createdAt: Date;
+  /** Last change — an accepted order unchanged for ORDER_LATE_AFTER_MINUTES is stalled. */
+  updatedAt: Date;
   items: ShopOrderItem[];
 }
 

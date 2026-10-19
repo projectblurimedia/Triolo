@@ -291,6 +291,16 @@ Broadcast a Quick Book request.
 - 201: `{ success: true, data: { bookingRequestId: string, matchedWorkerCount: number } }` — the app cancels the request straight away when `matchedWorkerCount` is 0
 - 400: `VALIDATION_ERROR`
 
+#### POST /bookings/direct
+Book one particular worker (from their profile). Only that worker is asked — a personal push ("Booking Request for You"), and their offer carries `direct: true`. From accept on it is the same trip as Quick Book. It waits `DIRECT_TTL_MINUTES` (10) for an answer, then expires; the worker declining (`POST /bookings/:id/decline`) ends it as `cancelled` by `worker` and the customer is notified ("Worker Not Available"). Only the named worker can accept it, and Find Jobs Now never offers it to anyone else.
+- Auth: Bearer access token
+- Body: `{ workerId: uuid, skillCategories: string[], latitude: number, longitude: number, locationAddress?: string }` — every skill must be one the worker offers
+- 201: `{ success: true, data: { bookingRequestId: string } }`
+- 400: `VALIDATION_ERROR`, `BOOKING_SKILL_MISMATCH`, `BOOKING_OWN_PROFILE`
+- 404: `WORKER_NOT_FOUND` (missing, unverified, or the account isn't active)
+
+The customer's `CustomerBooking` gains `directWorker: { fullName } | null` (who it was sent to); the worker's `PendingOffer` gains `direct: boolean`.
+
 #### GET /bookings/mine
 The caller's own bookings, newest first (max 50) — feeds `user-app`'s My Bookings and Home's live-booking card.
 - Auth: Bearer access token
@@ -306,6 +316,7 @@ One booking the caller made — polled by `user-app`'s tracker (dynamic interval
 #### POST /bookings/:id/cancel
 Cancel while `broadcasting`, `accepted`, `on_the_way` or `arrived` (not once the PIN is verified). Any still-pending offers flip to `lost`; an assigned worker is notified (`booking_cancelled`).
 - Auth: Bearer access token (the requester)
+- Body (optional): `{ rating: 1-5, review?: string }` — only for a **late worker**: accepted over `LATE_AFTER_MINUTES` (60) ago and still `accepted`/`on_the_way`. The rating is stored on the booking (`cancel_reason: 'late'`), counted in the worker's average, shown in their reviews, and the worker is told why. Otherwise 409 `BOOKING_NOT_LATE`.
 - 200: `{ success: true, message: "Booking cancelled", data: null }`
 - 404 / 409 as above
 
@@ -512,7 +523,7 @@ Common errors: `404 ORDER_NOT_FOUND` (also for a malformed id), `409 ORDER_INVAL
 ### Customer
 - `POST /orders` — body `{ businessId, fulfillment, items: Array<{ name, quantity?, unit? }> (1–100), latitude, longitude, locationAddress?, note? }` → 201 `CustomerOrder`. 404 `SHOP_NOT_FOUND` (unknown/unverified), 400 `ORDER_OWN_SHOP`, 400 `ORDER_DELIVERY_UNAVAILABLE`.
 - `GET /orders/mine` → newest first (max 50). `GET /orders/:id` → `CustomerOrder`.
-- `POST /orders/:id/cancel` — only while `placed`.
+- `POST /orders/:id/cancel` — only while `placed`; or, with body `{ rating: 1-5, review? }`, a **stalled** order: the shop took it (`accepted` … `out_for_delivery`) and it hasn't changed for `ORDER_LATE_AFTER_MINUTES` (60). The shop's rating is stored (`cancel_reason: 'late'`), counted and shown in its reviews; the shop is told why. Otherwise 409 `ORDER_NOT_LATE`. Customer orders now carry `updatedAt`.
 - `POST /orders/:id/rate` — body `{ rating: 1..5, review? }`, once, only when `completed`.
 
 ### Shop (the caller's own business profile)
@@ -555,7 +566,17 @@ Ads from local businesses (shops, openings, offers), booked by the admin by hand
 - `GET /admin/ads/overview` → `{ settings, counts: { running, scheduled, ended, deleted }, revenueTotal, revenueThisMonth, prices: { 1: 20, 3: 50, 7: 100, 30: 300 }, radiusKm: 5 }`.
 - `PATCH /admin/ads/settings` — any of `adsEnabled` (master switch), `launchUser`, `launchPartner`, `homeUser`, `homePartner`, `prices` (`{ "1", "3", "7", "30" }` whole ₹, 0–100000); the per-app placement switches are `launchUser`, `launchPartner`, `actionUser`, `actionPartner` → the settings (which include `prices`). New prices apply to new bookings only.
 - `GET /admin/ads?status=running|scheduled|ended|deleted&q&page&limit` → page of ads, newest booked first (`q` matches business, title or bill number). Deleted ads stay here as history.
-- `POST /admin/ads` → 201, the ad. Body: `advertiserName` (2–80), `advertiserPhone?`, `title` (2–80), `description?` (≤600), `orientation` (`vertical` | `horizontal`), `displaySeconds` (3–30, default 5: how long an image shows before it can be closed), `title?` (defaults to the business name), `latitude`, `longitude` and `locationText` (the ad's place, required), `imageUrl?` / `videoUrl?` (the ad's media, already uploaded, checked and saved with it — a refused video books nothing), `linkUrl?` (optional web link opened when the ad is tapped; "https://" is added if missing; only http(s)), `planDays` (1, 3, 7 or 30), `paymentMethod` (`cash` | `upi` | `other`), `startDate` (YYYY-MM-DD). The amount is the admin's current price for the plan (defaults ₹20 / ₹50 / ₹100 / ₹300); the end date is start + days − 1. Each ad gets the next bill number. 400 `VALIDATION_ERROR`.
+**Businesses booking their own ads (the Triolo Ads website, `ads-web/`).** Any signed-in account; every ad is scoped to its owner (`owner_account_id`).
+- `GET /ads/self/info` → `{ prices, radiusKm, maxVideoSeconds, openLimit }`.
+- `GET /ads/self` → the caller's ads, newest first. `GET /ads/self/:id` → one (404 `AD_NOT_FOUND` if not theirs).
+- `POST /ads/self/upload-signature` → body `{ kind: 'image' | 'video' }`, same signed direct-upload permission as the admin's.
+- `POST /ads/self` → 201. Body like `POST /admin/ads` without `paymentMethod`, with `imageUrl` or `videoUrl` required. Saved as `reviewStatus: 'pending'` (status `in_review`), `paymentMethod: 'pending'`, at today's price. 400 `AD_START_IN_PAST` (start before today, India date), `AD_MEDIA_INVALID`, `AD_VIDEO_TOO_LONG`; 409 `AD_SELF_LIMIT` (already 5 waiting for review / rejected).
+- `PUT /ads/self/:id` → same body; only while `in_review` or `rejected` — it goes back to `in_review` (the reason is cleared). 409 `AD_NOT_EDITABLE` once approved.
+- `DELETE /ads/self/:id` → withdraws an ad that wasn't approved (soft delete, media deleted). 409 `AD_NOT_EDITABLE` otherwise.
+- `POST /admin/ads/:id/review` (admin) → body `{ decision: 'approve' | 'reject', note? }` — `note` (≤300) required to reject; the business sees it. 409 `AD_NOT_IN_REVIEW`, `AD_DATES_PASSED` (approving an ad whose end date has passed). Only `approved` ads are ever served (`GET /ads/serve`). Admin-booked ads are approved from the start.
+- Ad statuses gain `in_review` and `rejected` (list filter `status=in_review` etc.; overview `counts.in_review` / `counts.rejected`). `paymentMethod` may be `'pending'` (not paid yet) — also accepted from the admin form. Revenue totals count approved, paid ads only.
+
+- `POST /admin/ads` → 201, the ad. Body: `advertiserName` (2–80), `advertiserPhone?`, `title` (2–80), `description?` (≤600), `orientation` (`vertical` | `horizontal` — admin-web sets it from the file's shape), `displaySeconds` (3–30, default 15: how long an image shows before it can be closed), `title?` (defaults to the business name), `latitude`, `longitude` and `locationText` (the ad's place, required), `imageUrl?` / `videoUrl?` (the ad's media, already uploaded, checked and saved with it — a refused video books nothing), `linkUrl?` (optional web link opened when the ad is tapped; "https://" is added if missing; only http(s)), `planDays` (1, 3, 7 or 30), `paymentMethod` (`cash` | `upi` | `other`), `startDate` (YYYY-MM-DD). The amount is the admin's current price for the plan (defaults ₹20 / ₹50 / ₹100 / ₹300); the end date is start + days − 1. Each ad gets the next bill number. 400 `VALIDATION_ERROR`.
 - `GET /admin/ads/:id` · `PUT /admin/ads/:id` (same body; keeps the booked amount unless `planDays` changes, which is priced at today's price) · `DELETE /admin/ads/:id` (stops it, keeps it in history with its bill). 404 `AD_NOT_FOUND` (also for editing a deleted ad).
 - `POST /admin/ads/upload-signature` `{ kind: "image" | "video" }` → `{ cloudName, apiKey, timestamp, signature, folder, resourceType }`: permission for the admin website to upload one file straight to Cloudinary (`folder` is `triolo/ads`). Videos can't pass through the server — Vercel rejects bodies over 4.5 MB.
 - `PUT /admin/ads/:id/media` `{ imageUrl?, videoUrl? }` — exactly one → the ad with that media; the old one is deleted from Cloudinary. A video's length is read from Cloudinary; over 30 s it is deleted and refused (`AD_VIDEO_TOO_LONG`). 400 `AD_MEDIA_INVALID` (none, both, or not one of our `triolo/ads` files); 404 `AD_NOT_FOUND`.

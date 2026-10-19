@@ -43,6 +43,25 @@ export function bookingOfferBody(distanceMeters: number, skillCategories: string
   return language === 'te' ? `${distance} ఉన్న వినియోగదారుకు ${skills} అవసరం.` : `Someone ${distance} needs ${skills}.`;
 }
 
+/** A customer booked this worker in particular — a personal request, not a broadcast. */
+export function directOfferTitle(language: PreferredLanguage): string {
+  return language === 'te' ? 'మీకు బుకింగ్ అభ్యర్థన' : 'Booking Request for You';
+}
+
+export function directOfferBody(
+  customerName: string,
+  distanceMeters: number | null,
+  skillCategories: string[],
+  language: PreferredLanguage,
+): string {
+  const skills = skillLabels(skillCategories, language);
+  const distance = distanceMeters != null ? formatDistance(distanceMeters, language) : null;
+  if (language === 'te') {
+    return `${customerName} మిమ్మల్ని ${skills} పని కోసం బుక్ చేయాలనుకుంటున్నారు${distance ? ` (${distance})` : ''}.`;
+  }
+  return `${customerName} wants to book you for ${skills}${distance ? ` (${distance})` : ''}.`;
+}
+
 export function jobTakenTitle(language: PreferredLanguage): string {
   return language === 'te' ? 'పని అందుబాటులో లేదు' : 'Job No Longer Available';
 }
@@ -61,6 +80,8 @@ export type TripEvent =
   | 'cancelled'
   | 'worker_cancelled'
   | 'worker_cancelled_problem'
+  | 'worker_declined'
+  | 'cancelled_late'
   | 'admin_cancelled';
 
 const TRIP_TEMPLATES: Record<TripEvent, Record<PreferredLanguage, { title: string; body: string }>> = {
@@ -89,6 +110,13 @@ const TRIP_TEMPLATES: Record<TripEvent, Record<PreferredLanguage, { title: strin
       body: 'మీ వర్కర్ ఈ బుకింగ్‌ను రద్దు చేయాల్సి వచ్చింది. మరొక వర్కర్ కోసం మళ్లీ బుక్ చేయండి.',
     },
   },
+  worker_declined: {
+    en: { title: 'Worker Not Available', body: "The worker you chose can't take this job. Try Quick Book to ask everyone nearby." },
+    te: {
+      title: 'వర్కర్ అందుబాటులో లేరు',
+      body: 'మీరు ఎంచుకున్న వర్కర్ ఈ పని తీసుకోలేరు. దగ్గరలోని అందరినీ అడగడానికి క్విక్ బుక్ ప్రయత్నించండి.',
+    },
+  },
   worker_cancelled_problem: {
     en: { title: 'Worker Cancelled', body: 'Your worker had to cancel. Your problem is open again for other workers nearby.' },
     te: { title: 'వర్కర్ రద్దు చేశారు', body: 'మీ వర్కర్ రద్దు చేశారు. మీ సమస్య మళ్లీ దగ్గరలోని ఇతర వర్కర్లకు అందుబాటులో ఉంది.' },
@@ -101,6 +129,10 @@ const TRIP_TEMPLATES: Record<TripEvent, Record<PreferredLanguage, { title: strin
   completed: {
     en: { title: 'Job Finished', body: 'The customer confirmed the job is finished. Great work!' },
     te: { title: 'పని ముగిసింది', body: 'పని పూర్తయిందని కస్టమర్ నిర్ధారించారు. చాలా బాగా చేశారు!' },
+  },
+  cancelled_late: {
+    en: { title: 'Booking Cancelled', body: "The customer cancelled because you didn't arrive in time, and rated the job." },
+    te: { title: 'బుకింగ్ రద్దయింది', body: 'మీరు సమయానికి రాలేదని కస్టమర్ రద్దు చేసి, రేటింగ్ ఇచ్చారు.' },
   },
   cancelled: {
     en: { title: 'Booking Cancelled', body: 'The customer cancelled this booking.' },

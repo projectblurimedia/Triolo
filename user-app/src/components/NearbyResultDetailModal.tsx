@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VerificationBadge } from './VerificationBadge';
 import { PhotoViewer } from './PhotoViewer';
 import { initialsOf, WorkerProfileFacts, WorkerReviewsSection } from './WorkerProfileGlass';
+import { BookWorkerModal } from './BookWorkerModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BusinessNearbyResult } from '@/services/businessesService';
 import { WorkerNearbyResult } from '@/services/workersService';
@@ -72,6 +73,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
   const shopReviews = useBusinessReviews(visible ? shopId : null);
   const favorite = useFavoriteToggle(worker ? 'worker' : 'business', result?.id ?? null);
   const [orderVisible, setOrderVisible] = useState(false);
+  const [bookVisible, setBookVisible] = useState(false);
 
   if (!result) {
     return null;
@@ -149,7 +151,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
         title={firstName(w.accountFullName)}
         subtitle={distance}
         right={heartButton}
-        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 110 }]}
       >
         <WorkerProfileFacts
           skills={tagLabels}
@@ -174,6 +176,26 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
         </View>
         <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} />
       </GlassProfileLayout>
+      {/* Book this worker personally — only they are asked. */}
+      <View
+        style={[
+          styles.orderBar,
+          { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: colors.border },
+        ]}
+      >
+        <Button label={t('directBook.button', { name: firstName(w.accountFullName) })} onPress={() => setBookVisible(true)} />
+      </View>
+      <BookWorkerModal
+        worker={bookVisible ? w : null}
+        onClose={() => setBookVisible(false)}
+        onBooked={() => {
+          // The tracker opens on top; this profile closes underneath it.
+          setTimeout(() => {
+            setBookVisible(false);
+            onClose();
+          }, 350);
+        }}
+      />
     </>
   );
 

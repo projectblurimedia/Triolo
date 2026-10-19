@@ -42,7 +42,6 @@ import {
   AD_MAX_VIDEO_MB,
   AD_PLANS,
   Ad,
-  AdOrientation,
   AdPaymentMethod,
   AdPlanDays,
   AdPlanPrices,
@@ -67,13 +66,15 @@ interface MediaItem {
 }
 
 const STATUS: Record<AdStatus, { label: string; tone: Tone }> = {
+  in_review: { label: 'Waiting for review', tone: 'warning' },
+  rejected: { label: 'Rejected', tone: 'error' },
   running: { label: 'Running', tone: 'success' },
   scheduled: { label: 'Scheduled', tone: 'info' },
   ended: { label: 'Ended', tone: 'muted' },
   deleted: { label: 'Deleted', tone: 'error' },
 };
 
-const PAYMENT_LABEL: Record<AdPaymentMethod, string> = { cash: 'Cash', upi: 'UPI', other: 'Other' };
+const PAYMENT_LABEL: Record<AdPaymentMethod, string> = { cash: 'Cash', upi: 'UPI', other: 'Other', pending: 'Not paid yet' };
 
 const LIMIT = 20;
 
@@ -296,6 +297,25 @@ export function AdsPage() {
               overview.setData((current) => (current ? { ...current, settings, prices: settings.prices } : current))
             }
           />
+          {overview.data.counts.in_review > 0 ? (
+            <div style={{ marginBottom: 16 }}>
+              <Notice tone="warning" icon={faBullhorn}>
+                {overview.data.counts.in_review === 1
+                  ? '1 ad booked by a business is waiting for your review.'
+                  : `${overview.data.counts.in_review} ads booked by businesses are waiting for your review.`}{' '}
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => {
+                    setStatus('in_review');
+                    setPage(1);
+                  }}
+                >
+                  Review now
+                </button>
+              </Notice>
+            </div>
+          ) : null}
           <div className="stats ad-stats">
             <div className="stat glass">
               <span className="stat-value">{overview.data.counts.running}</span>
@@ -334,9 +354,11 @@ export function AdsPage() {
           }}
           options={[
             { value: '', label: 'All' },
+            { value: 'in_review', label: 'Waiting for review', count: counts?.in_review },
             { value: 'running', label: 'Running', count: counts?.running },
             { value: 'scheduled', label: 'Scheduled', count: counts?.scheduled },
             { value: 'ended', label: 'Ended' },
+            { value: 'rejected', label: 'Rejected' },
             { value: 'deleted', label: 'Deleted' },
           ]}
         />
@@ -396,7 +418,7 @@ const EMPTY_FORM: AdFormValues = {
   advertiserPhone: '',
   linkUrl: '',
   orientation: 'vertical',
-  displaySeconds: 5,
+  displaySeconds: 15,
   planDays: 7,
   paymentMethod: 'cash',
   startDate: todayInIndia(),
@@ -445,11 +467,6 @@ function readMediaInfo(file: File): Promise<{ kind: 'image' | 'video'; width: nu
     video.src = url;
   });
 }
-
-const FORMATS: { value: AdOrientation; label: string; sub: string }[] = [
-  { value: 'vertical', label: 'Vertical', sub: 'Reel / poster · 9:16' },
-  { value: 'horizontal', label: 'Horizontal', sub: 'Wide · 16:9' },
-];
 
 function AdForm({ ad }: { ad?: Ad }) {
   const navigate = useNavigate();
@@ -645,23 +662,6 @@ function AdForm({ ad }: { ad?: Ad }) {
           <FontAwesomeIcon icon={faBullhorn} /> The ad
         </div>
         <div className="field">
-          <span>Format</span>
-          <div className="ad-formats">
-            {FORMATS.map((format) => (
-              <button
-                key={format.value}
-                type="button"
-                className={`ad-format${form.orientation === format.value ? ' active' : ''}`}
-                onClick={() => set('orientation', format.value)}
-              >
-                <span className={`ad-format-shape ${format.value}`} />
-                <strong>{format.label}</strong>
-                <span>{format.sub}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="field">
           <span>Image or video * (one)</span>
           <div className="ad-image-pick">
             {media ? (
@@ -683,6 +683,11 @@ function AdForm({ ad }: { ad?: Ad }) {
                 </button>
               </div>
             ) : null}
+            {media ? (
+              <span className="muted" style={{ fontSize: 12 }}>
+                {form.orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'} — from the file's shape
+              </span>
+            ) : null}
             {media?.file && !mediaStatus ? (
               <div className="ad-upload ad-upload-picked">
                 <div className="ad-upload-text">
@@ -702,7 +707,7 @@ function AdForm({ ad }: { ad?: Ad }) {
             <span className="muted" style={{ fontSize: 12 }}>
               Image: JPG / PNG up to {AD_MAX_IMAGE_MB} MB. Video: up to {AD_MAX_VIDEO_SECONDS} seconds and {AD_MAX_VIDEO_MB} MB.
               Play it here first — nothing is uploaded until you save, and then it goes up exactly as it is (keep this tab open
-              until it finishes). The format is picked from its shape — change it above if needed.
+              until it finishes). Vertical or horizontal is worked out from its shape.
             </span>
           </div>
         </div>
@@ -718,7 +723,7 @@ function AdForm({ ad }: { ad?: Ad }) {
               min={3}
               max={30}
               value={form.displaySeconds}
-              onChange={(e) => set('displaySeconds', Math.max(3, Math.min(30, Math.round(Number(e.target.value) || 5))))}
+              onChange={(e) => set('displaySeconds', Math.max(3, Math.min(30, Math.round(Number(e.target.value) || 15))))}
             />
           </label>
         )}
@@ -767,7 +772,7 @@ function AdForm({ ad }: { ad?: Ad }) {
         <div className="field">
           <span>Paid by</span>
           <div className="chips">
-            {(['cash', 'upi', 'other'] as AdPaymentMethod[]).map((method) => (
+            {(['cash', 'upi', 'other', 'pending'] as AdPaymentMethod[]).map((method) => (
               <button
                 key={method}
                 type="button"
@@ -866,6 +871,9 @@ export function AdDetailPage() {
   const navigate = useNavigate();
   const { data: ad, error, loading, reload, setData } = useApi(() => adsApi.get(id), [id]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [rejectNote, setRejectNote] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+  const [reviewing, setReviewing] = useState<'approve' | 'reject' | null>(null);
 
   if (loading) return <Loading />;
   if (error || !ad) {
@@ -892,6 +900,90 @@ export function AdDetailPage() {
         }
       />
       <BackLink to="/ads" label="All ads" />
+
+      {ad.status === 'in_review' ? (
+        <div className="glass card review-card">
+          <div className="card-title">
+            <FontAwesomeIcon icon={faBullhorn} /> Waiting for your review
+          </div>
+          <p className="muted" style={{ margin: '0 0 12px', fontSize: 14 }}>
+            {ad.advertiserName} booked this on the Triolo Ads website. It is not shown in the apps until you approve it — then it
+            runs {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}. Payment: not paid yet (online payment is coming soon; record
+            cash / UPI with Edit).
+          </p>
+          {rejecting ? (
+            <label className="field">
+              <span>Why is it rejected? (the business sees this)</span>
+              <textarea
+                value={rejectNote}
+                onChange={(e) => setRejectNote(e.target.value)}
+                maxLength={300}
+                rows={3}
+                placeholder="e.g. The picture is blurry — please upload a clearer one."
+                autoFocus
+              />
+            </label>
+          ) : null}
+          <div className="actions">
+            {rejecting ? (
+              <>
+                <button className="btn btn-ghost" onClick={() => setRejecting(false)} disabled={reviewing !== null}>
+                  Back
+                </button>
+                <button
+                  className="btn btn-danger"
+                  disabled={reviewing !== null || rejectNote.trim().length < 3}
+                  onClick={async () => {
+                    setReviewing('reject');
+                    try {
+                      setData(await adsApi.review(ad.id, 'reject', rejectNote.trim()));
+                      setRejecting(false);
+                      showToast({ variant: 'success', title: 'Ad rejected', message: 'The business sees your reason.' });
+                    } catch (err) {
+                      showToast({ variant: 'error', title: 'Not rejected', message: getErrorMessage(err) });
+                    } finally {
+                      setReviewing(null);
+                    }
+                  }}
+                >
+                  {reviewing === 'reject' ? <Spinner small /> : 'Reject Ad'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="btn btn-danger" onClick={() => setRejecting(true)} disabled={reviewing !== null}>
+                  <FontAwesomeIcon icon={faXmark} /> Reject
+                </button>
+                <button
+                  className="btn btn-primary"
+                  disabled={reviewing !== null}
+                  onClick={async () => {
+                    setReviewing('approve');
+                    try {
+                      setData(await adsApi.review(ad.id, 'approve'));
+                      showToast({ variant: 'success', title: 'Ad approved', message: 'It runs from its start date.' });
+                    } catch (err) {
+                      showToast({ variant: 'error', title: 'Not approved', message: getErrorMessage(err) });
+                    } finally {
+                      setReviewing(null);
+                    }
+                  }}
+                >
+                  {reviewing === 'approve' ? <Spinner small /> : 'Approve'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {ad.status === 'rejected' && ad.reviewNote ? (
+        <div style={{ marginBottom: 16 }}>
+          <Notice tone="error" icon={faXmark}>
+            Rejected: {ad.reviewNote}
+          </Notice>
+        </div>
+      ) : null}
 
       {ad.latitude == null && ad.status !== 'deleted' ? (
         <div style={{ marginBottom: 16 }}>
@@ -957,8 +1049,14 @@ export function AdDetailPage() {
               <InfoRow icon={faCalendarDays} label={`${planLabel(ad.planDays)} plan`}>
                 {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
               </InfoRow>
-              <InfoRow icon={faReceipt} label="Paid">
-                {rupees(ad.amount)} by {PAYMENT_LABEL[ad.paymentMethod]} · bill {billNumber(ad)}
+              <InfoRow icon={faReceipt} label={ad.paymentMethod === 'pending' ? 'Price' : 'Paid'}>
+                {ad.paymentMethod === 'pending'
+                  ? `${rupees(ad.amount)} · not paid yet`
+                  : `${rupees(ad.amount)} by ${PAYMENT_LABEL[ad.paymentMethod]}`}{' '}
+                · bill {billNumber(ad)}
+              </InfoRow>
+              <InfoRow icon={faStore} label="Booked by">
+                {ad.ownerAccountId ? 'The business, on the Triolo Ads website' : 'You (admin)'}
               </InfoRow>
               <InfoRow icon={faStore} label="Billed to">
                 {ad.advertiserName}

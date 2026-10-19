@@ -5,7 +5,7 @@ import { WorkerProfile } from '@/modules/workers/interfaces';
 import { NotificationsService } from '@/modules/notifications/service';
 import { NotificationType } from '@/modules/notifications/interfaces';
 import { BookingsRepository } from './repository';
-import { CompleteBookingDto, CreateQuickBookingDto, UpdateWorkerLocationDto } from './dto';
+import { CancelBookingDto, CompleteBookingDto, CreateDirectBookingDto, CreateQuickBookingDto, UpdateWorkerLocationDto } from './dto';
 import {
   BookingLifecycleListener,
   BookingRequestStatus,
@@ -20,10 +20,28 @@ import {
   AdminBookingListFilter,
   NotifyTarget,
 } from './interfaces';
-import { bookingOfferBody, bookingOfferTitle, jobTakenBody, jobTakenTitle, TripEvent, tripTemplate } from './pushTemplates';
+import {
+  bookingOfferBody,
+  bookingOfferTitle,
+  directOfferBody,
+  directOfferTitle,
+  jobTakenBody,
+  jobTakenTitle,
+  TripEvent,
+  tripTemplate,
+} from './pushTemplates';
 
 const BOOKING_OFFER_CHANNEL = 'booking-offers';
 const HISTORY_LIMIT = 50;
+
+/** Great-circle distance in metres (same formula as the nearby searches' SQL). */
+function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const rad = Math.PI / 180;
+  const h =
+    Math.sin(((bLat - aLat) * rad) / 2) ** 2 +
+    Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(((bLng - aLng) * rad) / 2) ** 2;
+  return 12742000 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 
 /** A fresh, single-use 4-digit arrival PIN (cryptographically random). */
 function generateArrivalPin(): string {
@@ -134,6 +152,60 @@ export class BookingsService {
     return { bookingRequestId: request.id, matchedWorkerCount: matches.length };
   }
 
+  /**
+   * Book one particular worker (from their profile): only that worker is asked, personally.
+   * From their accept on it's the same trip as Quick Book. Waits DIRECT_TTL_MINUTES for an
+   * answer; the worker declining ends it and tells the customer.
+   */
+  async createDirectBooking(accountId: string, dto: CreateDirectBookingDto): Promise<{ bookingRequestId: string }> {
+    const worker = await this.workersService.getPublicProfile(dto.workerId);
+    if (!worker || worker.verificationStatus !== 'verified') {
+      throw AppError.notFound('This worker is not available.', 'WORKER_NOT_FOUND');
+    }
+    if (worker.accountId === accountId) {
+      throw AppError.badRequest('You cannot book yourself.', 'BOOKING_OWN_PROFILE');
+    }
+    const offered = new Set<string>(worker.skillCategories);
+    if (!dto.skillCategories.every((skill) => offered.has(skill))) {
+      throw AppError.badRequest('This worker does not do that work.', 'BOOKING_SKILL_MISMATCH');
+    }
+    const contact = await this.repository.findWorkerContact(worker.id);
+    if (!contact) {
+      throw AppError.notFound('This worker is not available.', 'WORKER_NOT_FOUND');
+    }
+    const distance =
+      worker.latitude != null && worker.longitude != null
+        ? distanceMeters(dto.latitude, dto.longitude, worker.latitude, worker.longitude)
+        : null;
+
+    const request = await this.repository.createRequest({
+      accountId,
+      skillCategories: dto.skillCategories,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      locationAddress: dto.locationAddress || null,
+      radiusKm: 50,
+      targetWorkerId: worker.id,
+    });
+    await this.repository.createOffers(request.id, [{ workerId: worker.id, distanceMeters: distance ?? 0 }]);
+
+    const customerName = (await this.repository.findAccountName(accountId)) ?? '';
+    await this.notificationsService.sendRawPush(
+      contact.accountId,
+      directOfferTitle(contact.preferredLanguage),
+      directOfferBody(customerName, distance, dto.skillCategories, contact.preferredLanguage),
+      {
+        data: { kind: 'booking_offer', bookingRequestId: request.id, direct: 'true' },
+        tag: request.id,
+        channelId: BOOKING_OFFER_CHANNEL,
+        priority: 'max',
+        dataOnly: true,
+        audience: 'partner',
+      },
+    );
+    return { bookingRequestId: request.id };
+  }
+
   /** Polled by user-app's tracking screen: status, worker, live location and (while travelling) the PIN. */
   async getRequestStatus(accountId: string, bookingRequestId: string): Promise<CustomerBooking> {
     await this.repository.expireStaleBroadcasts();
@@ -149,12 +221,25 @@ export class BookingsService {
     return this.repository.findForCustomer(accountId, HISTORY_LIMIT);
   }
 
-  async cancelBooking(accountId: string, bookingRequestId: string): Promise<void> {
-    const result = await this.repository.cancel(bookingRequestId, accountId);
+  /**
+   * Cancels before the PIN is verified. With a rating, it's cancelling a late worker (accepted
+   * over LATE_AFTER_MINUTES ago, not yet arrived): the rating is stored and counted.
+   */
+  async cancelBooking(accountId: string, bookingRequestId: string, dto: CancelBookingDto = {}): Promise<void> {
+    const late = dto.rating !== undefined;
+    const result = late
+      ? await this.repository.cancelLate(bookingRequestId, accountId, dto.rating as number, dto.review || null)
+      : await this.repository.cancel(bookingRequestId, accountId);
     if (!result) {
+      if (late) {
+        throw AppError.conflict('You can rate a worker when cancelling only once they are over an hour late.', 'BOOKING_NOT_LATE');
+      }
       throw await this.transitionError(bookingRequestId, 'This booking can no longer be cancelled.');
     }
-    await this.notify(result, 'cancelled', 'booking_cancelled');
+    if (late && result.request.acceptedWorkerId) {
+      await this.workersService.recordRating(result.request.acceptedWorkerId, dto.rating as number);
+    }
+    await this.notify(result, late ? 'cancelled_late' : 'cancelled', 'booking_cancelled');
     // A problem's trip cancelled by the customer reopens the problem for other workers.
     if (result.request.problemPostId && this.lifecycleListener) {
       await this.lifecycleListener.onProblemTripCancelled(result.request.problemPostId);
@@ -271,6 +356,10 @@ export class BookingsService {
   async declineOffer(workerAccountId: string, bookingRequestId: string): Promise<void> {
     const profile = await this.requireWorker(workerAccountId);
     await this.repository.declineOffer(bookingRequestId, profile.id);
+    // A booking of this worker in particular has nobody else to ask: it ends, and the
+    // customer is told so they can try Quick Book.
+    const ended = await this.repository.declineDirect(bookingRequestId, profile.id);
+    if (ended) await this.notify(ended, 'worker_declined', 'booking_cancelled');
   }
 
   async startTrip(workerAccountId: string, bookingRequestId: string): Promise<void> {
@@ -357,7 +446,7 @@ export class BookingsService {
     if (!transition.notify) return;
     const text = tripTemplate(event, transition.notify.preferredLanguage);
     // 'completed' and a customer's 'cancelled' go to the worker; every other trip step to the customer.
-    const audience = event === 'completed' || event === 'cancelled' ? 'partner' : 'user';
+    const audience = event === 'completed' || event === 'cancelled' || event === 'cancelled_late' ? 'partner' : 'user';
     await this.notificationsService.notify(transition.notify.accountId, type, text.title, text.body, {
       audience,
       data: { kind: type, bookingId: transition.request.id },

@@ -20,6 +20,7 @@ import {
   AD_MAX_VIDEO_SECONDS,
   AD_MEDIA_FOLDER,
   AD_RADIUS_KM,
+  AD_SELF_OPEN_LIMIT,
   AdApp,
   AdListFilter,
   AdPlacement,
@@ -72,6 +73,12 @@ function clean(params: SaveAdParams): SaveAdParams {
   };
 }
 
+/** A business can't book an ad that starts in the past (India calendar day). */
+function assertStartsTodayOrLater(startDate: string): void {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  if (startDate < today) throw AppError.badRequest('Choose a start date from today on.', 'AD_START_IN_PAST');
+}
+
 /** Whether ads are switched on for this app and place (the master switch first). */
 export function placementOn(settings: AdSettings, app: AdApp, placement: AdPlacement): boolean {
   if (!settings.adsEnabled) return false;
@@ -112,7 +119,89 @@ export class AdsService {
     await this.repository.recordClick(id);
   }
 
+  // --- Businesses booking their own ads (Triolo Ads website) ---
+
+  /** What a business sees before booking: today's prices and the rules. */
+  async selfInfo() {
+    const settings = await this.repository.getSettings();
+    return { prices: settings.prices, radiusKm: AD_RADIUS_KM, maxVideoSeconds: AD_MAX_VIDEO_SECONDS, openLimit: AD_SELF_OPEN_LIMIT };
+  }
+
+  listOwned(accountId: string): Promise<Ad[]> {
+    return this.repository.listOwned(accountId);
+  }
+
+  async getOwned(accountId: string, id: string): Promise<Ad> {
+    const ad = await this.repository.findById(id);
+    if (!ad || ad.ownerAccountId !== accountId) throw AppError.notFound('Ad not found.', 'AD_NOT_FOUND');
+    return ad;
+  }
+
+  /**
+   * A business books its own ad: at today's price, waiting for the admin's review (it's never
+   * shown before it's approved). Its image or video is checked first, as in the admin's form.
+   */
+  async createOwned(accountId: string, params: Omit<SaveAdParams, 'paymentMethod'>, media: AdMediaInput): Promise<Ad> {
+    assertStartsTodayOrLater(params.startDate);
+    if ((await this.repository.countOpenOwned(accountId)) >= AD_SELF_OPEN_LIMIT) {
+      throw AppError.conflict(
+        `You already have ${AD_SELF_OPEN_LIMIT} ads waiting for review. Wait for them, or withdraw one.`,
+        'AD_SELF_LIMIT',
+      );
+    }
+    const checked = await this.checkMedia(media.imageUrl ?? null, media.videoUrl ?? null);
+    const { prices } = await this.repository.getSettings();
+    const ad = await this.repository.create(
+      clean({ ...params, paymentMethod: 'pending' as never }),
+      prices[String(params.planDays) as keyof typeof prices],
+      accountId,
+    );
+    const result = await this.repository.setMedia(ad.id, checked.images, checked.videoUrl, checked.videoSeconds);
+    return result?.ad ?? ad;
+  }
+
+  /** Edits an own ad that's waiting for review or was rejected; it goes back for review. */
+  async updateOwned(
+    accountId: string,
+    id: string,
+    params: Omit<SaveAdParams, 'paymentMethod'>,
+    media: AdMediaInput,
+  ): Promise<Ad> {
+    assertStartsTodayOrLater(params.startDate);
+    const existing = await this.getOwned(accountId, id);
+    const { prices } = await this.repository.getSettings();
+    const amount = existing.planDays === params.planDays ? existing.amount : prices[String(params.planDays) as keyof typeof prices];
+    const ad = await this.repository.updateOwned(id, accountId, clean({ ...params, paymentMethod: 'pending' as never }), amount);
+    if (!ad) throw AppError.conflict('This ad was already approved — it can no longer be changed.', 'AD_NOT_EDITABLE');
+    const current = existing.videoUrl ?? existing.imageUrls[0] ?? null;
+    const picked = media.videoUrl ?? media.imageUrl ?? null;
+    if (picked && picked !== current) return this.setMedia(id, media.imageUrl ?? null, media.videoUrl ?? null);
+    return ad;
+  }
+
+  /** The business takes back an ad that wasn't approved; its media is deleted. */
+  async withdrawOwned(accountId: string, id: string): Promise<Ad> {
+    const ad = await this.repository.withdrawOwned(id, accountId);
+    if (!ad) throw AppError.conflict('Only an ad that is waiting for review or was rejected can be withdrawn.', 'AD_NOT_EDITABLE');
+    await this.deleteMedia(ad.id, ad.imageUrls, ad.videoUrl);
+    return { ...ad, imageUrl: null, imageUrls: [], videoUrl: null };
+  }
+
   // --- Admin ---
+
+  /** Approve (it runs from its start date) or reject (with the reason the business sees). */
+  async review(id: string, decision: 'approve' | 'reject', note?: string | null): Promise<Ad> {
+    const ad = await this.repository.review(id, decision, note?.trim() || null);
+    if (!ad) {
+      const existing = await this.repository.findById(id);
+      if (!existing) throw AppError.notFound('Ad not found.', 'AD_NOT_FOUND');
+      if (existing.reviewStatus === 'pending' && decision === 'approve') {
+        throw AppError.conflict('Its dates have already passed — change them before approving.', 'AD_DATES_PASSED');
+      }
+      throw AppError.conflict('This ad is not waiting for review.', 'AD_NOT_IN_REVIEW');
+    }
+    return ad;
+  }
 
   getSettings(): Promise<AdSettings> {
     return this.repository.getSettings();

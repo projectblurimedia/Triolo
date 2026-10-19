@@ -68,6 +68,10 @@ const AD: Ad = {
   paymentMethod: 'upi',
   startDate: '2026-10-18',
   endDate: '2026-10-20',
+  ownerAccountId: null,
+  reviewStatus: 'approved',
+  reviewNote: null,
+  reviewedAt: null,
   impressions: 0,
   clicks: 0,
   status: 'running',
@@ -108,6 +112,11 @@ function makeService() {
     summary: jest.fn(),
     pickAndCount: jest.fn().mockResolvedValue(AD),
     recordClick: jest.fn(),
+    updateOwned: jest.fn(),
+    listOwned: jest.fn().mockResolvedValue([]),
+    countOpenOwned: jest.fn().mockResolvedValue(0),
+    withdrawOwned: jest.fn(),
+    review: jest.fn(),
   } as unknown as MockRepository;
   return { service: new AdsService(repository as unknown as AdsRepository), repository };
 }
@@ -289,5 +298,55 @@ describe('AdsService', () => {
     expect(repository.clearMedia).toHaveBeenCalledWith('ad-1');
     repository.softDelete.mockResolvedValueOnce(null);
     await expect(service.remove('ad-1')).rejects.toMatchObject({ code: 'AD_NOT_FOUND' });
+  });
+
+  describe('businesses booking their own ads', () => {
+    const OWNER = 'account-7';
+    const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+    const own = { ...PARAMS, startDate: future };
+    const image = { imageUrl: `${OURS}image/upload/v1/triolo/ads/b.jpg` };
+
+    it('books an own ad at the current price, waiting for review, with payment pending', async () => {
+      const { service, repository } = makeService();
+      repository.setMedia.mockResolvedValue({ ad: AD, previousImages: [], previousVideo: null });
+      await service.createOwned(OWNER, own, image);
+      expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ paymentMethod: 'pending' }), 120, OWNER);
+      expect(repository.setMedia).toHaveBeenCalledWith(AD.id, [image.imageUrl], null, null);
+    });
+
+    it('refuses a start date in the past, media not ours, and too many waiting', async () => {
+      const { service, repository } = makeService();
+      await expect(service.createOwned(OWNER, { ...own, startDate: '2020-01-01' }, image)).rejects.toMatchObject({
+        code: 'AD_START_IN_PAST',
+      });
+      await expect(service.createOwned(OWNER, own, { imageUrl: 'https://example.com/a.jpg' })).rejects.toMatchObject({
+        code: 'AD_MEDIA_INVALID',
+      });
+      repository.countOpenOwned.mockResolvedValue(5);
+      await expect(service.createOwned(OWNER, own, image)).rejects.toMatchObject({ code: 'AD_SELF_LIMIT' });
+      expect(repository.create).not.toHaveBeenCalled();
+    });
+
+    it('lets only the owner see or change it, and not once approved', async () => {
+      const { service, repository } = makeService();
+      repository.findById.mockResolvedValue({ ...AD, ownerAccountId: 'someone-else' });
+      await expect(service.getOwned(OWNER, 'ad-1')).rejects.toMatchObject({ code: 'AD_NOT_FOUND' });
+      repository.findById.mockResolvedValue({ ...AD, ownerAccountId: OWNER });
+      repository.updateOwned.mockResolvedValue(null);
+      await expect(service.updateOwned(OWNER, 'ad-1', own, {})).rejects.toMatchObject({ code: 'AD_NOT_EDITABLE' });
+    });
+
+    it('reviews: approve, reject with a reason, and explains a refusal', async () => {
+      const { service, repository } = makeService();
+      repository.review.mockResolvedValueOnce({ ...AD, reviewStatus: 'approved' });
+      await service.review('ad-1', 'approve');
+      expect(repository.review).toHaveBeenCalledWith('ad-1', 'approve', null);
+      repository.review.mockResolvedValueOnce({ ...AD, reviewStatus: 'rejected' });
+      await service.review('ad-1', 'reject', ' Blurry picture ');
+      expect(repository.review).toHaveBeenLastCalledWith('ad-1', 'reject', 'Blurry picture');
+      repository.review.mockResolvedValueOnce(null);
+      repository.findById.mockResolvedValue({ ...AD, reviewStatus: 'pending' });
+      await expect(service.review('ad-1', 'approve')).rejects.toMatchObject({ code: 'AD_DATES_PASSED' });
+    });
   });
 });

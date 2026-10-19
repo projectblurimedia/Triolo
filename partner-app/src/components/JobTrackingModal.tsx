@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
-import { showAdBefore } from './Ads';
+import { useAdGate } from './Ads';
 import { LiveMap, MapPoint } from './LiveMap';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ToastHost } from './ToastHost';
@@ -35,7 +35,7 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { callPhone, distanceBetween, openDirections } from '@/utils/tripLinks';
 import { formatDistance } from '@/utils/formatDistance';
-import { ensureLocationOn, withLocation } from '@/utils/ensureLocationOn';
+import { askForLocation, ensureLocationOn } from '@/utils/ensureLocationOn';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
@@ -108,6 +108,12 @@ export function JobTrackingModal() {
   }, []);
 
   const visible = jobId !== null;
+  // Mark Work Done: location, then a local business's ad while the button spins, then confirm.
+  const { adLoading, waitForAd } = useAdGate(visible);
+  const markDone = async () => {
+    if (adLoading || !(await askForLocation())) return;
+    if (await waitForAd()) setConfirmDone(true);
+  };
   const status = job?.status;
   const tripText = { title: t('job.trackingTitle'), body: t('job.trackingBody') };
 
@@ -443,13 +449,7 @@ export function JobTrackingModal() {
     if (j.status === 'arrived') return renderPinEntry(j);
     if (j.status === 'in_progress') {
       // A local business's ad first (when one is running nearby), then the confirmation.
-      return (
-        <Button
-          label={t('job.markWorkDone')}
-          onPress={() => withLocation(() => showAdBefore(() => setConfirmDone(true)))}
-          gradient={DONE_GRADIENT}
-        />
-      );
+      return <Button label={t('job.markWorkDone')} onPress={markDone} loading={adLoading} gradient={DONE_GRADIENT} />;
     }
     if (j.status === 'work_done') {
       return <Text style={[styles.waiting, { color: colors.textMuted }]}>{t('job.waitingForCustomer')}</Text>;

@@ -33,6 +33,10 @@ function createMockRepository(): MockRepository {
     findRatedForWorker: jest.fn(),
     findStatuses: jest.fn(),
     expireStaleBroadcasts: jest.fn(),
+    findWorkerContact: jest.fn(),
+    findAccountName: jest.fn(),
+    declineDirect: jest.fn(),
+    cancelLate: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -47,6 +51,7 @@ beforeEach(() => {
   workers = {
     findMatchingForBroadcast: jest.fn(),
     getMyProfile: jest.fn(),
+    getPublicProfile: jest.fn(),
     recordRating: jest.fn(),
   } as unknown as jest.Mocked<WorkersService>;
   notifications = { sendRawPush: jest.fn(), notify: jest.fn() } as unknown as jest.Mocked<NotificationsService>;
@@ -78,6 +83,7 @@ function buildRequest(overrides: Partial<BookingRequest> = {}): BookingRequest {
     workerReview: null,
     problemPostId: null,
     quotationAmount: null,
+    targetWorkerId: null,
     createdAt: new Date(),
     ...overrides,
   };
@@ -332,6 +338,29 @@ describe('trip steps (worker)', () => {
   });
 });
 
+describe('cancelling a late worker', () => {
+  it('cancels with a rating, counts it, and tells the worker why', async () => {
+    repo.cancelLate.mockResolvedValue(transition('worker-account-1', { status: 'cancelled', acceptedWorkerId: 'worker-1' }));
+    await service.cancelBooking('account-1', 'request-1', { rating: 1, review: 'Did not come' });
+    expect(repo.cancelLate).toHaveBeenCalledWith('request-1', 'account-1', 1, 'Did not come');
+    expect(workers.recordRating).toHaveBeenCalledWith('worker-1', 1);
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'worker-account-1',
+      'booking_cancelled',
+      'Booking Cancelled',
+      expect.stringContaining("didn't arrive in time"),
+      expect.objectContaining({ audience: 'partner' }),
+    );
+    expect(repo.cancel).not.toHaveBeenCalled();
+  });
+
+  it('refuses a rating when the worker is not late', async () => {
+    repo.cancelLate.mockResolvedValue(null);
+    await expect(service.cancelBooking('account-1', 'request-1', { rating: 1 })).rejects.toMatchObject({ code: 'BOOKING_NOT_LATE' });
+    expect(workers.recordRating).not.toHaveBeenCalled();
+  });
+});
+
 describe('customer finish / cancel', () => {
   it('completes with a rating + feedback, adds it to the worker’s rating, and tells the worker', async () => {
     repo.complete.mockResolvedValue(transition('worker-account-1', { status: 'completed', acceptedWorkerId: 'worker-1' }));
@@ -476,8 +505,65 @@ describe('worker cancel', () => {
 describe('declineOffer', () => {
   it('declines only the worker’s own offer', async () => {
     asWorker();
+    repo.declineDirect.mockResolvedValue(null);
     await service.declineOffer('worker-account-1', 'request-1');
     expect(repo.declineOffer).toHaveBeenCalledWith('request-1', 'worker-1');
+    expect(notifications.notify).not.toHaveBeenCalled();
+  });
+
+  it('ends a booking of this worker in particular and tells the customer', async () => {
+    asWorker();
+    repo.declineDirect.mockResolvedValue(transition('account-1', { status: 'cancelled', cancelledBy: 'worker' }));
+    await service.declineOffer('worker-account-1', 'request-1');
+    expect(repo.declineDirect).toHaveBeenCalledWith('request-1', 'worker-1');
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'account-1',
+      'booking_cancelled',
+      'Worker Not Available',
+      expect.any(String),
+      expect.objectContaining({ audience: 'user' }),
+    );
+  });
+});
+
+describe('createDirectBooking', () => {
+  const dto = { workerId: 'worker-1', skillCategories: ['plumber'], latitude: 17.385, longitude: 78.4867 };
+  const worker = {
+    id: 'worker-1',
+    accountId: 'worker-account-1',
+    skillCategories: ['plumber', 'electrician'],
+    latitude: 17.39,
+    longitude: 78.49,
+    verificationStatus: 'verified',
+  };
+
+  it('asks only that worker, personally', async () => {
+    workers.getPublicProfile.mockResolvedValue(worker as never);
+    repo.findWorkerContact.mockResolvedValue({ accountId: 'worker-account-1', preferredLanguage: 'en' });
+    repo.findAccountName.mockResolvedValue('Ravi');
+    repo.createRequest.mockResolvedValue(buildRequest({ id: 'request-9', targetWorkerId: 'worker-1' }));
+    const result = await service.createDirectBooking('account-1', dto);
+    expect(result).toEqual({ bookingRequestId: 'request-9' });
+    expect(repo.createRequest).toHaveBeenCalledWith(expect.objectContaining({ targetWorkerId: 'worker-1', skillCategories: ['plumber'] }));
+    expect(repo.createOffers).toHaveBeenCalledWith('request-9', [expect.objectContaining({ workerId: 'worker-1' })]);
+    expect(notifications.sendRawPush).toHaveBeenCalledTimes(1);
+    expect(notifications.sendRawPush).toHaveBeenCalledWith(
+      'worker-account-1',
+      'Booking Request for You',
+      expect.stringContaining('Ravi wants to book you for Plumber'),
+      expect.objectContaining({ data: expect.objectContaining({ kind: 'booking_offer', direct: 'true' }) }),
+    );
+  });
+
+  it('refuses work the worker does not do, an unverified worker, and booking yourself', async () => {
+    workers.getPublicProfile.mockResolvedValue(worker as never);
+    await expect(service.createDirectBooking('account-1', { ...dto, skillCategories: ['mason'] })).rejects.toMatchObject({
+      code: 'BOOKING_SKILL_MISMATCH',
+    });
+    await expect(service.createDirectBooking('worker-account-1', dto)).rejects.toMatchObject({ code: 'BOOKING_OWN_PROFILE' });
+    workers.getPublicProfile.mockResolvedValue({ ...worker, verificationStatus: 'pending_verification' } as never);
+    await expect(service.createDirectBooking('account-1', dto)).rejects.toMatchObject({ code: 'WORKER_NOT_FOUND' });
+    expect(repo.createRequest).not.toHaveBeenCalled();
   });
 });
 

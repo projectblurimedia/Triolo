@@ -521,6 +521,8 @@ export function AdLaunchBanner({ hold = false, waitFor = false }: { hold?: boole
 // --- Ads before key actions ---
 
 let actionPending = false;
+// Whether the latest showAdBefore actually showed an ad (read by adThen).
+let lastActionShowedAd = false;
 
 /**
  * Runs `action` after an ad, when one is running nearby and ads before key actions are on;
@@ -528,6 +530,7 @@ let actionPending = false;
  * action just goes ahead.
  */
 export function showAdBefore(action: () => void): void {
+  lastActionShowedAd = false;
   // From now on this action's ad is the only one: an app-open ad not yet shown is dropped.
   if (!useActionAd.getState().launchOver) useActionAd.setState({ launchOver: true });
   if (actionPending || useActionAd.getState().ad) {
@@ -570,6 +573,7 @@ export function showAdBefore(action: () => void): void {
       }
       settled = true;
       actionPending = false;
+      lastActionShowedAd = true;
       useActionAd.setState({ ad, then: action });
     })
     .catch(() => {
@@ -578,25 +582,32 @@ export function showAdBefore(action: () => void): void {
     });
 }
 
-/** `showAdBefore` as a promise: resolves once the ad (if there was one) is closed. */
-export function adThen(): Promise<void> {
-  return new Promise((resolve) => showAdBefore(resolve));
+/** `showAdBefore` as a promise: resolves once the ad (if there was one) is closed — true if one was shown. */
+export function adThen(): Promise<boolean> {
+  return new Promise((resolve) => showAdBefore(() => resolve(lastActionShowedAd)));
 }
 
 /**
  * For a final button: `await waitForAd()` before the action (false if it's already waiting),
  * and `adLoading` to show the button's spinner while the ad is being fetched, so the tap
- * answers at once instead of seeming to do nothing.
+ * answers at once instead of seeming to do nothing. One ad per opening of the screen: pass
+ * the screen's `open` — once an ad has been shown, later taps go straight through until the
+ * screen is closed and opened again.
  */
-export function useAdGate(): { adLoading: boolean; waitForAd: () => Promise<boolean> } {
+export function useAdGate(open = true): { adLoading: boolean; waitForAd: () => Promise<boolean> } {
   const [adLoading, setAdLoading] = useState(false);
   const busy = useRef(false);
+  const shownThisOpening = useRef(false);
+  useEffect(() => {
+    if (!open) shownThisOpening.current = false;
+  }, [open]);
   const waitForAd = useCallback(async () => {
     if (busy.current) return false;
+    if (shownThisOpening.current) return true;
     busy.current = true;
     setAdLoading(true);
     try {
-      await adThen();
+      if (await adThen()) shownThisOpening.current = true;
       return true;
     } finally {
       busy.current = false;

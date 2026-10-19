@@ -21,6 +21,11 @@ export class BookingsController {
     return created(res, result, 'Quick Book request broadcast');
   });
 
+  createDirectBooking = asyncHandler(async (req: Request, res: Response) => {
+    const result = await this.service.createDirectBooking(requireAccountId(req), req.body);
+    return created(res, result, 'Booking request sent to the worker');
+  });
+
   getStatus = asyncHandler(async (req: Request, res: Response) => {
     const result = await this.service.getRequestStatus(requireAccountId(req), req.params.id);
     return ok(res, result);
@@ -32,7 +37,7 @@ export class BookingsController {
   });
 
   cancel = asyncHandler(async (req: Request, res: Response) => {
-    await this.service.cancelBooking(requireAccountId(req), req.params.id);
+    await this.service.cancelBooking(requireAccountId(req), req.params.id, req.body);
     return ok(res, null, 'Booking cancelled');
   });
 

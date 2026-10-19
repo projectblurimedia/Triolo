@@ -1,8 +1,10 @@
 import { apiClient } from './apiClient';
 import type { Page } from './adminApi';
 
-export type AdStatus = 'scheduled' | 'running' | 'ended' | 'deleted';
-export type AdPaymentMethod = 'cash' | 'upi' | 'other';
+/** in_review / rejected: booked by a business on the Triolo Ads website, not approved (yet). */
+export type AdStatus = 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
+/** 'pending' = not paid yet (a business's own booking, until you record how it was paid). */
+export type AdPaymentMethod = 'cash' | 'upi' | 'other' | 'pending';
 export type AdPlanDays = 1 | 3 | 7 | 30;
 export type AdOrientation = 'vertical' | 'horizontal';
 export type AdPlanPrices = Record<'1' | '3' | '7' | '30', number>;
@@ -53,6 +55,12 @@ export interface Ad {
   /** YYYY-MM-DD, India date. */
   startDate: string;
   endDate: string;
+  /** The business account that booked it on the Triolo Ads website; null when you did. */
+  ownerAccountId: string | null;
+  reviewStatus: 'pending' | 'approved' | 'rejected';
+  /** Why it was rejected (the business sees it). */
+  reviewNote: string | null;
+  reviewedAt: string | null;
   impressions: number;
   clicks: number;
   status: AdStatus;
@@ -118,6 +126,9 @@ export const adsApi = {
   create: (body: SaveAd) => apiClient.post<Ad>('/admin/ads', body, true),
   update: (id: string, body: SaveAd) => apiClient.put<Ad>(`/admin/ads/${id}`, body, true),
   remove: (id: string) => apiClient.delete<Ad>(`/admin/ads/${id}`, true),
+  /** Approve a business's own ad (it then runs from its start date) or reject it with a reason. */
+  review: (id: string, decision: 'approve' | 'reject', note?: string) =>
+    apiClient.post<Ad>(`/admin/ads/${id}/review`, { decision, note: note || undefined }, true),
   /** Sets the ad's one image or one video; the server deletes what it no longer uses. */
   setMedia: (id: string, imageUrl: string | null, videoUrl: string | null) =>
     apiClient.put<Ad>(`/admin/ads/${id}/media`, { imageUrl, videoUrl }, true),

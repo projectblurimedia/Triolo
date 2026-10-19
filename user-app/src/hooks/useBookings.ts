@@ -57,6 +57,16 @@ export function useCancelBooking() {
   });
 }
 
+/** Cancel a worker who's over an hour late, rating them. */
+export function useCancelLateBooking() {
+  const invalidate = useInvalidateBooking();
+  return useMutation({
+    mutationFn: ({ id, rating, review }: { id: string; rating: number; review?: string }) =>
+      bookingsService.cancel(id, { rating, review }),
+    onSettled: (_data, _error, { id }) => invalidate(id),
+  });
+}
+
 export function useCompleteBooking() {
   const invalidate = useInvalidateBooking();
   const queryClient = useQueryClient();

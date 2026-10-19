@@ -7,8 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
-import { withLocation } from '@/utils/ensureLocationOn';
-import { showAdBefore } from './Ads';
+import { askForLocation } from '@/utils/ensureLocationOn';
+import { useAdGate } from './Ads';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ToastHost } from './ToastHost';
 import { useShopOrder, useShopOrderAction } from '@/hooks/useShopOrders';
@@ -80,6 +80,8 @@ export function ShopOrderModal() {
   const orderId = useShopOrderFocusStore((state) => state.orderId);
   const close = useShopOrderFocusStore((state) => state.close);
   const { data: order, isLoading, isError, refetch } = useShopOrder(orderId);
+  // Handover: location, then a local business's ad while the button spins, then the PIN check.
+  const { adLoading, waitForAd } = useAdGate(orderId !== null);
 
   const accept = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.accept(id));
   const decline = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.decline(id));
@@ -243,7 +245,9 @@ export function ShopOrderModal() {
             {o.status === 'cancelled' && o.cancelledBy === 'admin'
               ? t('shopOrders.adminCancelled')
               : t(`shopOrders.status.${o.status}.message`, { name: o.customerFullName })}
-            {o.status === 'cancelled' && o.cancelReason ? ` ${t('job.reason', { reason: o.cancelReason })}` : ''}
+            {o.status === 'cancelled' && o.cancelReason
+              ? ` ${t('job.reason', { reason: o.cancelReason === 'late' ? t('shopOrders.lateReason') : o.cancelReason })}`
+              : ''}
           </Text>
         </View>
       </View>
@@ -503,8 +507,11 @@ export function ShopOrderModal() {
         <Button
           label={t('shopOrders.verifyPin')}
           // Handover finishes the order: a local business's ad first (when one is running nearby).
-          onPress={() => withLocation(() => showAdBefore(() => handleVerifyPin(o)))}
-          loading={verifyPin.isPending}
+          onPress={async () => {
+            if (adLoading || !(await askForLocation())) return;
+            if (await waitForAd()) handleVerifyPin(o);
+          }}
+          loading={verifyPin.isPending || adLoading}
           disabled={pin.length !== 4}
         />
       </View>

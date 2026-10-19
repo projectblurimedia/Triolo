@@ -5,7 +5,7 @@ import { BusinessProfile } from '@/modules/businesses/interfaces';
 import { NotificationsService } from '@/modules/notifications/service';
 import { NotificationType } from '@/modules/notifications/interfaces';
 import { OrdersRepository } from './repository';
-import { CreateOrderDto, RateOrderDto, SaveItemsDto } from './dto';
+import { CreateOrderDto, CustomerCancelDto, RateOrderDto, SaveItemsDto } from './dto';
 import { CustomerOrder, OrderTransition, RatedOrder, ShopSideOrder, AdminOrder, AdminOrderListFilter } from './interfaces';
 import { OrderEvent, orderTemplate } from './pushTemplates';
 
@@ -99,8 +99,23 @@ export class OrdersService {
     return this.repository.listForCustomer(accountId, LIST_LIMIT);
   }
 
-  /** Only before the shop starts reviewing; afterwards the customer contacts the shop. */
-  async cancelOrder(accountId: string, orderId: string): Promise<void> {
+  /**
+   * Before the shop starts reviewing; afterwards only if the order has made no progress for
+   * ORDER_LATE_AFTER_MINUTES — then with a rating of the shop, which counts like any other.
+   */
+  async cancelOrder(accountId: string, orderId: string, dto: CustomerCancelDto = {}): Promise<void> {
+    if (dto.rating !== undefined) {
+      const stalled = await this.repository.cancelStalled(orderId, accountId, dto.rating, dto.review || null);
+      if (!stalled) {
+        throw AppError.conflict(
+          'You can rate a shop when cancelling only once the order has made no progress for over an hour.',
+          'ORDER_NOT_LATE',
+        );
+      }
+      await this.businessesService.recordRating(stalled.businessId, dto.rating);
+      await this.notify(stalled.transition, 'cancelled_late', 'order_cancelled');
+      return;
+    }
     const result = await this.repository.cancelByCustomer(orderId, accountId);
     if (!result) {
       throw await this.transitionError(orderId, 'This order can no longer be cancelled from the app.');
@@ -234,7 +249,7 @@ export class OrdersService {
       total: rupees(order.totalAmount),
     });
     // Only the customer's own cancellation goes to the shop; every other step to the customer.
-    const audience = event === 'cancelled_by_customer' ? 'partner' : 'user';
+    const audience = event === 'cancelled_by_customer' || event === 'cancelled_late' ? 'partner' : 'user';
     await this.notificationsService.notify(transition.notify.accountId, type, text.title, text.body, {
       audience,
       data: { kind: type, orderId: order.id },

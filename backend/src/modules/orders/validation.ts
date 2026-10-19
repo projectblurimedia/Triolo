@@ -40,6 +40,14 @@ export const rateOrderSchema = z.object({
   review: z.string().trim().max(300).optional(),
 });
 
+// A plain cancel sends nothing; cancelling a stalled order sends the shop's rating.
+export const customerCancelSchema = z
+  .object({
+    rating: z.number().int().min(1).max(5).optional(),
+    review: z.string().trim().max(300).optional(),
+  })
+  .default({});
+
 export const shopCancelSchema = z.object({
   reason: z.string().trim().max(200).optional(),
 });

@@ -32,6 +32,15 @@ export const MAX_PIN_ATTEMPTS = 5;
  * longer offered to anyone — the customer gets a "no worker found, try again" screen.
  */
 export const BROADCAST_TTL_MINUTES = 3;
+/** A request sent to one particular worker waits longer for them to answer. */
+export const DIRECT_TTL_MINUTES = 10;
+/**
+ * A worker who accepted this long ago and still hasn't arrived counts as late: the customer may
+ * then cancel and rate them (otherwise a cancel carries no rating).
+ */
+export const LATE_AFTER_MINUTES = 60;
+/** Statuses where a late worker can be cancelled and rated (they haven't arrived). */
+export const LATE_STATUSES: BookingRequestStatus[] = ['accepted', 'on_the_way'];
 
 export interface BookingRequest {
   id: string;
@@ -59,6 +68,8 @@ export interface BookingRequest {
   problemPostId: string | null;
   /** That problem's quotation (whole rupees), shown on both trip screens. */
   quotationAmount: number | null;
+  /** Set when the customer booked this particular worker (only they are asked). */
+  targetWorkerId: string | null;
   createdAt: Date;
 }
 
@@ -80,6 +91,8 @@ export interface CustomerBooking extends BookingRequest {
   worker: BookingWorker | null;
   /** Only while the trip is active; the worker never receives this. */
   arrivalPin: string | null;
+  /** The worker this was sent to, for a booking of a particular worker (shown while waiting). */
+  directWorker: { fullName: string } | null;
   /** Kept for the older QuickBookModal build that reads these two flat fields. */
   acceptedWorkerFullName: string | null;
   acceptedWorkerSkillCategories: string[] | null;
@@ -103,6 +116,7 @@ export interface CreateBookingRequestParams {
   longitude: number;
   locationAddress: string | null;
   radiusKm: number;
+  targetWorkerId?: string | null;
 }
 
 export interface BookingOfferInsert {
@@ -119,6 +133,8 @@ export interface PendingOffer {
   /** Who is asking and where — shown before accepting. Their phone stays hidden until accepted. */
   customerFullName: string;
   locationAddress: string | null;
+  /** The customer chose this worker personally (not a broadcast to everyone nearby). */
+  direct: boolean;
   createdAt: Date;
 }
 

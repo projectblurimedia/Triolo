@@ -68,6 +68,7 @@ function buildOrder(overrides: Partial<ShopOrder> = {}): ShopOrder {
     declinedAt: null,
     expiredAt: null,
     createdAt: new Date(),
+    updatedAt: new Date(),
     items: [
       { id: 'i1', position: 1, name: 'Kandipappu', quantity: '1', unit: 'kg', status: 'packed', price: 120 },
       { id: 'i2', position: 2, name: 'Minapappu', quantity: '2', unit: 'kg', status: 'unavailable', price: null },
@@ -103,6 +104,7 @@ beforeEach(() => {
     listForShop: jest.fn(),
     findRatedForBusiness: jest.fn(),
     cancelByCustomer: jest.fn(),
+    cancelStalled: jest.fn(),
     rate: jest.fn(),
     accept: jest.fn(),
     decline: jest.fn(),
@@ -192,6 +194,20 @@ describe('customer steps', () => {
     repo.cancelByCustomer.mockResolvedValue(null);
     repo.exists.mockResolvedValue(true);
     await expect(service.cancelOrder('customer-1', 'order-1')).rejects.toMatchObject({ code: 'ORDER_INVALID_STATE' });
+  });
+
+  it('cancels a stalled order with a rating of the shop, and counts it', async () => {
+    repo.cancelStalled.mockResolvedValue({ transition: transition({ status: 'cancelled' }), businessId: 'shop-1' });
+    await service.cancelOrder('customer-1', 'order-1', { rating: 1, review: 'Never came' });
+    expect(repo.cancelStalled).toHaveBeenCalledWith('order-1', 'customer-1', 1, 'Never came');
+    expect(businesses.recordRating).toHaveBeenCalledWith('shop-1', 1);
+    expect(repo.cancelByCustomer).not.toHaveBeenCalled();
+  });
+
+  it('refuses a rated cancel of an order that is not stalled', async () => {
+    repo.cancelStalled.mockResolvedValue(null);
+    await expect(service.cancelOrder('customer-1', 'order-1', { rating: 1 })).rejects.toMatchObject({ code: 'ORDER_NOT_LATE' });
+    expect(businesses.recordRating).not.toHaveBeenCalled();
   });
 
   it('rates a completed order once and adds it to the shop rating', async () => {

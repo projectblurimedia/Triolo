@@ -7,6 +7,9 @@ import {
   BookingRequest,
   BookingRequestStatus,
   BROADCAST_TTL_MINUTES,
+  DIRECT_TTL_MINUTES,
+  LATE_AFTER_MINUTES,
+  LATE_STATUSES,
   BookingTransition,
   CANCELLABLE_STATUSES,
   CreateAssignedBookingParams,
@@ -52,6 +55,7 @@ function mapBookingRequest(row: QueryResultRow): BookingRequest {
     workerReview: row.worker_review ?? null,
     problemPostId: row.problem_post_id ?? null,
     quotationAmount: row.quotation_amount != null ? Number(row.quotation_amount) : null,
+    targetWorkerId: row.target_worker_id ?? null,
     createdAt: row.created_at,
   };
 }
@@ -76,6 +80,7 @@ function mapCustomerBooking(row: QueryResultRow): CustomerBooking {
         }
       : null,
     arrivalPin: tripActive ? (row.arrival_pin ?? null) : null,
+    directWorker: row.target_worker_full_name ? { fullName: row.target_worker_full_name } : null,
     acceptedWorkerFullName: row.worker_full_name ?? null,
     acceptedWorkerSkillCategories: workerSkills,
   };
@@ -106,10 +111,20 @@ function mapTransition(row: QueryResultRow | undefined): BookingTransition | nul
 const CUSTOMER_BOOKING_SELECT = `
   SELECT br.*, wa.full_name AS worker_full_name, wa.mobile_number AS worker_mobile_number,
          w.skill_categories AS worker_skill_categories, w.rating_sum AS worker_rating_sum,
-         w.rating_count AS worker_rating_count
+         w.rating_count AS worker_rating_count, ta.full_name AS target_worker_full_name
   FROM booking_requests br
   LEFT JOIN worker_profiles w ON w.id = br.accepted_worker_id
-  LEFT JOIN accounts wa ON wa.id = w.account_id`;
+  LEFT JOIN accounts wa ON wa.id = w.account_id
+  LEFT JOIN worker_profiles tw ON tw.id = br.target_worker_id
+  LEFT JOIN accounts ta ON ta.id = tw.account_id`;
+
+/**
+ * Whether a request (alias `br`) is still young enough to be offered or accepted: a Quick Book
+ * broadcast for BROADCAST_TTL_MINUTES, a booking of a particular worker for DIRECT_TTL_MINUTES.
+ * (Constants only — no user input in this SQL.)
+ */
+const STILL_OPEN = `br.created_at > now() - make_interval(mins => CASE WHEN br.target_worker_id IS NULL
+  THEN ${BROADCAST_TTL_MINUTES} ELSE ${DIRECT_TTL_MINUTES} END)`;
 
 const WORKER_JOB_SELECT = `
   SELECT br.*, ca.full_name AS customer_full_name, ca.mobile_number AS customer_mobile_number,
@@ -132,10 +147,18 @@ export class BookingsRepository {
 
   async createRequest(params: CreateBookingRequestParams): Promise<BookingRequest> {
     const result = await this.pool.query(
-      `INSERT INTO booking_requests (account_id, skill_categories, latitude, longitude, location_address, radius_km)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO booking_requests (account_id, skill_categories, latitude, longitude, location_address, radius_km, target_worker_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [params.accountId, params.skillCategories, params.latitude, params.longitude, params.locationAddress, params.radiusKm],
+      [
+        params.accountId,
+        params.skillCategories,
+        params.latitude,
+        params.longitude,
+        params.locationAddress,
+        params.radiusKm,
+        params.targetWorkerId ?? null,
+      ],
     );
     return mapBookingRequest(result.rows[0]);
   }
@@ -184,12 +207,13 @@ export class BookingsRepository {
   /** Finished, rated or reviewed trips for one worker, newest first — their public reviews. */
   async findRatedForWorker(workerId: string, limit: number): Promise<RatedJob[]> {
     const result = await this.pool.query(
-      `SELECT br.worker_rating, br.worker_review, br.skill_categories, br.completed_at, ca.full_name AS customer_full_name
+      `SELECT br.worker_rating, br.worker_review, br.skill_categories,
+              COALESCE(br.completed_at, br.cancelled_at) AS completed_at, ca.full_name AS customer_full_name
        FROM booking_requests br
        JOIN accounts ca ON ca.id = br.account_id
-       WHERE br.accepted_worker_id = $1 AND br.status = 'completed'
+       WHERE br.accepted_worker_id = $1 AND br.status IN ('completed', 'cancelled')
          AND (br.worker_rating IS NOT NULL OR br.worker_review IS NOT NULL)
-       ORDER BY br.completed_at DESC
+       ORDER BY COALESCE(br.completed_at, br.cancelled_at) DESC
        LIMIT $2`,
       [workerId, limit],
     );
@@ -265,7 +289,62 @@ export class BookingsRepository {
     });
   }
 
+  /**
+   * The customer cancels a worker who accepted over LATE_AFTER_MINUTES ago and still hasn't
+   * arrived, rating them — the rating counts like a finished job's.
+   */
+  async cancelLate(id: string, accountId: string, rating: number, review: string | null): Promise<BookingTransition | null> {
+    return this.inTransaction(async (client) => {
+      const result = await client.query(
+        `WITH updated AS (
+           UPDATE booking_requests SET status = 'cancelled', cancelled_by = 'customer', cancelled_at = now(), arrival_pin = NULL,
+             cancel_reason = 'late', worker_rating = $4, worker_review = $5
+           WHERE id = $1 AND account_id = $2 AND status = ANY($3::booking_request_status[])
+             AND accepted_worker_id IS NOT NULL AND accepted_at <= now() - make_interval(mins => ${LATE_AFTER_MINUTES})
+           RETURNING *
+         ) ${NOTIFY_WORKER}`,
+        [id, accountId, LATE_STATUSES, rating, review],
+      );
+      if (!result.rows[0]) return null;
+      await client.query(`UPDATE booking_offers SET status = 'lost' WHERE booking_request_id = $1 AND status = 'pending'`, [id]);
+      return mapTransition(result.rows[0]);
+    });
+  }
+
+  /** The customer's name, for the worker's personal request. */
+  async findAccountName(accountId: string): Promise<string | null> {
+    const result = await this.pool.query(`SELECT full_name FROM accounts WHERE id = $1`, [accountId]);
+    return result.rows[0]?.full_name ?? null;
+  }
+
+  /** The asked worker's account and language, for their personal push. */
+  async findWorkerContact(workerId: string): Promise<NotifyTarget | null> {
+    const result = await this.pool.query(
+      `SELECT a.id, a.preferred_language FROM worker_profiles w JOIN accounts a ON a.id = w.account_id
+       WHERE w.id = $1 AND a.status = 'active'`,
+      [workerId],
+    );
+    const row = result.rows[0];
+    return row ? { accountId: row.id, preferredLanguage: row.preferred_language } : null;
+  }
+
   // --- Worker side ---
+
+  /**
+   * The asked worker turning down a booking of them in particular: there's nobody else to
+   * ask, so it ends ('cancelled' by the worker) and the customer is told.
+   */
+  async declineDirect(id: string, workerId: string): Promise<BookingTransition | null> {
+    const result = await this.pool.query(
+      `WITH updated AS (
+         UPDATE booking_requests SET status = 'cancelled', cancelled_by = 'worker', cancelled_at = now(), arrival_pin = NULL
+         WHERE id = $1 AND target_worker_id = $2 AND status = 'broadcasting'
+         RETURNING *
+       ) ${NOTIFY_CUSTOMER}`,
+      [id, workerId],
+    );
+    return mapTransition(result.rows[0]);
+  }
 
   async declineOffer(bookingRequestId: string, workerId: string): Promise<void> {
     await this.pool.query(
@@ -281,9 +360,8 @@ export class BookingsRepository {
    */
   async expireStaleBroadcasts(): Promise<void> {
     await this.pool.query(
-      `UPDATE booking_requests SET status = 'expired', expired_at = now()
-       WHERE status = 'broadcasting' AND created_at <= now() - make_interval(mins => $1)`,
-      [BROADCAST_TTL_MINUTES],
+      `UPDATE booking_requests br SET status = 'expired', expired_at = now()
+       WHERE br.status = 'broadcasting' AND NOT (${STILL_OPEN})`,
     );
   }
 
@@ -310,14 +388,15 @@ export class BookingsRepository {
            )))) AS distance_meters
          FROM booking_requests br
          WHERE br.status = 'broadcasting'
-           AND br.created_at > now() - make_interval(mins => $6)
+           AND br.target_worker_id IS NULL
+           AND ${STILL_OPEN}
            AND br.account_id != $2
            AND br.skill_categories <@ $5::worker_skill_category[]
        ) sub
        WHERE sub.distance_meters <= sub.radius_km * 1000
        ON CONFLICT (booking_request_id, worker_id)
          DO UPDATE SET status = 'pending' WHERE booking_offers.status = 'declined'`,
-      [workerId, workerAccountId, latitude, longitude, skillCategories, BROADCAST_TTL_MINUTES],
+      [workerId, workerAccountId, latitude, longitude, skillCategories],
     );
     return result.rowCount ?? 0;
   }
@@ -325,14 +404,14 @@ export class BookingsRepository {
   async findPendingOffersForWorker(workerId: string): Promise<PendingOffer[]> {
     const result = await this.pool.query(
       `SELECT bo.id AS offer_id, bo.booking_request_id, bo.distance_meters, bo.created_at, br.skill_categories,
-              br.location_address, ca.full_name AS customer_full_name
+              br.location_address, br.target_worker_id, ca.full_name AS customer_full_name
        FROM booking_offers bo
        JOIN booking_requests br ON br.id = bo.booking_request_id
        JOIN accounts ca ON ca.id = br.account_id
        WHERE bo.worker_id = $1 AND bo.status = 'pending' AND br.status = 'broadcasting'
-         AND br.created_at > now() - make_interval(mins => $2)
+         AND ${STILL_OPEN}
        ORDER BY bo.created_at DESC`,
-      [workerId, BROADCAST_TTL_MINUTES],
+      [workerId],
     );
     return result.rows.map((row) => ({
       offerId: row.offer_id,
@@ -341,6 +420,7 @@ export class BookingsRepository {
       distanceMeters: Number(row.distance_meters),
       customerFullName: row.customer_full_name,
       locationAddress: row.location_address ?? null,
+      direct: row.target_worker_id != null,
       createdAt: row.created_at,
     }));
   }
@@ -374,11 +454,13 @@ export class BookingsRepository {
     const outcome = await this.inTransaction<AcceptOfferResult | null>(
       async (client) => {
         const requestResult = await client.query(
-          `UPDATE booking_requests
+          // A booking of a particular worker can only be accepted by that worker.
+          `UPDATE booking_requests br
          SET status = 'accepted', accepted_worker_id = $2, accepted_at = now(), arrival_pin = $3, pin_attempts = 0
-         WHERE id = $1 AND status = 'broadcasting' AND created_at > now() - make_interval(mins => $4)
+         WHERE br.id = $1 AND br.status = 'broadcasting' AND ${STILL_OPEN}
+           AND (br.target_worker_id IS NULL OR br.target_worker_id = $2)
          RETURNING *`,
-          [bookingRequestId, workerId, arrivalPin, BROADCAST_TTL_MINUTES],
+          [bookingRequestId, workerId, arrivalPin],
         );
         if (requestResult.rowCount === 0) return null;
 

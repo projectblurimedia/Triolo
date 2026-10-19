@@ -29,7 +29,7 @@ export class OrdersController {
   });
 
   cancel = asyncHandler(async (req: Request, res: Response) => {
-    await this.service.cancelOrder(requireAccountId(req), req.params.id);
+    await this.service.cancelOrder(requireAccountId(req), req.params.id, req.body);
     return ok(res, null, 'Order cancelled');
   });
 

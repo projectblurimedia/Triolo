@@ -140,6 +140,7 @@ Migration `0010_create_push_tokens.sql`. Owned by the `notifications` module, no
 | skill_categories | `worker_skill_category[]` | every skill required — a matching worker must have **all** of these, not just one |
 | latitude / longitude | double precision | the requester's location at broadcast time |
 | radius_km | numeric | how far the broadcast reached — currently always `50` (a testing-only default, also the max the API allows) |
+| target_worker_id | uuid FK → worker_profiles.id, ON DELETE SET NULL, nullable | set for a booking of one particular worker (migration `0036`): only that worker is offered / may accept it, it stays open 10 minutes instead of 3, and Find Jobs Now skips it. Partial index `idx_booking_requests_target_worker` |
 | location_address | text, nullable | reverse-geocoded label for the customer's location, shown to the worker (migration `0018`) |
 | status | enum `booking_request_status` (`broadcasting`, `accepted`, `on_the_way`, `arrived`, `in_progress`, `work_done`, `completed`, `cancelled`, `expired`) | full trip flow added in migration `0018`; `expired` (+ `expired_at`, migration `0020`) = no worker accepted within 3 minutes — transitions in `docs/api.md`'s Bookings Module |
 | accepted_worker_id | uuid FK → worker_profiles.id, ON DELETE SET NULL, nullable | set atomically the moment a worker wins the accept race |
@@ -243,7 +244,8 @@ Partial index `(category) WHERE is_active`. No admin review: a post is live as s
 - `ad_settings` — one row (`id = 1`): `ads_enabled` (master switch, starts off), `launch_user`, `launch_partner`, `home_user`, `home_partner`.
 - `ads` — `bill_number` (from `ad_bill_number_seq`, never reused), `advertiser_name`, `advertiser_phone`, `title`, `description`, `image_url`, `contact_phone`, `location_text`, `plan_days` (1/3/7/30), `amount` (₹ as charged), `payment_method`, `start_date`/`end_date` (inclusive, India calendar), `impressions`, `clicks`, `deleted_at` (soft delete — history and bill stay).
 - `ad_daily_stats` — `(ad_id, day)` views and opens per day; the fair rotation picks the running ad with the fewest views today.
-- Migration `0034`: `ads.orientation` (`vertical`/`horizontal`), `ads.display_seconds` (3–30, default 5), `ads.video_seconds` (≤30.5); one piece of media per ad (`ads_one_media`); `ad_settings.home_*` renamed `action_*` (ads before key actions — the Home card is gone).
+- Migration `0034`: `ads.orientation` (`vertical`/`horizontal`), `ads.display_seconds` (3–30, default 5), `ads.video_seconds` (≤30.5); one piece of media per ad (`ads_one_media`); `ad_settings.home_*` renamed `action_*` (ads before key actions — the Home card is gone). Migration `0037`: `display_seconds` default 15.
+- Migration `0038` (self-booked ads): `ads.owner_account_id` (FK accounts, ON DELETE SET NULL — the business that booked it on the Triolo Ads website; null when the admin did), `ads.review_status` (`pending` / `approved` / `rejected`, default `approved`), `ads.review_note`, `ads.reviewed_at`; `payment_method` may be `pending`. Indexes `idx_ads_owner`, `idx_ads_in_review`.
 - Migration `0033`: `ads.link_url` (optional web link).
 - Migration `0032`: `ads.image_urls TEXT[]` (≤4, replaces `image_url`), `ads.video_url`, `ads.media_cleared_at` (set when an ended/deleted ad's media was removed from Cloudinary).
 - Migration `0031`: `ad_settings.plan_prices` JSONB (`{"1":20,"3":50,"7":100,"30":300}` by default), set by the admin; `ads.amount` keeps what each ad was booked at.

@@ -1,5 +1,5 @@
 import React, { ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { colors as brandColors, fonts, headerGradient, typography, useThemeColor
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
 const ACCEPT_GRADIENT = ['#16A34A', '#22C55E'] as const;
+const DISABLED_GRADIENT = ['#9CA3AF', '#B6BCC6'] as const;
 
 export interface IncomingAction {
   label: string;
@@ -279,16 +280,19 @@ export function IncomingRequestScreen({
           </Pressable>
           <Animated.View style={[styles.acceptWrap, { transform: [{ scale: accept.disabled ? 1 : acceptScale }] }]}>
             <Pressable
-              style={({ pressed }) => [
-                styles.acceptPress,
-                { opacity: accept.disabled && !accept.loading ? 0.6 : pressed ? 0.85 : 1 },
-              ]}
+              style={({ pressed }) => [styles.acceptPress, { opacity: pressed ? 0.85 : 1 }]}
               onPress={accept.onPress}
               disabled={accept.disabled}
               accessibilityRole="button"
               accessibilityLabel={accept.label}
             >
-              <LinearGradient colors={ACCEPT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.acceptButton}>
+              {/* Can't be pressed (e.g. the job is gone): a solid grey button, never a see-through one. */}
+              <LinearGradient
+                colors={accept.disabled && !accept.loading ? DISABLED_GRADIENT : ACCEPT_GRADIENT}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.acceptButton}
+              >
                 {accept.loading ? (
                   <LoadingIndicator size={22} dotSize={4.5} />
                 ) : (
@@ -397,14 +401,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   declineText: { ...typography.subheading, fontFamily: fonts.semiBold, fontSize: 16 },
+  // A soft green glow on iOS only: Android's elevation shadow shows through the button as a
+  // dark block whenever it's see-through (fading in, or greyed out), so it has none there.
   acceptWrap: {
     flex: 1.4,
     borderRadius: 18,
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: { shadowColor: '#16A34A', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12 },
+      default: {},
+    }),
   },
   acceptPress: { borderRadius: 18, overflow: 'hidden' },
   dashRing: {

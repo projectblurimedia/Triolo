@@ -15,7 +15,7 @@ export const saveAdSchema = z.object({
   title: optionalText(80),
   description: optionalText(600),
   orientation: z.enum(AD_ORIENTATIONS),
-  displaySeconds: z.number().int().min(3, 'At least 3 seconds').max(30, 'At most 30 seconds').default(5),
+  displaySeconds: z.number().int().min(3, 'At least 3 seconds').max(30, 'At most 30 seconds').default(15),
   latitude: z.number().min(-90).max(90, 'Set where the ad is'),
   longitude: z.number().min(-180).max(180),
   locationText: z.string().trim().min(2, 'Set where the ad is').max(120),
@@ -35,7 +35,8 @@ export const saveAdSchema = z.object({
     .number()
     .int()
     .refine((days) => (AD_PLAN_DAYS as readonly number[]).includes(days), 'Choose 1, 3, 7 or 30 days'),
-  paymentMethod: z.enum(AD_PAYMENT_METHODS).default('cash'),
+  // 'pending' = not paid yet (a business's own booking, until the admin records the payment).
+  paymentMethod: z.enum([...AD_PAYMENT_METHODS, 'pending'] as [string, ...string[]]).default('cash'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a start date'),
 });
 
@@ -55,9 +56,26 @@ export const adSettingsSchema = z
   })
   .partial();
 
+/**
+ * A business booking its own ad on the Triolo Ads website: like the admin's form, minus how it
+ * was paid (online payment comes later — it's 'pending' until then) and with its image or
+ * video required.
+ */
+export const selfAdSchema = saveAdSchema
+  .omit({ paymentMethod: true })
+  .extend({ advertiserName: z.string().trim().min(2, 'Enter your business name').max(80) })
+  .refine((body) => !!body.imageUrl !== !!body.videoUrl, 'Add one image or one video');
+
+export const reviewAdSchema = z
+  .object({
+    decision: z.enum(['approve', 'reject']),
+    note: z.string().trim().max(300).optional(),
+  })
+  .refine((body) => body.decision === 'approve' || !!body.note, { message: 'Say why it was rejected', path: ['note'] });
+
 export const adListQuerySchema = z.object({
   status: z
-    .enum(['scheduled', 'running', 'ended', 'deleted'])
+    .enum(['in_review', 'rejected', 'scheduled', 'running', 'ended', 'deleted'])
     .optional()
     .or(z.literal('').transform(() => undefined)),
   q: z.string().trim().max(60).optional(),

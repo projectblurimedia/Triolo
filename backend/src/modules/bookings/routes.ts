@@ -13,6 +13,8 @@ import { BookingsService } from './service';
 import { BookingsRepository } from './repository';
 import {
   completeBookingSchema,
+  cancelBookingSchema,
+  createDirectBookingSchema,
   createQuickBookingSchema,
   updateWorkerLocationSchema,
   verifyPinSchema,
@@ -36,6 +38,7 @@ export const bookingsRouter = Router();
 
 // Literal paths first, so they're never captured as an `:id`.
 bookingsRouter.post('/quick', authenticate, validateBody(createQuickBookingSchema), controller.createQuickBooking);
+bookingsRouter.post('/direct', authenticate, validateBody(createDirectBookingSchema), controller.createDirectBooking);
 bookingsRouter.get('/mine', authenticate, controller.listMine);
 bookingsRouter.get('/offers/mine', authenticate, controller.getMyOffers);
 bookingsRouter.post('/offers/search', authenticate, validateBody(searchOffersSchema), controller.searchOffers);
@@ -44,7 +47,7 @@ bookingsRouter.get('/jobs/:id', authenticate, controller.getMyJob);
 
 // Customer
 bookingsRouter.get('/:id', authenticate, controller.getStatus);
-bookingsRouter.post('/:id/cancel', authenticate, controller.cancel);
+bookingsRouter.post('/:id/cancel', authenticate, validateBody(cancelBookingSchema), controller.cancel);
 bookingsRouter.post('/:id/complete', authenticate, validateBody(completeBookingSchema), controller.complete);
 
 // Worker

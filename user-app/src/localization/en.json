@@ -20,7 +20,8 @@
     "updateCompleteTitle": "Update Complete!",
     "updateCompleteMessage": "Restarting the app with the latest version...",
     "edit": "Edit",
-    "back": "Back"
+    "back": "Back",
+    "search": "Search"
   },
   "verification": {
     "pending": "Pending Review",
@@ -545,7 +546,12 @@
     "suspendedTitle": "Account Suspended",
     "bannedTitle": "Account Banned",
     "validationFields": "Please check: {{fields}}.",
-    "LOCATION_REQUIRED": "Turn on location to do this."
+    "LOCATION_REQUIRED": "Turn on location to do this.",
+    "BOOKING_SKILL_MISMATCH": "This worker doesn't do that work.",
+    "BOOKING_OWN_PROFILE": "You can't book yourself.",
+    "WORKER_NOT_FOUND": "This worker isn't available right now.",
+    "BOOKING_NOT_LATE": "You can rate when cancelling only once the worker is over an hour late.",
+    "ORDER_NOT_LATE": "You can rate when cancelling only once the order has made no progress for over an hour."
   },
   "problemForm": {
     "photosLabel": "Photos of the problem (up to 5)",
@@ -971,7 +977,9 @@
     "rate": "Rate",
     "seeAll": "See all {{count}}",
     "searching": "Finding a worker…",
-    "pending": "Pending"
+    "pending": "Pending",
+    "more": "+{{count}} more · Tap to see all",
+    "allSubtitle": "{{count}} in progress — tap one to continue"
   },
   "profilePhoto": {
     "add": "Add photo",
@@ -1107,5 +1115,33 @@
     "continue": "Continue",
     "closeAfter": "You can close this in {{count}} s",
     "loading": "Loading the ad…"
+  },
+  "directBook": {
+    "button": "Book {{name}}",
+    "title": "Book {{name}}",
+    "subtitle": "Only {{name}} will be asked",
+    "chooseWork": "What do you need done?",
+    "note": "{{name}} gets your request personally and has 10 minutes to accept. Then you can track them like Quick Book.",
+    "send": "Send Booking Request",
+    "waitingTitle": "Waiting for {{name}}",
+    "waitingMessage": "We asked {{name}} personally. They have 10 minutes to accept.",
+    "expiredMessage": "{{name}} didn't answer in time. Book Again asks every worker nearby.",
+    "declinedMessage": "{{name}} can't take this job. Book Again asks every worker nearby."
+  },
+  "late": {
+    "workerTitle": "{{name}} hasn't arrived yet",
+    "workerMessage": "It's been over an hour since {{name}} accepted. You can cancel and rate them.",
+    "workerAction": "Cancel & Rate Worker",
+    "rateWorkerTitle": "Cancel and rate",
+    "rateWorkerMessage": "{{name}} accepted but didn't come. Your rating helps other customers.",
+    "shopTitle": "No update from {{shop}}",
+    "shopMessage": "This order hasn't moved for over an hour. You can cancel it and rate the shop.",
+    "shopAction": "Cancel & Rate Shop",
+    "rateShopTitle": "Cancel and rate",
+    "rateShopMessage": "{{shop}} took your order but didn't finish it. Your rating helps other customers.",
+    "rateShopLabel": "Rate the shop",
+    "cancelAndRate": "Cancel & Rate",
+    "cancelledToast": "Cancelled — thanks for your rating",
+    "orderReason": "no progress for over an hour"
   }
 }
