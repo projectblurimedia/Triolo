@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -25,11 +25,14 @@ import { formatRupees } from '@/services/ordersService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { callPhone } from '@/utils/tripLinks';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { showAdBefore } from './Ads';
+import { askForLocation } from '@/utils/ensureLocationOn';
+import { useAdGate } from './Ads';
 
 const CALL_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const SEARCH_DEBOUNCE_MS = 350;
 const SKILLS_SHOWN = 4;
+// Tile colours on the intro, one per kind of work in turn (no orange — that's the shop colour).
+const TILE_COLORS = ['#0055D3', '#0D9488', '#7C3AED', '#16A34A', '#DB2777', '#2563EB'];
 
 interface HireStaffModalProps {
   visible: boolean;
@@ -40,6 +43,10 @@ interface HireStaffModalProps {
  * "Hire Staff": people nearby looking for regular work — a home cook, a tutor, a driver, a
  * nanny… (posted from the partner app). Filter by kind of work and daily / monthly pay, sort
  * nearest or lowest pay, search by name / work / skill, and call them straight away.
+ *
+ * It opens on an intro (the kinds of work, how it works) with no filter selected and nobody
+ * listed. The first search or filter asks for location, shows a local business's ad (when one is
+ * running), and then lists the people near you.
  */
 export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
   const { t } = useTranslation();
@@ -54,11 +61,54 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selected, setSelected] = useState<JobSeeker | null>(null);
+  // Whether people are listed yet (after the first search / filter), and whether that's starting.
+  const [started, setStarted] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
+  const { waitForAd } = useAdGate();
+
+  // Every opening starts on the intro again.
+  useEffect(() => {
+    if (!visible) return;
+    setStarted(false);
+    setCategory(null);
+    setPayPeriod(null);
+    setSort('distance');
+    setQuery('');
+    setDebouncedQuery('');
+  }, [visible]);
+
+  /** Location first, then the ad, then the list. */
+  const begin = async () => {
+    if (started || startingRef.current) return;
+    startingRef.current = true;
+    try {
+      if (!(await askForLocation())) return;
+      setStarting(true);
+      await waitForAd();
+      setStarted(true);
+    } finally {
+      startingRef.current = false;
+      setStarting(false);
+    }
+  };
+
+  /** A filter change — on the intro it also starts the search. */
+  const pick = (change: () => void) => {
+    change();
+    if (!started) begin();
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query]);
+
+  // Typing a search on the intro starts it too.
+  useEffect(() => {
+    if (visible && debouncedQuery && !started) begin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery]);
 
   const results = useQuery({
     queryKey: ['job-seekers', coords?.latitude, coords?.longitude, category, payPeriod, sort, debouncedQuery],
@@ -72,7 +122,7 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
         query: debouncedQuery || undefined,
         sort,
       }),
-    enabled: visible && coords !== null,
+    enabled: visible && started && coords !== null,
     staleTime: 30_000,
   });
 
@@ -179,10 +229,7 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
               {item.mobileNumber}
             </Text>
           </View>
-          <Pressable
-            onPress={() => showAdBefore(() => callPhone(item.mobileNumber))}
-            accessibilityLabel={`${t('hireStaff.call')} ${item.fullName}`}
-          >
+          <Pressable onPress={() => callPhone(item.mobileNumber)} accessibilityLabel={`${t('hireStaff.call')} ${item.fullName}`}>
             <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>
               <FontAwesome6 name="phone" size={13} color="#FFFFFF" solid />
               <Text style={styles.callText}>{t('hireStaff.call')}</Text>
@@ -193,7 +240,73 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
     );
   };
 
+  const renderIntro = () => (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={[styles.intro, { paddingBottom: insets.bottom + 28 }]}
+    >
+      <Text style={[styles.introHeading, { color: colors.text }]}>{t('hireStaff.chooseType')}</Text>
+      <View style={styles.tiles}>
+        {JOB_CATEGORIES.map((entry, index) => {
+          const tint = TILE_COLORS[index % TILE_COLORS.length];
+          return (
+            <Pressable
+              key={entry.key}
+              onPress={() => pick(() => setCategory(entry.key))}
+              style={({ pressed }) => [
+                styles.tile,
+                { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <View style={[styles.tileIcon, { backgroundColor: `${tint}16` }]}>
+                <FontAwesome6 name={entry.icon as never} size={18} color={tint} solid />
+              </View>
+              <Text style={[styles.tileText, { color: colors.text }]} numberOfLines={2}>
+                {t(`hireStaff.categories.${entry.key}`)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.introHeading, { color: colors.text }]}>{t('hireStaff.howTitle')}</Text>
+      <View style={[styles.howCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {(
+          [
+            ['magnifying-glass', 'hireStaff.how1'],
+            ['id-card', 'hireStaff.how2'],
+            ['phone', 'hireStaff.how3'],
+          ] as const
+        ).map(([icon, key], index) => (
+          <View key={key} style={styles.howRow}>
+            <View style={[styles.howIcon, { backgroundColor: `${colors.primary}12` }]}>
+              <FontAwesome6 name={icon} size={14} color={colors.primary} solid />
+            </View>
+            <Text style={[styles.howText, { color: colors.text }]}>
+              <Text style={{ color: colors.primary, fontFamily: fonts.semiBold }}>{index + 1}. </Text>
+              {t(key)}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <View style={styles.note}>
+        <FontAwesome6 name="shield-halved" size={12} color={colors.textMuted} solid />
+        <Text style={[styles.noteText, { color: colors.textMuted }]}>{t('hireStaff.introNote')}</Text>
+      </View>
+    </ScrollView>
+  );
+
   const renderBody = () => {
+    if (starting) {
+      return (
+        <View style={styles.state}>
+          <LoadingIndicator size={36} dotSize={5} color={colors.primary} />
+          <Text style={[styles.stateText, { color: colors.textMuted }]}>{t('hireStaff.finding')}</Text>
+        </View>
+      );
+    }
+    if (!started) return renderIntro();
     if (!coords) {
       const blocked = location.status === 'denied' || location.status === 'disabled' || location.status === 'error';
       return (
@@ -280,6 +393,7 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
               placeholder={t('hireStaff.searchPlaceholder')}
               placeholderTextColor={colors.textMuted}
               returnKeyType="search"
+              onSubmitEditing={() => begin()}
               maxLength={60}
             />
             {query ? (
@@ -289,13 +403,13 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
             ) : null}
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            {chip('all', t('hireStaff.all'), category === null, () => setCategory(null))}
+            {chip('all', t('hireStaff.all'), started && category === null, () => pick(() => setCategory(null)))}
             {JOB_CATEGORIES.map((entry) =>
               chip(
                 entry.key,
                 t(`hireStaff.categories.${entry.key}`),
-                category === entry.key,
-                () => setCategory(entry.key),
+                started && category === entry.key,
+                () => pick(() => setCategory(entry.key)),
                 entry.icon,
               ),
             )}
@@ -305,10 +419,12 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
               {([null, 'daily', 'monthly'] as (PayPeriod | null)[]).map((value) => (
                 <Pressable
                   key={value ?? 'any'}
-                  onPress={() => setPayPeriod(value)}
-                  style={[styles.segmentItem, payPeriod === value ? { backgroundColor: colors.surface } : null]}
+                  onPress={() => pick(() => setPayPeriod(value))}
+                  style={[styles.segmentItem, started && payPeriod === value ? { backgroundColor: colors.surface } : null]}
                 >
-                  <Text style={[styles.segmentText, { color: payPeriod === value ? colors.primary : colors.textMuted }]}>
+                  <Text
+                    style={[styles.segmentText, { color: started && payPeriod === value ? colors.primary : colors.textMuted }]}
+                  >
                     {value ? t(`hireStaff.period.${value}`) : t('hireStaff.anyPay')}
                   </Text>
                 </Pressable>
@@ -318,10 +434,10 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
               {(['distance', 'pay'] as JobSeekerSort[]).map((value) => (
                 <Pressable
                   key={value}
-                  onPress={() => setSort(value)}
-                  style={[styles.segmentItem, sort === value ? { backgroundColor: colors.surface } : null]}
+                  onPress={() => pick(() => setSort(value))}
+                  style={[styles.segmentItem, started && sort === value ? { backgroundColor: colors.surface } : null]}
                 >
-                  <Text style={[styles.segmentText, { color: sort === value ? colors.primary : colors.textMuted }]}>
+                  <Text style={[styles.segmentText, { color: started && sort === value ? colors.primary : colors.textMuted }]}>
                     {t(value === 'distance' ? 'hireStaff.sortNearest' : 'hireStaff.sortPay')}
                   </Text>
                 </Pressable>
@@ -340,6 +456,28 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  intro: { padding: 16, paddingTop: 4 },
+  introHeading: { ...typography.body, fontFamily: fonts.semiBold, marginTop: 10, marginBottom: 12 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  tile: {
+    width: '31%',
+    flexGrow: 1,
+    minHeight: 96,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  tileIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  tileText: { ...typography.caption, fontFamily: fonts.medium, textAlign: 'center' },
+  howCard: { borderRadius: 18, borderWidth: 1, padding: 14, gap: 12 },
+  howRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  howIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  howText: { ...typography.body, flex: 1 },
+  note: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, paddingHorizontal: 4 },
+  noteText: { ...typography.caption, flex: 1 },
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingBottom: 16 },
   backButton: {

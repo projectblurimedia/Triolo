@@ -1,6 +1,7 @@
 import { Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import i18n from '@/localization/i18n';
+import { useLocationStore } from '@/state/locationStore';
 import { showToast } from '@/state/toastStore';
 
 /*
@@ -52,6 +53,13 @@ export function ensureLocationOn(): Promise<boolean> {
 /** `ensureLocationOn`, plus the "Turn on location" message when it's still off. */
 export async function askForLocation(): Promise<boolean> {
   const on = await ensureLocationOn();
+  // Screens that list what's near you read the shared position: update it straight away.
+  if (on) {
+    useLocationStore
+      .getState()
+      .refresh()
+      .catch(() => undefined);
+  }
   if (!on) {
     showToast({ variant: 'error', title: i18n.t('location.requiredTitle'), message: i18n.t('location.requiredMessage') });
   }

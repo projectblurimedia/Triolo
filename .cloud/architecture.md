@@ -319,7 +319,7 @@ Area-based for MVP: users select village/town, workers/businesses define service
   - Android 12+ can only blur inside a `BlurTargetView`, so overlays use the nearest `BlurScope` (React context), else the tab on screen (`blurTargetStore.activeKey`, set by `CustomTabBar`).
   - **Any new full-screen modal that opens an overlay must wrap its content in `<BlurScope style={StyleSheet.absoluteFill}>`**, or the overlay blurs the tab underneath instead.
   - New overlays should use `GlassBackdrop` + `GlassCard`, not a black `rgba` backdrop with a `colors.surface` card.
-- **No platform `RefreshControl`.** Wrap a ScrollView/FlatList in `<PullToRefresh refreshing onRefresh>`. It claims the drag only at the top of the list moving down: a JS responder that blocks the native scroll view on Android, with `bounces={false}` on iOS.
+- **No platform `RefreshControl`.** Wrap one vertical ScrollView/FlatList in `<PullToRefresh refreshing onRefresh>`. The list gets a hidden 96 px room above its content (prepended child / `ListHeaderComponent`) and rests scrolled just past it, so pulling down is the list's own native scroll, and opening/closing on release is native snapping (`snapToOffsets`, `snapToStart` only while the finger is in the room). Never move the list from JS during a pull: an earlier JS-responder version lost the finger, and a JS-scrolling version stuttered against Android's fling. Offsets the child sees include the room; the room is never shown at rest.
 
 ## Maps & Live Tracking (Quick Book trips)
 

@@ -127,15 +127,14 @@ export function HomeScreen() {
     businessesService.recordView(shop.id).catch(() => {});
   };
 
-  // Every quick action works from where you are, so location is asked for before the screen
-  // opens. Ads come later, on each screen's final button (Book Nearby, Send, Post, Call).
-  const handleQuickAction = (key: (typeof QUICK_ACTIONS)[number]['key']) =>
-    withLocation(() => {
-      if (key === 'quickBook') setQuickBookVisible(true);
-      else if (key === 'postProblem') setProblemFormVisible(true);
-      else if (key === 'hireStaff') setHireStaffVisible(true);
-      else setChooseListVisible(true);
-    });
+  // Opening a quick action asks for nothing: location is asked for, and the ad shown, at the
+  // step that needs it (Book Nearby, Choose a Shop / Send, searching Hire Staff, Post).
+  const handleQuickAction = (key: (typeof QUICK_ACTIONS)[number]['key']) => {
+    if (key === 'quickBook') setQuickBookVisible(true);
+    else if (key === 'postProblem') setProblemFormVisible(true);
+    else if (key === 'hireStaff') setHireStaffVisible(true);
+    else setChooseListVisible(true);
+  };
 
   const renderSectionHeader = (title: string, onSeeAll?: () => void) => (
     <View style={styles.sectionHeader}>
@@ -332,10 +331,13 @@ export function HomeScreen() {
       <ChooseListModal
         visible={chooseListVisible}
         onClose={() => setChooseListVisible(false)}
-        onPick={(listId) => {
-          setChooseListVisible(false);
-          setSendListId(listId);
-        }}
+        // Choosing a shop lists shops near you: location is asked for here.
+        onPick={(listId) =>
+          withLocation(() => {
+            setChooseListVisible(false);
+            setSendListId(listId);
+          })
+        }
         onCreate={() => {
           setChooseListVisible(false);
           navigation.navigate('PrepareList');

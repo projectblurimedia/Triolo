@@ -78,7 +78,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
       subtitle: t('hireStaff.menuSubtitle'),
       onPress: () => {
         onClose();
-        withLocation(() => setHireStaffVisible(true));
+        setHireStaffVisible(true);
       },
     },
   ];

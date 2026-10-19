@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   AppState,
@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Updates from 'expo-updates';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -52,6 +53,23 @@ const MEDIA_START_FALLBACK_MS = 8000;
 // fix). If the fresh fix then turns out to be this far away, that ad is dropped for a nearer one.
 const LAUNCH_COORDS_KEY = 'triolo-ad-coords';
 const MOVED_TOO_FAR_KM = 3;
+// The app-open ad only shows close to when the app opened; one that's only ready later (e.g.
+// location was off and got turned on for an action) is dropped — never popped mid-use.
+const LAUNCH_WINDOW_MS = 15000;
+// Set just before the app restarts to install an update, when an ad was already shown this
+// run, so the restarted app doesn't show a second one.
+const SKIP_NEXT_LAUNCH_AD_KEY = 'triolo-skip-launch-ad';
+// The app version (update) that last opened. The first launch on a new update shows no app-open
+// ad: that launch follows the restart that installed it, and the run before may have shown one.
+const LAST_UPDATE_KEY = 'triolo-ad-last-update';
+const thisUpdate = Updates.updateId ?? 'embedded';
+let launchAdShownThisRun = false;
+
+/** Call right before restarting for an update: the restarted app then skips its app-open ad. */
+export async function rememberAdBeforeRestart(): Promise<void> {
+  if (!launchAdShownThisRun) return;
+  await AsyncStorage.setItem(SKIP_NEXT_LAUNCH_AD_KEY, '1').catch(() => undefined);
+}
 // A picture gets this long to load before the ad shows, so it doesn't open on a blank card.
 const IMAGE_PRELOAD_MS = 1500;
 
@@ -186,7 +204,19 @@ function AdVideo({
  * each over a backdrop made from the ad itself. A bar fills over the ad's time; only then do
  * ✕ and Continue / Close appear. Tapping the ad or Visit opens its link.
  */
+/** How many ads are on screen right now (0 or 1) — the app waits before restarting for an update. */
+const useAdsOnScreen = create<{ count: number }>(() => ({ count: 0 }));
+
+/** True while an ad is on screen. */
+export function useAdOnScreen(): boolean {
+  return useAdsOnScreen((state) => state.count > 0);
+}
+
 function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; onClose: () => void }) {
+  useEffect(() => {
+    useAdsOnScreen.setState((state) => ({ count: state.count + 1 }));
+    return () => useAdsOnScreen.setState((state) => ({ count: Math.max(0, state.count - 1) }));
+  }, []);
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -392,9 +422,19 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
 
 /**
  * The ad shown once each time the app opens (when the admin has it switched on). `hold` keeps
- * it back while something more important is on screen (the partner app's new job request).
+ * it back while something more important is on screen (the partner app's new job request);
+ * `waitFor` keeps it back until the app's update check is done (an update restarts the app).
  */
-export function AdLaunchBanner({ hold = false }: { hold?: boolean }) {
+interface ActionAdState {
+  ad: Ad | null;
+  then: (() => void) | null;
+  /** An action's ad was asked for: the app-open ad's moment has passed (only one ad at a time). */
+  launchOver: boolean;
+}
+
+const useActionAd = create<ActionAdState>(() => ({ ad: null, then: null, launchOver: false }));
+
+export function AdLaunchBanner({ hold = false, waitFor = false }: { hold?: boolean; waitFor?: boolean }) {
   const signedIn = useAuthStore((state) => !!state.accessToken && !state.isCompletingRegistration);
   const coords = useReadyCoords();
   const [ad, setAd] = useState<Ad | null>(null);
@@ -402,6 +442,9 @@ export function AdLaunchBanner({ hold = false }: { hold?: boolean }) {
   // Refs, not state: changing state here re-ran the effects, whose cleanups cancelled the work.
   const requested = useRef(false);
   const askedFrom = useRef<Coords | null>(null);
+  const openedAt = useRef<number | null>(null);
+  const shown = useRef(false);
+  const launchOver = useActionAd((state) => state.launchOver);
 
   const fetchAd = (here: Coords) => {
     requested.current = true;
@@ -421,10 +464,20 @@ export function AdLaunchBanner({ hold = false }: { hold?: boolean }) {
   // wait for a screen to ask for it).
   useEffect(() => {
     if (!signedIn || requested.current) return;
+    openedAt.current ??= Date.now();
     const store = useLocationStore.getState();
     if (store.status === 'idle') store.refresh().catch(() => undefined);
-    AsyncStorage.getItem(LAUNCH_COORDS_KEY)
-      .then((saved) => {
+    AsyncStorage.multiGet([SKIP_NEXT_LAUNCH_AD_KEY, LAUNCH_COORDS_KEY, LAST_UPDATE_KEY])
+      .then(([[, skip], [, saved], [, lastUpdate]]) => {
+        if (lastUpdate !== thisUpdate) AsyncStorage.setItem(LAST_UPDATE_KEY, thisUpdate).catch(() => undefined);
+        const justUpdated = lastUpdate !== null && lastUpdate !== thisUpdate;
+        if (skip || justUpdated) {
+          // The app just restarted for an update right after showing an ad: none this time.
+          AsyncStorage.removeItem(SKIP_NEXT_LAUNCH_AD_KEY).catch(() => undefined);
+          requested.current = true;
+          setClosed(true);
+          return;
+        }
         if (!saved || requested.current) return;
         const last = JSON.parse(saved) as Coords;
         if (typeof last.latitude === 'number' && typeof last.longitude === 'number') fetchAd(last);
@@ -441,26 +494,32 @@ export function AdLaunchBanner({ hold = false }: { hold?: boolean }) {
     if (!signedIn || closed) return;
     if (!requested.current) {
       fetchAd(coords);
-    } else if (askedFrom.current && distanceKm(askedFrom.current, coords) > MOVED_TOO_FAR_KM) {
+    } else if (!shown.current && askedFrom.current && distanceKm(askedFrom.current, coords) > MOVED_TOO_FAR_KM) {
+      // (Never swaps an ad already on screen.)
       setAd(null);
       fetchAd(coords);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn, coords?.latitude, coords?.longitude]);
 
-  // Shown only once location is confirmed on (like every ad), even if it was fetched before.
-  if (!ad || !coords || closed || !signedIn || hold) return null;
+  // Shown only once location is confirmed on (like every ad), even if it was fetched before —
+  // and only around app opening: too late, or once an action's own ad has started, it's dropped.
+  // `waitFor` (the app is checking for / installing an update, and would restart under the
+  // ad) only delays an ad that hasn't started; `hold` hides one even while it plays.
+  const ready = !!ad && !!coords && !closed && signedIn && !hold && (!waitFor || shown.current);
+  const missed =
+    !shown.current && (launchOver || (openedAt.current !== null && Date.now() - openedAt.current > LAUNCH_WINDOW_MS));
+  useEffect(() => {
+    if (ready && missed) setClosed(true);
+  }, [ready, missed]);
+  if (!ready || missed) return null;
+  shown.current = true;
+  launchAdShownThisRun = true;
   return <AdPlayer ad={ad} mode="launch" onClose={() => setClosed(true)} />;
 }
 
 // --- Ads before key actions ---
 
-interface ActionAdState {
-  ad: Ad | null;
-  then: (() => void) | null;
-}
-
-const useActionAd = create<ActionAdState>(() => ({ ad: null, then: null }));
 let actionPending = false;
 
 /**
@@ -469,6 +528,8 @@ let actionPending = false;
  * action just goes ahead.
  */
 export function showAdBefore(action: () => void): void {
+  // From now on this action's ad is the only one: an app-open ad not yet shown is dropped.
+  if (!useActionAd.getState().launchOver) useActionAd.setState({ launchOver: true });
   if (actionPending || useActionAd.getState().ad) {
     action();
     return;
@@ -520,6 +581,29 @@ export function showAdBefore(action: () => void): void {
 /** `showAdBefore` as a promise: resolves once the ad (if there was one) is closed. */
 export function adThen(): Promise<void> {
   return new Promise((resolve) => showAdBefore(resolve));
+}
+
+/**
+ * For a final button: `await waitForAd()` before the action (false if it's already waiting),
+ * and `adLoading` to show the button's spinner while the ad is being fetched, so the tap
+ * answers at once instead of seeming to do nothing.
+ */
+export function useAdGate(): { adLoading: boolean; waitForAd: () => Promise<boolean> } {
+  const [adLoading, setAdLoading] = useState(false);
+  const busy = useRef(false);
+  const waitForAd = useCallback(async () => {
+    if (busy.current) return false;
+    busy.current = true;
+    setAdLoading(true);
+    try {
+      await adThen();
+      return true;
+    } finally {
+      busy.current = false;
+      setAdLoading(false);
+    }
+  }, []);
+  return { adLoading, waitForAd };
 }
 
 /** Mounted once at the app root: shows the ad `showAdBefore` found, then runs the action. */

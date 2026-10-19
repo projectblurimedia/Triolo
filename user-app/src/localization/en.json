@@ -956,7 +956,14 @@
     "locationLabel": "Location",
     "skillsLabel": "Skills",
     "aboutLabel": "About",
-    "expectedPay": "Expected pay"
+    "expectedPay": "Expected pay",
+    "chooseType": "What help do you need?",
+    "howTitle": "How it works",
+    "how1": "Search, or pick the kind of work you need.",
+    "how2": "See each person's pay, skills, experience and distance.",
+    "how3": "Call them directly — no middleman, no fee.",
+    "introNote": "Uses your location to show only people near you.",
+    "finding": "Finding people near you…"
   },
   "continueSteps": {
     "title": "Continue Where You Left Off",

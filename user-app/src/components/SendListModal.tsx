@@ -27,7 +27,7 @@ import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { openNewList } from '@/navigation/navigationRef';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { adThen } from './Ads';
+import { useAdGate } from './Ads';
 
 interface SendListModalProps {
   visible: boolean;
@@ -126,6 +126,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
 
   // Asking for location / showing the ad: a second tap must not send the list twice.
   const preparing = useRef(false);
+  const { adLoading, waitForAd } = useAdGate();
 
   const handleSend = async () => {
     if (!selected || sending || preparing.current) return;
@@ -133,7 +134,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
     try {
       // Location first, then a local business's ad (when one is running), then the order goes.
       if (!(await askForLocation())) return;
-      await adThen();
+      if (!(await waitForAd())) return;
     } finally {
       preparing.current = false;
     }
@@ -378,7 +379,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           placeholder={t('sendList.notePlaceholder')}
           placeholderTextColor={colors.textMuted}
         />
-        <Button label={t('sendList.send', { count: items.length })} onPress={handleSend} loading={sending} />
+        <Button label={t('sendList.send', { count: items.length })} onPress={handleSend} loading={sending || adLoading} />
       </View>
     );
   };

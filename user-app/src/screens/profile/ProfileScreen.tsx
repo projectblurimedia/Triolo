@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import { SmartImage } from '@/components/SmartImage';
 import { WorkerProfileCard } from '@/components/WorkerProfileCard';
 import { BusinessProfileCard } from '@/components/BusinessProfileCard';
@@ -52,140 +54,155 @@ export function ProfileScreen() {
   // `Math.max(insets.bottom, 18) + 66` (bottom margin + bar height); a flat 32 wasn't
   // enough once both capability sections render, so the last card sat under the bar.
   const tabBarClearance = Math.max(insets.bottom, 18) + 66 + 24;
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  // Everything on this tab (profiles, bookings, orders) reloads together.
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await queryClient.refetchQueries({ type: 'active' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
-        {account ? (
-          <LinearGradient colors={HERO_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, HERO_SHADOW]}>
-            {/* Soft light circles give the card depth. */}
-            <View style={[styles.bubble, styles.bubbleLarge]} />
-            <View style={[styles.bubble, styles.bubbleSmall]} />
+      <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
+          {account ? (
+            <LinearGradient colors={HERO_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, HERO_SHADOW]}>
+              {/* Soft light circles give the card depth. */}
+              <View style={[styles.bubble, styles.bubbleLarge]} />
+              <View style={[styles.bubble, styles.bubbleSmall]} />
 
-            <View style={styles.heroTop}>
-              <View style={styles.avatarRing}>
-                {account.profilePhotoUrl ? (
-                  <SmartImage source={{ uri: account.profilePhotoUrl }} style={styles.avatar} />
-                ) : (
-                  <LinearGradient
-                    colors={['#FFFFFF', '#DCE8FF']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.avatar}
-                  >
-                    <Text style={styles.avatarText}>{initial}</Text>
-                  </LinearGradient>
-                )}
-              </View>
-              <View style={styles.heroIdentity}>
-                <Text style={styles.heroName} numberOfLines={1}>
-                  {account.fullName}
-                </Text>
-                {account.status === 'active' ? (
-                  <View style={styles.statusPill}>
-                    <View style={styles.statusDot} />
-                    <Text style={styles.statusText}>{t('profile.activeStatus')}</Text>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-          </LinearGradient>
-        ) : null}
-
-        {account ? (
-          <View style={styles.detailsSection}>
-            <Text style={[styles.detailsTitle, { color: colors.textMuted }]}>{t('profile.detailsTitle')}</Text>
-            <View style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {[
-                { icon: 'phone' as const, label: t('profile.detailPhone'), value: account.mobileNumber },
-                ...(account.email ? [{ icon: 'envelope' as const, label: t('profile.detailEmail'), value: account.email }] : []),
-              ].map((row, index) => (
-                <View
-                  key={row.icon}
-                  style={[
-                    styles.detailRow,
-                    index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null,
-                  ]}
-                >
-                  <View style={[styles.detailIcon, { backgroundColor: `${colors.primary}14` }]}>
-                    <FontAwesome6 name={row.icon} size={13} color={colors.primary} solid />
-                  </View>
-                  <View style={styles.detailText}>
-                    <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{row.label}</Text>
-                    <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
-                      {row.value}
-                    </Text>
-                  </View>
+              <View style={styles.heroTop}>
+                <View style={styles.avatarRing}>
+                  {account.profilePhotoUrl ? (
+                    <SmartImage source={{ uri: account.profilePhotoUrl }} style={styles.avatar} />
+                  ) : (
+                    <LinearGradient
+                      colors={['#FFFFFF', '#DCE8FF']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.avatar}
+                    >
+                      <Text style={styles.avatarText}>{initial}</Text>
+                    </LinearGradient>
+                  )}
                 </View>
-              ))}
+                <View style={styles.heroIdentity}>
+                  <Text style={styles.heroName} numberOfLines={1}>
+                    {account.fullName}
+                  </Text>
+                  {account.status === 'active' ? (
+                    <View style={styles.statusPill}>
+                      <View style={styles.statusDot} />
+                      <Text style={styles.statusText}>{t('profile.activeStatus')}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </LinearGradient>
+          ) : null}
+
+          {account ? (
+            <View style={styles.detailsSection}>
+              <Text style={[styles.detailsTitle, { color: colors.textMuted }]}>{t('profile.detailsTitle')}</Text>
+              <View style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {[
+                  { icon: 'phone' as const, label: t('profile.detailPhone'), value: account.mobileNumber },
+                  ...(account.email
+                    ? [{ icon: 'envelope' as const, label: t('profile.detailEmail'), value: account.email }]
+                    : []),
+                ].map((row, index) => (
+                  <View
+                    key={row.icon}
+                    style={[
+                      styles.detailRow,
+                      index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null,
+                    ]}
+                  >
+                    <View style={[styles.detailIcon, { backgroundColor: `${colors.primary}14` }]}>
+                      <FontAwesome6 name={row.icon} size={13} color={colors.primary} solid />
+                    </View>
+                    <View style={styles.detailText}>
+                      <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{row.label}</Text>
+                      <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
+                        {row.value}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
-        ) : null}
+          ) : null}
 
-        {account ? (
-          <>
-            <ProfileActivity />
-            <ProfileOrders />
-          </>
-        ) : null}
+          {account ? (
+            <>
+              <ProfileActivity />
+              <ProfileOrders />
+            </>
+          ) : null}
 
-        {workerProfile ? (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.workerSection')}</Text>
-            <ProfileStatsRow
-              stats={[
-                {
-                  icon: 'star',
-                  value: workerProfile.ratingAverage != null ? workerProfile.ratingAverage.toFixed(1) : t('workerReviews.new'),
-                  label: t('workerReviews.statRating'),
-                  tint: colors.primary,
-                },
-                {
-                  icon: 'circle-check',
-                  value: String(workerProfile.ratingCount),
-                  label: t('workerReviews.statRatedJobs'),
-                  tint: colors.primary,
-                },
-              ]}
-            />
-            <WorkerProfileCard profile={workerProfile} />
-          </View>
-        ) : null}
-
-        {businessProfile ? (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.businessSection')}</Text>
-            <ProfileStatsRow
-              stats={[
-                {
-                  icon: 'star',
-                  value:
-                    businessProfile.ratingAverage != null ? businessProfile.ratingAverage.toFixed(1) : t('workerReviews.new'),
-                  label: t('workerReviews.statRating'),
-                  tint: colors.primary,
-                },
-                {
-                  icon: 'bag-shopping',
-                  value: String(businessProfile.ratingCount),
-                  label: t('profile.ratedOrders'),
-                  tint: colors.primary,
-                },
-              ]}
-            />
-            <BusinessProfileCard profile={businessProfile} />
-          </View>
-        ) : null}
-
-        {hasNoCapability ? (
-          <View style={[styles.emptyCard, SOFT_SHADOW, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}1A` }]}>
-              <FontAwesome6 name="circle-info" size={18} color={colors.primary} solid />
+          {workerProfile ? (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.workerSection')}</Text>
+              <ProfileStatsRow
+                stats={[
+                  {
+                    icon: 'star',
+                    value: workerProfile.ratingAverage != null ? workerProfile.ratingAverage.toFixed(1) : t('workerReviews.new'),
+                    label: t('workerReviews.statRating'),
+                    tint: colors.primary,
+                  },
+                  {
+                    icon: 'circle-check',
+                    value: String(workerProfile.ratingCount),
+                    label: t('workerReviews.statRatedJobs'),
+                    tint: colors.primary,
+                  },
+                ]}
+              />
+              <WorkerProfileCard profile={workerProfile} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('profile.noCapabilitiesTitle')}</Text>
-            <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('profile.noCapabilitiesMessage')}</Text>
-          </View>
-        ) : null}
-      </ScrollView>
+          ) : null}
+
+          {businessProfile ? (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.businessSection')}</Text>
+              <ProfileStatsRow
+                stats={[
+                  {
+                    icon: 'star',
+                    value:
+                      businessProfile.ratingAverage != null ? businessProfile.ratingAverage.toFixed(1) : t('workerReviews.new'),
+                    label: t('workerReviews.statRating'),
+                    tint: colors.primary,
+                  },
+                  {
+                    icon: 'bag-shopping',
+                    value: String(businessProfile.ratingCount),
+                    label: t('profile.ratedOrders'),
+                    tint: colors.primary,
+                  },
+                ]}
+              />
+              <BusinessProfileCard profile={businessProfile} />
+            </View>
+          ) : null}
+
+          {hasNoCapability ? (
+            <View style={[styles.emptyCard, SOFT_SHADOW, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                <FontAwesome6 name="circle-info" size={18} color={colors.primary} solid />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('profile.noCapabilitiesTitle')}</Text>
+              <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('profile.noCapabilitiesMessage')}</Text>
+            </View>
+          ) : null}
+        </ScrollView>
+      </PullToRefresh>
     </ScreenContainer>
   );
 }

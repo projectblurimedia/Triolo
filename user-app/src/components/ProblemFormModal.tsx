@@ -15,10 +15,8 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { ProblemPost, problemsService } from '@/services/problemsService';
 import { MY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
 import { showToast } from '@/state/toastStore';
-import { ensureLocation } from '@/state/locationStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
-import { askForLocation } from '@/utils/ensureLocationOn';
-import { adThen } from './Ads';
+import { useAdGate } from './Ads';
 
 interface ProblemFormModalProps {
   visible: boolean;
@@ -95,27 +93,25 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
 
   // Asking for location / showing the ad: a second tap must not post twice.
   const preparing = useRef(false);
+  const { adLoading, waitForAd } = useAdGate();
 
   const handleSubmit = async () => {
     if (!canSubmit || submitting || preparing.current) return;
+    // The form's own Location field (current location or a map pin) is where workers come,
+    // so nothing more is asked here.
+    if (!location) {
+      showToast({ variant: 'error', title: t('location.requiredTitle'), message: t('location.requiredMessage') });
+      return;
+    }
     preparing.current = true;
     try {
-      // Location first, before the saving spinner; a new post shows a local business's ad
-      // (when one is running) before it goes out. Edits don't.
-      if (!(await askForLocation())) return;
-      if (!isEditMode) await adThen();
+      // A new post shows a local business's ad (when one is running) before it goes out; the
+      // button shows its spinner while the ad loads. Edits don't.
+      if (!isEditMode && !(await waitForAd())) return;
     } finally {
       preparing.current = false;
     }
     setSubmitting(true);
-
-    // Every task needs location on (the picked point is what workers navigate to).
-    const here = await ensureLocation();
-    if (!here || !location) {
-      showToast({ variant: 'error', title: t('location.requiredTitle'), message: t('location.requiredMessage') });
-      setSubmitting(false);
-      return;
-    }
 
     const fields = {
       skillCategories: selectedSkills,
@@ -272,7 +268,7 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
           <Button
             label={t(isEditMode ? 'common.saveChanges' : 'problemForm.submit')}
             onPress={handleSubmit}
-            loading={submitting}
+            loading={submitting || adLoading}
             disabled={!canSubmit}
           />
         </View>

@@ -18,7 +18,7 @@ import { showToast } from '@/state/toastStore';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { ensureLocation } from '@/state/locationStore';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { adThen } from './Ads';
+import { useAdGate } from './Ads';
 
 interface QuickBookModalProps {
   visible: boolean;
@@ -69,6 +69,7 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
   const [submitting, setSubmitting] = useState(false);
   // Asking for location / showing the ad: a second tap must not start a second booking.
   const preparing = useRef(false);
+  const { adLoading, waitForAd } = useAdGate();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -92,7 +93,8 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
       // Location first — before anything else — so nothing starts that would only stop. Then a
       // local business's ad (when one is running nearby), and only then the search.
       if (!(await askForLocation())) return;
-      await adThen();
+      // The button shows its spinner while the ad loads.
+      if (!(await waitForAd())) return;
     } finally {
       preparing.current = false;
     }
@@ -220,7 +222,7 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
           <Button
             label={t('quickBook.bookNearby')}
             onPress={handleBookNearby}
-            loading={submitting}
+            loading={submitting || adLoading}
             disabled={selectedSkills.length === 0}
           />
         </View>
