@@ -10,7 +10,7 @@ export function dayLabel(day: string): string {
   return `${date} ${months[month - 1]} ${year}`;
 }
 
-const PAYMENT = { cash: 'Cash', upi: 'UPI', other: 'Other', pending: 'Not paid yet' };
+const PAYMENT = { cash: 'Cash', upi: 'UPI', other: 'Other', pending: 'Not paid yet', online: 'Online (Razorpay)' };
 
 // The PDF's built-in fonts have no ₹ sign, so amounts read "Rs. 100".
 const money = (amount: number) => `Rs. ${amount.toLocaleString('en-IN')}`;

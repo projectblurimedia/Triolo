@@ -1,4 +1,5 @@
 import { AdsService, placementOn } from './service';
+import { razorpayService } from '@/common/services/razorpayService';
 import { AdsRepository } from './repository';
 import { Ad, AdSettings, SaveAdParams } from './interfaces';
 import {
@@ -29,6 +30,19 @@ jest.mock('@/common/services/cloudinaryService', () => ({
   isOwnCloudinaryUrl: (url: string, folder: string, kind: string) =>
     url.startsWith(`https://res.cloudinary.com/demo/${kind}/upload/`) && url.includes(`/${folder}/`),
 }));
+
+jest.mock('@/common/services/razorpayService', () => ({
+  razorpayService: {
+    keyId: () => 'rzp_test_key',
+    createOrder: jest.fn().mockResolvedValue({ id: 'order_1', amount: 5000, currency: 'INR', status: 'created' }),
+    orderPayments: jest.fn().mockResolvedValue([]),
+    payment: jest.fn(),
+    capture: jest.fn(),
+    refund: jest.fn().mockResolvedValue({ id: 'rfnd_1' }),
+    signatureValid: jest.fn().mockReturnValue(true),
+  },
+}));
+const razorpay = razorpayService as unknown as Record<string, jest.Mock>;
 
 type MockRepository = { [K in keyof AdsRepository]: jest.Mock };
 
@@ -64,6 +78,12 @@ const AD: Ad = {
   destination: null,
   promoted: null,
   promoteMobile: null,
+  needsPayment: false,
+  razorpayOrderId: null,
+  razorpayPaymentId: null,
+  paidAt: null,
+  refundId: null,
+  refundedAt: null,
   latitude: 16.7,
   longitude: 81.1,
   radiusKm: 5,
@@ -121,6 +141,9 @@ function makeService(promotions?: { accountIdByMobile: jest.Mock; find: jest.Moc
     countOpenOwned: jest.fn().mockResolvedValue(0),
     withdrawOwned: jest.fn(),
     review: jest.fn(),
+    setOrder: jest.fn(),
+    markPaidOnline: jest.fn(),
+    markRefunded: jest.fn(),
   } as unknown as MockRepository;
   return { service: new AdsService(repository as unknown as AdsRepository, promotions), repository };
 }
@@ -502,6 +525,94 @@ describe('AdsService', () => {
       });
       const ad = await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null);
       expect(ad).toMatchObject({ actionType: 'business', promoted: { kind: 'business', id: 'shop-1' }, destination: null });
+    });
+  });
+
+  describe('online payment (Razorpay)', () => {
+    const UNPAID: Ad = {
+      ...AD,
+      ownerAccountId: 'owner-1',
+      reviewStatus: 'pending',
+      status: 'unpaid',
+      paymentMethod: 'pending',
+      amount: 50,
+      endDate: '2999-01-03',
+      needsPayment: true,
+      razorpayOrderId: 'order_1',
+    };
+
+    it('opens a Razorpay order for an unpaid booking, in paise', async () => {
+      const { service, repository } = makeService();
+      repository.findById.mockResolvedValue({ ...UNPAID, razorpayOrderId: null });
+      const order = await service.startPayment('owner-1', 'ad-1');
+      expect(razorpay.createOrder).toHaveBeenCalledWith(5000, 'ad-7', { adId: 'ad-1' });
+      expect(repository.setOrder).toHaveBeenCalledWith('ad-1', 'order_1');
+      expect(order).toMatchObject({ keyId: 'rzp_test_key', orderId: 'order_1', amount: 5000 });
+    });
+
+    it('refuses to take payment for an ad that needs none', async () => {
+      const { service, repository } = makeService();
+      repository.findById.mockResolvedValue({ ...UNPAID, status: 'in_review', paymentMethod: 'online' });
+      await expect(service.startPayment('owner-1', 'ad-1')).rejects.toMatchObject({ code: 'AD_NOT_PAYABLE' });
+    });
+
+    it('rejects a payment whose signature does not check out', async () => {
+      const { service, repository } = makeService();
+      repository.findById.mockResolvedValue(UNPAID);
+      razorpay.signatureValid.mockReturnValueOnce(false);
+      await expect(
+        service.confirmPayment('owner-1', 'ad-1', { razorpayOrderId: 'order_1', razorpayPaymentId: 'pay_1', razorpaySignature: 'x' }),
+      ).rejects.toMatchObject({ code: 'AD_PAYMENT_INVALID' });
+      expect(repository.markPaidOnline).not.toHaveBeenCalled();
+    });
+
+    it('captures an authorized payment of the right amount and records it', async () => {
+      const { service, repository } = makeService();
+      repository.findById.mockResolvedValue(UNPAID);
+      razorpay.payment.mockResolvedValue({ id: 'pay_1', order_id: 'order_1', amount: 5000, currency: 'INR', status: 'authorized' });
+      razorpay.capture.mockResolvedValue({ id: 'pay_1', order_id: 'order_1', amount: 5000, currency: 'INR', status: 'captured' });
+      repository.markPaidOnline.mockResolvedValue({ ...UNPAID, status: 'in_review', paymentMethod: 'online' });
+      const ad = await service.confirmPayment('owner-1', 'ad-1', {
+        razorpayOrderId: 'order_1',
+        razorpayPaymentId: 'pay_1',
+        razorpaySignature: 'sig',
+      });
+      expect(razorpay.capture).toHaveBeenCalledWith('pay_1', 5000);
+      expect(repository.markPaidOnline).toHaveBeenCalledWith('ad-1', 'order_1', 'pay_1');
+      expect(ad.status).toBe('in_review');
+    });
+
+    it('refuses a payment for a different amount', async () => {
+      const { service, repository } = makeService();
+      repository.findById.mockResolvedValue(UNPAID);
+      razorpay.payment.mockResolvedValue({ id: 'pay_1', order_id: 'order_1', amount: 100, currency: 'INR', status: 'captured' });
+      await expect(
+        service.confirmPayment('owner-1', 'ad-1', { razorpayOrderId: 'order_1', razorpayPaymentId: 'pay_1', razorpaySignature: 'sig' }),
+      ).rejects.toMatchObject({ code: 'AD_PAYMENT_INVALID' });
+    });
+
+    it('rejecting an ad paid online refunds it', async () => {
+      const { service, repository } = makeService();
+      const paid = { ...UNPAID, status: 'rejected' as const, reviewStatus: 'rejected' as const, paymentMethod: 'online' as const, razorpayPaymentId: 'pay_1' };
+      repository.review.mockResolvedValue(paid);
+      repository.markRefunded.mockResolvedValue({ ...paid, paymentMethod: 'pending', refundId: 'rfnd_1' });
+      const ad = await service.review('ad-1', 'reject', 'Blurry picture');
+      expect(razorpay.refund).toHaveBeenCalledWith('pay_1', 5000, { adId: 'ad-1', reason: 'rejected' });
+      expect(ad.refundId).toBe('rfnd_1');
+    });
+
+    it('an unpaid booking cannot be approved', async () => {
+      const { service, repository } = makeService();
+      repository.review.mockResolvedValue(null);
+      repository.findById.mockResolvedValue(UNPAID);
+      await expect(service.review('ad-1', 'approve')).rejects.toMatchObject({ code: 'AD_NOT_PAID' });
+    });
+
+    it('a paid booking keeps its plan', async () => {
+      const { service, repository } = makeService();
+      repository.findById.mockResolvedValue({ ...UNPAID, status: 'in_review', paymentMethod: 'online', planDays: 3 });
+      const params = { ...PARAMS, startDate: '2999-01-01', planDays: 7 } as Omit<SaveAdParams, 'paymentMethod'>;
+      await expect(service.updateOwned('owner-1', 'ad-1', params, {})).rejects.toMatchObject({ code: 'AD_PAID_PLAN_LOCKED' });
     });
   });
 });

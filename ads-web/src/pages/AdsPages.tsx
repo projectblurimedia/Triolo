@@ -21,6 +21,8 @@ import {
   faWallet,
   faXmark,
   faIdBadge,
+  faLock,
+  faShieldHalved,
 } from '@fortawesome/free-solid-svg-icons';
 import { Topbar } from '@/components/Layout';
 import {
@@ -53,8 +55,10 @@ import { getErrorMessage } from '@/services/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { useAuthStore } from '@/state/authStore';
 import { rupees, timeAgo, Tone } from '@/utils/format';
+import { payForAd } from '@/utils/razorpayCheckout';
 
 const STATUS: Record<AdStatus, { label: string; tone: Tone; help: string }> = {
+  unpaid: { label: 'Waiting for payment', tone: 'warning', help: 'Pay for it to send it to Triolo for review.' },
   in_review: { label: 'In review', tone: 'warning', help: 'Triolo is checking your ad. It is not shown yet.' },
   rejected: { label: 'Not approved', tone: 'error', help: 'Change it as asked and send it again.' },
   scheduled: { label: 'Approved · starts soon', tone: 'info', help: 'Approved — it starts showing on its start date.' },
@@ -78,7 +82,24 @@ function dayLabel(date: string): string {
   return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const editable = (ad: Ad) => ad.status === 'in_review' || ad.status === 'rejected';
+const editable = (ad: Ad) => ad.status === 'unpaid' || ad.status === 'in_review' || ad.status === 'rejected';
+
+/** Pays for an ad with Razorpay and says how it went; returns the updated ad (or null if not paid). */
+async function payWithToast(ad: Ad): Promise<Ad | null> {
+  const account = useAuthStore.getState().account;
+  try {
+    const paid = await payForAd(ad, { name: account?.fullName, contact: account?.mobileNumber });
+    if (!paid) {
+      showToast({ variant: 'info', title: 'Not paid yet', message: 'Your ad is saved — pay any time from its page.' });
+      return null;
+    }
+    showToast({ variant: 'success', title: 'Payment received', message: 'Your ad is sent for review — usually within a day.' });
+    return paid;
+  } catch (err) {
+    showToast({ variant: 'error', title: 'Payment not completed', message: err instanceof Error && !(err as { statusCode?: number }).statusCode ? err.message : getErrorMessage(err) });
+    return null;
+  }
+}
 
 function AdThumb({ ad }: { ad: Ad }) {
   return (
@@ -230,11 +251,11 @@ export function HowItWorksPage() {
       </div>
       <div className="glass card">
         <div className="card-title">
-          <FontAwesomeIcon icon={faWallet} /> Payment <span className="soon-tag">Coming soon</span>
+          <FontAwesomeIcon icon={faWallet} /> Payment
         </div>
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          Paying online here is coming soon. For now, send your ad for review — once it's approved, Triolo contacts you on your
-          mobile number to take the payment by cash or UPI.
+          You pay online right after booking — UPI, debit / credit card or net banking, through Razorpay. Then Triolo reviews
+          your ad. If it isn't approved, or you withdraw it before approval, your money is refunded in full.
         </p>
       </div>
     </>
@@ -292,6 +313,7 @@ function AdForm({ ad }: { ad?: Ad }) {
   // A picture shows for 15 seconds (a video for its own length); not asked any more.
   const displaySeconds = ad?.displaySeconds ?? 15;
   const [planDays, setPlanDays] = useState<AdPlanDays>(ad?.planDays ?? 7);
+  const paidOnline = ad?.paymentMethod === 'online';
   // A business can't start in the past; tomorrow by default, so there's time for the review.
   const [startDate, setStartDate] = useState(ad && ad.startDate >= todayInIndia() ? ad.startDate : addDays(todayInIndia(), 1));
   const [media, setMedia] = useState<MediaPick | null>(() =>
@@ -393,7 +415,11 @@ function AdForm({ ad }: { ad?: Ad }) {
         ...mediaBody,
       };
       const saved = ad ? await adsApi.update(ad.id, body) : await adsApi.create(body);
-      showToast({ variant: 'success', title: 'Sent for review', message: 'Triolo checks your ad — usually within a day.' });
+      if (saved.status === 'unpaid') {
+        await payWithToast(saved);
+      } else {
+        showToast({ variant: 'success', title: 'Sent for review', message: 'Triolo checks your ad — usually within a day.' });
+      }
       navigate(`/ads/${saved.id}`, { replace: true });
     } catch (err) {
       setError(err instanceof Error && !(err as { statusCode?: number }).statusCode ? err.message : getErrorMessage(err));
@@ -505,6 +531,8 @@ function AdForm({ ad }: { ad?: Ad }) {
                 type="button"
                 className={`ad-plan${planDays === plan.days ? ' active' : ''}`}
                 onClick={() => setPlanDays(plan.days)}
+                // A paid booking keeps its plan (its price is paid).
+                disabled={paidOnline && plan.days !== planDays}
               >
                 <strong>{plan.label}</strong>
                 <span>{info.data ? rupees(info.data.prices[String(plan.days) as keyof typeof info.data.prices]) : '…'}</span>
@@ -518,14 +546,19 @@ function AdForm({ ad }: { ad?: Ad }) {
         </label>
 
         <div className="pay-soon">
-          <FontAwesomeIcon icon={faWallet} style={{ marginTop: 3, color: 'var(--primary)' }} />
-          <div>
-            <strong>
-              Payment <span className="soon-tag">Coming soon</span>
-            </strong>
-            Online payment is coming soon. Send your ad for review now — once it's approved, Triolo contacts you to take the
-            payment by cash or UPI.
-          </div>
+          <FontAwesomeIcon icon={paidOnline ? faCircleCheck : faShieldHalved} style={{ marginTop: 3, color: 'var(--primary)' }} />
+          {paidOnline ? (
+            <div>
+              <strong>Paid</strong>
+              Already paid online — saving sends the changes for review. The plan stays the same.
+            </div>
+          ) : (
+            <div>
+              <strong>Pay securely online</strong>
+              Right after booking: UPI, card or net banking through Razorpay. If your ad isn't approved, or you withdraw it before
+              approval, you get a full refund.
+            </div>
+          )}
         </div>
 
         {uploadStatus ? (
@@ -552,7 +585,15 @@ function AdForm({ ad }: { ad?: Ad }) {
             <div className="ad-total-amount">{price === undefined ? '…' : rupees(price)}</div>
           </div>
           <button className="btn btn-primary" type="submit" disabled={saving}>
-            {saving ? <Spinner small /> : ad ? 'Send Changes for Review' : 'Send for Review'}
+            {saving ? (
+              <Spinner small />
+            ) : paidOnline ? (
+              'Send Changes for Review'
+            ) : (
+              <>
+                <FontAwesomeIcon icon={faLock} /> {ad ? 'Save & Pay' : 'Book & Pay'} {price === undefined ? '' : rupees(price)}
+              </>
+            )}
           </button>
         </div>
         {error ? (
@@ -611,6 +652,8 @@ export function AdDetailPage() {
   const navigate = useNavigate();
   const { data: ad, error, loading, reload, setData } = useApi(() => adsApi.get(id), [id]);
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   if (loading) return <Loading />;
   if (error || !ad) {
@@ -649,6 +692,60 @@ export function AdDetailPage() {
           {status.help}
         </Notice>
       </div>
+
+      {ad.status === 'unpaid' ? (
+        <div className="glass card pay-card">
+          <div className="pay-card-text">
+            <span className="pay-card-icon">
+              <FontAwesomeIcon icon={faShieldHalved} />
+            </span>
+            <div>
+              <div className="pay-card-amount">{rupees(ad.amount)}</div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                Pay to send your ad for review · UPI, card or net banking · full refund if it isn't approved
+              </div>
+            </div>
+          </div>
+          <div className="pay-card-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={paying}
+              onClick={async () => {
+                setPaying(true);
+                const paid = await payWithToast(ad);
+                if (paid) setData(paid);
+                setPaying(false);
+              }}
+            >
+              {paying ? <Spinner small /> : <><FontAwesomeIcon icon={faLock} /> Pay {rupees(ad.amount)}</>}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={checking}
+              onClick={async () => {
+                setChecking(true);
+                try {
+                  const checked = await adsApi.checkPayment(ad.id);
+                  setData(checked);
+                  showToast(
+                    checked.status === 'unpaid'
+                      ? { variant: 'info', title: 'No payment found yet', message: 'If money was taken, it shows here within a few minutes.' }
+                      : { variant: 'success', title: 'Payment received', message: 'Your ad is sent for review.' },
+                  );
+                } catch (err) {
+                  showToast({ variant: 'error', title: 'Could not check', message: getErrorMessage(err) });
+                } finally {
+                  setChecking(false);
+                }
+              }}
+            >
+              {checking ? <Spinner small /> : 'Already paid? Check'}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid-2">
         <div className="glass card">
@@ -712,7 +809,14 @@ export function AdDetailPage() {
                 {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
               </InfoRow>
               <InfoRow icon={faWallet} label="Price">
-                {rupees(ad.amount)} · {ad.paymentMethod === 'pending' ? 'not paid yet (online payment coming soon)' : 'paid'}
+                {rupees(ad.amount)} ·{' '}
+                {ad.paymentMethod === 'online'
+                  ? 'paid online'
+                  : ad.paymentMethod === 'pending'
+                    ? ad.refundId
+                      ? 'refunded'
+                      : 'not paid yet'
+                    : 'paid'}
               </InfoRow>
             </div>
           </div>
@@ -761,7 +865,11 @@ export function AdDetailPage() {
         icon={faRotateLeft}
         tone="danger"
         title="Withdraw this ad?"
-        message="It won't be reviewed or shown. Its picture or video is deleted."
+        message={
+          ad.paymentMethod === 'online'
+            ? `It won't be reviewed or shown, and its picture or video is deleted. Your ${rupees(ad.amount)} is refunded to how you paid (usually 5–7 days).`
+            : "It won't be reviewed or shown. Its picture or video is deleted."
+        }
         confirmLabel="Withdraw"
         onConfirm={async () => {
           try {

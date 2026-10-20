@@ -17,8 +17,8 @@ export const AD_MEDIA_FOLDER = 'triolo/ads';
 
 export const AD_PAYMENT_METHODS = ['cash', 'upi', 'other'] as const;
 export type AdPaymentMethod = (typeof AD_PAYMENT_METHODS)[number];
-/** A self-booked ad before payment is recorded (online payment isn't built yet). */
-export type AdPaymentState = AdPaymentMethod | 'pending';
+/** 'pending' = not paid yet; 'online' = paid through Razorpay on the Triolo Ads website. */
+export type AdPaymentState = AdPaymentMethod | 'pending' | 'online';
 
 /** How many ads one business may have waiting for review (or rejected) at a time. */
 export const AD_SELF_OPEN_LIMIT = 5;
@@ -105,7 +105,8 @@ export interface PromotionResolver {
   card(kind: AdPromotedKind, id: string): Promise<AdPromotedCard | null>;
 }
 
-export type AdStatus = 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
+/** unpaid: booked on the Triolo Ads website, waiting for its online payment (then in_review). */
+export type AdStatus = 'unpaid' | 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
 
 export interface AdSettings {
   adsEnabled: boolean;
@@ -170,6 +171,14 @@ export interface Ad extends PublicAd {
   reviewedAt: string | null;
   /** The phone number the admin used to find the promoted profile (refills the form). */
   promoteMobile: string | null;
+  /** Booked on the Triolo Ads website after online payment began: must be paid before review. */
+  needsPayment: boolean;
+  razorpayOrderId: string | null;
+  razorpayPaymentId: string | null;
+  paidAt: string | null;
+  /** The Razorpay refund of a rejected / withdrawn online payment. */
+  refundId: string | null;
+  refundedAt: string | null;
   impressions: number;
   clicks: number;
   status: AdStatus;

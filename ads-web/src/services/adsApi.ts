@@ -1,7 +1,7 @@
 import { apiClient } from './apiClient';
 
 /** in_review = waiting for Triolo to check it; only approved ads are shown in the apps. */
-export type AdStatus = 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
+export type AdStatus = 'unpaid' | 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
 export type AdPlanDays = 1 | 3 | 7 | 30;
 export type AdOrientation = 'vertical' | 'horizontal';
 export type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
@@ -35,7 +35,13 @@ export interface Ad {
   radiusKm: number;
   planDays: AdPlanDays;
   amount: number;
-  paymentMethod: 'cash' | 'upi' | 'other' | 'pending';
+  /** 'online' = paid here through Razorpay. */
+  paymentMethod: 'cash' | 'upi' | 'other' | 'pending' | 'online';
+  razorpayPaymentId: string | null;
+  paidAt: string | null;
+  /** A rejected / withdrawn online payment's refund. */
+  refundId: string | null;
+  refundedAt: string | null;
   startDate: string;
   endDate: string;
   reviewStatus: 'pending' | 'approved' | 'rejected';
@@ -97,6 +103,17 @@ export const adsApi = {
   update: (id: string, body: SaveOwnAd) => apiClient.put<Ad>(`/ads/self/${id}`, body, true),
   /** Takes back an ad that wasn't approved. */
   withdraw: (id: string) => apiClient.delete<Ad>(`/ads/self/${id}`, true),
+  /** Opens a Razorpay order for an unpaid booking. */
+  startPayment: (id: string) =>
+    apiClient.post<{ keyId: string; orderId: string; amount: number; currency: string; description: string }>(
+      `/ads/self/${id}/pay`,
+      {},
+      true,
+    ),
+  confirmPayment: (id: string, body: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }) =>
+    apiClient.post<Ad>(`/ads/self/${id}/pay/confirm`, body, true),
+  /** Asks Razorpay whether the ad's payment went through (e.g. the page closed mid-payment). */
+  checkPayment: (id: string) => apiClient.post<Ad>(`/ads/self/${id}/pay/check`, {}, true),
 };
 
 interface SignedUpload {

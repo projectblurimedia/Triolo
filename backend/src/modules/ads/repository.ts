@@ -28,6 +28,7 @@ const TODAY = `(now() AT TIME ZONE 'Asia/Kolkata')::date`;
 
 const STATUS_SQL = `CASE
   WHEN a.deleted_at IS NOT NULL THEN 'deleted'
+  WHEN a.review_status = 'pending' AND a.needs_payment AND a.payment_method = 'pending' THEN 'unpaid'
   WHEN a.review_status = 'pending' THEN 'in_review'
   WHEN a.review_status = 'rejected' THEN 'rejected'
   WHEN ${TODAY} < a.start_date THEN 'scheduled'
@@ -71,6 +72,12 @@ function mapAd(row: any): Ad {
         ? { kind: row.action_type, id: row.promoted_id, name: row.promoted_name ?? '' }
         : null,
     promoteMobile: row.promote_mobile ?? null,
+    needsPayment: !!row.needs_payment,
+    razorpayOrderId: row.razorpay_order_id ?? null,
+    razorpayPaymentId: row.razorpay_payment_id ?? null,
+    paidAt: row.paid_at ? new Date(row.paid_at).toISOString() : null,
+    refundId: row.refund_id ?? null,
+    refundedAt: row.refunded_at ? new Date(row.refunded_at).toISOString() : null,
     orientation: row.orientation,
     displaySeconds: Number(row.display_seconds),
     videoSeconds: row.video_seconds == null ? null : Number(row.video_seconds),
@@ -161,9 +168,9 @@ export class AdsRepository {
       `WITH inserted AS (
          INSERT INTO ads (advertiser_name, advertiser_phone, title, description, latitude, longitude, location_text,
                           plan_days, amount, payment_method, start_date, end_date, link_url, orientation, display_seconds,
-                          owner_account_id, review_status, action_type, action_latitude, action_longitude, action_place, promoted_id, promoted_name, promote_mobile)
+                          owner_account_id, review_status, needs_payment, action_type, action_latitude, action_longitude, action_place, promoted_id, promoted_name, promote_mobile)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $11::date + ($8::int - 1), $12, $13, $14,
-                 $15, CASE WHEN $15::uuid IS NULL THEN 'approved' ELSE 'pending' END, $16, $17, $18, $19, $20, $21, $22)
+                 $15, CASE WHEN $15::uuid IS NULL THEN 'approved' ELSE 'pending' END, $15::uuid IS NOT NULL, $16, $17, $18, $19, $20, $21, $22)
          RETURNING *
        )
        SELECT ${AD_COLUMNS} FROM inserted a`,
@@ -268,11 +275,45 @@ export class AdsRepository {
       `WITH reviewed AS (
          UPDATE ads SET review_status = $2, review_note = $3, reviewed_at = now(), updated_at = now()
          WHERE id = $1 AND deleted_at IS NULL AND review_status = 'pending'
-           AND ($2 = 'rejected' OR end_date >= ${TODAY})
+           AND ($2 = 'rejected' OR (end_date >= ${TODAY} AND NOT (needs_payment AND payment_method = 'pending')))
          RETURNING *
        )
        SELECT ${AD_COLUMNS} FROM reviewed a`,
       [id, decision === 'approve' ? 'approved' : 'rejected', note],
+    );
+    return result.rows[0] ? mapAd(result.rows[0]) : null;
+  }
+
+  /** Remembers the Razorpay order a payment for this ad is being made against. */
+  async setOrder(id: string, orderId: string): Promise<void> {
+    await this.pool.query(`UPDATE ads SET razorpay_order_id = $2, updated_at = now() WHERE id = $1`, [id, orderId]);
+  }
+
+  /** Records the online payment; null when the ad was already paid (or isn't waiting for it). */
+  async markPaidOnline(id: string, orderId: string, paymentId: string): Promise<Ad | null> {
+    const result = await this.pool.query(
+      `WITH paid AS (
+         UPDATE ads SET payment_method = 'online', razorpay_payment_id = $3, paid_at = now(), updated_at = now()
+         WHERE id = $1 AND razorpay_order_id = $2 AND payment_method = 'pending' AND deleted_at IS NULL
+         RETURNING *
+       )
+       SELECT ${AD_COLUMNS} FROM paid a`,
+      [id, orderId, paymentId],
+    );
+    return result.rows[0] ? mapAd(result.rows[0]) : null;
+  }
+
+  /** The online payment was refunded: the ad is unpaid again (a resubmission pays anew). */
+  async markRefunded(id: string, refundId: string): Promise<Ad | null> {
+    const result = await this.pool.query(
+      `WITH refunded AS (
+         UPDATE ads SET payment_method = 'pending', refund_id = $2, refunded_at = now(),
+           razorpay_payment_id = NULL, razorpay_order_id = NULL, paid_at = NULL, updated_at = now()
+         WHERE id = $1 AND payment_method = 'online'
+         RETURNING *
+       )
+       SELECT ${AD_COLUMNS} FROM refunded a`,
+      [id, refundId],
     );
     return result.rows[0] ? mapAd(result.rows[0]) : null;
   }
@@ -282,7 +323,8 @@ export class AdsRepository {
     const result = await this.pool.query(
       `WITH updated AS (
          UPDATE ads SET advertiser_name = $2, advertiser_phone = $3, title = $4, description = $5,
-           latitude = $6, longitude = $7, location_text = $8, plan_days = $9, amount = $10, payment_method = $11,
+           latitude = $6, longitude = $7, location_text = $8, plan_days = $9, amount = $10,
+           payment_method = CASE WHEN payment_method = 'online' THEN 'online' ELSE $11 END,
            start_date = $12::date, end_date = $12::date + ($9::int - 1), link_url = $13, orientation = $14, display_seconds = $15, ${actionSets(16)}, updated_at = now()
          WHERE id = $1 AND deleted_at IS NULL
          RETURNING *
@@ -405,6 +447,7 @@ export class AdsRepository {
     const result = await this.pool.query(
       // Revenue counts only approved ads whose payment was recorded.
       `SELECT
+         count(*) FILTER (WHERE status = 'unpaid')::int AS unpaid,
          count(*) FILTER (WHERE status = 'in_review')::int AS in_review,
          count(*) FILTER (WHERE status = 'rejected')::int AS rejected,
          count(*) FILTER (WHERE status = 'running')::int AS running,
@@ -422,6 +465,7 @@ export class AdsRepository {
     const row = result.rows[0];
     return {
       counts: {
+        unpaid: row.unpaid,
         in_review: row.in_review,
         rejected: row.rejected,
         running: row.running,

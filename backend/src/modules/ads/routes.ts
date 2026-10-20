@@ -26,6 +26,7 @@ import {
   reviewAdSchema,
   selfAdSchema,
   adSettingsSchema,
+  confirmPaymentSchema,
   saveAdSchema,
   serveQuerySchema,
   uploadSignatureSchema,
@@ -133,6 +134,28 @@ adsRouter.delete(
   asyncHandler(async (req: Request, res: Response) =>
     ok(res, await service.withdrawOwned(requireAccountId(req), req.params.id), 'Ad withdrawn'),
   ),
+);
+
+// Online payment for a business's own booking (Razorpay checkout on the Triolo Ads website).
+adsRouter.post(
+  '/self/:id/pay',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.startPayment(requireAccountId(req), req.params.id))),
+);
+
+adsRouter.post(
+  '/self/:id/pay/confirm',
+  authenticate,
+  validateBody(confirmPaymentSchema),
+  asyncHandler(async (req: Request, res: Response) =>
+    ok(res, await service.confirmPayment(requireAccountId(req), req.params.id, req.body), 'Payment received'),
+  ),
+);
+
+adsRouter.post(
+  '/self/:id/pay/check',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.checkPayment(requireAccountId(req), req.params.id))),
 );
 
 adsRouter.post(

@@ -2,9 +2,10 @@ import { apiClient } from './apiClient';
 import type { Page } from './adminApi';
 
 /** in_review / rejected: booked by a business on the Triolo Ads website, not approved (yet). */
-export type AdStatus = 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
+export type AdStatus = 'unpaid' | 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
 /** 'pending' = not paid yet (a business's own booking, until you record how it was paid). */
-export type AdPaymentMethod = 'cash' | 'upi' | 'other' | 'pending';
+/** 'online' = paid by the business through Razorpay on the Triolo Ads website. */
+export type AdPaymentMethod = 'cash' | 'upi' | 'other' | 'pending' | 'online';
 export type AdPlanDays = 1 | 3 | 7 | 30;
 export type AdOrientation = 'vertical' | 'horizontal';
 export type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
@@ -62,6 +63,11 @@ export interface Ad {
   planDays: AdPlanDays;
   amount: number;
   paymentMethod: AdPaymentMethod;
+  razorpayPaymentId?: string | null;
+  paidAt?: string | null;
+  /** The Razorpay refund of a rejected / withdrawn online payment. */
+  refundId?: string | null;
+  refundedAt?: string | null;
   /** YYYY-MM-DD, India date. */
   startDate: string;
   endDate: string;

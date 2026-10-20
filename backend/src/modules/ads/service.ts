@@ -12,6 +12,7 @@ import {
   SignedUpload,
 } from '@/common/services/cloudinaryService';
 import { logger } from '@/common/utils/logger';
+import { razorpayService } from '@/common/services/razorpayService';
 import { AdsRepository, StoredAdParams } from './repository';
 import {
   Ad,
@@ -270,6 +271,9 @@ export class AdsService {
   ): Promise<Ad> {
     assertStartsTodayOrLater(params.startDate);
     const existing = await this.getOwned(accountId, id);
+    if (existing.paymentMethod === 'online' && existing.planDays !== params.planDays) {
+      throw AppError.conflict('It is already paid for — the plan can no longer change.', 'AD_PAID_PLAN_LOCKED');
+    }
     const { prices } = await this.repository.getSettings();
     const amount = existing.planDays === params.planDays ? existing.amount : prices[String(params.planDays) as keyof typeof prices];
     const stored = await this.stored({ ...params, paymentMethod: 'pending' as never }, accountId);
@@ -282,12 +286,78 @@ export class AdsService {
     return ad;
   }
 
-  /** The business takes back an ad that wasn't approved; its media is deleted. */
+  /** The business takes back an ad that wasn't approved; its media is deleted and an online payment refunded. */
   async withdrawOwned(accountId: string, id: string): Promise<Ad> {
-    const ad = await this.repository.withdrawOwned(id, accountId);
+    let ad = await this.repository.withdrawOwned(id, accountId);
     if (!ad) throw AppError.conflict('Only an ad that is waiting for review or was rejected can be withdrawn.', 'AD_NOT_EDITABLE');
+    ad = await this.refundIfPaidOnline(ad, 'withdrawn');
     await this.deleteMedia(ad.id, ad.imageUrls, ad.videoUrl);
     return { ...ad, imageUrl: null, imageUrls: [], videoUrl: null };
+  }
+
+  // --- Online payment (Razorpay), right after a business books ---
+
+  /** Opens a Razorpay order for an unpaid booking; the website then shows Razorpay's checkout. */
+  async startPayment(accountId: string, id: string) {
+    const ad = await this.getOwned(accountId, id);
+    if (ad.status !== 'unpaid') throw AppError.conflict('This ad does not need paying.', 'AD_NOT_PAYABLE');
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    if (ad.endDate < today) throw AppError.conflict('Its dates have passed — change them, then pay.', 'AD_DATES_PASSED');
+    const order = await razorpayService.createOrder(ad.amount * 100, `ad-${ad.billNumber}`, { adId: ad.id });
+    await this.repository.setOrder(ad.id, order.id);
+    return {
+      keyId: razorpayService.keyId(),
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      description: `${ad.planDays === 30 ? '1 month' : ad.planDays === 7 ? '1 week' : `${ad.planDays} day${ad.planDays === 1 ? '' : 's'}`} ad · bill ${ad.billNumber}`,
+    };
+  }
+
+  /** Checkout's success: the signature proves it came from Razorpay, then the payment is checked and recorded. */
+  async confirmPayment(accountId: string, id: string, body: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }): Promise<Ad> {
+    const ad = await this.getOwned(accountId, id);
+    if (ad.status !== 'unpaid') return ad;
+    if (!ad.razorpayOrderId || body.razorpayOrderId !== ad.razorpayOrderId) {
+      throw AppError.badRequest('This payment is not for this ad.', 'AD_PAYMENT_INVALID');
+    }
+    if (!razorpayService.signatureValid(body.razorpayOrderId, body.razorpayPaymentId, body.razorpaySignature)) {
+      throw AppError.badRequest('The payment could not be verified.', 'AD_PAYMENT_INVALID');
+    }
+    return this.settlePayment(ad, body.razorpayPaymentId);
+  }
+
+  /** "I've paid": asks Razorpay about the ad's order (e.g. the page was closed before checkout finished). */
+  async checkPayment(accountId: string, id: string): Promise<Ad> {
+    const ad = await this.getOwned(accountId, id);
+    if (ad.status !== 'unpaid' || !ad.razorpayOrderId) return ad;
+    const payments = await razorpayService.orderPayments(ad.razorpayOrderId);
+    const done = payments.find((payment) => payment.status === 'captured') ?? payments.find((payment) => payment.status === 'authorized');
+    return done ? this.settlePayment(ad, done.id) : ad;
+  }
+
+  /** Confirms with Razorpay that the payment is this ad's, for its full amount, and taken; then records it. */
+  private async settlePayment(ad: Ad, paymentId: string): Promise<Ad> {
+    let payment = await razorpayService.payment(paymentId);
+    if (payment.order_id !== ad.razorpayOrderId || payment.amount !== ad.amount * 100 || payment.currency !== 'INR') {
+      throw AppError.badRequest('This payment is not for this ad.', 'AD_PAYMENT_INVALID');
+    }
+    if (payment.status === 'authorized') payment = await razorpayService.capture(payment.id, payment.amount);
+    if (payment.status !== 'captured') throw AppError.conflict('The payment has not gone through yet.', 'AD_PAYMENT_NOT_DONE');
+    const paid = await this.repository.markPaidOnline(ad.id, ad.razorpayOrderId as string, payment.id);
+    return paid ?? (await this.repository.findById(ad.id)) ?? ad;
+  }
+
+  /** Gives back an online payment (rejected or withdrawn ad). A failed refund is logged; the ad still shows it as paid. */
+  private async refundIfPaidOnline(ad: Ad, reason: 'rejected' | 'withdrawn'): Promise<Ad> {
+    if (ad.paymentMethod !== 'online' || !ad.razorpayPaymentId) return ad;
+    try {
+      const refund = await razorpayService.refund(ad.razorpayPaymentId, ad.amount * 100, { adId: ad.id, reason });
+      return (await this.repository.markRefunded(ad.id, refund.id)) ?? ad;
+    } catch (err) {
+      logger.error({ err, adId: ad.id }, 'Ad refund failed — refund it from the Razorpay dashboard');
+      return ad;
+    }
   }
 
   // --- Admin ---
@@ -298,12 +368,16 @@ export class AdsService {
     if (!ad) {
       const existing = await this.repository.findById(id);
       if (!existing) throw AppError.notFound('Ad not found.', 'AD_NOT_FOUND');
+      if (existing.status === 'unpaid' && decision === 'approve') {
+        throw AppError.conflict('Not paid yet — wait for the payment, or record a cash / UPI payment with Edit.', 'AD_NOT_PAID');
+      }
       if (existing.reviewStatus === 'pending' && decision === 'approve') {
         throw AppError.conflict('Its dates have already passed — change them before approving.', 'AD_DATES_PASSED');
       }
       throw AppError.conflict('This ad is not waiting for review.', 'AD_NOT_IN_REVIEW');
     }
-    return ad;
+    // A rejected ad that was paid online gets its money back.
+    return decision === 'reject' ? this.refundIfPaidOnline(ad, 'rejected') : ad;
   }
 
   getSettings(): Promise<AdSettings> {

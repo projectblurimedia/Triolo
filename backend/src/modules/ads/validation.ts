@@ -115,12 +115,19 @@ export const reviewAdSchema = z
 
 export const adListQuerySchema = z.object({
   status: z
-    .enum(['in_review', 'rejected', 'scheduled', 'running', 'ended', 'deleted'])
+    .enum(['unpaid', 'in_review', 'rejected', 'scheduled', 'running', 'ended', 'deleted'])
     .optional()
     .or(z.literal('').transform(() => undefined)),
   q: z.string().trim().max(60).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+/** What Razorpay checkout hands back after a payment. */
+export const confirmPaymentSchema = z.object({
+  razorpayOrderId: z.string().min(1).max(64),
+  razorpayPaymentId: z.string().min(1).max(64),
+  razorpaySignature: z.string().min(1).max(256),
 });
 
 export const uploadSignatureSchema = z.object({ kind: z.enum(['image', 'video']) });

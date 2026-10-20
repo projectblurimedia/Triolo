@@ -2931,3 +2931,52 @@ a.row:hover {
   padding: 0 16px;
   text-align: center;
 }
+
+/* Pay for a booked ad (Razorpay). */
+.pay-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  border: 1px solid rgba(0, 85, 211, 0.3);
+}
+
+.pay-card-text {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.pay-card-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #fff;
+  font-size: 18px;
+  background: var(--gradient);
+}
+
+.pay-card-amount {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.pay-card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .pay-card-actions,
+  .pay-card-actions .btn {
+    width: 100%;
+  }
+}

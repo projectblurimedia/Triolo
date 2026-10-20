@@ -76,6 +76,7 @@ interface MediaItem {
 }
 
 const STATUS: Record<AdStatus, { label: string; tone: Tone }> = {
+  unpaid: { label: 'Waiting for payment', tone: 'muted' },
   in_review: { label: 'Waiting for review', tone: 'warning' },
   rejected: { label: 'Rejected', tone: 'error' },
   running: { label: 'Running', tone: 'success' },
@@ -84,7 +85,13 @@ const STATUS: Record<AdStatus, { label: string; tone: Tone }> = {
   deleted: { label: 'Deleted', tone: 'error' },
 };
 
-const PAYMENT_LABEL: Record<AdPaymentMethod, string> = { cash: 'Cash', upi: 'UPI', other: 'Other', pending: 'Not paid yet' };
+const PAYMENT_LABEL: Record<AdPaymentMethod, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  other: 'Other',
+  pending: 'Not paid yet',
+  online: 'Online (Razorpay)',
+};
 
 const LIMIT = 20;
 
@@ -365,6 +372,7 @@ export function AdsPage() {
           options={[
             { value: '', label: 'All' },
             { value: 'in_review', label: 'Waiting for review', count: counts?.in_review },
+            { value: 'unpaid', label: 'Waiting for payment', count: counts?.unpaid },
             { value: 'running', label: 'Running', count: counts?.running },
             { value: 'scheduled', label: 'Scheduled', count: counts?.scheduled },
             { value: 'ended', label: 'Ended' },
@@ -771,6 +779,12 @@ function AdForm({ ad }: { ad?: Ad }) {
         </label>
         <div className="field">
           <span>Paid by</span>
+          {form.paymentMethod === 'online' ? (
+            <div className="muted" style={{ fontSize: 14 }}>
+              <FontAwesomeIcon icon={faCircleCheck} style={{ color: 'var(--success)' }} /> Paid online (Razorpay)
+              {ad?.razorpayPaymentId ? ` · ${ad.razorpayPaymentId}` : ''}
+            </div>
+          ) : (
           <div className="chips">
             {(['cash', 'upi', 'other', 'pending'] as AdPaymentMethod[]).map((method) => (
               <button
@@ -783,6 +797,7 @@ function AdForm({ ad }: { ad?: Ad }) {
               </button>
             ))}
           </div>
+          )}
         </div>
         {media?.file && mediaStatus ? (
           <div className={`ad-upload ad-upload-above ad-upload-${mediaStatus.state}`}>
@@ -901,6 +916,15 @@ export function AdDetailPage() {
       />
       <BackLink to="/ads" label="All ads" />
 
+      {ad.status === 'unpaid' ? (
+        <div style={{ marginBottom: 16 }}>
+          <Notice tone="info" icon={faReceipt}>
+            Waiting for {ad.advertiserName} to pay {rupees(ad.amount)} online. It comes to your review once paid. Paid you in cash
+            / UPI instead? Edit it and set <strong>Paid by</strong>.
+          </Notice>
+        </div>
+      ) : null}
+
       {ad.status === 'in_review' ? (
         <div className="glass card review-card">
           <div className="card-title">
@@ -908,8 +932,12 @@ export function AdDetailPage() {
           </div>
           <p className="muted" style={{ margin: '0 0 12px', fontSize: 14 }}>
             {ad.advertiserName} booked this on the Triolo Ads website. It is not shown in the apps until you approve it — then it
-            runs {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}. Payment: not paid yet (online payment is coming soon; record
-            cash / UPI with Edit).
+            runs {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}. Payment:{' '}
+            {ad.paymentMethod === 'online'
+              ? `${rupees(ad.amount)} paid online — rejecting refunds it automatically.`
+              : ad.paymentMethod === 'pending'
+                ? 'not paid (booked before online payment; record cash / UPI with Edit).'
+                : `${rupees(ad.amount)} by ${PAYMENT_LABEL[ad.paymentMethod]}.`}
           </p>
           {rejecting ? (
             <label className="field">
@@ -1069,6 +1097,8 @@ export function AdDetailPage() {
                   ? `${rupees(ad.amount)} · not paid yet`
                   : `${rupees(ad.amount)} by ${PAYMENT_LABEL[ad.paymentMethod]}`}{' '}
                 · bill {billNumber(ad)}
+                {ad.razorpayPaymentId ? ` · ${ad.razorpayPaymentId}` : ''}
+                {ad.refundId ? ` · refunded (${ad.refundId})` : ''}
               </InfoRow>
               <InfoRow icon={faStore} label="Booked by">
                 {ad.ownerAccountId ? 'The business, on the Triolo Ads website' : 'You (admin)'}
