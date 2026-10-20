@@ -12,10 +12,13 @@ import {
   SignedUpload,
 } from '@/common/services/cloudinaryService';
 import { logger } from '@/common/utils/logger';
-import { AdsRepository } from './repository';
+import { AdsRepository, StoredAdParams } from './repository';
 import {
   Ad,
+  AdActionColumns,
   AdMediaInput,
+  AdPromotedKind,
+  PromotionResolver,
   AD_MAX_IMAGES,
   AD_MAX_VIDEO_SECONDS,
   AD_MEDIA_FOLDER,
@@ -48,9 +51,23 @@ function toPublic(ad: Ad): PublicAd {
     contactPhone: ad.advertiserPhone,
     locationText: ad.locationText,
     linkUrl: ad.linkUrl,
+    actionType: ad.actionType,
+    destination: ad.destination,
+    promoted: ad.promoted,
     endDate: ad.endDate,
   };
 }
+
+/** A Triolo Partner profile ad: it shows the profile as a card, never a picture or video. */
+function isProfileAd(type?: string | null): boolean {
+  return type === 'service' || type === 'business' || type === 'job_post';
+}
+
+const PROMOTED_LABEL: Record<AdPromotedKind, string> = {
+  service: 'verified worker profile',
+  business: 'verified shop',
+  job_post: 'live job post',
+};
 
 /** "sritextiles.com" → "https://sritextiles.com"; empty → null. */
 function normalizeLink(link?: string | null): string | null {
@@ -63,12 +80,11 @@ function clean(params: SaveAdParams): SaveAdParams {
   const optional = (value?: string | null) => (value?.trim() ? value.trim() : null);
   return {
     ...params,
-    advertiserName: params.advertiserName.trim(),
+    advertiserName: params.advertiserName?.trim() ?? '',
     // The ad itself is just its media; the title only names it in the list and on the bill.
-    title: params.title?.trim() || params.advertiserName.trim(),
+    title: params.title?.trim() || params.advertiserName?.trim() || '',
     advertiserPhone: optional(params.advertiserPhone),
     description: optional(params.description),
-    locationText: params.locationText.trim(),
     linkUrl: normalizeLink(params.linkUrl),
   };
 }
@@ -91,7 +107,85 @@ export function placementOn(settings: AdSettings, app: AdApp, placement: AdPlace
  * `ad_settings` and `ad_daily_stats`; depends on no other module.
  */
 export class AdsService {
-  constructor(private readonly repository: AdsRepository) {}
+  constructor(
+    private readonly repository: AdsRepository,
+    // Finds the profile a 'service' / 'business' / 'job_post' ad promotes.
+    private readonly promotions?: PromotionResolver,
+  ) {}
+
+  /**
+   * The ad's checked tap action. A promoted profile is found by the admin's phone number, or
+   * for a business's own ad, its own account; it must be a verified worker / shop or a live
+   * job post. Fields that don't belong to the chosen action are cleared.
+   */
+  private async resolveAction(params: SaveAdParams, ownerAccountId: string | null): Promise<AdActionColumns> {
+    const link = normalizeLink(params.linkUrl);
+    const type = params.actionType ?? (link ? 'link' : 'none');
+    const action: AdActionColumns = {
+      actionType: type,
+      linkUrl: null,
+      actionLatitude: null,
+      actionLongitude: null,
+      actionPlace: null,
+      promotedId: null,
+      promotedName: null,
+      promoteMobile: null,
+    };
+    if (type === 'link') {
+      if (!link) throw AppError.badRequest('Enter the link.', 'AD_ACTION_INVALID');
+      action.linkUrl = link;
+    } else if (type === 'location') {
+      if (params.actionLatitude == null || params.actionLongitude == null || !params.actionPlace?.trim()) {
+        throw AppError.badRequest('Set the place for directions.', 'AD_ACTION_INVALID');
+      }
+      action.actionLatitude = params.actionLatitude;
+      action.actionLongitude = params.actionLongitude;
+      action.actionPlace = params.actionPlace.trim();
+    } else if (type !== 'none') {
+      if (!this.promotions) throw AppError.badRequest('Promoting a profile is not available.', 'AD_ACTION_INVALID');
+      // Found by its Triolo Partner mobile number (a business's own account when it gives none).
+      let accountId = ownerAccountId;
+      const mobile = params.promoteMobile?.trim();
+      if (mobile) {
+        accountId = await this.promotions.accountIdByMobile(mobile);
+        if (!accountId) throw AppError.badRequest('No Triolo account has this mobile number.', 'AD_PROMOTE_ACCOUNT_NOT_FOUND');
+        action.promoteMobile = mobile;
+      }
+      if (!accountId) throw AppError.badRequest('Enter the Triolo Partner mobile number.', 'AD_ACTION_INVALID');
+      const profile = await this.promotions.find(type, accountId);
+      if (!profile) {
+        throw AppError.badRequest(
+          mobile ? `This number has no ${PROMOTED_LABEL[type]}.` : `You don't have a ${PROMOTED_LABEL[type]} to promote yet.`,
+          'AD_PROMOTE_PROFILE_NOT_FOUND',
+        );
+      }
+      action.promotedId = profile.id;
+      action.promotedName = profile.name;
+    }
+    return action;
+  }
+
+  /**
+   * An ad's place is its directions place: only a 'Show directions' ad has one (and is shown
+   * within its radius of it); every other ad has none and is shown to everyone.
+   */
+  private async stored(params: SaveAdParams, ownerAccountId: string | null): Promise<StoredAdParams> {
+    const action = await this.resolveAction(params, ownerAccountId);
+    const directions = action.actionType === 'location';
+    const cleaned = clean(params);
+    // A promoted profile names the ad, and its number is the ad's phone.
+    const named = action.promotedName
+      ? { advertiserName: action.promotedName, title: action.promotedName, advertiserPhone: action.promoteMobile ?? cleaned.advertiserPhone }
+      : {};
+    return {
+      ...cleaned,
+      ...named,
+      ...action,
+      latitude: directions ? action.actionLatitude : null,
+      longitude: directions ? action.actionLongitude : null,
+      locationText: directions ? action.actionPlace : null,
+    };
+  }
 
   // --- Apps ---
 
@@ -112,7 +206,12 @@ export class AdsService {
     const settings = await this.repository.getSettings();
     if (!placementOn(settings, app, placement)) return null;
     const ad = await this.repository.pickAndCount(excludeId, viewer.latitude, viewer.longitude);
-    return ad ? toPublic(ad) : null;
+    if (!ad) return null;
+    const served = toPublic(ad);
+    if (ad.promoted && this.promotions) {
+      served.promotedCard = await this.promotions.card(ad.promoted.kind, ad.promoted.id).catch(() => null);
+    }
+    return served;
   }
 
   async recordClick(id: string): Promise<void> {
@@ -149,13 +248,15 @@ export class AdsService {
         'AD_SELF_LIMIT',
       );
     }
-    const checked = await this.checkMedia(media.imageUrl ?? null, media.videoUrl ?? null);
+    const stored = await this.stored({ ...params, paymentMethod: 'pending' as never }, accountId);
+    const checked = isProfileAd(stored.actionType) ? null : await this.checkMedia(media.imageUrl ?? null, media.videoUrl ?? null);
     const { prices } = await this.repository.getSettings();
     const ad = await this.repository.create(
-      clean({ ...params, paymentMethod: 'pending' as never }),
+      stored,
       prices[String(params.planDays) as keyof typeof prices],
       accountId,
     );
+    if (!checked) return ad;
     const result = await this.repository.setMedia(ad.id, checked.images, checked.videoUrl, checked.videoSeconds);
     return result?.ad ?? ad;
   }
@@ -171,8 +272,10 @@ export class AdsService {
     const existing = await this.getOwned(accountId, id);
     const { prices } = await this.repository.getSettings();
     const amount = existing.planDays === params.planDays ? existing.amount : prices[String(params.planDays) as keyof typeof prices];
-    const ad = await this.repository.updateOwned(id, accountId, clean({ ...params, paymentMethod: 'pending' as never }), amount);
+    const stored = await this.stored({ ...params, paymentMethod: 'pending' as never }, accountId);
+    const ad = await this.repository.updateOwned(id, accountId, stored, amount);
     if (!ad) throw AppError.conflict('This ad was already approved — it can no longer be changed.', 'AD_NOT_EDITABLE');
+    if (isProfileAd(stored.actionType)) return this.dropMedia(ad);
     const current = existing.videoUrl ?? existing.imageUrls[0] ?? null;
     const picked = media.videoUrl ?? media.imageUrl ?? null;
     if (picked && picked !== current) return this.setMedia(id, media.imageUrl ?? null, media.videoUrl ?? null);
@@ -232,10 +335,13 @@ export class AdsService {
    * first, so a refused video never leaves an ad without its media behind).
    */
   async create(params: SaveAdParams, media?: AdMediaInput): Promise<Ad> {
+    const stored = await this.stored(params, null);
     const checked =
-      media && (media.imageUrl || media.videoUrl) ? await this.checkMedia(media.imageUrl ?? null, media.videoUrl ?? null) : null;
+      !isProfileAd(stored.actionType) && media && (media.imageUrl || media.videoUrl)
+        ? await this.checkMedia(media.imageUrl ?? null, media.videoUrl ?? null)
+        : null;
     const { prices } = await this.repository.getSettings();
-    const ad = await this.repository.create(clean(params), prices[String(params.planDays) as keyof typeof prices]);
+    const ad = await this.repository.create(stored, prices[String(params.planDays) as keyof typeof prices]);
     if (!checked) return ad;
     const result = await this.repository.setMedia(ad.id, checked.images, checked.videoUrl, checked.videoSeconds);
     return result?.ad ?? ad;
@@ -253,8 +359,10 @@ export class AdsService {
       const { prices } = await this.repository.getSettings();
       amount = prices[String(params.planDays) as keyof typeof prices];
     }
-    const ad = await this.repository.update(id, clean(params), amount);
+    const stored = await this.stored(params, null);
+    const ad = await this.repository.update(id, stored, amount);
     if (!ad) throw AppError.notFound('Ad not found, or it was deleted.', 'AD_NOT_FOUND');
+    if (isProfileAd(stored.actionType)) return this.dropMedia(ad);
     if (media && (media.imageUrl || media.videoUrl)) return this.setMedia(id, media.imageUrl ?? null, media.videoUrl ?? null);
     return ad;
   }
@@ -299,6 +407,13 @@ export class AdsService {
     }
     if (removed > 0) logger.info({ removed }, 'Deleted unused ad uploads');
     return removed;
+  }
+
+  /** An ad switched to a profile ad no longer has a picture or video: they're deleted. */
+  private async dropMedia(ad: Ad): Promise<Ad> {
+    if (ad.imageUrls.length === 0 && !ad.videoUrl) return ad;
+    await this.deleteMedia(ad.id, ad.imageUrls, ad.videoUrl);
+    return { ...ad, imageUrl: null, imageUrls: [], videoUrl: null, videoSeconds: null, durationSeconds: ad.displaySeconds };
   }
 
   private async deleteMedia(id: string, imageUrls: string[], videoUrl: string | null): Promise<void> {

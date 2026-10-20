@@ -22,6 +22,7 @@ import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
 import { AdActionHost, AdLaunchBanner, rememberAdBeforeRestart, useAdOnScreen } from '@/components/Ads';
 import { PortalHost } from '@/components/Portal';
+import { registerAdPromotions } from '@/utils/adPromotions';
 import { IncomingJobModal } from '@/components/IncomingJobModal';
 import { IncomingOrderModal } from '@/components/IncomingOrderModal';
 import { JobTrackingModal } from '@/components/JobTrackingModal';
@@ -30,6 +31,9 @@ import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+
+// An ad promoting a job post gets a Contact button here (see utils/adPromotions).
+registerAdPromotions();
 
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 

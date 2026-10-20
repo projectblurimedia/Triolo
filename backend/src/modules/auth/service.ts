@@ -265,6 +265,12 @@ export class AuthService {
 
   // --- Admin ---
 
+  /** The account with this mobile number (for other modules, e.g. promoting a profile in an ad). */
+  async findAccountByMobile(mobileNumber: string): Promise<{ id: string; fullName: string } | null> {
+    const account = await this.repository.findAccountByMobile(mobileNumber);
+    return account ? { id: account.id, fullName: account.fullName } : null;
+  }
+
   adminListAccounts(filter: AdminAccountListFilter): Promise<AdminAccountListResult> {
     return this.repository.adminList(filter);
   }

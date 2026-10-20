@@ -608,9 +608,24 @@ p {
 
 .search input:focus,
 .field input:focus,
-.field textarea:focus {
+.field textarea:focus,
+.field select:focus {
   border-color: var(--primary-light);
   box-shadow: 0 0 0 4px rgba(29, 118, 250, 0.15);
+}
+
+.field select {
+  width: 100%;
+  height: 44px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: var(--input);
+  color: var(--text);
+  padding: 0 16px;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
 }
 
 .field {
@@ -2276,4 +2291,465 @@ a.row:hover {
   color: var(--primary);
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* Dropdown colours (the shared .dd-* rules below use these). */
+:root {
+  --dd-height: 44px;
+  --dd-radius: 22px;
+  --dd-pad: 16px;
+  --dd-field-bg: var(--input);
+  --dd-border: var(--border);
+  --dd-text: var(--text);
+  --dd-muted: var(--muted);
+  --dd-panel: var(--glass-strong);
+  --dd-shadow: var(--glass-shadow);
+  --dd-hover: rgba(0, 85, 211, 0.07);
+  --dd-primary: var(--primary);
+  --dd-gradient: var(--gradient);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dd-panel: rgba(26, 32, 45, 0.96);
+    --dd-hover: rgba(255, 255, 255, 0.07);
+    --dd-primary: #5b9dff;
+  }
+}
+
+/* ---------- Dropdown (our own list instead of the browser's <select>) ---------- */
+
+.dd {
+  position: relative;
+  width: 100%;
+}
+
+.dd-trigger {
+  width: 100%;
+  height: var(--dd-height);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 0 var(--dd-pad);
+  border-radius: var(--dd-radius);
+  border: 1px solid var(--dd-border);
+  background: var(--dd-field-bg);
+  color: var(--dd-text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.dd-trigger:hover:not(:disabled) {
+  border-color: var(--dd-primary);
+}
+
+.dd-trigger:focus-visible,
+.dd.open .dd-trigger {
+  outline: none;
+  border-color: var(--dd-primary);
+  box-shadow: 0 0 0 4px rgba(29, 118, 250, 0.15);
+}
+
+.dd-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dd-trigger-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #fff;
+  background: var(--dd-gradient);
+}
+
+.dd-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dd-value.placeholder {
+  color: var(--dd-muted);
+}
+
+.dd-chevron {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--dd-muted);
+  transition: transform 0.2s ease;
+}
+
+.dd.open .dd-chevron {
+  transform: rotate(180deg);
+  color: var(--dd-primary);
+}
+
+.dd-panel {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid var(--dd-border);
+  background: var(--dd-panel);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: var(--dd-shadow);
+  overflow: hidden;
+  animation: dd-in 0.14s ease-out;
+}
+
+@keyframes dd-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.dd-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+  outline: none;
+  overscroll-behavior: contain;
+}
+
+.dd-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: var(--dd-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dd-option.active {
+  background: var(--dd-hover);
+}
+
+.dd-option.selected .dd-option-label {
+  color: var(--dd-primary);
+  font-weight: 600;
+}
+
+.dd-option-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--dd-primary);
+  background: rgba(0, 85, 211, 0.1);
+}
+
+.dd-option.selected .dd-option-icon {
+  color: #fff;
+  background: var(--dd-gradient);
+}
+
+.dd-option-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dd-option-label {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.dd-option-desc {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--dd-muted);
+}
+
+.dd-check {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--dd-primary);
+}
+
+/* Phones: a sheet from the bottom with big rows, over a dimmed page. */
+.dd-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(5, 10, 20, 0.45);
+  animation: dd-fade 0.18s ease-out;
+}
+
+@keyframes dd-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.dd-sheet {
+  width: 100%;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px calc(14px + env(safe-area-inset-bottom));
+  border-radius: 24px 24px 0 0;
+  border: 1px solid var(--dd-border);
+  border-bottom: 0;
+  background: var(--dd-panel);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.18);
+  animation: dd-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes dd-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.dd-sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  margin: 2px auto 10px;
+  background: var(--dd-border);
+}
+
+.dd-sheet-title {
+  padding: 0 12px 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dd-text);
+}
+
+.dd-sheet .dd-option {
+  padding: 13px 12px;
+}
+
+.dd-sheet .dd-option-label {
+  font-size: 15px;
+}
+
+/* ---------- Phones ---------- */
+
+/* Two columns side by side only when both fit; never wider than the screen. */
+.grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+}
+
+.info-row > div,
+.info-row a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .main {
+    padding: 10px 12px 36px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+
+  .topbar-icon {
+    display: none;
+  }
+
+  .topbar-title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .topbar-title h1 {
+    font-size: 17px;
+  }
+
+  .topbar-title p {
+    font-size: 12px;
+  }
+
+  .topbar-actions {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .topbar-actions .btn {
+    flex: 1;
+  }
+
+  .search {
+    min-width: 0;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat {
+    padding: 14px;
+  }
+
+  .stat-icon {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 4px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+  }
+
+  .ad-total {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ad-total .btn {
+    width: 100%;
+    height: 48px;
+  }
+
+  .ad-total-amount {
+    font-size: 24px;
+  }
+
+  .ad-plans {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ad-numbers {
+    gap: 8px;
+  }
+
+  .ad-numbers > div {
+    padding: 10px;
+  }
+
+  .ad-numbers strong {
+    font-size: 17px;
+  }
+
+  .ad-frame.vertical {
+    width: min(100%, 220px);
+  }
+
+  .actions .btn {
+    flex: 1;
+  }
+
+  .chips {
+    gap: 6px;
+  }
+
+  .welcome {
+    padding: 20px;
+  }
+
+  .welcome h2 {
+    font-size: 19px;
+  }
+
+  .welcome .btn {
+    width: 100%;
+  }
+
+  .my-ad {
+    grid-template-columns: 68px 1fr;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .my-ad-media {
+    width: 68px;
+    height: 68px;
+    border-radius: 12px;
+  }
+
+  .my-ad-numbers {
+    flex-wrap: wrap;
+    gap: 6px 14px;
+  }
+
+  .login {
+    padding: 14px;
+  }
+
+  .login-head {
+    padding: 24px 20px;
+  }
+}
+
+/* A Triolo Partner profile ad: no media, the apps draw the profile as a card. */
+.profile-ad-note {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 85, 211, 0.25);
+  background: rgba(0, 85, 211, 0.07);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.profile-ad-note svg {
+  margin-top: 3px;
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.profile-ad-note strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.ad-preview-blank {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ad-preview-name {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 16px;
+  text-align: center;
 }

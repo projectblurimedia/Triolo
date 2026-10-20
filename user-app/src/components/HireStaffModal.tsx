@@ -85,7 +85,7 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
     try {
       if (!(await askForLocation())) return;
       setStarting(true);
-      await waitForAd();
+      if (!(await waitForAd())) return;
       setStarted(true);
     } finally {
       startingRef.current = false;

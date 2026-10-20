@@ -30,6 +30,8 @@ export interface JobSeeker {
   skills: string[];
   description: string | null;
   locationAddress: string;
+  latitude: number;
+  longitude: number;
   photoUrl: string | null;
   fullName: string;
   mobileNumber: string;
@@ -60,4 +62,6 @@ export const jobSeekersService = {
     if (params.query) search.set('query', params.query);
     return apiClient.get<JobSeeker[]>(`/job-seekers/search?${search.toString()}`, true);
   },
+  /** One live post (e.g. from an ad's Contact). */
+  getPublic: (id: string) => apiClient.get<JobSeeker>(`/job-seekers/public/${id}`, true),
 };

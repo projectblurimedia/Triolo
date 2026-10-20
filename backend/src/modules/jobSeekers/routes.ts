@@ -33,6 +33,13 @@ jobSeekersRouter.get(
   }),
 );
 
+// One live post — e.g. an ad's "Contact".
+jobSeekersRouter.get(
+  '/public/:id',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.getPublic(req.params.id))),
+);
+
 // Poster side: their own post.
 jobSeekersRouter.get(
   '/me',

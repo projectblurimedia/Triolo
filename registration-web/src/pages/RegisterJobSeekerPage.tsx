@@ -5,6 +5,7 @@ import { PhoneVerification } from '@/components/PhoneVerification';
 import { LocationField } from '@/components/LocationField';
 import { ProfilePhotoField } from '@/components/ProfilePhotoField';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Dropdown } from '@/components/Dropdown';
 import { PlaceValue } from '@/utils/place';
 import {
   AVAILABILITIES,
@@ -221,14 +222,13 @@ export function RegisterJobSeekerPage() {
             <>
               <div className="field">
                 <label>Work you are looking for</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value as JobCategory | '')}>
-                  <option value="">Choose the kind of work</option>
-                  {JOB_CATEGORIES.map((entry) => (
-                    <option key={entry.key} value={entry.key}>
-                      {entry.label}
-                    </option>
-                  ))}
-                </select>
+                <Dropdown<JobCategory>
+                  value={category}
+                  options={JOB_CATEGORIES.map((entry) => ({ value: entry.key, label: entry.label }))}
+                  onChange={setCategory}
+                  placeholder="Choose the kind of work"
+                  title="Work you are looking for"
+                />
               </div>
               {category === 'other' ? (
                 <div className="field">

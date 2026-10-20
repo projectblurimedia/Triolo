@@ -20,6 +20,13 @@ const PHOTO_FOLDER = 'triolo/job-seekers';
 export class JobSeekersService {
   constructor(private readonly repository: JobSeekersRepository) {}
 
+  /** One live post (e.g. an ad's "Contact"). */
+  async getPublic(id: string): Promise<JobSeekerSearchResult> {
+    const post = await this.repository.findPublicById(id);
+    if (!post) throw AppError.notFound('This job post is not available.', 'JOB_POST_NOT_FOUND');
+    return post;
+  }
+
   getMine(accountId: string): Promise<JobSeekerPost | null> {
     return this.repository.findByAccount(accountId);
   }

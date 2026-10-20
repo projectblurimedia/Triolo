@@ -1,4 +1,7 @@
-import { Router } from 'express';
+import { Request, Response, Router } from 'express';
+import { asyncHandler } from '@/common/utils/asyncHandler';
+import { ok } from '@/common/utils/response';
+import { AppError } from '@/common/errors/AppError';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
 import { validateBody } from '@/common/middleware/validate';
@@ -39,4 +42,14 @@ businessesRouter.delete('/me/profile', authenticate, controller.deleteProfile);
 businessesRouter.put('/me/profile/photo', authenticate, upload.single('photo'), logUploadedFiles, controller.setProfilePhoto);
 businessesRouter.delete('/me/profile/photo', authenticate, controller.removeProfilePhoto);
 businessesRouter.get('/nearby', authenticate, controller.searchNearby);
+// One verified shop as customers see it — e.g. an ad's "Order from this Shop".
+businessesRouter.get(
+  '/public/:id',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const [profile] = await service.getVerifiedProfiles([req.params.id]);
+    if (!profile) throw AppError.notFound('This shop is not available.', 'SHOP_NOT_FOUND');
+    return ok(res, profile);
+  }),
+);
 businessesRouter.post('/:id/view', authenticate, controller.recordView);

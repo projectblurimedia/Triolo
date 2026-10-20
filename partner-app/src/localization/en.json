@@ -875,6 +875,25 @@
     "visit": "Visit",
     "continue": "Continue",
     "closeAfter": "You can close this in {{count}} s",
-    "loading": "Loading the ad…"
+    "loading": "Loading the ad…",
+    "directions": "Directions",
+    "bookNow": "Book Now",
+    "orderShop": "Order from this Shop",
+    "contact": "Contact",
+    "profileGoneTitle": "Not available now",
+    "profileGoneMessage": "This profile is not on Triolo right now.",
+    "kindWorker": "Trusted worker",
+    "kindShop": "Local shop",
+    "kindJob": "Looking for work",
+    "experience_one": "{{count}} year of experience",
+    "experience_other": "{{count}} years of experience",
+    "homeDelivery": "Home delivery available",
+    "payDaily": "₹{{amount}} per day",
+    "payMonthly": "₹{{amount}} per month",
+    "reviews_one": "{{count}} review",
+    "reviews_other": "{{count}} reviews",
+    "newOnTriolo": "New on Triolo",
+    "findInCustomerApp": "Book them in the Triolo app",
+    "callNow": "Call Now"
   }
 }

@@ -8,6 +8,31 @@ export const AD_APP = 'partner' as const;
 export type AdPlacement = 'launch' | 'action';
 
 /** A local business's ad, as booked by the Triolo admin. */
+/** A worker (Book Now), shop (Order from this Shop) or job post (Contact) an ad promotes. */
+export interface AdPromoted {
+  kind: 'service' | 'business' | 'job_post';
+  id: string;
+  name: string;
+}
+
+export interface AdPromotedCard {
+  kind: AdPromoted['kind'];
+  name: string;
+  photoUrl: string | null;
+  /** Skill (worker) or shop category codes. */
+  tags: string[];
+  customTags: string[];
+  /** A job post's work, e.g. "Cook". */
+  headline: string | null;
+  ratingAverage: number | null;
+  ratingCount: number;
+  experienceYears: number | null;
+  deliveryAvailable: boolean | null;
+  payAmount: number | null;
+  payPeriod: 'daily' | 'monthly' | null;
+  placeName: string | null;
+}
+
 export interface Ad {
   id: string;
   title: string;
@@ -22,6 +47,14 @@ export interface Ad {
   locationText: string | null;
   /** Opened when the video or a picture is tapped. */
   linkUrl: string | null;
+  /** What tapping the ad does (older servers leave it out: then a link means 'link'). */
+  actionType?: 'none' | 'link' | 'location' | 'service' | 'business' | 'job_post';
+  /** For 'location': where Directions goes. */
+  destination?: { latitude: number; longitude: number; name: string } | null;
+  /** For 'service' / 'business' / 'job_post': the Triolo profile it promotes. */
+  promoted?: AdPromoted | null;
+  /** A profile ad's card (it has no picture or video): the promoted worker, shop or job post. */
+  promotedCard?: AdPromotedCard | null;
   /** Vertical (reel / poster, 9:16) or horizontal (16:9). */
   orientation: 'vertical' | 'horizontal';
   /** Seconds it shows before it can be closed (an image's set time, or the video's length). */

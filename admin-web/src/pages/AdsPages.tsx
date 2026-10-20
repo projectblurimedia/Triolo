@@ -19,6 +19,7 @@ import {
   faTrash,
   faVideo,
   faXmark,
+  faIdBadge,
 } from '@fortawesome/free-solid-svg-icons';
 import { Topbar } from '@/components/Layout';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -53,8 +54,17 @@ import {
   uploadAdFile,
 } from '@/services/adsApi';
 import { getErrorMessage } from '@/services/errorMessages';
-import { PlaceField } from '@/components/PlaceField';
-import { PlaceValue } from '@/utils/place';
+import {
+  ACTION_LABEL,
+  AdActionDetails,
+  AdActionTop,
+  AdActionValue,
+  EMPTY_ACTION,
+  actionBody,
+  actionFromAd,
+  actionProblem,
+  promotesProfile,
+} from '@/components/AdActionField';
 import { showToast } from '@/state/toastStore';
 import { billNumber, dayLabel, downloadAdBill } from '@/utils/adBill';
 import { rupees, timeAgo, Tone } from '@/utils/format';
@@ -128,7 +138,7 @@ function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange
   const rows: { label: string; note: string; launch: keyof AdSettings; action: keyof AdSettings }[] = [
     {
       label: 'Customer app (Triolo)',
-      note: 'Before Home quick actions: Quick Book, Order from a Shop, Hire Staff, Post a Problem',
+      note: 'On the final step: Book Nearby, Book a worker, Send a list, Post a problem, Hire Staff search',
       launch: 'launchUser',
       action: 'actionUser',
     },
@@ -298,7 +308,7 @@ export function AdsPage() {
             }
           />
           {overview.data.counts.in_review > 0 ? (
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginTop: 16, marginBottom: 16 }}>
               <Notice tone="warning" icon={faBullhorn}>
                 {overview.data.counts.in_review === 1
                   ? '1 ad booked by a business is waiting for your review.'
@@ -411,21 +421,26 @@ export function AdsPage() {
 
 // ---------------- Book / edit ----------------
 
-type AdFormValues = Omit<SaveAd, 'latitude' | 'longitude' | 'locationText'>;
+type AdFormValues = Omit<
+  SaveAd,
+  | 'advertiserPhone'
+  | 'linkUrl'
+  | 'actionType'
+  | 'actionLatitude'
+  | 'actionLongitude'
+  | 'actionPlace'
+  | 'promoteMobile'
+> & { advertiserName: string };
 
 const EMPTY_FORM: AdFormValues = {
   advertiserName: '',
-  advertiserPhone: '',
-  linkUrl: '',
+  description: '',
   orientation: 'vertical',
   displaySeconds: 15,
   planDays: 7,
   paymentMethod: 'cash',
   startDate: todayInIndia(),
 };
-
-/** People see an ad only within this distance of its place (same as the backend). */
-const AD_RADIUS_KM = 5;
 
 /** Progress of a newly picked file being made smaller and uploaded (`share` is this step's 0–1). */
 interface MediaStatus {
@@ -474,8 +489,7 @@ function AdForm({ ad }: { ad?: Ad }) {
     ad
       ? {
           advertiserName: ad.advertiserName,
-          advertiserPhone: ad.advertiserPhone ?? '',
-          linkUrl: ad.linkUrl ?? '',
+          description: ad.description ?? '',
           orientation: ad.orientation,
           displaySeconds: ad.displaySeconds,
           planDays: ad.planDays,
@@ -484,12 +498,6 @@ function AdForm({ ad }: { ad?: Ad }) {
         }
       : { ...EMPTY_FORM, startDate: todayInIndia() },
   );
-  // Where the ad is shown: a GPS point or a map pin, never typed.
-  const [place, setPlace] = useState<PlaceValue | null>(() =>
-    ad && ad.latitude != null && ad.longitude != null
-      ? { latitude: ad.latitude, longitude: ad.longitude, locationName: ad.locationText ?? 'Pinned location' }
-      : null,
-  );
   const [media, setMedia] = useState<MediaPick | null>(() =>
     ad?.videoUrl
       ? { kind: 'video', url: ad.videoUrl, seconds: ad.videoSeconds }
@@ -497,6 +505,8 @@ function AdForm({ ad }: { ad?: Ad }) {
         ? { kind: 'image', url: ad.imageUrls[0] }
         : null,
   );
+  // What tapping the ad does (nothing / link / directions / a Triolo profile).
+  const [action, setAction] = useState<AdActionValue>(() => (ad ? actionFromAd(ad) : EMPTY_ACTION));
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
@@ -582,7 +592,8 @@ function AdForm({ ad }: { ad?: Ad }) {
    * address, or nothing when the media didn't change.
    */
   const uploadMedia = async (): Promise<{ imageUrl?: string | null; videoUrl?: string | null }> => {
-    if (!media) return {};
+    // A profile ad has no picture or video (the server drops any it had).
+    if (!media || promotesProfile(action)) return {};
     if (!media.file) {
       const current = ad?.videoUrl ?? ad?.imageUrls[0] ?? null;
       if (media.url === current) return {};
@@ -599,9 +610,10 @@ function AdForm({ ad }: { ad?: Ad }) {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (form.advertiserName.trim().length < 2) return setError('Enter the business name.');
-    if (!media) return setError('Add the ad: one image or one video.');
-    if (!place) return setError('Set where the ad is: use the current location or select it on the map.');
+    const actionError = actionProblem(action);
+    if (actionError) return setError(actionError);
+    if (!promotesProfile(action) && form.advertiserName.trim().length < 2) return setError('Enter the business name.');
+    if (!promotesProfile(action) && !media) return setError('Add the ad: one image or one video.');
     if (!form.startDate) return setError('Choose a start date.');
     setError('');
     setSaving(true);
@@ -612,10 +624,10 @@ function AdForm({ ad }: { ad?: Ad }) {
       setProgress('Saving the ad…');
       const body: SaveAd = {
         ...form,
+        // A promoted Triolo Partner profile's own name is used.
+        advertiserName: promotesProfile(action) ? undefined : form.advertiserName,
         ...uploaded,
-        latitude: place.latitude,
-        longitude: place.longitude,
-        locationText: place.locationName,
+        ...actionBody(action),
       };
       const saved = ad ? await adsApi.update(ad.id, body) : await adsApi.create(body);
       showToast({
@@ -638,29 +650,43 @@ function AdForm({ ad }: { ad?: Ad }) {
         <div className="card-title">
           <FontAwesomeIcon icon={faStore} /> Who is advertising
         </div>
+        <AdActionTop value={action} onChange={setAction} mine={false} disabled={saving} />
+        {promotesProfile(action) ? null : (
+          <label className="field">
+            <span>Business name *</span>
+            <input
+              value={form.advertiserName}
+              onChange={(e) => set('advertiserName', e.target.value)}
+              maxLength={80}
+              placeholder="e.g. Sri Sai Textiles"
+            />
+          </label>
+        )}
+        <AdActionDetails value={action} onChange={setAction} disabled={saving} />
         <label className="field">
-          <span>Business name *</span>
-          <input
-            value={form.advertiserName}
-            onChange={(e) => set('advertiserName', e.target.value)}
-            maxLength={80}
-            placeholder="e.g. Sri Sai Textiles"
-          />
-        </label>
-        <label className="field">
-          <span>Business phone (optional — on the bill)</span>
-          <input
-            value={form.advertiserPhone}
-            onChange={(e) => set('advertiserPhone', e.target.value)}
-            inputMode="tel"
-            maxLength={15}
-            placeholder="Mobile number"
+          <span>A few words (optional) — shown on the ad</span>
+          <textarea
+            value={form.description ?? ''}
+            onChange={(e) => set('description', e.target.value)}
+            maxLength={600}
+            rows={2}
+            placeholder="e.g. Diwali offer — 30% off on all sarees"
           />
         </label>
 
         <div className="card-title" style={{ marginTop: 10 }}>
           <FontAwesomeIcon icon={faBullhorn} /> The ad
         </div>
+        {promotesProfile(action) ? (
+          <div className="profile-ad-note">
+            <FontAwesomeIcon icon={faIdBadge} />
+            <div>
+              <strong>No picture or video needed</strong>
+              The apps show the profile as a card — photo, name, rating and what they do — with a big Book Now / Order from
+              this Shop / Contact button.
+            </div>
+          </div>
+        ) : (
         <div className="field">
           <span>Image or video * (one)</span>
           <div className="ad-image-pick">
@@ -711,38 +737,12 @@ function AdForm({ ad }: { ad?: Ad }) {
             </span>
           </div>
         </div>
-        {media?.kind === 'video' ? (
+        )}
+        {!promotesProfile(action) && media?.kind === 'video' ? (
           <p className="muted" style={{ fontSize: 13, margin: '-4px 0 14px' }}>
             Shows for the whole video{media.seconds ? ` (${Math.round(media.seconds)} seconds)` : ''}, then it can be closed.
           </p>
-        ) : (
-          <label className="field">
-            <span>Show the image for (seconds) — then it can be closed</span>
-            <input
-              type="number"
-              min={3}
-              max={30}
-              value={form.displaySeconds}
-              onChange={(e) => set('displaySeconds', Math.max(3, Math.min(30, Math.round(Number(e.target.value) || 15))))}
-            />
-          </label>
-        )}
-        <label className="field">
-          <span>Link (optional) — opens when people tap the ad</span>
-          <input
-            value={form.linkUrl}
-            onChange={(e) => set('linkUrl', e.target.value)}
-            inputMode="url"
-            maxLength={500}
-            placeholder="e.g. sritextiles.com or a WhatsApp / Instagram / Maps link"
-          />
-        </label>
-        <PlaceField
-          label="Where to show the ad *"
-          hint={`Shown only to people within ${AD_RADIUS_KM} km of this place.`}
-          value={place}
-          onChange={setPlace}
-        />
+        ) : null}
       </div>
 
       <div className="glass card">
@@ -985,13 +985,6 @@ export function AdDetailPage() {
         </div>
       ) : null}
 
-      {ad.latitude == null && ad.status !== 'deleted' ? (
-        <div style={{ marginBottom: 16 }}>
-          <Notice tone="warning" icon={faLocationDot}>
-            This ad has no place yet, so nobody sees it. Edit it and set where it is — it shows to people within {ad.radiusKm} km.
-          </Notice>
-        </div>
-      ) : null}
 
       <div className="grid-2">
         <div className="glass card">
@@ -1002,7 +995,8 @@ export function AdDetailPage() {
               <img src={ad.imageUrls[0]} alt="" />
             ) : (
               <div className="ad-preview-blank">
-                <FontAwesomeIcon icon={faBullhorn} />
+                <FontAwesomeIcon icon={ad.promoted ? faIdBadge : faBullhorn} />
+                {ad.promoted ? <span className="ad-preview-name">{ad.promoted.name} — profile card</span> : null}
               </div>
             )}
             <span className="ad-preview-tag">Ad</span>
@@ -1018,21 +1012,42 @@ export function AdDetailPage() {
             {ad.videoUrl ? `video, ${ad.durationSeconds} s` : `image, shown ${ad.displaySeconds} s`} before it can be closed
           </div>
           <div className="info">
+            {ad.description ? (
+              <InfoRow icon={faBullhorn} label="Words on the ad">
+                {ad.description}
+              </InfoRow>
+            ) : null}
             {ad.advertiserPhone ? (
               <InfoRow icon={faPhone} label="Business phone">
                 {ad.advertiserPhone}
               </InfoRow>
             ) : null}
-            {ad.linkUrl ? (
-              <InfoRow icon={faLink} label="Opens when tapped">
-                <a href={ad.linkUrl} target="_blank" rel="noreferrer">
-                  {ad.linkUrl}
-                </a>
-              </InfoRow>
-            ) : null}
-            <InfoRow icon={faLocationDot} label="Shown to people near">
-              {ad.locationText ?? '—'}
-              {ad.latitude != null ? ` · within ${ad.radiusKm} km` : ''}
+            <InfoRow icon={faLink} label="When tapped">
+              {ACTION_LABEL[ad.actionType ?? (ad.linkUrl ? 'link' : 'none')]}
+              {ad.linkUrl ? (
+                <>
+                  {' — '}
+                  <a href={ad.linkUrl} target="_blank" rel="noreferrer">
+                    {ad.linkUrl}
+                  </a>
+                </>
+              ) : null}
+              {ad.destination ? (
+                <>
+                  {' — '}
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${ad.destination.latitude},${ad.destination.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {ad.destination.name}
+                  </a>
+                </>
+              ) : null}
+              {ad.promoted ? ` — ${ad.promoted.name}${ad.promoteMobile ? ` (${ad.promoteMobile})` : ''}` : null}
+            </InfoRow>
+            <InfoRow icon={faLocationDot} label="Shown to">
+              {ad.latitude != null ? `People within ${ad.radiusKm} km of ${ad.locationText ?? 'its place'}` : 'Everyone, everywhere'}
             </InfoRow>
           </div>
         </div>

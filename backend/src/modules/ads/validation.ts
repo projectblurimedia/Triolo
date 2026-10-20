@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AD_APPS, AD_ORIENTATIONS, AD_PAYMENT_METHODS, AD_PLACEMENTS, AD_PLAN_DAYS } from './interfaces';
+import { AD_ACTION_TYPES, AD_APPS, AD_ORIENTATIONS, AD_PAYMENT_METHODS, AD_PLACEMENTS, AD_PLAN_DAYS } from './interfaces';
 
 const optionalText = (max: number) => z.string().trim().max(max).nullish();
 const phone = z
@@ -9,16 +9,18 @@ const phone = z
   .nullish()
   .or(z.literal(''));
 
-export const saveAdSchema = z.object({
-  advertiserName: z.string().trim().min(2, 'Enter the business name').max(80),
+const adFields = z.object({
+  // Left out when promoting a Triolo Partner profile: the profile's own name is used.
+  advertiserName: z.string().trim().max(80).optional(),
   advertiserPhone: phone,
   title: optionalText(80),
   description: optionalText(600),
   orientation: z.enum(AD_ORIENTATIONS),
   displaySeconds: z.number().int().min(3, 'At least 3 seconds').max(30, 'At most 30 seconds').default(15),
-  latitude: z.number().min(-90).max(90, 'Set where the ad is'),
-  longitude: z.number().min(-180).max(180),
-  locationText: z.string().trim().min(2, 'Set where the ad is').max(120),
+  // Older forms sent the ad's place here; it now comes only from 'Show directions' (below).
+  latitude: z.number().min(-90).max(90).nullish(),
+  longitude: z.number().min(-180).max(180).nullish(),
+  locationText: optionalText(120),
   // A web address; "https://" may be left out (it's added). Only http(s) links are allowed.
   linkUrl: z
     .string()
@@ -28,6 +30,19 @@ export const saveAdSchema = z.object({
     .refine((value) => !/^[a-z][a-z0-9+.-]*:/i.test(value) || /^https?:/i.test(value), 'Only web (https) links')
     // Optional: not every shop has a website.
     .nullish(),
+  // What tapping the ad does. Left out by older forms: then a link means 'link', else 'none'.
+  actionType: z.enum(AD_ACTION_TYPES).optional(),
+  // For 'location': the place directions go to.
+  actionLatitude: z.number().min(-90).max(90).nullish(),
+  actionLongitude: z.number().min(-180).max(180).nullish(),
+  actionPlace: optionalText(120),
+  // Admin form, for 'service' / 'business' / 'job_post': whose profile to promote.
+  promoteMobile: z
+    .string()
+    .trim()
+    .regex(/^\d{10}$/, 'Enter the 10-digit mobile number')
+    .nullish()
+    .or(z.literal('')),
   // The ad's image or video, already uploaded to Cloudinary; saved together with the ad.
   imageUrl: z.string().url().nullish(),
   videoUrl: z.string().url().nullish(),
@@ -39,6 +54,29 @@ export const saveAdSchema = z.object({
   paymentMethod: z.enum([...AD_PAYMENT_METHODS, 'pending'] as [string, ...string[]]).default('cash'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a start date'),
 });
+
+type AdFields = Partial<z.infer<typeof adFields>>;
+
+const promotes = (type?: string) => type === 'service' || type === 'business' || type === 'job_post';
+
+/** Each tap action needs its own detail: a link, a place, or (admin) the phone number. */
+function checkAction(body: AdFields, ctx: z.RefinementCtx, needsMobile: boolean): void {
+  if (body.actionType === 'link' && !body.linkUrl?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter the link', path: ['linkUrl'] });
+  }
+  if (body.actionType === 'location' && (body.actionLatitude == null || body.actionLongitude == null || !body.actionPlace)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Set the place for directions', path: ['actionPlace'] });
+  }
+  const promotes = body.actionType === 'service' || body.actionType === 'business' || body.actionType === 'job_post';
+  if (needsMobile && promotes && !body.promoteMobile) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter the Triolo Partner mobile number', path: ['promoteMobile'] });
+  }
+  if (!promotes && (body.advertiserName?.length ?? 0) < 2) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter the business name', path: ['advertiserName'] });
+  }
+}
+
+export const saveAdSchema = adFields.superRefine((body, ctx) => checkAction(body, ctx, true));
 
 export const adSettingsSchema = z
   .object({
@@ -61,10 +99,12 @@ export const adSettingsSchema = z
  * was paid (online payment comes later — it's 'pending' until then) and with its image or
  * video required.
  */
-export const selfAdSchema = saveAdSchema
+export const selfAdSchema = adFields
   .omit({ paymentMethod: true })
-  .extend({ advertiserName: z.string().trim().min(2, 'Enter your business name').max(80) })
-  .refine((body) => !!body.imageUrl !== !!body.videoUrl, 'Add one image or one video');
+  // A Triolo Partner profile ad shows the profile itself: no picture or video.
+  .refine((body) => promotes(body.actionType) || !!body.imageUrl !== !!body.videoUrl, 'Add one image or one video')
+  // Promoting a Triolo Partner profile needs its mobile number here too (the admin reviews it).
+  .superRefine((body, ctx) => checkAction(body, ctx, true));
 
 export const reviewAdSchema = z
   .object({

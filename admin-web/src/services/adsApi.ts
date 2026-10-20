@@ -7,6 +7,8 @@ export type AdStatus = 'in_review' | 'rejected' | 'scheduled' | 'running' | 'end
 export type AdPaymentMethod = 'cash' | 'upi' | 'other' | 'pending';
 export type AdPlanDays = 1 | 3 | 7 | 30;
 export type AdOrientation = 'vertical' | 'horizontal';
+export type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
+import type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
 export type AdPlanPrices = Record<'1' | '3' | '7' | '30', number>;
 
 export interface AdSettings {
@@ -45,6 +47,14 @@ export interface Ad {
   locationText: string | null;
   /** Opened when the video or a picture is tapped in the apps. */
   linkUrl: string | null;
+  /** What tapping the ad does. */
+  actionType: AdActionType;
+  /** For 'location': where directions go. */
+  destination: { latitude: number; longitude: number; name: string } | null;
+  /** For 'service' / 'business' / 'job_post': the promoted profile. */
+  promoted: { kind: AdPromotedKind; id: string; name: string } | null;
+  /** The phone number used to find the promoted profile. */
+  promoteMobile: string | null;
   latitude: number | null;
   longitude: number | null;
   /** Shown only to people within this distance of the place. */
@@ -82,16 +92,19 @@ export interface SaveAd {
   /** The ad's image or video, already uploaded; saved together with the ad. */
   imageUrl?: string | null;
   videoUrl?: string | null;
-  advertiserName: string;
+  /** Left out when promoting a Triolo Partner profile (its name is used). */
+  advertiserName?: string;
   advertiserPhone: string;
   title?: string;
   description?: string;
   orientation: AdOrientation;
   displaySeconds: number;
-  latitude: number;
-  longitude: number;
-  locationText: string;
   linkUrl: string;
+  actionType: AdActionType;
+  actionLatitude: number | null;
+  actionLongitude: number | null;
+  actionPlace: string | null;
+  promoteMobile?: string;
   planDays: AdPlanDays;
   paymentMethod: AdPaymentMethod;
   startDate: string;

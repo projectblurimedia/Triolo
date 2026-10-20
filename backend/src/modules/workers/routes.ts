@@ -1,4 +1,7 @@
-import { Router } from 'express';
+import { Request, Response, Router } from 'express';
+import { asyncHandler } from '@/common/utils/asyncHandler';
+import { ok } from '@/common/utils/response';
+import { AppError } from '@/common/errors/AppError';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
 import { validateBody } from '@/common/middleware/validate';
@@ -44,4 +47,14 @@ workersRouter.delete('/me/profile', authenticate, controller.deleteProfile);
 workersRouter.put('/me/profile/photo', authenticate, upload.single('photo'), logUploadedFiles, controller.setProfilePhoto);
 workersRouter.delete('/me/profile/photo', authenticate, controller.removeProfilePhoto);
 workersRouter.get('/nearby', authenticate, controller.searchNearby);
+// One verified worker as customers see them (no contact details) — e.g. an ad's "Book Now".
+workersRouter.get(
+  '/public/:id',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const [profile] = await service.getVerifiedProfiles([req.params.id]);
+    if (!profile) throw AppError.notFound('This worker is not available.', 'WORKER_NOT_FOUND');
+    return ok(res, profile);
+  }),
+);
 workersRouter.post('/:id/view', authenticate, controller.recordView);

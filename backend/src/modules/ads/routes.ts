@@ -8,6 +8,17 @@ import { created, ok } from '@/common/utils/response';
 import { AppError } from '@/common/errors/AppError';
 import { AdsRepository } from './repository';
 import { AdsService } from './service';
+import { ServicePromotionResolver } from './promotions';
+import { AuthRepository } from '@/modules/auth/repository';
+import { AuthService } from '@/modules/auth/service';
+import { WorkersRepository } from '@/modules/workers/repository';
+import { WorkersService } from '@/modules/workers/service';
+import { BusinessesRepository } from '@/modules/businesses/repository';
+import { BusinessesService } from '@/modules/businesses/service';
+import { JobSeekersRepository } from '@/modules/jobSeekers/repository';
+import { JobSeekersService } from '@/modules/jobSeekers/service';
+import { NotificationsRepository } from '@/modules/notifications/repository';
+import { NotificationsService } from '@/modules/notifications/service';
 import { SaveAdParams } from './interfaces';
 import {
   adListQuerySchema,
@@ -20,7 +31,15 @@ import {
   uploadSignatureSchema,
 } from './validation';
 
-const service = new AdsService(new AdsRepository(pool));
+const notifications = new NotificationsService(new NotificationsRepository(pool));
+// An ad can promote a worker / shop / job post: looked up through those modules' services.
+const promotions = new ServicePromotionResolver(
+  new AuthService(new AuthRepository(pool)),
+  new WorkersService(new WorkersRepository(pool), notifications),
+  new BusinessesService(new BusinessesRepository(pool), notifications),
+  new JobSeekersService(new JobSeekersRepository(pool)),
+);
+const service = new AdsService(new AdsRepository(pool), promotions);
 
 /** The image / video sent along with an ad's details, if any. */
 function mediaOf(body: { imageUrl?: string | null; videoUrl?: string | null }) {

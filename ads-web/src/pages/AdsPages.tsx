@@ -20,9 +20,20 @@ import {
   faVideo,
   faWallet,
   faXmark,
+  faIdBadge,
 } from '@fortawesome/free-solid-svg-icons';
 import { Topbar } from '@/components/Layout';
-import { PlaceField } from '@/components/PlaceField';
+import {
+  ACTION_LABEL,
+  AdActionDetails,
+  AdActionTop,
+  AdActionValue,
+  EMPTY_ACTION,
+  actionBody,
+  actionFromAd,
+  actionProblem,
+  promotesProfile,
+} from '@/components/AdActionField';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { BackLink, Badge, ErrorState, InfoRow, Loading, Notice, Spinner } from '@/components/ui';
 import { useApi } from '@/hooks/useApi';
@@ -41,7 +52,6 @@ import {
 import { getErrorMessage } from '@/services/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { useAuthStore } from '@/state/authStore';
-import { PlaceValue } from '@/utils/place';
 import { rupees, timeAgo, Tone } from '@/utils/format';
 
 const STATUS: Record<AdStatus, { label: string; tone: Tone; help: string }> = {
@@ -78,7 +88,7 @@ function AdThumb({ ad }: { ad: Ad }) {
       ) : ad.imageUrls[0] ? (
         <img src={ad.imageUrls[0]} alt="" loading="lazy" />
       ) : (
-        <FontAwesomeIcon icon={faBullhorn} />
+        <FontAwesomeIcon icon={ad.promoted ? faIdBadge : faBullhorn} />
       )}
     </span>
   );
@@ -111,7 +121,7 @@ export function MyAdsPage() {
           <div className="welcome">
             <h2>Hi {account?.fullName?.split(' ')[0] ?? 'there'} — reach customers near your shop</h2>
             <p>
-              Your picture or short video shows full screen in the Triolo apps to people within a few kilometres of your business.
+              Your picture or short video shows full screen in the Triolo apps — to everyone, or with directions, to people near your place.
               Book it here in a few minutes; Triolo checks it and it goes live on your start date.
             </p>
             <Link to="/new" className="btn">
@@ -163,11 +173,11 @@ function HowItWorksSteps() {
   const steps = [
     {
       title: 'Make your ad',
-      text: 'One picture or a short video (up to 30 seconds), vertical or wide. Add your phone and a link if you like.',
+      text: 'One picture or a short video (up to 30 seconds), vertical or wide. Choose what tapping it does: a link, directions, or your Triolo profile.',
     },
     {
       title: 'Choose where and when',
-      text: 'Pin your business on the map and pick 1 day, 3 days, a week or a month, and the start date.',
+      text: 'Pick 1 day, 3 days, a week or a month, and the start date. Want directions to your shop? Pin it on the map.',
     },
     {
       title: 'Triolo checks it',
@@ -214,8 +224,8 @@ export function HowItWorksPage() {
           <Loading />
         )}
         <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
-          Your ad is shown to people within {info.data?.radiusKm ?? 5} km of your business. Every running ad nearby gets an equal
-          share of views each day.
+          Your ad is shown to everyone — or, with directions, to people within {info.data?.radiusKm ?? 5} km of that place.
+          Every running ad gets an equal share of views each day.
         </p>
       </div>
       <div className="glass card">
@@ -275,19 +285,15 @@ function AdForm({ ad }: { ad?: Ad }) {
   const navigate = useNavigate();
   const info = useApi(() => adsApi.info(), []);
   const [advertiserName, setAdvertiserName] = useState(ad?.advertiserName ?? '');
-  const [advertiserPhone, setAdvertiserPhone] = useState(ad?.advertiserPhone ?? '');
-  const [linkUrl, setLinkUrl] = useState(ad?.linkUrl ?? '');
+  // What tapping the ad does (nothing / link / directions / your Triolo profile).
+  const [action, setAction] = useState<AdActionValue>(() => (ad ? actionFromAd(ad) : EMPTY_ACTION));
   const [description, setDescription] = useState(ad?.description ?? '');
   const [orientation, setOrientation] = useState<AdOrientation>(ad?.orientation ?? 'vertical');
-  const [displaySeconds, setDisplaySeconds] = useState(ad?.displaySeconds ?? 15);
+  // A picture shows for 15 seconds (a video for its own length); not asked any more.
+  const displaySeconds = ad?.displaySeconds ?? 15;
   const [planDays, setPlanDays] = useState<AdPlanDays>(ad?.planDays ?? 7);
   // A business can't start in the past; tomorrow by default, so there's time for the review.
   const [startDate, setStartDate] = useState(ad && ad.startDate >= todayInIndia() ? ad.startDate : addDays(todayInIndia(), 1));
-  const [place, setPlace] = useState<PlaceValue | null>(() =>
-    ad && ad.latitude != null && ad.longitude != null
-      ? { latitude: ad.latitude, longitude: ad.longitude, locationName: ad.locationText ?? 'Pinned location' }
-      : null,
-  );
   const [media, setMedia] = useState<MediaPick | null>(() =>
     ad?.videoUrl
       ? { kind: 'video', url: ad.videoUrl, seconds: ad.videoSeconds }
@@ -302,7 +308,6 @@ function AdForm({ ad }: { ad?: Ad }) {
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
 
   const price = info.data?.prices[String(planDays) as keyof typeof info.data.prices];
-  const radiusKm = info.data?.radiusKm ?? 5;
 
   const startUpload = (file: File, kind: 'image' | 'video') => {
     const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
@@ -357,15 +362,19 @@ function AdForm({ ad }: { ad?: Ad }) {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (advertiserName.trim().length < 2) return setError('Enter your business name.');
-    if (!media) return setError('Add your ad: one picture or one video.');
-    if (!place) return setError('Set where your business is: use your current location or pick it on the map.');
+    const actionError = actionProblem(action);
+    if (actionError) return setError(actionError);
+    if (!promotesProfile(action) && advertiserName.trim().length < 2) return setError('Enter your business name.');
+    if (!promotesProfile(action) && !media) return setError('Add your ad: one picture or one video.');
     if (!startDate || startDate < todayInIndia()) return setError('Choose a start date from today on.');
     setError('');
     setSaving(true);
     try {
       let mediaBody: { imageUrl?: string | null; videoUrl?: string | null };
-      if (media.file) {
+      if (promotesProfile(action) || !media) {
+        // A profile ad has no picture or video.
+        mediaBody = {};
+      } else if (media.file) {
         if (upload.current?.file !== media.file || uploadStatus?.state === 'failed') startUpload(media.file, media.kind);
         const url = await (upload.current as { promise: Promise<string> }).promise;
         mediaBody = media.kind === 'image' ? { imageUrl: url } : { videoUrl: url };
@@ -373,17 +382,14 @@ function AdForm({ ad }: { ad?: Ad }) {
         mediaBody = media.kind === 'image' ? { imageUrl: media.url } : { videoUrl: media.url };
       }
       const body = {
-        advertiserName: advertiserName.trim(),
-        advertiserPhone: advertiserPhone.trim() || undefined,
+        // A promoted Triolo Partner profile's own name is used.
+        advertiserName: promotesProfile(action) ? undefined : advertiserName.trim(),
         description: description.trim() || undefined,
-        linkUrl: linkUrl.trim() || undefined,
+        ...actionBody(action),
         orientation,
         displaySeconds,
         planDays,
         startDate,
-        latitude: place.latitude,
-        longitude: place.longitude,
-        locationText: place.locationName,
         ...mediaBody,
       };
       const saved = ad ? await adsApi.update(ad.id, body) : await adsApi.create(body);
@@ -402,29 +408,33 @@ function AdForm({ ad }: { ad?: Ad }) {
         <div className="card-title">
           <FontAwesomeIcon icon={faStore} /> Your business
         </div>
-        <label className="field">
-          <span>Business name *</span>
-          <input
-            value={advertiserName}
-            onChange={(e) => setAdvertiserName(e.target.value)}
-            maxLength={80}
-            placeholder="e.g. Sri Sai Textiles"
-          />
-        </label>
-        <label className="field">
-          <span>Business phone (optional)</span>
-          <input
-            value={advertiserPhone}
-            onChange={(e) => setAdvertiserPhone(e.target.value)}
-            inputMode="tel"
-            maxLength={15}
-            placeholder="For customers and for Triolo to reach you"
-          />
-        </label>
+        <AdActionTop value={action} onChange={setAction} mine disabled={saving} />
+        {promotesProfile(action) ? null : (
+          <label className="field">
+            <span>Business name *</span>
+            <input
+              value={advertiserName}
+              onChange={(e) => setAdvertiserName(e.target.value)}
+              maxLength={80}
+              placeholder="e.g. Sri Sai Textiles"
+            />
+          </label>
+        )}
+        <AdActionDetails value={action} onChange={setAction} disabled={saving} />
 
         <div className="card-title" style={{ marginTop: 10 }}>
           <FontAwesomeIcon icon={faBullhorn} /> The ad
         </div>
+        {promotesProfile(action) ? (
+          <div className="profile-ad-note">
+            <FontAwesomeIcon icon={faIdBadge} />
+            <div>
+              <strong>No picture or video needed</strong>
+              The apps show your profile as a card — photo, name, rating and what they do — with a big Book Now / Order from
+              this Shop / Contact button.
+            </div>
+          </div>
+        ) : (
         <div className="field">
           <span>Picture or video * (one)</span>
           <div className="ad-image-pick">
@@ -464,24 +474,14 @@ function AdForm({ ad }: { ad?: Ad }) {
             </span>
           </div>
         </div>
-        {media?.kind === 'video' ? (
+        )}
+        {!promotesProfile(action) && media?.kind === 'video' ? (
           <p className="muted" style={{ fontSize: 13, margin: '-4px 0 14px' }}>
             Shows for the whole video{media.seconds ? ` (${Math.round(media.seconds)} seconds)` : ''}, then people can close it.
           </p>
-        ) : (
-          <label className="field">
-            <span>Show the picture for (seconds) — then people can close it</span>
-            <input
-              type="number"
-              min={3}
-              max={30}
-              value={displaySeconds}
-              onChange={(e) => setDisplaySeconds(Math.max(3, Math.min(30, Math.round(Number(e.target.value) || 15))))}
-            />
-          </label>
-        )}
+        ) : null}
         <label className="field">
-          <span>A few words (optional)</span>
+          <span>A few words (optional) — shown on the ad</span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -490,22 +490,6 @@ function AdForm({ ad }: { ad?: Ad }) {
             placeholder="e.g. Diwali offer — 30% off on all sarees"
           />
         </label>
-        <label className="field">
-          <span>Link (optional) — opens when people tap your ad</span>
-          <input
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            inputMode="url"
-            maxLength={500}
-            placeholder="Your website, WhatsApp, Instagram or Google Maps link"
-          />
-        </label>
-        <PlaceField
-          label="Where is your business? *"
-          hint={`Your ad is shown to people within ${radiusKm} km of this place.`}
-          value={place}
-          onChange={setPlace}
-        />
       </div>
 
       <div className="glass card">
@@ -675,7 +659,8 @@ export function AdDetailPage() {
               <img src={ad.imageUrls[0]} alt="" />
             ) : (
               <div className="ad-preview-blank">
-                <FontAwesomeIcon icon={faBullhorn} />
+                <FontAwesomeIcon icon={ad.promoted ? faIdBadge : faBullhorn} />
+                {ad.promoted ? <span className="ad-preview-name">{ad.promoted.name} — profile card</span> : null}
               </div>
             )}
             <span className="ad-preview-tag">Ad</span>
@@ -695,15 +680,21 @@ export function AdDetailPage() {
                 {ad.advertiserPhone}
               </InfoRow>
             ) : null}
-            {ad.linkUrl ? (
-              <InfoRow icon={faLink} label="Opens when tapped">
-                <a href={ad.linkUrl} target="_blank" rel="noreferrer">
-                  {ad.linkUrl}
-                </a>
-              </InfoRow>
-            ) : null}
-            <InfoRow icon={faLocationDot} label="Shown to people near">
-              {ad.locationText ?? '—'} · within {ad.radiusKm} km
+            <InfoRow icon={faLink} label="When tapped">
+              {ACTION_LABEL[ad.actionType ?? (ad.linkUrl ? 'link' : 'none')]}
+              {ad.linkUrl ? (
+                <>
+                  {' — '}
+                  <a href={ad.linkUrl} target="_blank" rel="noreferrer">
+                    {ad.linkUrl}
+                  </a>
+                </>
+              ) : null}
+              {ad.destination ? ` — ${ad.destination.name}` : null}
+              {ad.promoted ? ` — ${ad.promoted.name}` : null}
+            </InfoRow>
+            <InfoRow icon={faLocationDot} label="Shown to">
+              {ad.latitude != null ? `People within ${ad.radiusKm} km of ${ad.locationText ?? 'your place'}` : 'Everyone, everywhere'}
             </InfoRow>
           </div>
         </div>

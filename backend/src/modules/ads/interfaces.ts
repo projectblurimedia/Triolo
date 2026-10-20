@@ -37,6 +37,74 @@ export const AD_PLACEMENTS = ['launch', 'action'] as const;
 export type AdPlacement = (typeof AD_PLACEMENTS)[number];
 
 /** in_review / rejected: a self-booked ad not approved (yet); otherwise by its dates. */
+/**
+ * What tapping the ad does: nothing (it just promotes), open a link, show directions to a
+ * place, or open a Triolo profile — a worker's service ("Book Now"), a shop ("Order from this
+ * Shop") or a job post ("Contact").
+ */
+export const AD_ACTION_TYPES = ['none', 'link', 'location', 'service', 'business', 'job_post'] as const;
+export type AdActionType = (typeof AD_ACTION_TYPES)[number];
+export type AdPromotedKind = 'service' | 'business' | 'job_post';
+
+/** The profile an ad promotes, as the apps need it to open the right screen. */
+export interface AdPromoted {
+  kind: AdPromotedKind;
+  id: string;
+  /** The worker's / shop's / job post's name when the ad was saved. */
+  name: string;
+}
+
+/**
+ * What a profile ad shows instead of a picture or video: the promoted worker, shop or job post
+ * as a card. Looked up when the ad is served, so its rating and photo are current.
+ */
+export interface AdPromotedCard {
+  kind: AdPromotedKind;
+  name: string;
+  photoUrl: string | null;
+  /** Skill (worker) or shop category codes; the apps translate them. */
+  tags: string[];
+  /** Words typed for "other" (shown as they are). */
+  customTags: string[];
+  /** A job post's work, e.g. "Cook". */
+  headline: string | null;
+  ratingAverage: number | null;
+  ratingCount: number;
+  experienceYears: number | null;
+  deliveryAvailable: boolean | null;
+  payAmount: number | null;
+  payPeriod: 'daily' | 'monthly' | null;
+  placeName: string | null;
+}
+
+/** Where "Directions" takes people. */
+export interface AdDestination {
+  latitude: number;
+  longitude: number;
+  name: string;
+}
+
+/** The ad's tap action as stored (what the service saves after checking it). */
+export interface AdActionColumns {
+  actionType: AdActionType;
+  linkUrl: string | null;
+  actionLatitude: number | null;
+  actionLongitude: number | null;
+  actionPlace: string | null;
+  promotedId: string | null;
+  promotedName: string | null;
+  promoteMobile: string | null;
+}
+
+/** Looks up the profile an ad promotes, through the owning modules (see promotions.ts). */
+export interface PromotionResolver {
+  accountIdByMobile(mobileNumber: string): Promise<string | null>;
+  /** The account's verified worker / shop, or its live job post: its id and display name. */
+  find(kind: AdPromotedKind, accountId: string): Promise<{ id: string; name: string } | null>;
+  /** The promoted profile as a card, or null when it's no longer available. */
+  card(kind: AdPromotedKind, id: string): Promise<AdPromotedCard | null>;
+}
+
 export type AdStatus = 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
 
 export interface AdSettings {
@@ -66,6 +134,12 @@ export interface PublicAd {
   locationText: string | null;
   /** Opened when the ad is tapped (or its Visit button). */
   linkUrl: string | null;
+  /** What tapping it does (see AD_ACTION_TYPES). */
+  actionType: AdActionType;
+  destination: AdDestination | null;
+  promoted: AdPromoted | null;
+  /** Filled in when served: the profile card a profile ad shows. */
+  promotedCard?: AdPromotedCard | null;
   endDate: string;
   /** Vertical (reel, 9:16) or horizontal (16:9) — the apps shape the full-screen card to it. */
   orientation: AdOrientation;
@@ -94,6 +168,8 @@ export interface Ad extends PublicAd {
   /** Why it was rejected (shown to the business). */
   reviewNote: string | null;
   reviewedAt: string | null;
+  /** The phone number the admin used to find the promoted profile (refills the form). */
+  promoteMobile: string | null;
   impressions: number;
   clicks: number;
   status: AdStatus;
@@ -103,18 +179,28 @@ export interface Ad extends PublicAd {
 }
 
 export interface SaveAdParams {
-  advertiserName: string;
+  /** Left out when promoting a Triolo Partner profile (its own name is used). */
+  advertiserName?: string;
   advertiserPhone?: string | null;
   /** Kept for the list and the bill; defaults to the business name. */
   title?: string | null;
   description?: string | null;
   orientation: AdOrientation;
   displaySeconds: number;
-  latitude: number;
-  longitude: number;
-  /** The place name shown under the ad (village / town). */
-  locationText: string;
+  /**
+   * Ignored when saving: an ad has a place only with 'Show directions' (that place — the ad is
+   * then shown within its radius); every other ad has none and is shown everywhere.
+   */
+  latitude?: number | null;
+  longitude?: number | null;
+  locationText?: string | null;
   linkUrl?: string | null;
+  actionType?: AdActionType;
+  actionLatitude?: number | null;
+  actionLongitude?: number | null;
+  actionPlace?: string | null;
+  /** Admin form: the phone number of the account whose profile the ad promotes. */
+  promoteMobile?: string | null;
   planDays: AdPlanDays;
   paymentMethod: AdPaymentState;
   /** YYYY-MM-DD (India date). */

@@ -4,6 +4,8 @@ import { apiClient } from './apiClient';
 export type AdStatus = 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
 export type AdPlanDays = 1 | 3 | 7 | 30;
 export type AdOrientation = 'vertical' | 'horizontal';
+export type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
+import type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
 export type AdPlanPrices = Record<'1' | '3' | '7' | '30', number>;
 
 export interface Ad {
@@ -21,6 +23,13 @@ export interface Ad {
   durationSeconds: number;
   locationText: string | null;
   linkUrl: string | null;
+  /** What tapping the ad does. */
+  actionType: AdActionType;
+  destination: { latitude: number; longitude: number; name: string } | null;
+  /** The Triolo Partner profile it promotes. */
+  promoted: { kind: AdPromotedKind; id: string; name: string } | null;
+  /** The Triolo Partner number that profile was found by. */
+  promoteMobile: string | null;
   latitude: number | null;
   longitude: number | null;
   radiusKm: number;
@@ -50,15 +59,18 @@ export interface AdInfo {
 }
 
 export interface SaveOwnAd {
-  advertiserName: string;
+  /** Left out when promoting a Triolo Partner profile (its name is used). */
+  advertiserName?: string;
   advertiserPhone?: string;
+  promoteMobile?: string;
   description?: string;
   orientation: AdOrientation;
   displaySeconds: number;
-  latitude: number;
-  longitude: number;
-  locationText: string;
   linkUrl?: string;
+  actionType: AdActionType;
+  actionLatitude: number | null;
+  actionLongitude: number | null;
+  actionPlace: string | null;
   planDays: AdPlanDays;
   startDate: string;
   imageUrl?: string | null;

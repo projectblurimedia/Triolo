@@ -23,6 +23,7 @@ import { ToastHost } from '@/components/ToastHost';
 import { AdActionHost, AdLaunchBanner, rememberAdBeforeRestart, useAdOnScreen } from '@/components/Ads';
 import { PortalHost } from '@/components/Portal';
 import { BookingTrackingModal } from '@/components/BookingTrackingModal';
+import { PromotedProfileHost } from '@/components/PromotedProfileHost';
 import { OrderTrackingModal } from '@/components/OrderTrackingModal';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
@@ -182,6 +183,8 @@ export default function App() {
         <AdLaunchBanner waitFor={!launchCheckDone || isUpdateAvailable || showUpdateOverlay} />
         {/* A local business's ad before a key action (see showAdBefore). */}
         <AdActionHost />
+        {/* A profile an ad promotes: Book Now / Order from this Shop / Contact. */}
+        <PromotedProfileHost />
         <ToastHost />
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}

@@ -68,6 +68,8 @@ export type NearbyShopSort = 'distance' | 'rating';
 
 export const businessesService = {
   getMyProfile: () => apiClient.get<BusinessProfile | null>('/businesses/me/profile', true),
+  /** One verified shop (e.g. from an ad's Order from this Shop). */
+  getPublic: (id: string) => apiClient.get<BusinessProfile>(`/businesses/public/${id}`, true),
 
   searchNearby: (params: NearbySearchParams) => {
     const search = new URLSearchParams();

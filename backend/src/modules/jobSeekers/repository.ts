@@ -193,6 +193,20 @@ export class JobSeekersRepository {
     return { items: rows.rows.map(mapAdminPost), total: Number(count.rows[0].count), page: filter.page, limit: filter.limit };
   }
 
+  /** A live post as customers see it (name and phone to call), or null. */
+  async findPublicById(id: string): Promise<JobSeekerSearchResult | null> {
+    const result = await this.pool.query(
+      `SELECT p.*, a.full_name, a.mobile_number, 0 AS distance_meters
+       FROM job_seeker_posts p JOIN accounts a ON a.id = p.account_id
+       WHERE p.id = $1 AND p.is_active AND a.status = 'active'`,
+      [id],
+    );
+    const row = result.rows[0];
+    return row
+      ? { ...mapPost(row), fullName: row.full_name, mobileNumber: row.mobile_number, distanceMeters: Number(row.distance_meters) }
+      : null;
+  }
+
   async adminGet(id: string): Promise<AdminJobSeekerPost | null> {
     const result = await this.pool.query(
       `SELECT p.*, a.full_name, a.mobile_number, a.status AS account_status

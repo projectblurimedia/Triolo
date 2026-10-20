@@ -60,6 +60,10 @@ const AD: Ad = {
   contactPhone: '9876543210',
   locationText: 'Main Road, Eluru',
   linkUrl: null,
+  actionType: 'none',
+  destination: null,
+  promoted: null,
+  promoteMobile: null,
   latitude: 16.7,
   longitude: 81.1,
   radiusKm: 5,
@@ -96,7 +100,7 @@ const PARAMS: SaveAdParams = {
   startDate: '2026-10-18',
 };
 
-function makeService() {
+function makeService(promotions?: { accountIdByMobile: jest.Mock; find: jest.Mock; card: jest.Mock }) {
   const repository = {
     getSettings: jest.fn().mockResolvedValue(SETTINGS),
     updateSettings: jest.fn(),
@@ -118,7 +122,7 @@ function makeService() {
     withdrawOwned: jest.fn(),
     review: jest.fn(),
   } as unknown as MockRepository;
-  return { service: new AdsService(repository as unknown as AdsRepository), repository };
+  return { service: new AdsService(repository as unknown as AdsRepository, promotions), repository };
 }
 
 describe('placementOn', () => {
@@ -153,6 +157,9 @@ describe('AdsService', () => {
       contactPhone: AD.advertiserPhone,
       locationText: AD.locationText,
       linkUrl: AD.linkUrl,
+      actionType: 'none',
+      destination: null,
+      promoted: null,
       endDate: AD.endDate,
     });
     expect(ad).not.toHaveProperty('amount');
@@ -173,7 +180,8 @@ describe('AdsService', () => {
         title: 'Diwali offer',
         advertiserPhone: null,
         description: null,
-        locationText: 'Eluru',
+        // Not a directions ad: no place, shown everywhere.
+        locationText: null,
       }),
       120,
     );
@@ -347,6 +355,153 @@ describe('AdsService', () => {
       repository.review.mockResolvedValueOnce(null);
       repository.findById.mockResolvedValue({ ...AD, reviewStatus: 'pending' });
       await expect(service.review('ad-1', 'approve')).rejects.toMatchObject({ code: 'AD_DATES_PASSED' });
+    });
+  });
+
+  describe('what tapping the ad does', () => {
+    const promotions = () => ({
+      accountIdByMobile: jest.fn().mockResolvedValue('acc-9'),
+      find: jest.fn().mockResolvedValue({ id: 'worker-1', name: 'Ravi' }),
+      card: jest.fn().mockResolvedValue({ kind: 'service', name: 'Ravi', photoUrl: null, tags: ['plumber'] }),
+    });
+
+    it('an older form with a link makes a link ad', async () => {
+      const { service, repository } = makeService();
+      await service.create(PARAMS);
+      expect(repository.create.mock.calls[0][0]).toMatchObject({ actionType: 'link', linkUrl: 'https://sritextiles.com' });
+    });
+
+    it('drops the link when another action is chosen', async () => {
+      const { service, repository } = makeService();
+      await service.create({ ...PARAMS, actionType: 'none' });
+      expect(repository.create.mock.calls[0][0]).toMatchObject({ actionType: 'none', linkUrl: null, promotedId: null });
+    });
+
+    it('only a directions ad has a place; the others are shown everywhere', async () => {
+      const { service, repository } = makeService();
+      await service.create({ ...PARAMS, actionType: 'none' });
+      expect(repository.create.mock.calls[0][0]).toMatchObject({ latitude: null, longitude: null, locationText: null });
+      await service.create({ ...PARAMS, actionType: 'location', actionLatitude: 16.5, actionLongitude: 80.6, actionPlace: 'Vijayawada' });
+      expect(repository.create.mock.calls[1][0]).toMatchObject({ latitude: 16.5, longitude: 80.6, locationText: 'Vijayawada' });
+    });
+
+    it('saves the place for directions', async () => {
+      const { service, repository } = makeService();
+      await service.create({ ...PARAMS, actionType: 'location', actionLatitude: 16.71, actionLongitude: 81.09, actionPlace: ' Eluru ' });
+      expect(repository.create.mock.calls[0][0]).toMatchObject({
+        actionType: 'location',
+        actionLatitude: 16.71,
+        actionLongitude: 81.09,
+        actionPlace: 'Eluru',
+        linkUrl: null,
+      });
+    });
+
+    it('finds the promoted profile by the admin-given phone number', async () => {
+      const resolver = promotions();
+      const { service, repository } = makeService(resolver);
+      await service.create({ ...PARAMS, actionType: 'service', promoteMobile: '9700000001' });
+      expect(resolver.accountIdByMobile).toHaveBeenCalledWith('9700000001');
+      expect(resolver.find).toHaveBeenCalledWith('service', 'acc-9');
+      expect(repository.create.mock.calls[0][0]).toMatchObject({
+        actionType: 'service',
+        promotedId: 'worker-1',
+        promotedName: 'Ravi',
+        promoteMobile: '9700000001',
+      });
+    });
+
+    it('a promoted profile names the ad and its number is the ad phone', async () => {
+      const resolver = promotions();
+      const { service, repository } = makeService(resolver);
+      await service.create({ ...PARAMS, advertiserName: undefined, title: undefined, actionType: 'service', promoteMobile: '9700000001' });
+      expect(repository.create.mock.calls[0][0]).toMatchObject({
+        advertiserName: 'Ravi',
+        title: 'Ravi',
+        advertiserPhone: '9700000001',
+      });
+    });
+
+    it("on the ads website the given Triolo Partner number is used, not the signed-in account", async () => {
+      const resolver = promotions();
+      const { service, repository } = makeService(resolver);
+      repository.setMedia.mockResolvedValue({ ad: AD, previousImages: [], previousVideo: null });
+      const params = { ...PARAMS } as Omit<SaveAdParams, 'paymentMethod'>;
+      await service.createOwned(
+        'owner-1',
+        { ...params, startDate: '2999-01-01', actionType: 'business', promoteMobile: '9700000001' },
+        { imageUrl: `${OURS}image/upload/v1/triolo/ads/b.jpg` },
+      );
+      expect(resolver.accountIdByMobile).toHaveBeenCalledWith('9700000001');
+      expect(resolver.find).toHaveBeenCalledWith('business', 'acc-9');
+    });
+
+    it('refuses an unknown number or a missing profile', async () => {
+      const resolver = promotions();
+      resolver.accountIdByMobile.mockResolvedValueOnce(null);
+      const { service, repository } = makeService(resolver);
+      await expect(service.create({ ...PARAMS, actionType: 'business', promoteMobile: '9000000000' })).rejects.toMatchObject({
+        code: 'AD_PROMOTE_ACCOUNT_NOT_FOUND',
+      });
+      resolver.find.mockResolvedValueOnce(null);
+      await expect(service.create({ ...PARAMS, actionType: 'business', promoteMobile: '9000000000' })).rejects.toMatchObject({
+        code: 'AD_PROMOTE_PROFILE_NOT_FOUND',
+      });
+      expect(repository.create).not.toHaveBeenCalled();
+    });
+
+    it("a business's own ad promotes its own profile", async () => {
+      const resolver = promotions();
+      resolver.find.mockResolvedValue({ id: 'post-1', name: 'Lakshmi' });
+      const { service, repository } = makeService(resolver);
+      repository.setMedia.mockResolvedValue({ ad: AD, previousImages: [], previousVideo: null });
+      const params = { ...PARAMS } as Omit<SaveAdParams, 'paymentMethod'>;
+      await service.createOwned(
+        'owner-1',
+        { ...params, startDate: '2999-01-01', actionType: 'job_post' },
+        { imageUrl: `${OURS}image/upload/v1/triolo/ads/b.jpg` },
+      );
+      expect(resolver.accountIdByMobile).not.toHaveBeenCalled();
+      expect(resolver.find).toHaveBeenCalledWith('job_post', 'owner-1');
+      expect(repository.create.mock.calls[0][0]).toMatchObject({ promotedId: 'post-1', promoteMobile: null });
+    });
+
+    it('a profile ad needs no picture or video, even on the ads website', async () => {
+      const resolver = promotions();
+      const { service, repository } = makeService(resolver);
+      const params = { ...PARAMS } as Omit<SaveAdParams, 'paymentMethod'>;
+      await service.createOwned('owner-1', { ...params, startDate: '2999-01-01', actionType: 'service', promoteMobile: '9700000001' }, {});
+      expect(repository.create).toHaveBeenCalled();
+      expect(repository.setMedia).not.toHaveBeenCalled();
+    });
+
+    it('switching an ad to a profile ad deletes its picture', async () => {
+      const resolver = promotions();
+      const { service, repository } = makeService(resolver);
+      const updated = await service.update('ad-1', { ...PARAMS, actionType: 'service', promoteMobile: '9700000001' });
+      expect(deletePhotosFromCloudinary).toHaveBeenCalledWith(AD.imageUrls);
+      expect(repository.clearMedia).toHaveBeenCalledWith('ad-1');
+      expect(updated.imageUrls).toEqual([]);
+    });
+
+    it('a served profile ad carries its profile card', async () => {
+      const resolver = promotions();
+      const { service, repository } = makeService(resolver);
+      repository.pickAndCount.mockResolvedValue({ ...AD, imageUrl: null, imageUrls: [], actionType: 'service', promoted: { kind: 'service', id: 'worker-1', name: 'Ravi' } });
+      const ad = await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null);
+      expect(resolver.card).toHaveBeenCalledWith('service', 'worker-1');
+      expect(ad?.promotedCard).toMatchObject({ name: 'Ravi', tags: ['plumber'] });
+    });
+
+    it('apps get the action with the ad', async () => {
+      const { service, repository } = makeService();
+      repository.pickAndCount.mockResolvedValue({
+        ...AD,
+        actionType: 'business',
+        promoted: { kind: 'business', id: 'shop-1', name: 'Sri Sai' },
+      });
+      const ad = await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null);
+      expect(ad).toMatchObject({ actionType: 'business', promoted: { kind: 'business', id: 'shop-1' }, destination: null });
     });
   });
 });

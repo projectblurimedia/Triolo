@@ -1,5 +1,27 @@
 import { Pool } from 'pg';
-import { Ad, AdListFilter, AdSettings, AdStatus, SaveAdParams } from './interfaces';
+import { Ad, AdActionColumns, AdListFilter, AdSettings, AdStatus, SaveAdParams } from './interfaces';
+
+/** An ad's details as saved: the form's fields plus its checked tap action. */
+export type StoredAdParams = SaveAdParams & AdActionColumns;
+
+function actionValues(params: StoredAdParams): unknown[] {
+  return [
+    params.actionType,
+    params.actionLatitude,
+    params.actionLongitude,
+    params.actionPlace,
+    params.promotedId,
+    params.promotedName,
+    params.promoteMobile,
+  ];
+}
+
+// SET list for the action columns, starting at parameter $from.
+function actionSets(from: number): string {
+  return ['action_type', 'action_latitude', 'action_longitude', 'action_place', 'promoted_id', 'promoted_name', 'promote_mobile']
+    .map((column, i) => `${column} = $${from + i}`)
+    .join(', ');
+}
 
 // Ads run by the India calendar day, whatever timezone the server is in.
 const TODAY = `(now() AT TIME ZONE 'Asia/Kolkata')::date`;
@@ -39,6 +61,16 @@ function mapAd(row: any): Ad {
     videoUrl: row.video_url,
     locationText: row.location_text,
     linkUrl: row.link_url ?? null,
+    actionType: row.action_type ?? 'none',
+    destination:
+      row.action_type === 'location' && row.action_latitude != null
+        ? { latitude: Number(row.action_latitude), longitude: Number(row.action_longitude), name: row.action_place ?? '' }
+        : null,
+    promoted:
+      ['service', 'business', 'job_post'].includes(row.action_type) && row.promoted_id
+        ? { kind: row.action_type, id: row.promoted_id, name: row.promoted_name ?? '' }
+        : null,
+    promoteMobile: row.promote_mobile ?? null,
     orientation: row.orientation,
     displaySeconds: Number(row.display_seconds),
     videoSeconds: row.video_seconds == null ? null : Number(row.video_seconds),
@@ -124,14 +156,14 @@ export class AdsRepository {
    * Books an ad. With `ownerAccountId` it's a business booking its own ad: it waits for review
    * and its payment is 'pending'; without it, the admin's booking (approved at once).
    */
-  async create(params: SaveAdParams, amount: number, ownerAccountId: string | null = null): Promise<Ad> {
+  async create(params: StoredAdParams, amount: number, ownerAccountId: string | null = null): Promise<Ad> {
     const result = await this.pool.query(
       `WITH inserted AS (
          INSERT INTO ads (advertiser_name, advertiser_phone, title, description, latitude, longitude, location_text,
                           plan_days, amount, payment_method, start_date, end_date, link_url, orientation, display_seconds,
-                          owner_account_id, review_status)
+                          owner_account_id, review_status, action_type, action_latitude, action_longitude, action_place, promoted_id, promoted_name, promote_mobile)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $11::date + ($8::int - 1), $12, $13, $14,
-                 $15, CASE WHEN $15::uuid IS NULL THEN 'approved' ELSE 'pending' END)
+                 $15, CASE WHEN $15::uuid IS NULL THEN 'approved' ELSE 'pending' END, $16, $17, $18, $19, $20, $21, $22)
          RETURNING *
        )
        SELECT ${AD_COLUMNS} FROM inserted a`,
@@ -151,6 +183,7 @@ export class AdsRepository {
         params.orientation,
         params.displaySeconds,
         ownerAccountId,
+        ...actionValues(params),
       ],
     );
     return mapAd(result.rows[0]);
@@ -160,13 +193,13 @@ export class AdsRepository {
    * A business editing its own ad while it waits for review or after it was rejected: the
    * changes go back for review.
    */
-  async updateOwned(id: string, ownerAccountId: string, params: SaveAdParams, amount: number): Promise<Ad | null> {
+  async updateOwned(id: string, ownerAccountId: string, params: StoredAdParams, amount: number): Promise<Ad | null> {
     const result = await this.pool.query(
       `WITH updated AS (
          UPDATE ads SET advertiser_name = $3, advertiser_phone = $4, title = $5, description = $6,
            latitude = $7, longitude = $8, location_text = $9, plan_days = $10, amount = $11,
            start_date = $12::date, end_date = $12::date + ($10::int - 1), link_url = $13, orientation = $14, display_seconds = $15,
-           review_status = 'pending', review_note = NULL, reviewed_at = NULL, updated_at = now()
+           review_status = 'pending', review_note = NULL, reviewed_at = NULL, ${actionSets(16)}, updated_at = now()
          WHERE id = $1 AND owner_account_id = $2 AND deleted_at IS NULL AND review_status IN ('pending', 'rejected')
          RETURNING *
        )
@@ -187,6 +220,7 @@ export class AdsRepository {
         params.linkUrl ?? null,
         params.orientation,
         params.displaySeconds,
+        ...actionValues(params),
       ],
     );
     return result.rows[0] ? mapAd(result.rows[0]) : null;
@@ -244,12 +278,12 @@ export class AdsRepository {
   }
 
   /** Edits a live (not deleted) ad; the end date and amount follow the plan. */
-  async update(id: string, params: SaveAdParams, amount: number): Promise<Ad | null> {
+  async update(id: string, params: StoredAdParams, amount: number): Promise<Ad | null> {
     const result = await this.pool.query(
       `WITH updated AS (
          UPDATE ads SET advertiser_name = $2, advertiser_phone = $3, title = $4, description = $5,
            latitude = $6, longitude = $7, location_text = $8, plan_days = $9, amount = $10, payment_method = $11,
-           start_date = $12::date, end_date = $12::date + ($9::int - 1), link_url = $13, orientation = $14, display_seconds = $15, updated_at = now()
+           start_date = $12::date, end_date = $12::date + ($9::int - 1), link_url = $13, orientation = $14, display_seconds = $15, ${actionSets(16)}, updated_at = now()
          WHERE id = $1 AND deleted_at IS NULL
          RETURNING *
        )
@@ -270,6 +304,7 @@ export class AdsRepository {
         params.linkUrl ?? null,
         params.orientation,
         params.displaySeconds,
+        ...actionValues(params),
       ],
     );
     return result.rows[0] ? mapAd(result.rows[0]) : null;
@@ -411,7 +446,8 @@ export class AdsRepository {
          SELECT a.id FROM ads a
          LEFT JOIN ad_daily_stats s ON s.ad_id = a.id AND s.day = ${TODAY}
          WHERE a.deleted_at IS NULL AND a.review_status = 'approved' AND ${TODAY} BETWEEN a.start_date AND a.end_date
-           AND a.latitude IS NOT NULL AND ${DISTANCE_SQL} <= a.radius_km * 1000
+           -- An ad with a place (a directions ad) is local; one without is shown everywhere.
+           AND (a.latitude IS NULL OR ${DISTANCE_SQL} <= a.radius_km * 1000)
          ORDER BY (a.id = $1::uuid) ASC NULLS FIRST, COALESCE(s.impressions, 0) ASC, random()
          LIMIT 1
        ),

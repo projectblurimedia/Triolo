@@ -20,10 +20,10 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { create } from 'zustand';
-import { Ad, adsService } from '@/services/adsService';
+import { Ad, AdPromoted, AdPromotedCard, adsService } from '@/services/adsService';
 import { useAuthStore } from '@/state/authStore';
 import { useLocationStore } from '@/state/locationStore';
-import { fonts, headerGradient, typography } from '@/theme';
+import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { LoadingIndicator } from './LoadingIndicator';
 import { SmartImage } from './SmartImage';
 
@@ -95,7 +95,7 @@ function useAppActive(): boolean {
 
 /** Waits (briefly) for a picture ad's image, so it opens already drawn. */
 function preload(ad: Ad): Promise<void> {
-  const url = ad.videoUrl ? null : (ad.imageUrl ?? ad.imageUrls?.[0] ?? null);
+  const url = ad.videoUrl ? null : (ad.imageUrl ?? ad.imageUrls?.[0] ?? ad.promotedCard?.photoUrl ?? null);
   if (!url) return Promise.resolve();
   return Promise.race([
     Image.prefetch(url).then(
@@ -119,11 +119,84 @@ function useReadyCoords(): { latitude: number; longitude: number } | null {
   return latitude != null && longitude != null ? { latitude, longitude } : null;
 }
 
-/** Opens the ad's link (and counts the open). */
-function openAdLink(ad: Ad) {
-  if (!ad.linkUrl) return;
-  adsService.recordOpen(ad.id);
-  Linking.openURL(ad.linkUrl).catch(() => undefined);
+/**
+ * Opens a promoted profile in this app (Book Now / Order from this Shop / Contact). Each app
+ * registers what it can open: the customer app all three, the partner app only Contact.
+ */
+type AdPromotionHandler = (promoted: AdPromoted) => void;
+let promotionHandler: { open: AdPromotionHandler; kinds: AdPromoted['kind'][] } | null = null;
+
+export function setAdPromotionHandler(open: AdPromotionHandler | null, kinds: AdPromoted['kind'][] = []): void {
+  promotionHandler = open ? { open, kinds } : null;
+}
+
+type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
+
+const TEAL = ['#0D9488', '#2DD4BF'] as const;
+const CALL_GRADIENT = ['#16A34A', '#22C55E'] as const;
+
+/** Each kind of promoted profile has its own colour, icon and tag. */
+const KIND_LOOK: Record<AdPromoted['kind'], { gradient: readonly [string, string]; icon: IconName; labelKey: string }> = {
+  service: { gradient: headerGradient, icon: 'screwdriver-wrench', labelKey: 'ads.kindWorker' },
+  business: { gradient: ['#16A34A', '#22C55E'], icon: 'store', labelKey: 'ads.kindShop' },
+  job_post: { gradient: ['#7C3AED', '#A78BFA'], icon: 'user-tie', labelKey: 'ads.kindJob' },
+};
+
+/** The ad's button: what tapping the ad (or the button) does. */
+interface AdCta {
+  labelKey: string;
+  icon: IconName;
+  gradient: readonly [string, string];
+  /** Opens a screen in this app: the ad closes first (without going on to the action). */
+  inApp: boolean;
+  run: () => void;
+}
+
+/** Null when the ad just promotes (nothing happens on a tap). */
+function adCta(ad: Ad): AdCta | null {
+  const type = ad.actionType ?? (ad.linkUrl ? 'link' : 'none');
+  const counted = (run: () => void) => () => {
+    adsService.recordOpen(ad.id);
+    run();
+  };
+  if (type === 'link' && ad.linkUrl) {
+    const url = ad.linkUrl;
+    return {
+      labelKey: 'ads.visit',
+      icon: 'arrow-up-right-from-square',
+      gradient: headerGradient,
+      inApp: false,
+      run: counted(() => Linking.openURL(url).catch(() => undefined)),
+    };
+  }
+  if (type === 'location' && ad.destination) {
+    const { latitude, longitude } = ad.destination;
+    return {
+      labelKey: 'ads.directions',
+      icon: 'diamond-turn-right',
+      gradient: TEAL,
+      inApp: false,
+      run: counted(() =>
+        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`).catch(() => undefined),
+      ),
+    };
+  }
+  const promoted = ad.promoted;
+  const handler = promotionHandler;
+  if (promoted && handler && handler.kinds.includes(promoted.kind)) {
+    const look: Record<AdPromoted['kind'], { labelKey: string; icon: IconName }> = {
+      service: { labelKey: 'ads.bookNow', icon: 'calendar-check' },
+      business: { labelKey: 'ads.orderShop', icon: 'basket-shopping' },
+      job_post: { labelKey: 'ads.contact', icon: 'phone' },
+    };
+    return {
+      ...look[promoted.kind],
+      gradient: KIND_LOOK[promoted.kind].gradient,
+      inApp: true,
+      run: counted(() => handler.open(promoted)),
+    };
+  }
+  return null;
 }
 
 // A tiny page around one <video>: plays by itself (muted to start, looping), takes commands
@@ -212,7 +285,18 @@ export function useAdOnScreen(): boolean {
   return useAdsOnScreen((state) => state.count > 0);
 }
 
-function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; onClose: () => void }) {
+function AdPlayer({
+  ad,
+  mode,
+  onClose,
+  onLeave,
+}: {
+  ad: Ad;
+  mode: 'launch' | 'action';
+  onClose: () => void;
+  /** Closes the ad without going on to the action (its button opened a profile instead). */
+  onLeave: () => void;
+}) {
   useEffect(() => {
     useAdsOnScreen.setState((state) => ({ count: state.count + 1 }));
     return () => useAdsOnScreen.setState((state) => ({ count: Math.max(0, state.count - 1) }));
@@ -230,6 +314,25 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
   const watched = useRef(0);
   const vertical = ad.orientation === 'vertical';
   const imageUrl = ad.imageUrl ?? ad.imageUrls?.[0] ?? null;
+  // A Triolo Partner profile ad has no picture or video: it shows the profile as a card.
+  const profile: AdPromotedCard | null =
+    ad.promoted && !ad.videoUrl && !imageUrl
+      ? (ad.promotedCard ?? {
+          kind: ad.promoted.kind,
+          name: ad.promoted.name,
+          photoUrl: null,
+          tags: [],
+          customTags: [],
+          headline: null,
+          ratingAverage: null,
+          ratingCount: 0,
+          experienceYears: null,
+          deliveryAvailable: null,
+          payAmount: null,
+          payPeriod: null,
+          placeName: null,
+        })
+      : null;
 
   // The card's size: as big as fits, keeping the ad's own shape.
   const room = { width: screenWidth - 32, height: screenHeight - insets.top - insets.bottom - 170 };
@@ -237,6 +340,11 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
   const cardHeight = vertical ? (cardWidth * 16) / 9 : Math.min((cardWidth * 9) / 16, room.height);
 
   const start = () => setStarted(true);
+
+  // A profile card has nothing to load: its time starts at once.
+  useEffect(() => {
+    if (profile) start();
+  }, []);
 
   // Never wait forever for slow media: the timer starts on its own after a while (on screen).
   useEffect(() => {
@@ -294,18 +402,62 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
     </LinearGradient>
   );
 
-  const visit = (
-    <Pressable onPress={() => openAdLink(ad)} style={styles.visitButton} accessibilityRole="link" hitSlop={6}>
-      <Text style={styles.visitText}>{t('ads.visit')}</Text>
-      <FontAwesome6 name="arrow-up-right-from-square" size={12} color="#0C0F14" solid />
+  const cta = adCta(ad);
+  const runCta = () => {
+    if (!cta) return;
+    if (cta.inApp) {
+      // The profile opens once the ad has gone (no screen can show over it).
+      onLeave();
+      setTimeout(cta.run, 300);
+    } else {
+      cta.run();
+    }
+  };
+  const visit = cta ? (
+    <Pressable onPress={runCta} accessibilityRole="button" hitSlop={6}>
+      <LinearGradient colors={cta.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.visitButton}>
+        <FontAwesome6 name={cta.icon} size={13} color="#FFFFFF" solid />
+        <Text style={styles.visitText}>{t(cta.labelKey)}</Text>
+      </LinearGradient>
     </Pressable>
-  );
+  ) : null;
+
+  // The business's number, as a Call Now button (the number itself isn't shown). Profile ads
+  // have their own Book Now / Order / Contact button instead.
+  const call = ad.contactPhone ? (
+    <Pressable
+      onPress={() => {
+        adsService.recordOpen(ad.id);
+        Linking.openURL(`tel:${ad.contactPhone}`).catch(() => undefined);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={t('ads.callNow')}
+      hitSlop={6}
+    >
+      <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.visitButton}>
+        <FontAwesome6 name="phone-volume" size={13} color="#FFFFFF" solid />
+        <Text style={styles.visitText}>{t('ads.callNow')}</Text>
+      </LinearGradient>
+    </Pressable>
+  ) : null;
+  const buttons =
+    call || visit ? (
+      <View style={styles.ctaStack}>
+        {call}
+        {visit}
+      </View>
+    ) : null;
 
   const who = (
     <View style={styles.whoText}>
       <Text style={styles.whoName} numberOfLines={1}>
         {ad.advertiserName}
       </Text>
+      {ad.description ? (
+        <Text style={styles.whoWords} numberOfLines={3}>
+          {ad.description}
+        </Text>
+      ) : null}
       {ad.locationText ? (
         <Text style={styles.whoPlace} numberOfLines={1}>
           {ad.locationText}
@@ -326,8 +478,13 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
     >
       <View style={styles.screen}>
         {/* The backdrop is the ad itself, blurred, so every ad gets its own colours. */}
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={40} />
+        {imageUrl || profile?.photoUrl ? (
+          <Image
+            source={{ uri: (imageUrl ?? profile?.photoUrl) as string }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+            blurRadius={40}
+          />
         ) : null}
         <View style={[StyleSheet.absoluteFill, styles.backdropDim]} />
 
@@ -360,12 +517,14 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
             />
           </View>
 
-          {/* The ad. */}
+          {/* The ad: a profile card, or the picture / video. */}
+          {profile ? <ProfileAdCard card={profile} words={ad.description} width={cardWidth} cta={cta} onCta={runCta} /> : null}
+          {profile ? null : (
           <View style={[styles.card, { width: cardWidth, height: cardHeight }]}>
             <Pressable
-              onPress={() => openAdLink(ad)}
-              disabled={!ad.linkUrl}
-              accessibilityRole={ad.linkUrl ? 'link' : undefined}
+              onPress={runCta}
+              disabled={!cta}
+              accessibilityRole={cta ? 'button' : undefined}
               accessibilityLabel={ad.advertiserName}
             >
               {media}
@@ -391,15 +550,16 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
               // On a reel the name and Visit sit over the bottom of the picture.
               <LinearGradient colors={['transparent', 'rgba(0,0,0,0.78)']} style={styles.reelFooter} pointerEvents="box-none">
                 {who}
-                {ad.linkUrl ? visit : null}
+                {buttons}
               </LinearGradient>
             ) : null}
           </View>
+          )}
 
-          {!vertical ? (
+          {!vertical && !profile ? (
             <View style={[styles.wideFooter, { width: cardWidth }]}>
               {who}
-              {ad.linkUrl ? visit : null}
+              {buttons}
             </View>
           ) : null}
 
@@ -420,6 +580,173 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
   );
 }
 
+/** The profile card's own colours, following the app's light / dark theme. */
+const CARD_LIGHT = {
+  card: '#FFFFFF',
+  name: '#0C0F14',
+  muted: '#475569',
+  emptyStar: '#E2E8F0',
+  factsBg: '#F1F5F9',
+  factIcon: '#64748B',
+  factText: '#334155',
+  tagAlpha: '14',
+};
+const CARD_DARK = {
+  card: '#161B24',
+  name: '#EEF2F8',
+  muted: '#A3AEC2',
+  emptyStar: '#334155',
+  factsBg: '#1F2632',
+  factIcon: '#94A0B4',
+  factText: '#CBD5E1',
+  tagAlpha: '33',
+};
+
+/** "Ravi Kumar" → "RK". */
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+/**
+ * A Triolo Partner profile ad: the worker, shop or job seeker as a card — photo, name, rating,
+ * what they do and a big Book Now / Order from this Shop / Contact button.
+ */
+function ProfileAdCard({
+  card,
+  words,
+  width,
+  cta,
+  onCta,
+}: {
+  card: AdPromotedCard;
+  /** The ad's own "few words" (an offer, a message). */
+  words: string | null;
+  width: number;
+  cta: AdCta | null;
+  onCta: () => void;
+}) {
+  const { t } = useTranslation();
+  const { isDark } = useThemeColors();
+  const pal = isDark ? CARD_DARK : CARD_LIGHT;
+  const look = KIND_LOOK[card.kind];
+  // In dark mode the lighter end of the kind's colour reads better on the dark card.
+  const accent = isDark ? look.gradient[1] : look.gradient[0];
+  const tags = [
+    ...(card.headline ? [card.headline] : []),
+    ...card.tags.map((code) =>
+      t(card.kind === 'business' ? `businessProfile.categories.${code}` : `workerProfile.skills.${code}`, { defaultValue: code }),
+    ),
+    ...card.customTags,
+  ].slice(0, 4);
+  const facts: { icon: IconName; text: string }[] = [];
+  if (card.experienceYears) facts.push({ icon: 'award', text: t('ads.experience', { count: card.experienceYears }) });
+  if (card.deliveryAvailable) facts.push({ icon: 'truck-fast', text: t('ads.homeDelivery') });
+  if (card.payAmount) {
+    facts.push({
+      icon: 'indian-rupee-sign',
+      text: t(card.payPeriod === 'monthly' ? 'ads.payMonthly' : 'ads.payDaily', { amount: card.payAmount.toLocaleString('en-IN') }),
+    });
+  }
+  if (card.placeName) facts.push({ icon: 'location-dot', text: card.placeName });
+  const stars = card.ratingAverage == null ? 0 : Math.round(card.ratingAverage);
+
+  return (
+    <View style={[styles.profileCard, { width, backgroundColor: pal.card }]}>
+      <LinearGradient colors={look.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.profileHero}>
+        <View style={styles.profileBubbleA} />
+        <View style={styles.profileBubbleB} />
+        <View style={styles.profileKind}>
+          <FontAwesome6 name={look.icon} size={11} color="#FFFFFF" solid />
+          <Text style={styles.profileKindText}>{t(look.labelKey)}</Text>
+        </View>
+      </LinearGradient>
+      <View style={[styles.profileAvatarRing, { backgroundColor: pal.card }]}>
+        {card.photoUrl ? (
+          <Image source={{ uri: card.photoUrl }} style={styles.profileAvatar} />
+        ) : (
+          <LinearGradient colors={look.gradient} style={[styles.profileAvatar, styles.center]}>
+            <Text style={styles.profileInitials}>{initials(card.name)}</Text>
+          </LinearGradient>
+        )}
+        <View style={[styles.profileVerified, { backgroundColor: look.gradient[0], borderColor: pal.card }]}>
+          <FontAwesome6 name="check" size={10} color="#FFFFFF" solid />
+        </View>
+      </View>
+      <View style={styles.profileBody}>
+        <Text style={[styles.profileName, { color: pal.name }]} numberOfLines={2}>
+          {card.name}
+        </Text>
+        {card.kind === 'job_post' ? null : (
+          <View style={styles.profileRating}>
+            {card.ratingAverage == null || card.ratingCount === 0 ? (
+              <View style={styles.profileNew}>
+                <FontAwesome6 name="wand-magic-sparkles" size={10} color={accent} solid />
+                <Text style={[styles.profileNewText, { color: accent }]}>{t('ads.newOnTriolo')}</Text>
+              </View>
+            ) : (
+              <>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <FontAwesome6 key={n} name="star" size={14} color={n <= stars ? '#FBBF24' : pal.emptyStar} solid />
+                ))}
+                <Text style={[styles.profileRatingText, { color: pal.muted }]}>
+                  {card.ratingAverage.toFixed(1)} · {t('ads.reviews', { count: card.ratingCount })}
+                </Text>
+              </>
+            )}
+          </View>
+        )}
+        {words ? (
+          <View style={[styles.profileWords, { borderColor: `${look.gradient[0]}55`, backgroundColor: `${look.gradient[0]}${pal.tagAlpha}` }]}>
+            <FontAwesome6 name="quote-left" size={12} color={accent} solid />
+            <Text style={[styles.profileWordsText, { color: pal.name }]} numberOfLines={4}>
+              {words}
+            </Text>
+          </View>
+        ) : null}
+        {tags.length > 0 ? (
+          <View style={styles.profileTags}>
+            {tags.map((tag) => (
+              <View key={tag} style={[styles.profileTag, { backgroundColor: `${look.gradient[0]}${pal.tagAlpha}` }]}>
+                <Text style={[styles.profileTagText, { color: accent }]} numberOfLines={1}>
+                  {tag}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {facts.length > 0 ? (
+          <View style={[styles.profileFacts, { backgroundColor: pal.factsBg }]}>
+            {facts.map((fact) => (
+              <View key={fact.text} style={styles.profileFact}>
+                <FontAwesome6 name={fact.icon} size={12} color={pal.factIcon} solid />
+                <Text style={[styles.profileFactText, { color: pal.factText }]} numberOfLines={1}>
+                  {fact.text}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {cta ? (
+          <Pressable onPress={onCta} accessibilityRole="button" style={({ pressed }) => [styles.profileCtaWrap, pressed && { transform: [{ scale: 0.98 }] }]}>
+            <LinearGradient colors={cta.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.profileCta}>
+              <FontAwesome6 name={cta.icon} size={17} color="#FFFFFF" solid />
+              <Text style={styles.profileCtaText}>{t(cta.labelKey)}</Text>
+              <FontAwesome6 name="arrow-right" size={14} color="rgba(255,255,255,0.9)" solid />
+            </LinearGradient>
+          </Pressable>
+        ) : (
+          <Text style={[styles.profileHint, { color: pal.muted }]}>{t('ads.findInCustomerApp')}</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 /**
  * The ad shown once each time the app opens (when the admin has it switched on). `hold` keeps
  * it back while something more important is on screen (the partner app's new job request);
@@ -427,7 +754,8 @@ function AdPlayer({ ad, mode, onClose }: { ad: Ad; mode: 'launch' | 'action'; on
  */
 interface ActionAdState {
   ad: Ad | null;
-  then: (() => void) | null;
+  /** Runs the action (go = true) or drops it (the ad's button opened a profile instead). */
+  then: ((go: boolean) => void) | null;
   /** An action's ad was asked for: the app-open ad's moment has passed (only one ad at a time). */
   launchOver: boolean;
 }
@@ -515,7 +843,7 @@ export function AdLaunchBanner({ hold = false, waitFor = false }: { hold?: boole
   if (!ready || missed) return null;
   shown.current = true;
   launchAdShownThisRun = true;
-  return <AdPlayer ad={ad} mode="launch" onClose={() => setClosed(true)} />;
+  return <AdPlayer ad={ad} mode="launch" onClose={() => setClosed(true)} onLeave={() => setClosed(true)} />;
 }
 
 // --- Ads before key actions ---
@@ -529,7 +857,7 @@ let lastActionShowedAd = false;
  * otherwise straight away. Never holds the action up for long: if no ad arrives quickly, the
  * action just goes ahead.
  */
-export function showAdBefore(action: () => void): void {
+export function showAdBefore(action: (go?: boolean) => void): void {
   lastActionShowedAd = false;
   // From now on this action's ad is the only one: an app-open ad not yet shown is dropped.
   if (!useActionAd.getState().launchOver) useActionAd.setState({ launchOver: true });
@@ -583,8 +911,8 @@ export function showAdBefore(action: () => void): void {
 }
 
 /** `showAdBefore` as a promise: resolves once the ad (if there was one) is closed — true if one was shown. */
-export function adThen(): Promise<boolean> {
-  return new Promise((resolve) => showAdBefore(() => resolve(lastActionShowedAd)));
+export function adThen(): Promise<{ shown: boolean; go: boolean }> {
+  return new Promise((resolve) => showAdBefore((go = true) => resolve({ shown: lastActionShowedAd, go })));
 }
 
 /**
@@ -607,8 +935,10 @@ export function useAdGate(open = true): { adLoading: boolean; waitForAd: () => P
     busy.current = true;
     setAdLoading(true);
     try {
-      if (await adThen()) shownThisOpening.current = true;
-      return true;
+      const { shown, go } = await adThen();
+      if (shown) shownThisOpening.current = true;
+      // False when the ad's own button took the person somewhere else instead.
+      return go;
     } finally {
       busy.current = false;
       setAdLoading(false);
@@ -630,7 +960,12 @@ export function AdActionHost() {
         const { then } = useActionAd.getState();
         useActionAd.setState({ ad: null, then: null });
         // Let the ad fade out before the next screen or popup opens.
-        setTimeout(() => then?.(), 250);
+        setTimeout(() => then?.(true), 250);
+      }}
+      onLeave={() => {
+        const { then } = useActionAd.getState();
+        useActionAd.setState({ ad: null, then: null });
+        then?.(false);
       }}
     />
   );
@@ -709,17 +1044,107 @@ const styles = StyleSheet.create({
   wideFooter: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   whoText: { flex: 1 },
   whoName: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  ctaStack: { gap: 8, alignItems: 'stretch' },
+  whoWords: { ...typography.caption, fontFamily: fonts.medium, color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 18, marginTop: 2 },
   whoPlace: { ...typography.caption, color: 'rgba(255,255,255,0.75)' },
   visitButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 7,
+    height: 38,
+    paddingHorizontal: 16,
+    borderRadius: 19,
+  },
+  visitText: { ...typography.caption, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 13 },
+  profileCard: { borderRadius: 26, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  profileHero: { height: 118, padding: 14, overflow: 'hidden' },
+  profileBubbleA: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    right: -50,
+    top: -90,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  profileBubbleB: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    left: -30,
+    bottom: -60,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  profileKind: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  profileKindText: { ...typography.caption, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 11 },
+  profileAvatarRing: {
+    alignSelf: 'center',
+    marginTop: -56,
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    padding: 4,
     backgroundColor: '#FFFFFF',
   },
-  visitText: { ...typography.caption, fontFamily: fonts.semiBold, color: '#0C0F14', fontSize: 13 },
+  profileAvatar: { width: 104, height: 104, borderRadius: 52 },
+  profileInitials: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 34 },
+  profileVerified: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileBody: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20, alignItems: 'center' },
+  profileName: { fontFamily: fonts.semiBold, fontSize: 22, lineHeight: 28, color: '#0C0F14', textAlign: 'center' },
+  profileRating: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },
+  profileRatingText: { ...typography.caption, fontFamily: fonts.medium, color: '#475569', marginLeft: 6 },
+  profileNew: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  profileNewText: { ...typography.caption, fontFamily: fonts.semiBold },
+  profileWords: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  profileWordsText: { ...typography.body, fontFamily: fonts.medium, fontSize: 14, lineHeight: 20, flex: 1 },
+  profileTags: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 12 },
+  profileTag: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, maxWidth: 200 },
+  profileTagText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
+  profileFacts: { alignSelf: 'stretch', gap: 8, marginTop: 14, padding: 12, borderRadius: 16, backgroundColor: '#F1F5F9' },
+  profileFact: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  profileFactText: { ...typography.caption, fontFamily: fonts.medium, color: '#334155', fontSize: 13, flex: 1 },
+  profileCtaWrap: { alignSelf: 'stretch', marginTop: 18 },
+  profileCta: {
+    height: 54,
+    borderRadius: 27,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 22,
+  },
+  profileCtaText: { fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
+  profileHint: { ...typography.caption, color: '#64748B', marginTop: 16, textAlign: 'center' },
   after: { height: 48, alignItems: 'center', justifyContent: 'center' },
   continueButton: {
     alignSelf: 'stretch',

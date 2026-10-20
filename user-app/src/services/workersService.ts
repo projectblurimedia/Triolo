@@ -60,6 +60,8 @@ export interface NearbySearchParams {
 
 export const workersService = {
   getMyProfile: () => apiClient.get<WorkerProfile | null>('/workers/me/profile', true),
+  /** One verified worker as customers see them (e.g. from an ad's Book Now). */
+  getPublic: (id: string) => apiClient.get<WorkerProfile & { accountFullName: string }>(`/workers/public/${id}`, true),
 
   searchNearby: (params: NearbySearchParams) => {
     const search = new URLSearchParams();
