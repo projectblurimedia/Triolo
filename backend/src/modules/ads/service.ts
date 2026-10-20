@@ -206,7 +206,8 @@ export class AdsService {
     }
     const settings = await this.repository.getSettings();
     if (!placementOn(settings, app, placement)) return null;
-    const ad = await this.repository.pickAndCount(excludeId, viewer.latitude, viewer.longitude);
+    // Triolo Partner profile ads are for customers (book / order / contact): never in the partner app.
+    const ad = await this.repository.pickAndCount(excludeId, viewer.latitude, viewer.longitude, app === 'user');
     if (!ad) return null;
     const served = toPublic(ad);
     if (ad.promoted && this.promotions) {

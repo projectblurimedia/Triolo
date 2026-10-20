@@ -166,7 +166,7 @@ describe('AdsService', () => {
   it('serves only what people see, passing on the last ad seen', async () => {
     const { service, repository } = makeService();
     const ad = await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, 'ad-0');
-    expect(repository.pickAndCount).toHaveBeenCalledWith('ad-0', 16.7, 81.1);
+    expect(repository.pickAndCount).toHaveBeenCalledWith('ad-0', 16.7, 81.1, true);
     expect(ad).toEqual({
       id: 'ad-1',
       title: AD.title,
@@ -186,6 +186,12 @@ describe('AdsService', () => {
       endDate: AD.endDate,
     });
     expect(ad).not.toHaveProperty('amount');
+  });
+
+  it('the partner app is never served Triolo Partner profile ads', async () => {
+    const { service, repository } = makeService();
+    await service.serve('partner', 'action', { latitude: 16.7, longitude: 81.1 }, null);
+    expect(repository.pickAndCount).toHaveBeenCalledWith(null, 16.7, 81.1, false);
   });
 
   it('serves nothing (and counts nothing) where ads are switched off', async () => {

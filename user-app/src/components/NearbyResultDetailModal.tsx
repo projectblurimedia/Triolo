@@ -29,6 +29,8 @@ import { useFavoriteToggle } from '@/hooks/useFavorites';
 import { Button } from './Button';
 import { RatingStars } from './RatingStars';
 import { SendListModal } from './SendListModal';
+import { ChooseListModal } from './ChooseListModal';
+import { openNewList } from '@/navigation/navigationRef';
 import { formatAddress } from '@/utils/formatAddress';
 import { formatDistanceValue, isWorkerResult, NearbyResult, NearbySearchMode } from '@/utils/nearbyResult';
 import { COMPACT_AVATAR_SIZE, GlassProfileLayout, GlassHeroButton } from './GlassHero';
@@ -72,7 +74,9 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
   const shopId = result && !worker ? result.id : null;
   const shopReviews = useBusinessReviews(visible ? shopId : null);
   const favorite = useFavoriteToggle(worker ? 'worker' : 'business', result?.id ?? null);
+  // Order from this shop: pick a list first (orderListId null), then send it.
   const [orderVisible, setOrderVisible] = useState(false);
+  const [orderListId, setOrderListId] = useState<string | null>(null);
   const [bookVisible, setBookVisible] = useState(false);
 
   if (!result) {
@@ -262,9 +266,32 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
           { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: colors.border },
         ]}
       >
-        <Button label={t('sendList.orderFromShop')} onPress={() => setOrderVisible(true)} />
+        <Button
+          label={t('sendList.orderFromShop')}
+          onPress={() => {
+            setOrderListId(null);
+            setOrderVisible(true);
+          }}
+        />
       </View>
-      <SendListModal visible={orderVisible} onClose={() => setOrderVisible(false)} shop={b} onLeave={onClose} />
+      <ChooseListModal
+        visible={orderVisible && orderListId === null}
+        shopName={b.shopName}
+        onClose={() => setOrderVisible(false)}
+        onPick={setOrderListId}
+        onCreate={() => {
+          setOrderVisible(false);
+          onClose();
+          openNewList();
+        }}
+      />
+      <SendListModal
+        visible={orderVisible && orderListId !== null}
+        listId={orderListId}
+        onClose={() => setOrderVisible(false)}
+        shop={b}
+        onLeave={onClose}
+      />
     </>
   );
 

@@ -484,7 +484,7 @@ export class AdsRepository {
    * are. `excludeId` (the ad this person saw last) goes to the back of the queue, so the
    * next open shows someone else whenever more than one ad is running.
    */
-  async pickAndCount(excludeId: string | null, latitude: number, longitude: number): Promise<Ad | null> {
+  async pickAndCount(excludeId: string | null, latitude: number, longitude: number, withProfileAds = true): Promise<Ad | null> {
     const result = await this.pool.query(
       `WITH picked AS (
          SELECT a.id FROM ads a
@@ -492,6 +492,8 @@ export class AdsRepository {
          WHERE a.deleted_at IS NULL AND a.review_status = 'approved' AND ${TODAY} BETWEEN a.start_date AND a.end_date
            -- An ad with a place (a directions ad) is local; one without is shown everywhere.
            AND (a.latitude IS NULL OR ${DISTANCE_SQL} <= a.radius_km * 1000)
+           -- Profile ads (Book Now / Order / Contact) only where they can be used.
+           AND ($4::boolean OR a.action_type NOT IN ('service', 'business', 'job_post'))
          ORDER BY (a.id = $1::uuid) ASC NULLS FIRST, COALESCE(s.impressions, 0) ASC, random()
          LIMIT 1
        ),
@@ -504,7 +506,7 @@ export class AdsRepository {
          UPDATE ads SET impressions = ads.impressions + 1 FROM picked WHERE ads.id = picked.id RETURNING ads.*
        )
        SELECT ${AD_COLUMNS} FROM counted a`,
-      [excludeId, latitude, longitude],
+      [excludeId, latitude, longitude, withProfileAds],
     );
     return result.rows[0] ? mapAd(result.rows[0]) : null;
   }

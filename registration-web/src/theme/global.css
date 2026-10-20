@@ -1169,3 +1169,26 @@ body::before {
 .dd-sheet .dd-option-label {
   font-size: 15px;
 }
+
+/* ---------- Phones ---------- */
+
+/* The glass panel ends with its content instead of stretching to the bottom of the screen. */
+.body {
+  flex: 0 0 auto;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 600px) {
+  /* 16px text in every box: phones (iPhones especially) zoom the page in on smaller text. */
+  .field input,
+  .field textarea,
+  .field select,
+  .delivery-row input,
+  .dd-trigger {
+    font-size: 16px;
+  }
+
+  .body {
+    padding: 18px 16px 22px;
+  }
+}

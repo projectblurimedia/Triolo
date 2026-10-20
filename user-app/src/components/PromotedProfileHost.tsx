@@ -9,6 +9,8 @@ import { showToast } from '@/state/toastStore';
 import { setAdPromotionHandler } from './Ads';
 import { BookWorkerModal } from './BookWorkerModal';
 import { SendListModal } from './SendListModal';
+import { ChooseListModal } from './ChooseListModal';
+import { openNewList } from '@/navigation/navigationRef';
 import { JobSeekerDetailModal } from './JobSeekerDetailModal';
 
 /** Metres from the phone's last known position (0 when it isn't known yet). */
@@ -29,6 +31,8 @@ function metresFromHere(latitude: number | null, longitude: number | null): numb
 export function PromotedProfileHost() {
   const [worker, setWorker] = useState<WorkerNearbyResult | null>(null);
   const [shop, setShop] = useState<BusinessNearbyResult | null>(null);
+  // The list picked for the shop (null while the list picker is open).
+  const [listId, setListId] = useState<string | null>(null);
   const [person, setPerson] = useState<JobSeeker | null>(null);
 
   useEffect(() => {
@@ -40,6 +44,7 @@ export function PromotedProfileHost() {
             setWorker({ ...profile, distanceMeters: metresFromHere(profile.latitude, profile.longitude) });
           } else if (promoted.kind === 'business') {
             const profile = await businessesService.getPublic(promoted.id);
+            setListId(null);
             setShop({ ...profile, distanceMeters: metresFromHere(profile.latitude, profile.longitude) });
           } else {
             const post = await jobSeekersService.getPublic(promoted.id);
@@ -57,7 +62,23 @@ export function PromotedProfileHost() {
   return (
     <>
       <BookWorkerModal worker={worker} onClose={() => setWorker(null)} onBooked={() => setTimeout(() => setWorker(null), 350)} />
-      <SendListModal visible={!!shop} shop={shop} onClose={() => setShop(null)} />
+      <ChooseListModal
+        visible={!!shop && listId === null}
+        shopName={shop?.shopName}
+        onClose={() => setShop(null)}
+        onPick={setListId}
+        onCreate={() => {
+          setShop(null);
+          openNewList();
+        }}
+      />
+      <SendListModal
+        visible={!!shop && listId !== null}
+        shop={shop}
+        listId={listId}
+        onClose={() => setShop(null)}
+        onLeave={() => setShop(null)}
+      />
       <JobSeekerDetailModal person={person} onClose={() => setPerson(null)} />
     </>
   );

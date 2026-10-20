@@ -1097,7 +1097,10 @@
     "newList": "Make a New List",
     "stepPick": "Pick a list",
     "stepShop": "Choose a shop",
-    "more": "+{{count}} more"
+    "more": "+{{count}} more",
+    "subtitleShop": "Choose a list to send to {{shop}}",
+    "stepSend": "Send to the shop",
+    "nextShop": "Continue"
   },
   "ads": {
     "tag": "Sponsored",

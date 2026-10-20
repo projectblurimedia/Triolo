@@ -19,6 +19,8 @@ interface ChooseListModalProps {
   onPick: (listId: string) => void;
   /** No lists yet (or a new one wanted): go and make one (the Prepare List tab). */
   onCreate: () => void;
+  /** The shop is already chosen (its profile, or its ad): step 2 sends straight to it. */
+  shopName?: string | null;
 }
 
 /**
@@ -26,7 +28,7 @@ interface ChooseListModalProps {
  * saved lists as cards (a peek at the items in each) to pick one, and Choose a Shop at the
  * bottom. With no lists yet, it points to Prepare List.
  */
-export function ChooseListModal({ visible, onClose, onPick, onCreate }: ChooseListModalProps) {
+export function ChooseListModal({ visible, onClose, onPick, onCreate, shopName }: ChooseListModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -63,7 +65,7 @@ export function ChooseListModal({ visible, onClose, onPick, onCreate }: ChooseLi
                 {t('chooseList.title')}
               </Text>
               <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {t('chooseList.subtitle')}
+                {shopName ? t('chooseList.subtitleShop', { shop: shopName }) : t('chooseList.subtitle')}
               </Text>
             </View>
           </View>
@@ -88,7 +90,9 @@ export function ChooseListModal({ visible, onClose, onPick, onCreate }: ChooseLi
               <View style={[styles.stepDot, { backgroundColor: colors.border }]}>
                 <Text style={[styles.stepNumber, { color: colors.textMuted }]}>2</Text>
               </View>
-              <Text style={[styles.stepText, { color: colors.textMuted }]}>{t('chooseList.stepShop')}</Text>
+              <Text style={[styles.stepText, { color: colors.textMuted }]} numberOfLines={1}>
+                {shopName ? t('chooseList.stepSend') : t('chooseList.stepShop')}
+              </Text>
             </View>
 
             {lists.map((list) => {
@@ -154,7 +158,11 @@ export function ChooseListModal({ visible, onClose, onPick, onCreate }: ChooseLi
           {lists.length === 0 ? (
             <Button label={t('chooseList.create')} onPress={onCreate} />
           ) : (
-            <Button label={t('chooseList.next')} onPress={() => selectedId && onPick(selectedId)} disabled={!selectedId} />
+            <Button
+              label={shopName ? t('chooseList.nextShop') : t('chooseList.next')}
+              onPress={() => selectedId && onPick(selectedId)}
+              disabled={!selectedId}
+            />
           )}
         </View>
       </View>

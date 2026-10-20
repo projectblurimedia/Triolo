@@ -2753,3 +2753,58 @@ a.row:hover {
   padding: 0 16px;
   text-align: center;
 }
+
+/* ---------- Phones, part 2 ---------- */
+
+/* Dark mode: blue text (links, back links, titles' icons) readable on the dark glass. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #3d86ff;
+  }
+}
+
+.login {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@media (max-width: 600px) {
+  /* 16px text in every box: phones (iPhones especially) zoom the page in on smaller text. */
+  .field input,
+  .field textarea,
+  .field select,
+  .search input,
+  .dd-trigger {
+    font-size: 16px;
+  }
+
+  /* Sign-in: near the top, so the keyboard never pushes the card up out of view. */
+  .login {
+    place-items: start center;
+    padding: max(20px, 6vh) 14px 24px;
+  }
+
+  /* Search gets its own full row instead of squeezing beside the tabs. */
+  .toolbar > .search {
+    flex: 1 1 100%;
+  }
+
+  .toolbar {
+    gap: 10px;
+  }
+}
+
+/* Phones: 100vh is taller than what's visible while the browser's address bar shows, which cut
+   off the bottom of the sidebar (the account and log-out button). dvh is the visible height. */
+.shell {
+  min-height: 100dvh;
+}
+
+.sidebar {
+  height: 100dvh;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.viewer-img {
+  max-height: calc(100dvh - 112px);
+}
