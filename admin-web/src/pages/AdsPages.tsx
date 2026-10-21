@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import {
   faBullhorn,
   faCircleCheck,
@@ -20,9 +21,19 @@ import {
   faVideo,
   faXmark,
   faIdBadge,
+  faBolt,
+  faUserCheck,
+  faBasketShopping,
+  faClipboardList,
+  faUserTie,
+  faKey,
+  faMobileScreen,
+  faHandshake,
+  faClock,
 } from '@fortawesome/free-solid-svg-icons';
 import { Topbar } from '@/components/Layout';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { Dropdown, DropdownOption } from '@/components/Dropdown';
 import {
   Badge,
   BackLink,
@@ -47,6 +58,7 @@ import {
   AdPlanDays,
   AdPlanPrices,
   AdSettings,
+  AdSpot,
   AdStatus,
   SaveAd,
   adsApi,
@@ -124,12 +136,96 @@ function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (
 
 // ---------------- Settings card ----------------
 
+type Gradient = string;
+
+/** Each app's key actions that can show an ad first (in the order they come up). */
+const AD_APPS: {
+  label: string;
+  note: string;
+  icon: IconDefinition;
+  gradient: Gradient;
+  setting: 'actionUser' | 'actionPartner';
+  spots: { spot: AdSpot; label: string; note: string; icon: IconDefinition; gradient: Gradient }[];
+}[] = [
+  {
+    label: 'Customer app',
+    note: 'Triolo — ads before the last tap of each action',
+    icon: faMobileScreen,
+    gradient: 'linear-gradient(135deg,#0055d3,#1d76fa)',
+    setting: 'actionUser',
+    spots: [
+      { spot: 'quick_book', label: 'Quick Book', note: 'Before Book Nearby', icon: faBolt, gradient: 'linear-gradient(135deg,#0055d3,#1d76fa)' },
+      {
+        spot: 'book_worker',
+        label: 'Book a particular worker',
+        note: 'Before sending the booking',
+        icon: faUserCheck,
+        gradient: 'linear-gradient(135deg,#4338ca,#6366f1)',
+      },
+      {
+        spot: 'send_list',
+        label: 'Order from a shop',
+        note: 'Before sending a list to a shop',
+        icon: faBasketShopping,
+        gradient: 'linear-gradient(135deg,#16a34a,#22c55e)',
+      },
+      {
+        spot: 'post_problem',
+        label: 'Post a problem',
+        note: 'Before posting a new problem',
+        icon: faClipboardList,
+        gradient: 'linear-gradient(135deg,#7c3aed,#a78bfa)',
+      },
+      { spot: 'hire_staff', label: 'Hire Staff', note: 'Before the first search', icon: faUserTie, gradient: 'linear-gradient(135deg,#0d9488,#2dd4bf)' },
+    ],
+  },
+  {
+    label: 'Partner app',
+    note: 'Triolo Partner — never shows Triolo Partner profile ads',
+    icon: faHandshake,
+    gradient: 'linear-gradient(135deg,#7c3aed,#a78bfa)',
+    setting: 'actionPartner',
+    spots: [
+      {
+        spot: 'work_done',
+        label: 'Mark work done',
+        note: 'A worker finishing a job',
+        icon: faCircleCheck,
+        gradient: 'linear-gradient(135deg,#16a34a,#22c55e)',
+      },
+      { spot: 'order_pin', label: 'Verify an order PIN', note: 'A shop handing over an order', icon: faKey, gradient: 'linear-gradient(135deg,#db2777,#f472b6)' },
+    ],
+  },
+];
+
+const AD_GAP_OPTIONS: DropdownOption<string>[] = [
+  { value: '0', label: 'No gap', description: 'Every switched-on action can show an ad' },
+  { value: '30', label: '30 seconds' },
+  { value: '60', label: '1 minute' },
+  { value: '300', label: '5 minutes' },
+  { value: '900', label: '15 minutes' },
+  { value: '1800', label: '30 minutes' },
+  { value: '3600', label: '1 hour' },
+  { value: '10800', label: '3 hours' },
+  { value: '43200', label: '12 hours' },
+  { value: '86400', label: '1 day' },
+];
+
+/** "On" / "Off" next to a switch, so it's clear what it's set to. */
+function StatePill({ on, onLabel = 'On', offLabel = 'Off' }: { on: boolean; onLabel?: string; offLabel?: string }) {
+  return <span className={`state-pill ${on ? 'on' : 'off'}`}>{on ? onLabel : offLabel}</span>;
+}
+
 function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange: (settings: AdSettings) => void }) {
   const [saving, setSaving] = useState(false);
 
   const save = async (changes: Partial<AdSettings>) => {
     const previous = settings;
-    onChange({ ...settings, ...changes });
+    onChange({
+      ...settings,
+      ...changes,
+      spots: changes.spots ? { ...settings.spots, ...changes.spots } : settings.spots,
+    });
     setSaving(true);
     try {
       onChange(await adsApi.saveSettings(changes));
@@ -142,64 +238,97 @@ function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange
   };
 
   const off = !settings.adsEnabled;
-  const rows: { label: string; note: string; launch: keyof AdSettings; action: keyof AdSettings }[] = [
-    {
-      label: 'Customer app (Triolo)',
-      note: 'On the final step: Book Nearby, Book a worker, Send a list, Post a problem, Hire Staff search',
-      launch: 'launchUser',
-      action: 'actionUser',
-    },
-    {
-      label: 'Partner app (Triolo Partner)',
-      note: 'Before marking work done or an order finished',
-      launch: 'launchPartner',
-      action: 'actionPartner',
-    },
-  ];
+  const gapValue = String(settings.actionGapSeconds ?? 0);
+  const gapOptions = AD_GAP_OPTIONS.some((option) => option.value === gapValue)
+    ? AD_GAP_OPTIONS
+    : [...AD_GAP_OPTIONS, { value: gapValue, label: `${gapValue} seconds` }];
 
   return (
-    <div className="glass card">
-      <div className="ad-master">
-        <span className="nav-icon" style={{ background: 'linear-gradient(135deg,#ea580c,#f59e0b)', width: 42, height: 42 }}>
+    <div className="glass card ad-settings">
+      {/* The master switch: its own coloured banner, unlike the per-action rows below. */}
+      <div className={`ad-master-banner${off ? ' off' : ''}`}>
+        <span className="ad-master-icon">
           <FontAwesomeIcon icon={faBullhorn} />
         </span>
-        <div style={{ flex: 1 }}>
-          <div className="row-title">Show ads in the apps</div>
-          <div className="row-sub">
-            {off ? 'Off — no ads are shown anywhere.' : 'On — running ads are shown where switched on below.'}
+        <div className="ad-master-text">
+          <div className="ad-master-title">
+            Ads in the apps <StatePill on={!off} onLabel="Showing" offLabel="Off everywhere" />
+          </div>
+          <div className="ad-master-sub">
+            {off
+              ? 'No ads are shown anywhere. Turn on to choose where below.'
+              : 'Full screen, only before the actions switched on below — never when an app opens.'}
           </div>
         </div>
         {saving ? <Spinner small /> : null}
         <Switch checked={settings.adsEnabled} onChange={(value) => save({ adsEnabled: value })} />
       </div>
-      <div className={`ad-places${off ? ' disabled' : ''}`}>
-        <div className="ad-places-head">
-          <span />
-          <span>Full screen when the app opens</span>
-          <span>Full screen before key actions</span>
-        </div>
-        {rows.map((row) => (
-          <div key={row.label} className="ad-places-row">
-            <span className="ad-places-label">
-              {row.label}
-              <small>{row.note}</small>
+
+      <div className={`ad-spots${off ? ' disabled' : ''}`}>
+        {AD_APPS.map((app) => {
+          const appOn = settings[app.setting];
+          return (
+            <div key={app.setting} className="ad-app">
+              <div className="ad-app-head">
+                <span className="ad-app-icon" style={{ background: app.gradient }}>
+                  <FontAwesomeIcon icon={app.icon} />
+                </span>
+                <span className="ad-app-text">
+                  <strong>{app.label}</strong>
+                  <small>{app.note}</small>
+                </span>
+                <StatePill on={appOn && !off} />
+                <Switch checked={appOn} disabled={off} onChange={(value) => save({ [app.setting]: value })} />
+              </div>
+              <div className={`ad-spot-list${appOn ? '' : ' disabled'}`}>
+                {app.spots.map((item) => {
+                  const spotOn = settings.spots?.[item.spot] !== false;
+                  const showing = spotOn && appOn && !off;
+                  return (
+                    <label key={item.spot} className={`ad-spot-row${showing ? ' on' : ''}`}>
+                      <span className="ad-spot-icon" style={{ background: item.gradient }}>
+                        <FontAwesomeIcon icon={item.icon} />
+                      </span>
+                      <span className="ad-spot-text">
+                        <strong>{item.label}</strong>
+                        <small>{item.note}</small>
+                      </span>
+                      <StatePill on={showing} onLabel="Ad shows" offLabel="No ad" />
+                      <Switch
+                        checked={spotOn}
+                        disabled={off || !appOn}
+                        onChange={(value) => save({ spots: { [item.spot]: value } as Record<AdSpot, boolean> })}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        <div className="ad-gap-box">
+          <div className="ad-gap-head">
+            <span className="ad-spot-icon" style={{ background: 'linear-gradient(135deg,#ea580c,#f59e0b)' }}>
+              <FontAwesomeIcon icon={faClock} />
             </span>
-            <span>
-              <Switch
-                checked={settings[row.launch] as boolean}
-                disabled={off}
-                onChange={(value) => save({ [row.launch]: value })}
-              />
-            </span>
-            <span>
-              <Switch
-                checked={settings[row.action] as boolean}
-                disabled={off}
-                onChange={(value) => save({ [row.action]: value })}
-              />
+            <span className="ad-spot-text">
+              <strong>Minimum gap between ads</strong>
+              <small>For the same person, in each app</small>
             </span>
           </div>
-        ))}
+          <Dropdown
+            value={gapValue}
+            options={gapOptions}
+            onChange={(value) => save({ actionGapSeconds: Number(value) })}
+            title="Minimum gap between ads"
+            disabled={off}
+          />
+          <small className="muted ad-gap-note">
+            Someone who just saw an ad isn't shown another until this much time has passed. A flow started from an ad's own
+            Book Now / Order / Contact never shows another ad.
+          </small>
+        </div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { apiClient } from './apiClient';
 /** Which app this is, so the admin's per-app switches apply. */
 export const AD_APP = 'partner' as const;
 
-/** `launch` = when the app opens; `action` = before a key action. */
+/** Ads are shown only before key actions now (`launch`, when the app opened, was removed). */
 export type AdPlacement = 'launch' | 'action';
 
 /** A local business's ad, as booked by the Triolo admin. */
@@ -80,12 +80,15 @@ function setLastSeen(id: string) {
   AsyncStorage.setItem(LAST_SEEN_KEY, id).catch(() => {});
 }
 
+/** Which key action the ad comes before (the admin switches each one on or off). */
+export type AdSpot = 'quick_book' | 'book_worker' | 'send_list' | 'post_problem' | 'hire_staff' | 'work_done' | 'order_pin';
+
 export interface AdViewer {
   latitude: number;
   longitude: number;
 }
 
-async function serveNow(placement: AdPlacement, here: AdViewer): Promise<Ad | null> {
+async function serveNow(placement: AdPlacement, here: AdViewer, spot?: AdSpot): Promise<Ad | null> {
   const exclude = await getLastSeen();
   // Ads are local: the server shows only ads running near here.
   const params = new URLSearchParams({
@@ -95,6 +98,7 @@ async function serveNow(placement: AdPlacement, here: AdViewer): Promise<Ad | nu
     longitude: String(here.longitude),
   });
   if (exclude) params.set('exclude', exclude);
+  if (spot) params.set('spot', spot);
   const ad = await apiClient.get<Ad | null>(`/ads/serve?${params.toString()}`, true);
   if (ad) setLastSeen(ad.id);
   return ad;
@@ -105,8 +109,8 @@ let queue: Promise<unknown> = Promise.resolve();
 
 export const adsService = {
   /** The ad to show now, or null when ads are off here or none is running nearby. */
-  serve(placement: AdPlacement, here: AdViewer): Promise<Ad | null> {
-    const run = queue.then(() => serveNow(placement, here));
+  serve(placement: AdPlacement, here: AdViewer, spot?: AdSpot): Promise<Ad | null> {
+    const run = queue.then(() => serveNow(placement, here, spot));
     queue = run.catch(() => null);
     return run;
   },

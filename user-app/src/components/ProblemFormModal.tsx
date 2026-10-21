@@ -93,7 +93,7 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
 
   // Asking for location / showing the ad: a second tap must not post twice.
   const preparing = useRef(false);
-  const { adLoading, waitForAd } = useAdGate(visible);
+  const { adLoading, waitForAd } = useAdGate(visible, 'post_problem');
 
   const handleSubmit = async () => {
     if (!canSubmit || submitting || preparing.current) return;

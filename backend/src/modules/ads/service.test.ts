@@ -52,6 +52,16 @@ const SETTINGS: AdSettings = {
   launchPartner: false,
   actionUser: true,
   actionPartner: true,
+  spots: {
+    quick_book: true,
+    book_worker: true,
+    send_list: false,
+    post_problem: true,
+    hire_staff: true,
+    work_done: true,
+    order_pin: true,
+  },
+  actionGapSeconds: 0,
   // Admin-set prices (not the old defaults), to prove they're used.
   prices: { '1': 25, '3': 60, '7': 120, '30': 350 },
   updatedAt: '2026-10-18T00:00:00.000Z',
@@ -123,6 +133,8 @@ const PARAMS: SaveAdParams = {
 function makeService(promotions?: { accountIdByMobile: jest.Mock; find: jest.Mock; card: jest.Mock }) {
   const repository = {
     getSettings: jest.fn().mockResolvedValue(SETTINGS),
+    sawActionAdWithin: jest.fn().mockResolvedValue(false),
+    markActionAdShown: jest.fn().mockResolvedValue(undefined),
     updateSettings: jest.fn(),
     create: jest.fn().mockResolvedValue(AD),
     update: jest.fn().mockResolvedValue(AD),
@@ -153,10 +165,18 @@ describe('placementOn', () => {
     expect(placementOn({ ...SETTINGS, adsEnabled: false }, 'user', 'action')).toBe(false);
   });
 
-  it('checks each app and place separately', () => {
-    expect(placementOn(SETTINGS, 'user', 'launch')).toBe(true);
+  it('never shows the (removed) app-open ad', () => {
+    expect(placementOn(SETTINGS, 'user', 'launch')).toBe(false);
     expect(placementOn(SETTINGS, 'partner', 'launch')).toBe(false);
+  });
+
+  it('checks each app, then each action', () => {
     expect(placementOn(SETTINGS, 'partner', 'action')).toBe(true);
+    expect(placementOn({ ...SETTINGS, actionUser: false }, 'user', 'action', 'quick_book')).toBe(false);
+    expect(placementOn(SETTINGS, 'user', 'action', 'quick_book')).toBe(true);
+    expect(placementOn(SETTINGS, 'user', 'action', 'send_list')).toBe(false);
+    // A spot of the other app is never shown.
+    expect(placementOn(SETTINGS, 'user', 'action', 'work_done')).toBe(false);
   });
 });
 
@@ -192,6 +212,24 @@ describe('AdsService', () => {
     const { service, repository } = makeService();
     await service.serve('partner', 'action', { latitude: 16.7, longitude: 81.1 }, null);
     expect(repository.pickAndCount).toHaveBeenCalledWith(null, 16.7, 81.1, false);
+  });
+
+  it("keeps the admin's minimum gap between two ads for the same person", async () => {
+    const { service, repository } = makeService();
+    repository.getSettings.mockResolvedValue({ ...SETTINGS, actionGapSeconds: 1800 });
+    repository.sawActionAdWithin.mockResolvedValueOnce(true);
+    const viewer = { latitude: 16.7, longitude: 81.1 };
+    expect(await service.serve('user', 'action', viewer, null, { spot: 'quick_book', accountId: 'acc-1' })).toBeNull();
+    expect(repository.pickAndCount).not.toHaveBeenCalled();
+    await service.serve('user', 'action', viewer, null, { spot: 'quick_book', accountId: 'acc-1' });
+    expect(repository.sawActionAdWithin).toHaveBeenCalledWith('acc-1', 'user', 1800);
+    expect(repository.markActionAdShown).toHaveBeenCalledWith('acc-1', 'user');
+  });
+
+  it('serves nothing before an action the admin switched off', async () => {
+    const { service, repository } = makeService();
+    expect(await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null, { spot: 'send_list' })).toBeNull();
+    expect(repository.pickAndCount).not.toHaveBeenCalled();
   });
 
   it('serves nothing (and counts nothing) where ads are switched off', async () => {

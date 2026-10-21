@@ -81,7 +81,7 @@ export function ShopOrderModal() {
   const close = useShopOrderFocusStore((state) => state.close);
   const { data: order, isLoading, isError, refetch } = useShopOrder(orderId);
   // Handover: location, then a local business's ad while the button spins, then the PIN check.
-  const { adLoading, waitForAd } = useAdGate(orderId !== null);
+  const { adLoading, waitForAd } = useAdGate(orderId !== null, 'order_pin');
 
   const accept = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.accept(id));
   const decline = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.decline(id));

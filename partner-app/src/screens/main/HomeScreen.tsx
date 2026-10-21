@@ -55,7 +55,7 @@ const SIDE_LABELS = { shop: 'shopHome.myShop', worker: 'shopHome.myServices', jo
 export function HomeScreen() {
   const { t } = useTranslation();
   // Mark Work Done: location, then a local business's ad while that job's button spins.
-  const { adLoading, waitForAd } = useAdGate();
+  const { adLoading, waitForAd } = useAdGate(true, 'work_done');
   const [adForJob, setAdForJob] = useState<string | null>(null);
   const { colors } = useThemeColors();
   const account = useAuthStore((state) => state.account);

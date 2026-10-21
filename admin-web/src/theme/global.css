@@ -2808,3 +2808,373 @@ a.row:hover {
 .viewer-img {
   max-height: calc(100dvh - 112px);
 }
+
+/* Ad settings: each app's switch, then each key action's own switch. */
+.ad-spots {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  transition: opacity 0.18s;
+}
+
+.ad-spots.disabled,
+.ad-spots-list.disabled {
+  opacity: 0.5;
+}
+
+.ad-spots-app {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ad-spots-app-head,
+.ad-spot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ad-spots-app-head strong {
+  display: block;
+  font-size: 14px;
+}
+
+.ad-spots-app-head small,
+.ad-spot small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ad-spots-list {
+  margin: 8px 0 0 12px;
+  padding-left: 14px;
+  border-left: 2px solid var(--border);
+  display: grid;
+  gap: 10px;
+  transition: opacity 0.18s;
+}
+
+.ad-spot {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ad-gap {
+  margin: 14px 0 0;
+}
+
+.ad-gap small {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+/* The master switch's line wraps instead of being cut off on phones. */
+.ad-master > div {
+  min-width: 0;
+}
+
+.ad-master .row-sub {
+  white-space: normal;
+  overflow: visible;
+}
+
+/* ---------- Ad settings, redesigned ---------- */
+
+/* The master switch: a coloured banner, so it never looks like one of the action switches. */
+.ad-master-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(135deg, #ea580c, #f59e0b);
+  box-shadow: 0 10px 28px rgba(234, 88, 12, 0.28);
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
+}
+
+.ad-master-banner.off {
+  background: linear-gradient(135deg, #475569, #64748b);
+  box-shadow: none;
+}
+
+.ad-master-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 19px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.ad-master-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ad-master-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ad-master-sub {
+  margin-top: 3px;
+  font-size: 12.5px;
+  opacity: 0.92;
+}
+
+.ad-master-banner .state-pill {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.ad-master-banner .switch:not(.on) {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.state-pill.on {
+  color: var(--success);
+  background: rgba(22, 163, 74, 0.13);
+}
+
+.state-pill.off {
+  color: var(--muted);
+  background: var(--row-hover);
+}
+
+.ad-settings .ad-spots {
+  margin-top: 6px;
+  border-top: 0;
+}
+
+.ad-app {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--input);
+}
+
+.ad-app-head,
+.ad-spot-row,
+.ad-gap-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ad-app-icon,
+.ad-spot-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.ad-app-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  font-size: 16px;
+}
+
+.ad-spot-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  font-size: 14px;
+}
+
+.ad-app-text,
+.ad-spot-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ad-app-text strong {
+  display: block;
+  font-size: 15px;
+}
+
+.ad-spot-text strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ad-app-text small,
+.ad-spot-text small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.ad-spot-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  transition: opacity 0.18s;
+}
+
+.ad-spot-list.disabled {
+  opacity: 0.45;
+}
+
+.ad-spot-row {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--glass-strong);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.ad-spot-row.on {
+  border-color: rgba(22, 163, 74, 0.35);
+  box-shadow: inset 3px 0 0 var(--success);
+}
+
+.ad-spot-row:not(.on) .ad-spot-icon {
+  filter: grayscale(0.9);
+  opacity: 0.6;
+}
+
+.ad-gap-box {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--input);
+}
+
+.ad-gap-box .dd {
+  margin-top: 12px;
+}
+
+.ad-gap-note {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .ad-app,
+  .ad-gap-box {
+    padding: 12px;
+  }
+
+  /* Phones: the pill moves under the text so the switch keeps its place on the right. */
+  .ad-spot-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .ad-spot-row .state-pill,
+  .ad-app-head .state-pill {
+    display: none;
+  }
+}
+
+.ad-master-banner .state-pill.on,
+.ad-master-banner .state-pill.off {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+/* ---------- Ad settings: action rows and app headers, refined ---------- */
+
+/* Action rows: a short, thin bar in the brand gradient on the left instead of a green edge. */
+.ad-spot-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.ad-spot-row.on {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.ad-spot-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--gradient);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.ad-spot-row.on::before {
+  opacity: 1;
+}
+
+.ad-spot-row:hover {
+  border-color: rgba(29, 118, 250, 0.35);
+}
+
+/* App headers: a tinted band of their own, clearly above the action rows. */
+.ad-app {
+  padding: 10px;
+}
+
+.ad-app-head {
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(0, 85, 211, 0.14), rgba(29, 118, 250, 0.04));
+  border: 1px solid rgba(29, 118, 250, 0.22);
+}
+
+.ad-app-head .ad-app-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  font-size: 18px;
+  box-shadow: 0 6px 16px rgba(0, 85, 211, 0.28);
+}
+
+.ad-app-text strong {
+  font-size: 15.5px;
+  font-weight: 700;
+}
+
+.ad-spot-list {
+  margin-top: 10px;
+  padding: 0 2px;
+}
+
+/* The brand bar runs the full height of the row (the row clips it to its rounded corners). */
+.ad-spot-row::before {
+  top: 0;
+  bottom: 0;
+  border-radius: 0;
+}

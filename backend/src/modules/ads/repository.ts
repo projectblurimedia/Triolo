@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { Ad, AdActionColumns, AdListFilter, AdSettings, AdStatus, SaveAdParams } from './interfaces';
+import { Ad, AdActionColumns, AdApp, AdListFilter, AdSettings, AdStatus, AD_SPOTS, AdSpot, SaveAdParams } from './interfaces';
 
 /** An ad's details as saved: the form's fields plus its checked tap action. */
 export type StoredAdParams = SaveAdParams & AdActionColumns;
@@ -111,6 +111,9 @@ function mapSettings(row: any): AdSettings {
     launchPartner: row.launch_partner,
     actionUser: row.action_user,
     actionPartner: row.action_partner,
+    // A spot not saved yet is on.
+    spots: Object.fromEntries(AD_SPOTS.map((spot) => [spot, row.action_spots?.[spot] !== false])) as Record<AdSpot, boolean>,
+    actionGapSeconds: Number(row.action_gap_seconds ?? 0),
     prices: {
       '1': Number(row.plan_prices['1']),
       '3': Number(row.plan_prices['3']),
@@ -121,7 +124,7 @@ function mapSettings(row: any): AdSettings {
   };
 }
 
-const SETTINGS_COLUMNS: Record<keyof Omit<AdSettings, 'updatedAt' | 'prices'>, string> = {
+const SETTINGS_COLUMNS: Record<keyof Omit<AdSettings, 'updatedAt' | 'prices' | 'spots' | 'actionGapSeconds'>, string> = {
   adsEnabled: 'ads_enabled',
   launchUser: 'launch_user',
   launchPartner: 'launch_partner',
@@ -143,6 +146,15 @@ export class AdsRepository {
     if (changes.prices) {
       values.push(JSON.stringify(changes.prices));
       sets.push(`plan_prices = $${values.length}::jsonb`);
+    }
+    if (changes.spots) {
+      // Merged, so saving one switch never resets the others.
+      values.push(JSON.stringify(changes.spots));
+      sets.push(`action_spots = action_spots || $${values.length}::jsonb`);
+    }
+    if (typeof changes.actionGapSeconds === 'number') {
+      values.push(changes.actionGapSeconds);
+      sets.push(`action_gap_seconds = $${values.length}`);
     }
     for (const [key, column] of Object.entries(SETTINGS_COLUMNS)) {
       const value = changes[key as keyof typeof SETTINGS_COLUMNS];
@@ -509,6 +521,24 @@ export class AdsRepository {
       [excludeId, latitude, longitude, withProfileAds],
     );
     return result.rows[0] ? mapAd(result.rows[0]) : null;
+  }
+
+  /** Whether this person saw an ad before an action less than `gapSeconds` ago (in this app). */
+  async sawActionAdWithin(accountId: string, app: AdApp, gapSeconds: number): Promise<boolean> {
+    const result = await this.pool.query(
+      `SELECT 1 FROM ad_viewer_state
+       WHERE account_id = $1 AND app = $2 AND last_action_ad_at > now() - make_interval(secs => $3)`,
+      [accountId, app, gapSeconds],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async markActionAdShown(accountId: string, app: AdApp): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO ad_viewer_state (account_id, app, last_action_ad_at) VALUES ($1, $2, now())
+       ON CONFLICT (account_id, app) DO UPDATE SET last_action_ad_at = now()`,
+      [accountId, app],
+    );
   }
 
   async recordClick(id: string): Promise<boolean> {

@@ -40,7 +40,7 @@ export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalPr
   const [selected, setSelected] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const preparing = useRef(false);
-  const { adLoading, waitForAd } = useAdGate(!!worker);
+  const { adLoading, waitForAd } = useAdGate(!!worker, 'book_worker');
 
   // The work this worker does; one kind is chosen for you.
   const skills = worker ? worker.skillCategories : [];

@@ -28,6 +28,8 @@ import {
   AdApp,
   AdListFilter,
   AdPlacement,
+  AdSpot,
+  AD_SPOTS_BY_APP,
   AdSettings,
   PublicAd,
   SaveAdParams,
@@ -97,10 +99,14 @@ function assertStartsTodayOrLater(startDate: string): void {
 }
 
 /** Whether ads are switched on for this app and place (the master switch first). */
-export function placementOn(settings: AdSettings, app: AdApp, placement: AdPlacement): boolean {
+export function placementOn(settings: AdSettings, app: AdApp, placement: AdPlacement, spot?: AdSpot | null): boolean {
   if (!settings.adsEnabled) return false;
-  if (placement === 'launch') return app === 'user' ? settings.launchUser : settings.launchPartner;
-  return app === 'user' ? settings.actionUser : settings.actionPartner;
+  // The full-screen ad when an app opens was removed: ads come only before key actions.
+  if (placement === 'launch') return false;
+  if (!(app === 'user' ? settings.actionUser : settings.actionPartner)) return false;
+  // A spot from the other app is never shown here.
+  if (spot && !(AD_SPOTS_BY_APP[app] as readonly string[]).includes(spot)) return false;
+  return spot ? settings.spots[spot] !== false : true;
 }
 
 /**
@@ -199,16 +205,24 @@ export class AdsService {
     placement: AdPlacement,
     viewer: { latitude: number; longitude: number },
     excludeId: string | null,
+    options: { spot?: AdSpot | null; accountId?: string | null } = {},
   ): Promise<PublicAd | null> {
     // Tidy up finished ads' media now and then (also run daily by the cron, and from the admin desk).
     if (Date.now() - lastCleanupAt > CLEANUP_EVERY_MS) {
       this.cleanupFinishedMedia().catch((err) => logger.warn({ err }, 'Ad media cleanup failed'));
     }
     const settings = await this.repository.getSettings();
-    if (!placementOn(settings, app, placement)) return null;
+    if (!placementOn(settings, app, placement, options.spot)) return null;
+    // Not too often for the same person (the admin's minimum gap).
+    if (options.accountId && settings.actionGapSeconds > 0) {
+      if (await this.repository.sawActionAdWithin(options.accountId, app, settings.actionGapSeconds)) return null;
+    }
     // Triolo Partner profile ads are for customers (book / order / contact): never in the partner app.
     const ad = await this.repository.pickAndCount(excludeId, viewer.latitude, viewer.longitude, app === 'user');
     if (!ad) return null;
+    if (options.accountId) {
+      this.repository.markActionAdShown(options.accountId, app).catch((err) => logger.warn({ err }, 'Ad view time not saved'));
+    }
     const served = toPublic(ad);
     if (ad.promoted && this.promotions) {
       served.promotedCard = await this.promotions.card(ad.promoted.kind, ad.promoted.id).catch(() => null);

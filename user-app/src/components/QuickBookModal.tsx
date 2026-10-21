@@ -69,7 +69,7 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
   const [submitting, setSubmitting] = useState(false);
   // Asking for location / showing the ad: a second tap must not start a second booking.
   const preparing = useRef(false);
-  const { adLoading, waitForAd } = useAdGate(visible);
+  const { adLoading, waitForAd } = useAdGate(visible, 'quick_book');
   const queryClient = useQueryClient();
 
   useEffect(() => {

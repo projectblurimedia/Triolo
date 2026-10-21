@@ -12,13 +12,21 @@ export type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
 import type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
 export type AdPlanPrices = Record<'1' | '3' | '7' | '30', number>;
 
+/** The key actions that can show an ad first. */
+export type AdSpot = 'quick_book' | 'book_worker' | 'send_list' | 'post_problem' | 'hire_staff' | 'work_done' | 'order_pin';
+
 export interface AdSettings {
   adsEnabled: boolean;
+  /** The removed app-open ad's switches (always off; not shown). */
   launchUser: boolean;
   launchPartner: boolean;
-  /** Before key actions: customer app quick actions; partner app work done / order finished. */
+  /** Each app's switch for ads before key actions. */
   actionUser: boolean;
   actionPartner: boolean;
+  /** Each key action's own switch. */
+  spots: Record<AdSpot, boolean>;
+  /** Seconds between two ads for the same person (0 = no gap). */
+  actionGapSeconds: number;
   /** ₹ per plan, keyed "1" / "3" / "7" / "30". New bookings only — booked ads keep their amount. */
   prices: AdPlanPrices;
   updatedAt: string;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AD_ACTION_TYPES, AD_APPS, AD_ORIENTATIONS, AD_PAYMENT_METHODS, AD_PLACEMENTS, AD_PLAN_DAYS } from './interfaces';
+import { AD_ACTION_TYPES, AD_SPOTS, AD_APPS, AD_ORIENTATIONS, AD_PAYMENT_METHODS, AD_PLACEMENTS, AD_PLAN_DAYS } from './interfaces';
 
 const optionalText = (max: number) => z.string().trim().max(max).nullish();
 const phone = z
@@ -85,6 +85,8 @@ export const adSettingsSchema = z
     launchPartner: z.boolean(),
     actionUser: z.boolean(),
     actionPartner: z.boolean(),
+    spots: z.object(Object.fromEntries(AD_SPOTS.map((spot) => [spot, z.boolean()]))).partial(),
+    actionGapSeconds: z.number().int().min(0).max(86400),
     prices: z.object({
       '1': z.number().int().min(0).max(100000),
       '3': z.number().int().min(0).max(100000),
@@ -143,6 +145,8 @@ export const adMediaSchema = z
 export const serveQuerySchema = z.object({
   app: z.enum(AD_APPS),
   placement: z.enum(AD_PLACEMENTS),
+  // Which key action this ad comes before (older app builds leave it out).
+  spot: z.enum(AD_SPOTS).optional(),
   exclude: z.string().uuid().optional(),
   // Ads are local: the viewer's position decides which ads are near enough to show.
   latitude: z.coerce.number().min(-90).max(90),

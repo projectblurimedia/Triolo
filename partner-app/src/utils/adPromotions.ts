@@ -1,6 +1,6 @@
 import { Linking } from 'react-native';
 import i18n from '@/localization/i18n';
-import { setAdPromotionHandler } from '@/components/Ads';
+import { endAdFreeFlow, setAdPromotionHandler } from '@/components/Ads';
 import { apiClient } from '@/services/apiClient';
 import { showToast } from '@/state/toastStore';
 
@@ -15,7 +15,10 @@ export function registerAdPromotions(): void {
       try {
         const post = await apiClient.get<{ mobileNumber: string }>(`/job-seekers/public/${promoted.id}`, true);
         await Linking.openURL(`tel:${post.mobileNumber}`);
+        // Calling is the whole flow here.
+        endAdFreeFlow();
       } catch {
+        endAdFreeFlow();
         showToast({ variant: 'info', title: i18n.t('ads.profileGoneTitle'), message: i18n.t('ads.profileGoneMessage') });
       }
     },

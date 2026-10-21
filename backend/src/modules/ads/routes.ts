@@ -78,6 +78,7 @@ adsRouter.get(
         query.placement,
         { latitude: query.latitude, longitude: query.longitude },
         query.exclude ?? null,
+        { spot: query.spot ?? null, accountId: req.account?.accountId ?? null },
       ),
     );
   }),

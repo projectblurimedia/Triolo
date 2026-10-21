@@ -109,7 +109,7 @@ export function JobTrackingModal() {
 
   const visible = jobId !== null;
   // Mark Work Done: location, then a local business's ad while the button spins, then confirm.
-  const { adLoading, waitForAd } = useAdGate(visible);
+  const { adLoading, waitForAd } = useAdGate(visible, 'work_done');
   const markDone = async () => {
     if (adLoading || !(await askForLocation())) return;
     if (await waitForAd()) setConfirmDone(true);

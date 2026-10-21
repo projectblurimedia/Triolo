@@ -34,7 +34,16 @@ export type AdApp = (typeof AD_APPS)[number];
  * (customer app: Home's quick actions; partner app: marking work done / an order finished).
  */
 export const AD_PLACEMENTS = ['launch', 'action'] as const;
+/** 'launch' (full screen when an app opens) is no longer shown; kept so older app builds get a clean "no ad". */
 export type AdPlacement = (typeof AD_PLACEMENTS)[number];
+
+/** The key actions that can show an ad first, per app — each switched on or off by the admin. */
+export const AD_SPOTS_BY_APP = {
+  user: ['quick_book', 'book_worker', 'send_list', 'post_problem', 'hire_staff'],
+  partner: ['work_done', 'order_pin'],
+} as const;
+export const AD_SPOTS = [...AD_SPOTS_BY_APP.user, ...AD_SPOTS_BY_APP.partner] as const;
+export type AdSpot = (typeof AD_SPOTS)[number];
 
 /** in_review / rejected: a self-booked ad not approved (yet); otherwise by its dates. */
 /**
@@ -114,6 +123,10 @@ export interface AdSettings {
   launchPartner: boolean;
   actionUser: boolean;
   actionPartner: boolean;
+  /** Each key action's own switch (under its app's switch). */
+  spots: Record<AdSpot, boolean>;
+  /** At least this many seconds between two ads for the same person (0 = no gap). */
+  actionGapSeconds: number;
   /** Applies to new bookings only — each ad keeps the amount it was booked at. */
   prices: AdPlanPrices;
   updatedAt: string;

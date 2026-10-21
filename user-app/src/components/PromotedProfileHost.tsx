@@ -6,7 +6,7 @@ import { businessesService, BusinessNearbyResult } from '@/services/businessesSe
 import { jobSeekersService, JobSeeker } from '@/services/jobSeekersService';
 import { useLocationStore } from '@/state/locationStore';
 import { showToast } from '@/state/toastStore';
-import { setAdPromotionHandler } from './Ads';
+import { endAdFreeFlow, setAdPromotionHandler } from './Ads';
 import { BookWorkerModal } from './BookWorkerModal';
 import { SendListModal } from './SendListModal';
 import { ChooseListModal } from './ChooseListModal';
@@ -51,6 +51,7 @@ export function PromotedProfileHost() {
             setPerson({ ...post, distanceMeters: metresFromHere(post.latitude, post.longitude) });
           }
         } catch {
+          endAdFreeFlow();
           showToast({ variant: 'info', title: i18n.t('ads.profileGoneTitle'), message: i18n.t('ads.profileGoneMessage') });
         }
       },
@@ -58,6 +59,12 @@ export function PromotedProfileHost() {
     );
     return () => setAdPromotionHandler(null);
   }, []);
+
+  // Booking / ordering / contacting from an ad shows no ads until these screens are all closed.
+  const flowOpen = !!worker || !!shop || !!person;
+  useEffect(() => {
+    if (!flowOpen) endAdFreeFlow();
+  }, [flowOpen]);
 
   return (
     <>

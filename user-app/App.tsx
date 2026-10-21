@@ -20,7 +20,7 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
-import { AdActionHost, AdLaunchBanner, rememberAdBeforeRestart, useAdOnScreen } from '@/components/Ads';
+import { AdActionHost, useAdOnScreen } from '@/components/Ads';
 import { PortalHost } from '@/components/Portal';
 import { BookingTrackingModal } from '@/components/BookingTrackingModal';
 import { PromotedProfileHost } from '@/components/PromotedProfileHost';
@@ -75,9 +75,6 @@ export default function App() {
   const [showUpdateOverlay, setShowUpdateOverlay] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const appState = useRef(AppState.currentState);
-  // The first update check after opening: the app-open ad waits for it, since installing an
-  // update restarts the app (which used to cut the ad off and then show another one).
-  const [launchCheckDone, setLaunchCheckDone] = useState(__DEV__);
   // An update found while an ad is playing waits until the ad is closed.
   const adOnScreen = useAdOnScreen();
 
@@ -103,9 +100,7 @@ export default function App() {
     if (!isUpdatePending || !showUpdateOverlay) return;
     setDownloadProgress(1);
     const timeout = setTimeout(() => {
-      rememberAdBeforeRestart()
-        .then(() => Updates.reloadAsync())
-        .catch(() => {});
+      Updates.reloadAsync().catch(() => {});
     }, 1800);
     return () => clearTimeout(timeout);
   }, [isUpdatePending, showUpdateOverlay]);
@@ -123,12 +118,7 @@ export default function App() {
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
-      // A slow network never holds the ad back for long.
-      const giveUp = setTimeout(() => setLaunchCheckDone(true), 4000);
-      checkForUpdate().finally(() => {
-        clearTimeout(giveUp);
-        setLaunchCheckDone(true);
-      });
+      checkForUpdate();
     }
   }, [fontsLoaded, fontError, checkForUpdate]);
 
@@ -179,8 +169,6 @@ export default function App() {
         {/* Quick Book's live tracking screen — opened from anywhere via bookingTrackerStore. */}
         <BookingTrackingModal />
         <OrderTrackingModal />
-        {/* A local business's ad when the app opens (if the admin has it on). */}
-        <AdLaunchBanner waitFor={!launchCheckDone || isUpdateAvailable || showUpdateOverlay} />
         {/* A local business's ad before a key action (see showAdBefore). */}
         <AdActionHost />
         {/* A profile an ad promotes: Book Now / Order from this Shop / Contact. */}

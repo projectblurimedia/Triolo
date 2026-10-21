@@ -65,7 +65,7 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
   const [started, setStarted] = useState(false);
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
-  const { waitForAd } = useAdGate(visible);
+  const { waitForAd } = useAdGate(visible, 'hire_staff');
 
   // Every opening starts on the intro again.
   useEffect(() => {
