@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -13,7 +14,9 @@ import { ToastHost } from './ToastHost';
 import { Avatar } from './WorkerMiniCard';
 import { useCancelOrder, useCancelStalledOrder, useOrder, useRateOrder } from '@/hooks/useOrders';
 import { useOrderTrackerStore } from '@/state/orderTrackerStore';
-import { CUSTOMER_CANCELLABLE, CustomerOrder, formatRupees, OrderItem, OrderStatus } from '@/services/ordersService';
+import { CUSTOMER_CANCELLABLE, CustomerOrder, formatRupees, isFindingShop, OrderItem, OrderStatus } from '@/services/ordersService';
+import { orderShopName } from '@/utils/orderShopName';
+import { RadarPulse } from './RadarPulse';
 import { LATE_AFTER_MS, LateNotice, useNow } from './LateNotice';
 import { FinishJobModal } from './FinishJobModal';
 
@@ -25,6 +28,7 @@ import { callPhone, openDirections } from '@/utils/tripLinks';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BlurScope } from './Glass';
 import { PullToRefresh } from './PullToRefresh';
+import { WaitCountdown } from './WaitCountdown';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -62,7 +66,13 @@ export function OrderTrackingModal() {
   const insets = useSafeAreaInsets();
   const orderId = useOrderTrackerStore((state) => state.orderId);
   const close = useOrderTrackerStore((state) => state.close);
-  const { data: order, isLoading, isError, refetch, isRefetching } = useOrder(orderId);
+  const { data: order, isLoading, isError, refetch } = useOrder(orderId);
+  // Only a pull shows the spinner — not the automatic refresh every few seconds.
+  const [pulling, setPulling] = useState(false);
+  const pullRefresh = () => {
+    setPulling(true);
+    refetch().finally(() => setPulling(false));
+  };
   const cancelOrder = useCancelOrder();
   // An order the shop hasn't moved on for over an hour: cancel and rate the shop.
   const cancelStalled = useCancelStalledOrder();
@@ -195,7 +205,7 @@ export function OrderTrackingModal() {
         <FontAwesome6 name={o.fulfillment === 'delivery' ? 'truck' : 'store'} size={13} color={colors.primary} solid />
         <Text style={[styles.fulfillmentText, { color: colors.text }]}>
           {o.fulfillment === 'delivery'
-            ? t('orders.deliveryTo', { address: o.locationAddress || t('orders.yourLocation') })
+            ? t('orders.deliveryTo', { address: placeName(o.locationAddress) || t('orders.yourLocation') })
             : t('orders.pickupAtShop')}
         </Text>
         {o.fulfillment === 'pickup' && o.shop.latitude != null && o.shop.longitude != null && o.status !== 'completed' ? (
@@ -390,12 +400,30 @@ export function OrderTrackingModal() {
       );
     }
     return (
-      <PullToRefresh refreshing={isRefetching} onRefresh={refetch}>
+      <PullToRefresh refreshing={pulling} onRefresh={pullRefresh}>
         <ScrollView
           contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 24 }]}
           showsVerticalScrollIndicator={false}
         >
-          {renderBanner(order)}
+          {/* A Quick Order still looking for a shop: every matching shop nearby has it. */}
+          {isFindingShop(order) ? (
+            <View style={styles.findingHero}>
+              <RadarPulse icon="store" />
+              <Text style={[styles.findingTitle, { color: colors.text }]}>{t('quickOrder.findingShop')}</Text>
+              <Text style={[styles.findingText, { color: colors.textMuted }]}>
+                {t(order.fulfillment === 'delivery' ? 'quickOrder.findingDelivery' : 'quickOrder.findingPickup')}
+              </Text>
+            </View>
+          ) : (
+            renderBanner(order)
+          )}
+          {/* Waiting for an answer: how long until it ends by itself (changeable). A Quick Order
+              waits like a Quick Book. */}
+          {order.status === 'placed' ? (
+            <View style={styles.countdownGap}>
+              <WaitCountdown createdAt={order.createdAt} kind={order.quick ? 'quickOrderMinutes' : 'orderMinutes'} />
+            </View>
+          ) : null}
           {isStalled(order) ? (
             <LateNotice
               title={t('late.shopTitle', { shop: order.shop.name })}
@@ -407,7 +435,7 @@ export function OrderTrackingModal() {
           {renderPin(order)}
           {renderRating(order)}
           {renderItems(order)}
-          {renderShop(order)}
+          {order.businessId ? renderShop(order) : null}
           {renderSteps(order)}
           {CUSTOMER_CANCELLABLE.includes(order.status) ? (
             <CancelButton label={t('orders.cancel')} hint={t('orders.cancelHint')} onPress={() => setConfirmCancel(true)} />
@@ -432,10 +460,10 @@ export function OrderTrackingModal() {
             </Pressable>
             <View style={styles.flex}>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {order ? t(`orders.status.${order.status}.title`) : t('orders.title')}
+                {order ? (isFindingShop(order) ? t('quickOrder.title') : t(`orders.status.${order.status}.title`)) : t('orders.title')}
               </Text>
               <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {order ? order.shop.name : ''}
+                {order ? orderShopName(order, t) : ''}
               </Text>
             </View>
           </LinearGradient>
@@ -471,6 +499,10 @@ export function OrderTrackingModal() {
 }
 
 const styles = StyleSheet.create({
+  countdownGap: { marginBottom: 14 },
+  findingHero: { alignItems: 'center', paddingTop: 16, paddingBottom: 18 },
+  findingTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginTop: 24, textAlign: 'center' },
+  findingText: { ...typography.body, textAlign: 'center', marginTop: 6, lineHeight: 20, paddingHorizontal: 12 },
   container: { flex: 1 },
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingBottom: 16 },

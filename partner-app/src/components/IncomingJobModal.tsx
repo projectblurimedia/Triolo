@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import * as Notifications from 'expo-notifications';
@@ -160,7 +161,7 @@ export function IncomingJobModal() {
       goneMessage={t('bookings.offerGoneMessage')}
       headline={offer ? t('bookings.distanceAway', { distance: formatDistance(offer.distanceMeters) }) : undefined}
       personName={offer?.customerFullName}
-      personLine={offer?.locationAddress}
+      personLine={placeName(offer?.locationAddress) || undefined}
       chips={(offer?.skillCategories ?? []).map((key) => ({
         icon: 'screwdriver-wrench' as const,
         label: t(`workerProfile.skills.${key}`),

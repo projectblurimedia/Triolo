@@ -66,6 +66,20 @@ export class AuthController {
     return ok(res, toPublicAccount(await this.service.removeProfilePhoto(req.account.accountId)), 'Photo removed');
   });
 
+  getWaitTimes = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    return ok(res, await this.service.getWaitTimes(req.account.accountId));
+  });
+
+  updateWaitTimes = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.account) {
+      throw AppError.unauthorized();
+    }
+    return ok(res, await this.service.updateWaitTimes(req.account.accountId, req.body), 'Waiting time saved');
+  });
+
   updateLanguage = asyncHandler(async (req: Request, res: Response) => {
     if (!req.account) {
       throw AppError.unauthorized();

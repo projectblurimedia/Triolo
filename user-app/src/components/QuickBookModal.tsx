@@ -17,12 +17,14 @@ import { payIfNeeded } from '@/state/payGateStore';
 import { SKILL_CATEGORIES } from '@/constants/categories';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { bookingsService, CustomerBooking } from '@/services/bookingsService';
-import { bookingQueryKey } from '@/hooks/useBookings';
+import { bookingQueryKey, MY_BOOKINGS_QUERY_KEY } from '@/hooks/useBookings';
 import { showToast } from '@/state/toastStore';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { ensureLocation } from '@/state/locationStore';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { useAdGate } from './Ads';
+import { useAdGate, useBusyAction } from './Ads';
+import { ServiceOrbit } from './ServiceOrbit';
+import { findWaitingQuickBook, waitingBookingIdFrom } from '@/utils/waitingBooking';
 
 interface QuickBookModalProps {
   visible: boolean;
@@ -75,6 +77,7 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
   // Asking for location / showing the ad: a second tap must not start a second booking.
   const preparing = useRef(false);
   const { adLoading, waitForAd } = useAdGate(visible, 'quick_book');
+  const { busy, run } = useBusyAction();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -87,8 +90,20 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
     onClose();
   };
 
+  const openWaiting = (bookingRequestId: string) => {
+    showToast({ variant: 'info', title: t('quickBook.alreadyWaitingTitle'), message: t('quickBook.alreadyWaitingMessage') });
+    openBookingTracker(bookingRequestId);
+    setTimeout(onClose, MODAL_HANDOFF_MS);
+  };
+
   const handleBookNearby = async () => {
     if (selectedSkills.length === 0 || submitting || preparing.current) return;
+    // Already looking for this work: open that one, before any ad or payment.
+    const waiting = findWaitingQuickBook(queryClient, selectedSkills);
+    if (waiting) {
+      openWaiting(waiting.id);
+      return;
+    }
     preparing.current = true;
     try {
       // Location first — before anything else — so nothing starts that would only stop. Then a
@@ -157,9 +172,20 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
         arrivalPin: null,
       };
       queryClient.setQueryData(bookingQueryKey(result.bookingRequestId), seeded);
+      // In My Bookings, Continue and the Services tab count at once, not at the next refresh.
+      queryClient.setQueryData<CustomerBooking[]>(MY_BOOKINGS_QUERY_KEY, (list) => [
+        seeded,
+        ...(list ?? []).filter((booking) => booking.id !== seeded.id),
+      ]);
+      queryClient.invalidateQueries({ queryKey: MY_BOOKINGS_QUERY_KEY });
       openBookingTracker(result.bookingRequestId);
       setTimeout(onClose, MODAL_HANDOFF_MS);
-    } catch {
+    } catch (error) {
+      const waitingId = waitingBookingIdFrom(error);
+      if (waitingId) {
+        openWaiting(waitingId);
+        return;
+      }
       showToast({ variant: 'error', title: t('common.errorTitle'), message: t('errors.generic') });
       setSubmitting(false);
     }
@@ -210,12 +236,27 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
             onChange={setSelectedSkills}
             searchCustom={workersService.customSkills}
           />
+
+          <View style={styles.orbitWrap}>
+            <ServiceOrbit size={250} centerIcon="bolt" title={t('quickBook.orbitTitle')} text={t('quickBook.orbitText')} />
+          </View>
+          {/* How it works, in three short steps. */}
+          <View style={[styles.howCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {(['pick', 'ask', 'come'] as const).map((step, index) => (
+              <View key={step} style={styles.howStep}>
+                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.howNumber}>
+                  <Text style={styles.howNumberText}>{index + 1}</Text>
+                </LinearGradient>
+                <Text style={[styles.howText, { color: colors.text }]}>{t(`quickBook.how.${step}`)}</Text>
+              </View>
+            ))}
+          </View>
         </ScrollView>
         <View style={[styles.bookButtonWrap, { borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
           <Button
             label={withFee(t('quickBook.bookNearby'), bookFee)}
-            onPress={handleBookNearby}
-            loading={submitting || adLoading}
+            onPress={() => run(handleBookNearby)}
+            loading={submitting || adLoading || busy}
             disabled={selectedSkills.length === 0}
           />
         </View>
@@ -274,6 +315,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectBody: { padding: 20, paddingBottom: 32 },
+  orbitWrap: { alignItems: 'center', marginTop: 14 },
+  howCard: { borderWidth: 1, borderRadius: 18, padding: 14, gap: 10, marginTop: 6 },
+  howStep: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  howNumber: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  howNumberText: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 12, includeFontPadding: false },
+  howText: { ...typography.body, fontSize: 13.5, flex: 1 },
   skillsLabel: { ...typography.body, fontFamily: fonts.semiBold, marginBottom: 12 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: {

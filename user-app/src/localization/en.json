@@ -324,7 +324,8 @@
       "nearbyShops": "Nearby Shops",
       "prepareList": "Prepare List",
       "hireStaff": "Hire Staff",
-      "orderShop": "Order from a Shop"
+      "orderShop": "Order from a Shop",
+      "quickOrder": "Quick Order"
     },
     "activeProblems": "{{count}} active problem",
     "activeProblems_other": "{{count}} active problems",
@@ -343,7 +344,8 @@
       "nearbyShops": "Shops around you",
       "prepareList": "Plan your list by voice",
       "hireStaff": "Cooks, tutors, drivers",
-      "orderShop": "Send your list to a nearby shop"
+      "orderShop": "Send your list to a nearby shop",
+      "quickOrder": "Nearest shop sends your list"
     },
     "trackBooking": "Track",
     "allServicesCount": "{{count}} services"
@@ -415,7 +417,15 @@
     "emptyMessage": "No verified workers were found near you yet. Pull down to refresh later.",
     "emptyCategoryMessage": "No {{category}} found near you yet.",
     "searchPlaceholder": "Search workers by name or skill",
-    "filterTitle": "Filter by service"
+    "filterTitle": "Filter by service",
+    "workersNearbyCount_one": "{{count}} worker near you",
+    "workersNearbyCount_other": "{{count}} workers near you",
+    "allWorkers": "All workers",
+    "heroSubtitle": "Verified workers, ready when you need them",
+    "heroCountCaption": "nearby now",
+    "allWorkersNearby": "All workers near you",
+    "bookWorkerTitle": "Book a nearby worker",
+    "bookWorkerSubtitle": "Choose the kind of work, or search a name"
   },
   "servicesMenu": {
     "title": "Services",
@@ -444,7 +454,16 @@
     "noWorkersTitle": "No Workers Nearby",
     "noWorkersMessage": "No verified workers with all the selected skills were found nearby right now. Try different skills or check back later.",
     "searchingTitle": "Searching Nearby Workers",
-    "searchingMessage": "Notifying verified workers who match your request…"
+    "searchingMessage": "Notifying verified workers who match your request…",
+    "alreadyWaitingTitle": "Already waiting for an answer",
+    "alreadyWaitingMessage": "You already asked nearby workers for this — here it is.",
+    "orbitTitle": "Help nearby",
+    "orbitText": "The nearest workers get your request at once",
+    "how": {
+      "pick": "Pick the work you need done",
+      "ask": "Every verified worker nearby gets it at once",
+      "come": "The first to accept comes to you — track them live"
+    }
   },
   "prepareList": {
     "tagline": "Get your list ready before you shop or book",
@@ -490,7 +509,12 @@
     "more": "+{{count}} more",
     "noListsTitle": "No lists yet",
     "noListsMessage": "Tap New List, speak or type your items, and save. Send any list to a nearby shop when you are ready.",
-    "defaultListName": "List"
+    "defaultListName": "List",
+    "duplicateNameTitle": "Name already used",
+    "duplicateNameMessage": "You already have a list with this name. Choose another name.",
+    "addItemManuallyHint": "Type an item, its quantity and unit",
+    "editorSubtitle": "Speak or type your items, then save",
+    "listNameLabel": "List name"
   },
   "bazaar": {
     "comingSoon": "Shop ordering is coming soon.",
@@ -511,14 +535,21 @@
     "emptyMessage": "No verified shops near you yet.",
     "emptyDeliveryMessage": "No shops near you deliver right now. Turn off the Delivery filter to see all shops.",
     "searchPlaceholder": "Search shops by name or category",
-    "filterTitle": "Filter by shop type"
+    "filterTitle": "Filter by shop type",
+    "shopsNearbyCount_one": "{{count}} shop near you",
+    "shopsNearbyCount_other": "{{count}} shops near you",
+    "allShops": "All shops",
+    "heroSubtitle": "Local shops that pack your list",
+    "allShopsNearby": "All shops near you",
+    "sendListButtonTitle": "Send your list to a shop",
+    "sendListButtonSubtitle": "Pick a list, then the shop that packs it"
   },
   "bazaarMenu": {
     "title": "Bazaar",
     "subtitle": "Shop nearby with ease",
     "shopSection": "Shop",
     "quickOrderTitle": "Quick Order",
-    "quickOrderSubtitle": "Browse and order from a shop directly",
+    "quickOrderSubtitle": "Your list to the first shop nearby that accepts",
     "quickOrderComingSoonMessage": "We're building direct shop ordering. Soon you'll be able to browse and order from a shop in a few taps.",
     "manageSection": "Manage",
     "myOrdersTitle": "My Orders",
@@ -527,7 +558,9 @@
     "favoriteShopsTitle": "Favorite Shops",
     "favoriteShopsSubtitle": "Shops you've saved for later",
     "favoriteShopsComingSoonMessage": "We're building saved shops. Soon you'll be able to bookmark shops here for quick reordering.",
-    "comingSoonTitle": "Coming Soon"
+    "comingSoonTitle": "Coming Soon",
+    "sendListTitle": "Send List to a Shop",
+    "sendListSubtitle": "Choose one shop for your list"
   },
   "profile": {
     "tagline": "Your profile overview",
@@ -763,7 +796,31 @@
       "staff": "All kinds of work ({{count}})"
     },
     "matchingItems": "Matching",
-    "nearbyResults": "Near you"
+    "nearbyResults": "Near you",
+    "filters": {
+      "trusted": "Trusted",
+      "workType": "Kind of work",
+      "shopType": "Kind of shop",
+      "anyWork": "Any kind of work",
+      "anyShop": "Any kind of shop",
+      "noResults": "Nothing nearby matches these filters. Try fewer filters.",
+      "topRated": "Top rated",
+      "workersNamePlaceholder": "Search by worker name",
+      "shopsNamePlaceholder": "Search by shop name"
+    },
+    "pickShopSubtitle": "Tap a shop to send your list there",
+    "viewProfile": "View",
+    "groups": {
+      "workers": "Workers",
+      "workersByWork": "By kind of work",
+      "shops": "Shops",
+      "shopsByType": "By kind of shop",
+      "people": "People",
+      "peopleByWork": "By kind of work",
+      "workTypes": "Kinds of work",
+      "shopTypes": "Kinds of shop",
+      "staffTypes": "Kinds of work"
+    }
   },
   "liveMap": {
     "unavailable": "Map unavailable right now",
@@ -867,7 +924,12 @@
     "experienceValue_one": "{{count}} yr",
     "experienceValue_other": "{{count}} yrs",
     "new": "New",
-    "workPhotos": "Work photos"
+    "workPhotos": "Work photos",
+    "sortNewest": "Newest",
+    "sortHigh": "High to low",
+    "sortLow": "Low to high",
+    "showMore": "Show {{count}} more",
+    "showLess": "Show less"
   },
   "sendList": {
     "title": "Send List to a Shop",
@@ -896,7 +958,10 @@
     "emptyMessage": "You haven't saved a list yet. Make one now — speak or type your items.",
     "orderFromShop": "Order from this shop",
     "chooseList": "Choose a list",
-    "createList": "Create a List"
+    "createList": "Create a List",
+    "searchShops": "Search shops by name or kind",
+    "filters": "Filters",
+    "nearestShops": "Nearest shops — or search above"
   },
   "orders": {
     "title": "Your Order",
@@ -1094,7 +1159,12 @@
     "introNote": "Uses your location to show only people near you.",
     "finding": "Finding people near you…",
     "selectType": "Select the type of staff you need",
-    "numberHidden": "Number hidden · tap Call"
+    "numberHidden": "Number hidden · tap Call",
+    "nearYou": "Near you",
+    "numberHiddenTitle": "Number hidden",
+    "payToSee": "Pay ₹{{fee}} once to see it",
+    "tapToSee": "Tap Call to see it",
+    "payAmount": "Pay ₹{{fee}}"
   },
   "continueSteps": {
     "title": "Continue Where You Left Off",
@@ -1268,13 +1338,14 @@
     "title": "Book {{name}}",
     "subtitle": "Only {{name}} will be asked",
     "chooseWork": "What do you need done?",
-    "note": "{{name}} gets your request personally and has 10 minutes to accept. Then you can track them like Quick Book.",
+    "note": "{{name}} gets your request personally. Once they accept, you can track them like Quick Book.",
     "send": "Send Booking Request",
     "waitingTitle": "Booking request sent to {{name}}",
-    "waitingMessage": "Waiting for {{name}} to accept. They have 10 minutes.",
+    "waitingMessage": "Waiting for {{name}} to accept.",
     "expiredMessage": "{{name}} didn't answer in time. Book Again asks every worker nearby.",
     "declinedMessage": "{{name}} can't take this job. Book Again asks every worker nearby.",
-    "sentTitle": "Request sent to {{name}}"
+    "sentTitle": "Request sent to {{name}}",
+    "alreadyWaitingMessage": "{{name}} already has your request for this — here it is."
   },
   "late": {
     "workerTitle": "{{name}} hasn't arrived yet",
@@ -1379,5 +1450,88 @@
       "book": "You paid for a booking that didn't go ahead, so this one is free.",
       "order": "You paid for an order that didn't go ahead, so this one is free."
     }
+  },
+  "waiting": {
+    "stepSent": "Request sent",
+    "stepAcceptName": "{{name}} accepts",
+    "stepAcceptAny": "A worker accepts",
+    "now": "Waiting now…",
+    "notifyTitle": "You don't have to wait here",
+    "notifyName": "Go back and carry on with your work — we'll notify you the moment {{name}} accepts.",
+    "notifyAny": "Go back and carry on with your work — we'll notify you the moment a worker accepts.",
+    "goBack": "Go Back"
+  },
+  "waitTime": {
+    "title": "Waiting Time",
+    "menuSubtitle": "How long requests wait for an answer",
+    "subtitle": "How long your requests wait for an answer",
+    "intro": "If no worker or shop answers within this time, the request ends by itself and you can try again. Changes apply straight away, also to requests waiting now.",
+    "quickBook": "Quick Book",
+    "quickBookHint": "Any worker nearby accepting",
+    "direct": "A worker you booked",
+    "directHint": "That one worker accepting",
+    "order": "List sent to a shop",
+    "orderHint": "The shop answering your list",
+    "save": "Save",
+    "savedTitle": "Waiting time saved",
+    "savedMessage": "Your requests now wait this long.",
+    "minutes_one": "{{count}} min",
+    "minutes_other": "{{count}} min",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "quickOrder": "Quick Order",
+    "quickOrderHint": "The first shop nearby accepting your list"
+  },
+  "waitCountdown": {
+    "label": "Ends by itself in",
+    "endingNow": "Ending now…",
+    "change": "Change",
+    "hint": "If nobody accepts within {{time}}, it ends and you can try again. Change it any time."
+  },
+  "quickOrder": {
+    "title": "Quick Order",
+    "subtitle": "Your list to every shop nearby, at once",
+    "intro": "Pick your list, the kind of shop and how you want it. Every matching shop nearby gets it at once — the first to accept packs your order.",
+    "stepList": "Your list",
+    "stepShop": "Kind of shop",
+    "shopPlaceholder": "Choose the kind of shop",
+    "stepHow": "How you want it",
+    "delivery": "Home Delivery",
+    "deliveryHint": "Only shops that deliver get it",
+    "pickup": "Pickup",
+    "pickupHint": "You collect it from the shop",
+    "orderNearby": "Order Nearby",
+    "noListMessage": "Make a list in Prepare List first — then send it to the nearest shops in one tap.",
+    "sentTitle": "Sent to shops nearby",
+    "sentMessage": "The first shop to accept packs your order.",
+    "noShopsTitle": "No shop nearby",
+    "noShopsMessage": "No shop of that kind is near you right now. Try another kind of shop.",
+    "noShopsDelivery": "No shop of that kind nearby delivers right now. Try Pickup or another kind of shop.",
+    "findingShop": "Finding a shop…",
+    "findingDelivery": "Every matching shop nearby that delivers has your list. The first to accept packs and delivers it.",
+    "findingPickup": "Every matching shop nearby has your list. The first to accept packs it for you to collect."
+  },
+  "profileView": {
+    "skills": "Skills",
+    "shopTypes": "Kinds of shop",
+    "shopPhotos": "Shop photos",
+    "ratings": "Ratings",
+    "delivery": "Delivery",
+    "deliversYes": "Yes",
+    "deliversNo": "No",
+    "workTheyDo": "Work they do",
+    "whatTheySell": "What this shop sells",
+    "kickerWorker": "Worker profile",
+    "kickerShop": "Shop profile",
+    "kickerStaff": "Looking for work",
+    "workAndSkills": "Work and skills",
+    "deliveryTitle": "Home delivery",
+    "deliveryNote": "This shop brings your order to your door",
+    "deliveryMin": "Minimum charge",
+    "deliveryPerKm": "Per km",
+    "pickupOnly": "No delivery — collect your order from the shop",
+    "deliveryChargeLine": "₹{{perKm}} per km · Min ₹{{min}}"
   }
 }

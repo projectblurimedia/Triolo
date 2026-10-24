@@ -6,8 +6,17 @@ import { BusinessProfile } from '@/modules/businesses/interfaces';
 import { NotificationsService } from '@/modules/notifications/service';
 import { NotificationType } from '@/modules/notifications/interfaces';
 import { OrdersRepository } from './repository';
-import { CreateOrderDto, CustomerCancelDto, RateOrderDto, SaveItemsDto } from './dto';
-import { CustomerOrder, OrderTransition, RatedOrder, ShopSideOrder, AdminOrder, AdminOrderListFilter } from './interfaces';
+import { CreateOrderDto, CreateQuickOrderDto, CustomerCancelDto, RateOrderDto, SaveItemsDto } from './dto';
+import {
+  CustomerOrder,
+  OrderTransition,
+  QUICK_ORDER_MAX_SHOPS,
+  QUICK_ORDER_RADIUS_KM,
+  RatedOrder,
+  ShopSideOrder,
+  AdminOrder,
+  AdminOrderListFilter,
+} from './interfaces';
 import { OrderEvent, orderTemplate } from './pushTemplates';
 
 const LIST_LIMIT = 50;
@@ -91,6 +100,51 @@ export class OrdersService {
     return this.getOrder(accountId, order.id);
   }
 
+  /**
+   * Quick Order: the list goes to every verified shop nearby of the chosen kinds (that deliver,
+   * for a delivery) at once; the first to accept gets it, then it is an ordinary order. Nothing
+   * is created (or paid) when no shop matches.
+   */
+  async createQuickOrder(accountId: string, dto: CreateQuickOrderDto): Promise<CustomerOrder> {
+    const shops = await this.businessesService.searchNearby(accountId, {
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      radiusKm: QUICK_ORDER_RADIUS_KM,
+      shopCategory: dto.shopCategories.join(','),
+      deliveryOnly: dto.fulfillment === 'delivery',
+      limit: QUICK_ORDER_MAX_SHOPS,
+    });
+    if (shops.length === 0) {
+      throw AppError.notFound('No matching shop nearby.', 'QUICK_ORDER_NO_SHOPS');
+    }
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'order')) ?? null;
+    const order = await this.repository.createQuick({
+      accountId,
+      fulfillment: dto.fulfillment,
+      shopCategories: dto.shopCategories,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      locationAddress: dto.locationAddress || null,
+      note: dto.note || null,
+      items: dto.items.map((item) => ({ name: item.name, quantity: item.quantity, unit: item.unit || null })),
+      offers: shops.map((shop) => ({ businessId: shop.id, distanceMeters: shop.distanceMeters })),
+    });
+    await this.subscriptionStatus?.attachPass(passId, order.id);
+
+    // Every shop asked hears at once, in its own language.
+    await Promise.all(
+      shops.map(async (shop) => {
+        const language = await this.repository.languageOf(shop.accountId);
+        const text = orderTemplate('quick_placed', language, { shop: shop.shopName, count: order.items.length });
+        await this.notificationsService.notify(shop.accountId, 'order_placed', text.title, text.body, {
+          data: { kind: 'order_placed', orderId: order.id },
+          channelId: 'default',
+        });
+      }),
+    );
+    return this.getOrder(accountId, order.id);
+  }
+
   /** Ends unanswered orders and gives back what was paid for them. */
   private async expireStale(): Promise<void> {
     const expired = await this.repository.expireStale();
@@ -168,7 +222,16 @@ export class OrdersService {
   async acceptOrder(ownerAccountId: string, orderId: string): Promise<void> {
     const shop = await this.requireShop(ownerAccountId);
     const passId = (await this.subscriptionStatus?.usePartnerPass(ownerAccountId, 'accept')) ?? null;
-    const result = await this.repository.accept(orderId, shop.id);
+    // A Quick Order offered to this shop: the first accept takes it (delivery charge from here).
+    const offerDistance = await this.repository.findQuickOffer(orderId, shop.id);
+    const result =
+      offerDistance != null
+        ? await this.repository.claimQuick(orderId, shop.id, offerDistance, deliveryCharge(shop, offerDistance))
+        : await this.repository.accept(orderId, shop.id);
+    if (!result && offerDistance != null) {
+      await this.subscriptionStatus?.restorePasses([], [passId]);
+      throw AppError.conflict('Another shop took this order first.', 'ORDER_ALREADY_TAKEN');
+    }
     if (!result) {
       await this.subscriptionStatus?.restorePasses([], [passId]);
       throw await this.transitionError(orderId, 'This order can no longer be accepted.');
@@ -179,6 +242,8 @@ export class OrdersService {
 
   async declineOrder(ownerAccountId: string, orderId: string, reason?: string): Promise<void> {
     const shop = await this.requireShop(ownerAccountId);
+    // A Quick Order: only this shop's offer closes — the others can still take it.
+    if (await this.repository.declineQuickOffer(orderId, shop.id)) return;
     const result = await this.repository.decline(orderId, shop.id, reason || null);
     if (!result) throw await this.transitionError(orderId, 'This order can no longer be declined.');
     await this.notify(result, 'declined', 'order_declined');
@@ -301,7 +366,7 @@ export class OrdersService {
     await Promise.all(
       [
         { target: result.customer, audience: 'user' as const },
-        { target: result.shopOwner, audience: 'partner' as const },
+        ...(result.shopOwner ? [{ target: result.shopOwner, audience: 'partner' as const }] : []),
       ].map(({ target, audience }) => {
         const text = orderTemplate('cancelled_by_admin', target.preferredLanguage, { shop: result.shopName });
         const why = reason ? (target.preferredLanguage === 'te' ? ` కారణం: ${reason}` : ` Reason: ${reason}`) : '';

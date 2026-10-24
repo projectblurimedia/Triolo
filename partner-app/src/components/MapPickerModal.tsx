@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -265,7 +266,7 @@ export function MapPickerModal({ visible, initial, onClose, onPick }: MapPickerM
               <Text style={[styles.placeCaption, { color: colors.textMuted }]}>{t('location.pinCaption')}</Text>
               {preview && !moving ? (
                 <Text style={[styles.placeName, { color: colors.text }]} numberOfLines={2}>
-                  {preview.locationName}
+                  {placeName(preview.locationName) || preview.locationName}
                 </Text>
               ) : (
                 <Text style={[styles.placeName, { color: colors.textMuted }]}>

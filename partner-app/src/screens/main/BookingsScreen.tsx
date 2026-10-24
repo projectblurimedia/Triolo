@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -167,7 +168,7 @@ export function BookingsScreen() {
             ) : null}
             {item.locationAddress ? (
               <Text style={[styles.entryMeta, { color: colors.textMuted }]} numberOfLines={1}>
-                {item.locationAddress}
+                {placeName(item.locationAddress)}
               </Text>
             ) : null}
           </View>

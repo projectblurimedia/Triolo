@@ -16,6 +16,7 @@ import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from './PullToRefresh';
 import { bookingStatusTitle } from '@/utils/bookingStatusText';
+import { CountBadge } from './CountBadge';
 
 interface MyBookingsModalProps {
   visible: boolean;
@@ -159,7 +160,7 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
   };
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'active', label: activeCount > 0 ? `${t('myBookings.active')} (${activeCount})` : t('myBookings.active') },
+    { key: 'active', label: t('myBookings.active') },
     { key: 'history', label: t('myBookings.history') },
   ];
 
@@ -196,6 +197,7 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
                 style={[styles.segmentItem, active ? { backgroundColor: colors.surface } : null]}
               >
                 <Text style={[styles.segmentText, { color: active ? colors.primary : colors.textMuted }]}>{option.label}</Text>
+                {option.key === 'active' ? <CountBadge count={activeCount} /> : null}
               </Pressable>
             );
           })}
@@ -252,8 +254,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   segment: { flexDirection: 'row', borderRadius: 14, padding: 4, margin: 16, marginBottom: 6 },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11 },
-  segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
+  segmentItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 11 },
+  // Fixed line height, no font padding: the text and the red count line up in the middle.
+  segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, includeFontPadding: false, textAlignVertical: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { padding: 16, paddingTop: 10, paddingBottom: 40, flexGrow: 1 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },

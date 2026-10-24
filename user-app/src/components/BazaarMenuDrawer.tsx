@@ -4,6 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
 import { SendListModal } from './SendListModal';
+import { QuickOrderModal } from './QuickOrderModal';
+import { NearbySearchModal } from './NearbySearchModal';
+import { useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { MainTabParamList } from '@/navigation/types';
 import { MyOrdersModal } from './MyOrdersModal';
 import { FavoritesModal } from './FavoritesModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -21,8 +26,10 @@ interface BazaarMenuDrawerProps {
 const BLUE_GRADIENT = headerGradient;
 const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
 const PINK_GRADIENT = ['#DB2777', '#F472B6'] as const;
+const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
+const TEAL_GRADIENT = ['#0891B2', '#22D3EE'] as const;
 
-type BazaarMenuItemKey = 'quickOrder' | 'myOrders' | 'favoriteShops';
+type BazaarMenuItemKey = 'quickOrder' | 'sendList' | 'nearbyShops' | 'myOrders' | 'favoriteShops';
 
 const ITEMS: {
   key: BazaarMenuItemKey;
@@ -43,6 +50,7 @@ export function BazaarMenuDrawer({ visible, onClose }: BazaarMenuDrawerProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const [activeItem, setActiveItem] = useState<BazaarMenuItemKey | null>(null);
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
 
   return (
     <>
@@ -62,7 +70,27 @@ export function BazaarMenuDrawer({ visible, onClose }: BazaarMenuDrawerProps) {
           subtitle={t('bazaarMenu.quickOrderSubtitle')}
           onPress={() => {
             onClose();
-            withLocation(() => setActiveItem('quickOrder'));
+            setActiveItem('quickOrder');
+          }}
+        />
+        <DrawerMenuItem
+          icon="paper-plane"
+          gradient={PURPLE_GRADIENT}
+          title={t('bazaarMenu.sendListTitle')}
+          subtitle={t('bazaarMenu.sendListSubtitle')}
+          onPress={() => {
+            onClose();
+            withLocation(() => setActiveItem('sendList'));
+          }}
+        />
+        <DrawerMenuItem
+          icon="location-dot"
+          gradient={TEAL_GRADIENT}
+          title={t('homeMenu.nearbyShopsTitle')}
+          subtitle={t('homeMenu.nearbyShopsSubtitle')}
+          onPress={() => {
+            onClose();
+            setActiveItem('nearbyShops');
           }}
         />
 
@@ -91,8 +119,18 @@ export function BazaarMenuDrawer({ visible, onClose }: BazaarMenuDrawerProps) {
         />
       </SideMenuDrawer>
 
-      {/* Quick Order sends the prepared list to a nearby shop (Prepare List → shop packs it). */}
-      <SendListModal visible={activeItem === 'quickOrder'} onClose={() => setActiveItem(null)} />
+      {/* Quick Order: the list to every matching shop nearby, first to accept gets it. */}
+      <QuickOrderModal
+        visible={activeItem === 'quickOrder'}
+        onClose={() => setActiveItem(null)}
+        onCreateList={() => {
+          setActiveItem(null);
+          navigation.navigate('PrepareList', { newList: Date.now() });
+        }}
+      />
+      {/* Send your list to one shop you choose. */}
+      <SendListModal visible={activeItem === 'sendList'} onClose={() => setActiveItem(null)} />
+      <NearbySearchModal visible={activeItem === 'nearbyShops'} onClose={() => setActiveItem(null)} mode="business" />
       <MyOrdersModal visible={activeItem === 'myOrders'} onClose={() => setActiveItem(null)} />
       <FavoritesModal visible={activeItem === 'favoriteShops'} onClose={() => setActiveItem(null)} type="business" />
     </>

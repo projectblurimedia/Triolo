@@ -53,6 +53,8 @@ export interface BusinessNearbyResult extends BusinessProfile {
 }
 
 export interface NearbySearchParams {
+  /** Match `query` against names only (a kind is already picked). */
+  nameOnly?: boolean;
   latitude: number;
   longitude: number;
   radiusKm?: number;
@@ -80,6 +82,7 @@ export const businessesService = {
     search.set('longitude', String(params.longitude));
     if (params.radiusKm != null) search.set('radiusKm', String(params.radiusKm));
     if (params.query) search.set('query', params.query);
+    if (params.nameOnly) search.set('nameOnly', 'true');
     if (params.limit != null) search.set('limit', String(params.limit));
     if (params.shopCategory) search.set('shopCategory', params.shopCategory);
     if (params.deliveryOnly) search.set('delivery', 'true');

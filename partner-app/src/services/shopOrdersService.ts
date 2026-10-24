@@ -36,6 +36,10 @@ export interface ShopOrderItem {
 
 export interface ShopOrder {
   id: string;
+  /** null while a Quick Order is still open to every shop asked. */
+  businessId?: string | null;
+  /** A Quick Order: sent to every matching shop nearby; the first to accept gets it. */
+  quick?: boolean;
   fulfillment: 'pickup' | 'delivery';
   status: ShopOrderStatus;
   latitude: number;

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -9,8 +10,8 @@ import { formatRupees } from '@/services/ordersService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { callStaff } from '@/utils/callStaff';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { COMPACT_AVATAR_SIZE, GlassProfileLayout } from './GlassHero';
-import { firstName } from '@/utils/firstName';
+import { PROFILE_AVATAR_SIZE, ProfileCover, ProfilePill, ProfileSection } from './ProfileCover';
+import { usePayHint } from '@/hooks/useSubscription';
 import { SmartImage } from './SmartImage';
 import { SealedAvatar, TrustedBadge } from './TrustedBadge';
 import { PhotoViewer } from './PhotoViewer';
@@ -43,6 +44,9 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
   const [unlockedNumber, setUnlockedNumber] = useState<string | null>(null);
   useEffect(() => setUnlockedNumber(null), [person?.id]);
 
+  const number = unlockedNumber ?? person?.mobileNumber ?? null;
+  // What seeing the number costs right now (null: free / already covered).
+  const fee = usePayHint('staff_contact');
   const icon = person ? (JOB_CATEGORIES.find((entry) => entry.key === person.category)?.icon ?? 'user-tie') : 'user-tie';
 
   const infoRow = (rowIcon: string, label: string, value: string) => (
@@ -62,7 +66,7 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {person ? (
           <>
-            <GlassProfileLayout
+            <ProfileCover
               topInset={insets.top}
               onBack={onClose}
               backLabel={t('common.close')}
@@ -73,94 +77,51 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                   accessibilityRole="imagebutton"
                   accessibilityLabel={person.fullName}
                 >
-                <SealedAvatar size={COMPACT_AVATAR_SIZE} kind="job_post" id={person.id}>
-                {person.photoUrl ? (
-                  <SmartImage source={{ uri: person.photoUrl }} style={styles.compactAvatar} />
-                ) : (
-                  <LinearGradient
-                    colors={headerGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.compactAvatar}
-                  >
-                    <Text style={styles.compactInitials}>{initialsOf(person.fullName)}</Text>
-                  </LinearGradient>
-                )}
-                </SealedAvatar>
+                  <SealedAvatar size={PROFILE_AVATAR_SIZE} kind="job_post" id={person.id}>
+                    {person.photoUrl ? (
+                      <SmartImage source={{ uri: person.photoUrl }} style={styles.avatar} />
+                    ) : (
+                      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
+                        <Text style={styles.initials}>{initialsOf(person.fullName)}</Text>
+                      </LinearGradient>
+                    )}
+                  </SealedAvatar>
                 </Pressable>
               }
-              title={firstName(person.fullName)}
+              name={person.fullName}
+              kicker={{ icon: 'user-tie', label: t('profileView.kickerStaff') }}
+              highlights={{
+                title: t('profileView.workAndSkills'),
+                items: [
+                  { label: jobSeekerTitle(person, t), icon: icon as React.ComponentProps<typeof FontAwesome6>['name'] },
+                  ...person.skills.map((skill) => ({ label: skill, icon: 'star' as const })),
+                ],
+              }}
               subtitle={jobSeekerTitle(person, t)}
+              pills={
+                <>
+                  <TrustedBadge kind="job_post" id={person.id} />
+                  <ProfilePill icon="location-arrow" label={t('hireStaff.away', { distance: formatDistanceValue(person.distanceMeters) })} filled />
+                  {placeName(person.locationAddress) ? <ProfilePill icon="location-dot" label={placeName(person.locationAddress)} /> : null}
+                </>
+              }
+              stats={[
+                { icon: 'indian-rupee-sign', value: formatRupees(person.payAmount), label: t(`hireStaff.per.${person.payPeriod}`), gold: true },
+                { icon: 'clock', value: t(`hireStaff.availability.${person.availability}`), label: t('hireStaff.availabilityLabel') },
+                {
+                  icon: 'briefcase',
+                  value: person.experienceYears > 0 ? t('hireStaff.years', { count: person.experienceYears }) : t('hireStaff.fresher'),
+                  label: t('hireStaff.experienceLabel'),
+                },
+              ]}
               contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
             >
-              {/* Pay, work and distance — the first thing a family wants to know. */}
-              <View style={styles.bodyTop}>
-                <Text style={[styles.fullName, { color: colors.text }]}>{person.fullName}</Text>
-                <TrustedBadge kind="job_post" id={person.id} style={styles.trusted} />
-                <View style={[styles.payCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <View style={styles.flex}>
-                    <Text style={[styles.payLabel, { color: colors.textMuted }]}>{t('hireStaff.expectedPay')}</Text>
-                    <View style={styles.payRow}>
-                      <Text style={[styles.pay, { color: colors.text }]}>{formatRupees(person.payAmount)}</Text>
-                      <Text style={[styles.per, { color: colors.textMuted }]}> / {t(`hireStaff.per.${person.payPeriod}`)}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.payTags}>
-                    <View
-                      style={[styles.workPill, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}33` }]}
-                    >
-                      <FontAwesome6 name={icon as never} size={11} color={colors.primary} solid />
-                      <Text style={[styles.workText, { color: colors.primary }]} numberOfLines={1}>
-                        {jobSeekerTitle(person, t)}
-                      </Text>
-                    </View>
-                    <View style={styles.distance}>
-                      <FontAwesome6 name="location-arrow" size={11} color={colors.primary} solid />
-                      <Text style={[styles.distanceText, { color: colors.textMuted }]}>
-                        {t('hireStaff.away', { distance: formatDistanceValue(person.distanceMeters) })}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.body}>
-                <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  {infoRow('clock', t('hireStaff.availabilityLabel'), t(`hireStaff.availability.${person.availability}`))}
-                  {infoRow(
-                    'briefcase',
-                    t('hireStaff.experienceLabel'),
-                    person.experienceYears > 0 ? t('hireStaff.years', { count: person.experienceYears }) : t('hireStaff.fresher'),
-                  )}
-                  {infoRow('location-dot', t('hireStaff.locationLabel'), person.locationAddress)}
-                </View>
-
-                {person.skills.length > 0 ? (
-                  <>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('hireStaff.skillsLabel')}</Text>
-                    <View style={styles.skills}>
-                      {person.skills.map((skill) => (
-                        <View
-                          key={skill}
-                          style={[styles.skill, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}33` }]}
-                        >
-                          <Text style={[styles.skillText, { color: colors.primary }]}>{skill}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </>
-                ) : null}
-
-                {person.description ? (
-                  <>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('hireStaff.aboutLabel')}</Text>
-                    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Text style={[styles.about, { color: colors.text }]}>{person.description}</Text>
-                    </View>
-                  </>
-                ) : null}
-              </View>
-            </GlassProfileLayout>
+              {person.description ? (
+                <ProfileSection title={t('hireStaff.aboutLabel')} icon="quote-left">
+                  <Text style={[styles.about, { color: colors.text }]}>{person.description}</Text>
+                </ProfileSection>
+              ) : null}
+            </ProfileCover>
 
             <View
               style={[
@@ -168,19 +129,37 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                 { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: colors.border },
               ]}
             >
-              <View style={styles.flex}>
-                <Text style={[styles.phoneLabel, { color: colors.textMuted }]}>{t('hireStaff.phoneLabel')}</Text>
-                <Text style={[styles.phone, { color: colors.text }]} selectable>
-                  {unlockedNumber ?? person.mobileNumber ?? t('hireStaff.numberHidden')}
-                </Text>
-              </View>
+              {number ? (
+                <View style={styles.flex}>
+                  <Text style={[styles.phoneLabel, { color: colors.textMuted }]}>{t('hireStaff.phoneLabel')}</Text>
+                  <Text style={[styles.phone, { color: colors.text }]} selectable numberOfLines={1}>
+                    {number}
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.flex, styles.hiddenRow]}>
+                  <View style={[styles.lockIcon, { backgroundColor: `${colors.primary}14` }]}>
+                    <FontAwesome6 name="lock" size={13} color={colors.primary} solid />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={[styles.hiddenTitle, { color: colors.text }]} numberOfLines={1}>
+                      {t('hireStaff.numberHiddenTitle')}
+                    </Text>
+                    <Text style={[styles.phoneLabel, { color: colors.textMuted }]} numberOfLines={1}>
+                      {fee ? t('hireStaff.payToSee', { fee }) : t('hireStaff.tapToSee')}
+                    </Text>
+                  </View>
+                </View>
+              )}
               <Pressable
-                onPress={() => callStaff({ id: person.id, mobileNumber: unlockedNumber ?? person.mobileNumber }, setUnlockedNumber)}
+                onPress={() => callStaff({ id: person.id, mobileNumber: number }, setUnlockedNumber)}
                 accessibilityLabel={`${t('hireStaff.call')} ${person.fullName}`}
               >
                 <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>
                   <FontAwesome6 name="phone" size={15} color="#FFFFFF" solid />
-                  <Text style={styles.callText}>{t('hireStaff.callNow')}</Text>
+                  <Text style={styles.callText} numberOfLines={1}>
+                    {!number && fee ? t('hireStaff.payAmount', { fee }) : t('hireStaff.callNow')}
+                  </Text>
                 </LinearGradient>
               </Pressable>
             </View>
@@ -198,14 +177,13 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
 
 const styles = StyleSheet.create({
   trusted: { marginTop: -6, marginBottom: 12 },
-  compactAvatar: {
-    width: COMPACT_AVATAR_SIZE,
-    height: COMPACT_AVATAR_SIZE,
-    borderRadius: COMPACT_AVATAR_SIZE / 2,
+  avatar: {
+    width: PROFILE_AVATAR_SIZE,
+    height: PROFILE_AVATAR_SIZE,
+    borderRadius: PROFILE_AVATAR_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  compactInitials: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 17 },
   fullName: { fontFamily: fonts.semiBold, fontSize: 20, lineHeight: 27, marginBottom: 12 },
   bodyTop: { paddingHorizontal: 18 },
   payCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, borderWidth: 1, padding: 16 },
@@ -236,7 +214,7 @@ const styles = StyleSheet.create({
   distance: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   distanceText: { fontFamily: fonts.medium, fontSize: 12 },
   body: { padding: 18, paddingTop: 12 },
-  card: { borderRadius: 18, borderWidth: 1, padding: 14, gap: 14 },
+  card: { borderRadius: 18, borderWidth: 1, padding: 14 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   infoLabel: { ...typography.caption, fontSize: 11 },
@@ -259,7 +237,10 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   phoneLabel: { ...typography.caption, fontSize: 11 },
+  hiddenRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  lockIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  hiddenTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
   phone: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 17, letterSpacing: 0.4 },
-  callButton: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 48, paddingHorizontal: 24, borderRadius: 24 },
+  callButton: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 48, paddingHorizontal: 20, borderRadius: 24 },
   callText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
 });

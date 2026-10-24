@@ -1,4 +1,5 @@
 import React from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -58,7 +59,7 @@ export function JobPostHomeSection() {
             {row('clock', t('jobPost.availabilityLabel'), t(`jobPost.availability.${post.availability}`))}
             {row('briefcase', t('jobPost.experienceLabel'), t('jobPost.years', { count: post.experienceYears }))}
             {post.skills.length > 0 ? row('list-check', t('jobPost.skillsLabel'), post.skills.join(', ')) : null}
-            {row('location-dot', t('jobPost.locationLabel'), post.locationAddress)}
+            {row('location-dot', t('jobPost.locationLabel'), placeName(post.locationAddress))}
           </View>
           <Pressable style={[styles.editButton, { borderColor: colors.primary }]} onPress={open}>
             <FontAwesome6 name="pen" size={13} color={colors.primary} solid />

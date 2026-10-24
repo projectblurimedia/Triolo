@@ -269,7 +269,7 @@ export class BusinessesRepository {
            AND b.account_id != $3
        ) sub
        WHERE sub.distance_meters <= $4
-         AND ($5::text IS NULL OR sub.shop_name ILIKE $5 OR sub.other_category_description ILIKE $5 OR sub.location_name ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.shop_categories, ',') ILIKE $5)
+         AND ($5::text IS NULL OR ${filter.nameOnly ? 'sub.shop_name ILIKE $5' : "sub.shop_name ILIKE $5 OR sub.other_category_description ILIKE $5 OR sub.location_name ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.shop_categories, ',') ILIKE $5"})
          AND ($7::business_shop_category[] IS NULL OR sub.shop_categories && $7::business_shop_category[])
          AND ($8::boolean IS NOT TRUE OR sub.delivery_available)
        ORDER BY (sub.account_id = ANY($9::uuid[])) DESC, ${orderBy}

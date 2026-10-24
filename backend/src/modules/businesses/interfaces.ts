@@ -119,6 +119,8 @@ export interface NearbySearchFilter {
   /** Only shops that offer door delivery. */
   deliveryOnly?: boolean;
   sort?: 'distance' | 'rating';
+  /** Match `query` against the shop's name only (a kind of shop is already picked). */
+  nameOnly?: boolean;
   /** Subscribed partners' accounts: listed first. */
   priorityAccountIds?: string[];
 }

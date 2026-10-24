@@ -114,6 +114,8 @@ export interface NearbySearchFilter {
   skillCategory?: string;
   sort?: 'distance' | 'rating';
   limit: number;
+  /** Match `query` against the worker's name only (a kind of work is already picked). */
+  nameOnly?: boolean;
   /** Subscribed partners' accounts: listed first. */
   priorityAccountIds?: string[];
 }

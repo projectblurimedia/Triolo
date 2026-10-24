@@ -20,6 +20,10 @@ export class OrdersController {
     return created(res, await this.service.createOrder(requireAccountId(req), req.body), 'Order sent to the shop');
   });
 
+  createQuick = asyncHandler(async (req: Request, res: Response) => {
+    return created(res, await this.service.createQuickOrder(requireAccountId(req), req.body), 'Quick Order sent to shops nearby');
+  });
+
   listMine = asyncHandler(async (req: Request, res: Response) => {
     return ok(res, await this.service.listMyOrders(requireAccountId(req)));
   });

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -56,7 +57,7 @@ export function LocationField({ label, value, onChange }: LocationFieldProps) {
           </View>
           <View style={styles.flex}>
             <Text style={[styles.placeName, { color: colors.text }]} numberOfLines={2}>
-              {value.locationName}
+              {placeName(value.locationName) || value.locationName}
             </Text>
             <View style={styles.setRow}>
               <FontAwesome6 name="circle-check" size={10} color={colors.success} solid />

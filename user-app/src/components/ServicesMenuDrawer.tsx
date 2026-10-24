@@ -3,6 +3,7 @@ import { StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
+import { NearbySearchModal } from './NearbySearchModal';
 import { FavoritesModal } from './FavoritesModal';
 import { QuickBookModal } from './QuickBookModal';
 import { YourProblemsModal } from './YourProblemsModal';
@@ -26,7 +27,7 @@ const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
 const PINK_GRADIENT = ['#DB2777', '#F472B6'] as const;
 const TEAL_GRADIENT = ['#0D9488', '#2DD4BF'] as const;
 
-type ServicesMenuItemKey = 'quickBook' | 'yourProblems' | 'hireStaff' | 'myBookings' | 'favoriteWorkers';
+type ServicesMenuItemKey = 'quickBook' | 'yourProblems' | 'hireStaff' | 'myBookings' | 'favoriteWorkers' | 'nearbyWorkers';
 
 const ITEMS: {
   key: ServicesMenuItemKey;
@@ -95,6 +96,16 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
             setActiveItem('hireStaff');
           }}
         />
+        <DrawerMenuItem
+          icon="location-dot"
+          gradient={['#2563EB', '#60A5FA']}
+          title={t('homeMenu.nearbyWorkersTitle')}
+          subtitle={t('homeMenu.nearbyWorkersSubtitle')}
+          onPress={() => {
+            onClose();
+            setActiveItem('nearbyWorkers');
+          }}
+        />
 
         <Text style={[styles.sectionTitle, styles.sectionSpacing, { color: colors.textMuted }]}>
           {t('servicesMenu.manageSection')}
@@ -124,6 +135,7 @@ export function ServicesMenuDrawer({ visible, onClose }: ServicesMenuDrawerProps
       <QuickBookModal visible={activeItem === 'quickBook'} onClose={() => setActiveItem(null)} />
       <YourProblemsModal visible={activeItem === 'yourProblems'} onClose={() => setActiveItem(null)} />
       <HireStaffModal visible={activeItem === 'hireStaff'} onClose={() => setActiveItem(null)} />
+      <NearbySearchModal visible={activeItem === 'nearbyWorkers'} onClose={() => setActiveItem(null)} mode="worker" />
       <MyBookingsModal visible={activeItem === 'myBookings'} onClose={() => setActiveItem(null)} />
 
       <FavoritesModal visible={activeItem === 'favoriteWorkers'} onClose={() => setActiveItem(null)} type="worker" />

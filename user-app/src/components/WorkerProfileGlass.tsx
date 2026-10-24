@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react';
-import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import React, { ReactNode, useState } from 'react';
+import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -153,9 +153,15 @@ interface WorkerReviewsSectionProps {
   title?: string;
 }
 
+type ReviewSort = 'newest' | 'high' | 'low';
+const REVIEWS_SHOWN = 3;
+
 export function WorkerReviewsSection({ summary, loading, error, title }: WorkerReviewsSectionProps) {
   const { t } = useTranslation();
   const { colors, isDark } = useThemeColors();
+  // The written reviews: newest first, or by stars high → low / low → high; three, then Show more.
+  const [sort, setSort] = useState<ReviewSort>('newest');
+  const [showAll, setShowAll] = useState(false);
   // Flat and clean: one surface colour, a hairline border, no shadows.
   const cardStyle = { backgroundColor: colors.surface, borderColor: colors.border };
   const trackColor = isDark ? 'rgba(255,255,255,0.08)' : '#EEF2F8';
@@ -173,6 +179,18 @@ export function WorkerReviewsSection({ summary, loading, error, title }: WorkerR
   }
 
   const totalRated = summary.distribution.reduce((sum, count) => sum + count, 0);
+  const sorted = [...summary.reviews].sort((a, b) => {
+    if (sort === 'high') return (b.rating ?? 0) - (a.rating ?? 0) || b.completedAt.localeCompare(a.completedAt);
+    if (sort === 'low') return (a.rating ?? 0) - (b.rating ?? 0) || b.completedAt.localeCompare(a.completedAt);
+    return b.completedAt.localeCompare(a.completedAt);
+  });
+  const visibleReviews = showAll ? sorted : sorted.slice(0, REVIEWS_SHOWN);
+  const hiddenCount = sorted.length - visibleReviews.length;
+  const sortOptions: { key: ReviewSort; label: string; icon: React.ComponentProps<typeof FontAwesome6>['name'] }[] = [
+    { key: 'newest', label: t('workerReviews.sortNewest'), icon: 'clock' },
+    { key: 'high', label: t('workerReviews.sortHigh'), icon: 'arrow-down-wide-short' },
+    { key: 'low', label: t('workerReviews.sortLow'), icon: 'arrow-up-short-wide' },
+  ];
   const average = summary.ratingAverage ?? 0;
 
   return (
@@ -211,8 +229,34 @@ export function WorkerReviewsSection({ summary, loading, error, title }: WorkerR
       {summary.reviews.length > 0 ? (
         <>
           <Text style={[styles.subTitle, { color: colors.text }]}>{t('workerReviews.whatCustomersSay')}</Text>
+          {summary.reviews.length > 1 ? (
+            <View style={[styles.sortRow, { backgroundColor: colors.surface, borderColor: `${colors.primary}26` }]}>
+              {sortOptions.map((option) => {
+                const active = sort === option.key;
+                return (
+                  <Pressable key={option.key} style={styles.sortItem} onPress={() => setSort(option.key)}>
+                    {active ? (
+                      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.sortFill}>
+                        <FontAwesome6 name={option.icon} size={10} color="#FFFFFF" solid />
+                        <Text style={[styles.sortText, { color: '#FFFFFF' }]} numberOfLines={1}>
+                          {option.label}
+                        </Text>
+                      </LinearGradient>
+                    ) : (
+                      <View style={styles.sortFill}>
+                        <FontAwesome6 name={option.icon} size={10} color={colors.textMuted} solid />
+                        <Text style={[styles.sortText, { color: colors.text }]} numberOfLines={1}>
+                          {option.label}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           <View style={[styles.card, styles.reviewList, cardStyle]}>
-            {summary.reviews.map((review, index) => (
+            {visibleReviews.map((review, index) => (
               <View
                 key={`${review.completedAt}-${index}`}
                 style={[
@@ -241,6 +285,17 @@ export function WorkerReviewsSection({ summary, loading, error, title }: WorkerR
               </View>
             ))}
           </View>
+          {hiddenCount > 0 || showAll ? (
+            <Pressable
+              onPress={() => setShowAll((on) => !on)}
+              style={({ pressed }) => [styles.moreButton, { borderColor: `${colors.primary}40`, opacity: pressed ? 0.85 : 1 }]}
+            >
+              <Text style={[styles.moreText, { color: colors.primary }]}>
+                {showAll ? t('workerReviews.showLess') : t('workerReviews.showMore', { count: hiddenCount })}
+              </Text>
+              <FontAwesome6 name={showAll ? 'chevron-up' : 'chevron-down'} size={11} color={colors.primary} solid />
+            </Pressable>
+          ) : null}
         </>
       ) : (
         <View style={[styles.card, styles.center, cardStyle, styles.emptyGap]}>
@@ -332,6 +387,21 @@ const styles = StyleSheet.create({
   barTrack: { flex: 1, height: 7, borderRadius: 4, overflow: 'hidden' },
   barFill: { height: 7, borderRadius: 4, backgroundColor: STAR_GOLD },
   reviewList: { paddingVertical: 4 },
+  sortRow: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 3, marginBottom: 10 },
+  sortItem: { flex: 1 },
+  sortFill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, height: 32, borderRadius: 11, paddingHorizontal: 4 },
+  sortText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11.5, lineHeight: 15 },
+  moreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1.5,
+    marginTop: 12,
+  },
+  moreText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 13.5 },
   reviewRow: { paddingVertical: 14, gap: 8 },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   reviewAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },

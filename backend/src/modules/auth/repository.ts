@@ -1,3 +1,4 @@
+import { WaitTimes } from './dto';
 import { Pool, QueryResultRow } from 'pg';
 import {
   Account,
@@ -178,6 +179,26 @@ export class AuthRepository {
     return { account: mapAccount(result.rows[0]), previousUrl: result.rows[0].previous_url ?? null };
   }
 
+  async getWaitTimes(accountId: string): Promise<WaitTimes | null> {
+    const result = await this.pool.query(
+      `SELECT wait_quick_book_minutes, wait_direct_minutes, wait_order_minutes, wait_quick_order_minutes FROM accounts WHERE id = $1`,
+      [accountId],
+    );
+    const row = result.rows[0];
+    return row ? toWaitTimes(row) : null;
+  }
+
+  async updateWaitTimes(accountId: string, times: WaitTimes): Promise<WaitTimes | null> {
+    const result = await this.pool.query(
+      `UPDATE accounts SET wait_quick_book_minutes = $2, wait_direct_minutes = $3, wait_order_minutes = $4,
+         wait_quick_order_minutes = COALESCE($5, wait_quick_order_minutes), updated_at = now()
+       WHERE id = $1 RETURNING wait_quick_book_minutes, wait_direct_minutes, wait_order_minutes, wait_quick_order_minutes`,
+      [accountId, times.quickBookMinutes, times.directMinutes, times.orderMinutes, times.quickOrderMinutes ?? null],
+    );
+    const row = result.rows[0];
+    return row ? toWaitTimes(row) : null;
+  }
+
   async updatePreferredLanguage(accountId: string, preferredLanguage: PreferredLanguage): Promise<Account> {
     const result = await this.pool.query(
       `UPDATE accounts SET preferred_language = $2, updated_at = now() WHERE id = $1 RETURNING *`,
@@ -325,4 +346,18 @@ export class AuthRepository {
       newToday: Number(row.new_today),
     };
   }
+}
+
+function toWaitTimes(row: {
+  wait_quick_book_minutes: number;
+  wait_direct_minutes: number;
+  wait_order_minutes: number;
+  wait_quick_order_minutes: number;
+}): WaitTimes {
+  return {
+    quickBookMinutes: Number(row.wait_quick_book_minutes),
+    directMinutes: Number(row.wait_direct_minutes),
+    orderMinutes: Number(row.wait_order_minutes),
+    quickOrderMinutes: Number(row.wait_quick_order_minutes),
+  };
 }

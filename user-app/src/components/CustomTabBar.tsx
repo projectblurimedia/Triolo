@@ -6,6 +6,8 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { headerGradient, useThemeColors } from '@/theme';
 import { ANDROID_REAL_BLUR, useBlurTargetStore } from '@/state/blurTargetStore';
+import { CountBadge } from './CountBadge';
+import { useActivityCounts } from '@/hooks/useActivityCounts';
 
 // Floats on every side by the same amount — `MARGIN_H` insets the bar from the left/right
 // screen edges, and `barBottom` (below) is at least `MARGIN_H` too, so the gap reads
@@ -157,6 +159,8 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
     setActiveKey(activeRouteKey ?? null);
   }, [activeRouteKey, setActiveKey]);
   const androidBlurring = ANDROID_REAL_BLUR && !!blurTarget;
+  const activity = useActivityCounts();
+  const counts: Record<string, number> = { Services: activity.services, Bazaar: activity.bazaar };
 
   // Android has no elevation shadow (see the comment above GLASS_LIGHT), so the shell only
   // needs a background when it *is* the glass — older Android without blur.
@@ -254,6 +258,8 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
                         <FontAwesome6 name={ICONS[route.name]} size={20} color={gradient[0]} solid />
                       </Animated.View>
                     </View>
+                    {/* How many are still in progress there (Services: bookings, Bazaar: orders). */}
+                    <CountBadge count={counts[route.name] ?? 0} style={styles.countBadge} />
                   </Animated.View>
 
                   {/* Absolutely positioned against `tabContent`'s own (untransformed)
@@ -280,6 +286,8 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
+  // Sits on the icon's top-right corner (not above it), like a notification count.
+  countBadge: { position: 'absolute', top: 3, right: -3, zIndex: 2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4 },
   // position: 'absolute' so this contributes ~0 intrinsic height to BottomTabView's own
   // flex layout — screens render full-height with the bar floating on top, matching the
   // rest of the app's floating-overlay chrome conventions.

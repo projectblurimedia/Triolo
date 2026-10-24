@@ -12,7 +12,11 @@ import { Avatar } from './WorkerMiniCard';
 import { NearbyResultDetailModal } from './NearbyResultDetailModal';
 import { JobSeekerDetailModal, jobSeekerTitle } from './JobSeekerDetailModal';
 import { ToastHost } from './ToastHost';
-import { GlassPanel } from './GlassPanel';
+import { CategoryPicker } from './CategoryPicker';
+import { useTrustedIds } from '@/hooks/useSubscription';
+import { SectionHeader } from './SectionHeader';
+import { SearchResultCard } from './SearchResultCard';
+import { HighlightText, matchesTerm } from './HighlightText';
 import { ANDROID_REAL_BLUR } from '@/state/blurTargetStore';
 import { SHOP_CATEGORIES, SKILL_CATEGORIES } from '@/constants/categories';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
@@ -29,29 +33,34 @@ interface HomeSearchModalProps {
   onClose: () => void;
   /** Services opens it on workers, Bazaar on shops (and it stays there); Home lets you switch. */
   initialScope?: Scope;
+  /** Choosing a shop for something (a list to send): a tapped shop is picked, not opened. */
+  onPickShop?: (shop: BusinessNearbyResult) => void;
 }
 
 export type Scope = 'workers' | 'shops' | 'staff';
 type Row =
-  | { kind: 'header'; key: string; title: string }
+  | { kind: 'header'; key: string; title: string; icon: React.ComponentProps<typeof FontAwesome6>['name']; count: number }
   | { kind: 'worker'; key: string; worker: WorkerNearbyResult }
   | { kind: 'shop'; key: string; shop: BusinessNearbyResult }
   | { kind: 'staff'; key: string; person: JobSeeker };
 
 const DEBOUNCE_MS = 350;
 const RESULT_LIMIT = 20;
+// Only Trusted ones are kept on the phone, so fetch more to have enough left.
+const TRUSTED_FETCH_LIMIT = 50;
 const STAFF_SUGGESTIONS = JOB_CATEGORIES.filter((entry) => entry.key !== 'other');
 
 /**
  * Home's search, all in one: a search box, then Services / Shops / Hire Staff tabs (Services
- * first). Before typing, the tab's items are listed A–Z (tap one to search it); while typing,
+ * first). For workers and shops, filters sit under the box — Nearest / Top rated, Trusted,
+ * Delivery (shops) and the type — and any filter lists results even before typing. Before typing, the tab's items are listed A–Z (tap one to search it); while typing,
  * matching items (also ones partners made themselves) come first, then the people nearby.
  * Uses the nearby endpoints' free-text `query` and the shared device location; tapping a
  * result opens the shared detail view and records a profile view.
  */
-export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchModalProps) {
+export function HomeSearchModal({ visible, onClose, initialScope, onPickShop }: HomeSearchModalProps) {
   const { t } = useTranslation();
-  const { colors, isDark } = useThemeColors();
+  const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   // A tapped suggestion shows its (possibly Telugu) label in the box but searches by the
@@ -74,6 +83,21 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
   const contentTop = panelHeight + 24;
   const onPanelLayout = (event: LayoutChangeEvent) => setPanelHeight(Math.round(event.nativeEvent.layout.height));
   const coords = location.status === 'ready' ? location : null;
+  // Nearest and Top rated work together: Top rated keeps 4★ and up, Nearest puts the closest first.
+  const [nearest, setNearest] = useState(false);
+  const [topRated, setTopRated] = useState(false);
+  const [trustedOnly, setTrustedOnly] = useState(false);
+  const [deliveryOnly, setDeliveryOnly] = useState(false);
+  const [types, setTypes] = useState<string[]>([]);
+  const trusted = useTrustedIds();
+
+  const resetFilters = () => {
+    setNearest(false);
+    setTopRated(false);
+    setTrustedOnly(false);
+    setDeliveryOnly(false);
+    setTypes([]);
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -82,6 +106,7 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
     setScope(initialScope ?? 'workers');
     setSelected(null);
     setPerson(null);
+    resetFilters();
   }, [visible, initialScope]);
 
   useEffect(() => {
@@ -91,28 +116,43 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
     return () => clearTimeout(timer);
   }, [input]);
 
-  const searching = visible && query.length > 0 && coords !== null;
+  const hasFilters = scope !== 'staff';
+  const typeKey = types.length > 0 ? types.join(',') : undefined;
+  // A kind is picked: the box searches names within it, not kinds.
+  const byName = hasFilters && types.length > 0;
+  const filtering =
+    hasFilters && (nearest || topRated || trustedOnly || (scope === 'shops' && deliveryOnly) || types.length > 0);
+  const searching = visible && (query.length > 0 || filtering) && coords !== null;
+  const sort: 'distance' | 'rating' = topRated && !nearest ? 'rating' : 'distance';
+  const fetchLimit = trustedOnly || topRated ? TRUSTED_FETCH_LIMIT : RESULT_LIMIT;
   const workers = useQuery({
-    queryKey: ['homeSearch', 'workers', query, coords?.latitude, coords?.longitude],
+    queryKey: ['homeSearch', 'workers', query, coords?.latitude, coords?.longitude, sort, typeKey, byName, fetchLimit],
     queryFn: () =>
       workersService.searchNearby({
         latitude: coords!.latitude,
         longitude: coords!.longitude,
         radiusKm: SERVICES_RADIUS_KM,
-        query,
-        limit: RESULT_LIMIT,
+        query: query || undefined,
+        skillCategory: typeKey,
+        nameOnly: byName,
+        sort,
+        limit: fetchLimit,
       }),
     enabled: searching && scope === 'workers',
   });
   const shops = useQuery({
-    queryKey: ['homeSearch', 'shops', query, coords?.latitude, coords?.longitude],
+    queryKey: ['homeSearch', 'shops', query, coords?.latitude, coords?.longitude, sort, typeKey, byName, deliveryOnly, fetchLimit],
     queryFn: () =>
       businessesService.searchNearby({
         latitude: coords!.latitude,
         longitude: coords!.longitude,
         radiusKm: SERVICES_RADIUS_KM,
-        query,
-        limit: RESULT_LIMIT,
+        query: query || undefined,
+        shopCategory: typeKey,
+        nameOnly: byName,
+        deliveryOnly,
+        sort,
+        limit: fetchLimit,
       }),
     enabled: searching && scope === 'shops',
   });
@@ -132,24 +172,69 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
   const showWorkers = scope === 'workers';
   const showShops = scope === 'shops';
   const showStaff = scope === 'staff';
-  const workerResults = showWorkers ? (workers.data ?? []) : [];
-  const shopResults = showShops ? (shops.data ?? []) : [];
+  const isTrusted = (kind: 'service' | 'business', id: string) => !!trusted.data?.[kind]?.includes(id);
+  const TOP_RATED_MIN = 4;
+  const keep = (kind: 'service' | 'business', id: string, rating: number | null) =>
+    (!trustedOnly || isTrusted(kind, id)) && (!topRated || (rating ?? 0) >= TOP_RATED_MIN);
+  const workerResults = showWorkers
+    ? (workers.data ?? []).filter((worker) => keep('service', worker.id, worker.ratingAverage)).slice(0, RESULT_LIMIT)
+    : [];
+  const shopResults = showShops
+    ? (shops.data ?? []).filter((shop) => keep('business', shop.id, shop.ratingAverage)).slice(0, RESULT_LIMIT)
+    : [];
   const staffResults = showStaff ? (staff.data ?? []).slice(0, RESULT_LIMIT) : [];
   const loading =
     (showWorkers && workers.isLoading && workers.fetchStatus !== 'idle') ||
     (showShops && shops.isLoading && shops.fetchStatus !== 'idle') ||
     (showStaff && staff.isLoading && staff.fetchStatus !== 'idle');
 
+  // What was typed, marked in the cards. While typing, results are split into the people / shops
+  // whose name matches and those found by their kind of work / shop (or place).
+  const term = input.trim();
   const rows: Row[] = [];
-  if (workerResults.length > 0) {
-    workerResults.forEach((worker) => rows.push({ kind: 'worker', key: `w-${worker.id}`, worker }));
-  }
-  if (shopResults.length > 0) {
-    shopResults.forEach((shop) => rows.push({ kind: 'shop', key: `s-${shop.id}`, shop }));
-  }
-  if (staffResults.length > 0) {
-    staffResults.forEach((entry) => rows.push({ kind: 'staff', key: `j-${entry.id}`, person: entry }));
-  }
+  const pushGroups = <T,>(
+    list: T[],
+    nameOf: (entry: T) => string,
+    toRow: (entry: T) => Row,
+    groups: { named: string; other: string; namedIcon: React.ComponentProps<typeof FontAwesome6>['name']; otherIcon: React.ComponentProps<typeof FontAwesome6>['name']; prefix: string },
+  ) => {
+    if (list.length === 0) return;
+    if (!term) {
+      list.forEach((entry) => rows.push(toRow(entry)));
+      return;
+    }
+    const named = list.filter((entry) => matchesTerm(nameOf(entry), term));
+    const other = list.filter((entry) => !matchesTerm(nameOf(entry), term));
+    if (named.length > 0) {
+      rows.push({ kind: 'header', key: `${groups.prefix}-h-named`, title: groups.named, icon: groups.namedIcon, count: named.length });
+      named.forEach((entry) => rows.push(toRow(entry)));
+    }
+    if (other.length > 0) {
+      rows.push({ kind: 'header', key: `${groups.prefix}-h-other`, title: groups.other, icon: groups.otherIcon, count: other.length });
+      other.forEach((entry) => rows.push(toRow(entry)));
+    }
+  };
+  pushGroups(workerResults, (worker) => worker.accountFullName, (worker) => ({ kind: 'worker', key: `w-${worker.id}`, worker }), {
+    named: t('homeSearch.groups.workers'),
+    other: t('homeSearch.groups.workersByWork'),
+    namedIcon: 'user',
+    otherIcon: 'screwdriver-wrench',
+    prefix: 'w',
+  });
+  pushGroups(shopResults, (shop) => shop.shopName, (shop) => ({ kind: 'shop', key: `s-${shop.id}`, shop }), {
+    named: t('homeSearch.groups.shops'),
+    other: t('homeSearch.groups.shopsByType'),
+    namedIcon: 'store',
+    otherIcon: 'tags',
+    prefix: 's',
+  });
+  pushGroups(staffResults, (entry) => entry.fullName, (entry) => ({ kind: 'staff', key: `j-${entry.id}`, person: entry }), {
+    named: t('homeSearch.groups.people'),
+    other: t('homeSearch.groups.peopleByWork'),
+    namedIcon: 'user',
+    otherIcon: 'user-tie',
+    prefix: 'j',
+  });
 
   const scopeItems = (
     scope === 'workers'
@@ -183,6 +268,11 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
     workersService.recordView(worker.id).catch(() => {});
   };
   const openShop = (shop: BusinessNearbyResult) => {
+    if (onPickShop) {
+      onPickShop(shop);
+      onClose();
+      return;
+    }
     setSelected({ mode: 'business', result: shop });
     businessesService.recordView(shop.id).catch(() => {});
   };
@@ -195,7 +285,7 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
 
   const renderRow = ({ item }: { item: Row }) => {
     if (item.kind === 'header') {
-      return <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{item.title}</Text>;
+      return <SectionHeader title={item.title} icon={item.icon} count={item.count} style={styles.resultGroupHeader} />;
     }
     if (item.kind === 'staff') {
       const entry = item.person;
@@ -207,9 +297,7 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
           <Avatar photoUrl={entry.photoUrl ?? undefined} name={entry.fullName} size={48} seal={{ kind: 'job_post', id: entry.id }} />
           <View style={styles.resultInfo}>
             <View style={styles.resultTitleRow}>
-              <Text style={[styles.resultName, { color: colors.text }]} numberOfLines={1}>
-                {entry.fullName}
-              </Text>
+              <HighlightText text={entry.fullName} term={term} style={[styles.resultName, { color: colors.text }]} numberOfLines={1} />
               <View style={[styles.kindPill, { backgroundColor: `${colors.primary}14` }]}>
                 <FontAwesome6 name="user-tie" size={9} color={colors.primary} solid />
                 <Text style={[styles.kindText, { color: colors.primary }]}>{t('homeSearch.staff')}</Text>
@@ -228,56 +316,10 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
         </Pressable>
       );
     }
-    const isWorker = item.kind === 'worker';
-    const name = isWorker ? item.worker.accountFullName : item.shop.shopName;
-    const photo = isWorker
-      ? (item.worker.profilePhotoUrl)
-      : (item.shop.profilePhotoUrl);
-    const tags = isWorker
-      ? item.worker.skillCategories.filter((k) => k !== 'other').map((k) => t(`workerProfile.skills.${k}`))
-      : item.shop.shopCategories.filter((k) => k !== 'other').map((k) => t(`businessProfile.categories.${k}`));
-    const distance = isWorker ? item.worker.distanceMeters : item.shop.distanceMeters;
-    return (
-      <Pressable
-        style={[styles.resultRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        onPress={() => (isWorker ? openWorker(item.worker) : openShop(item.shop))}
-      >
-        <Avatar
-          photoUrl={photo}
-          name={name}
-          size={48}
-          seal={
-            isWorker
-              ? { kind: 'service', id: item.worker.id }
-              : { kind: 'business', id: item.shop.id }
-          }
-        />
-        <View style={styles.resultInfo}>
-          <View style={styles.resultTitleRow}>
-            <Text style={[styles.resultName, { color: colors.text }]} numberOfLines={1}>
-              {name}
-            </Text>
-            <View style={[styles.kindPill, { backgroundColor: `${colors.primary}14` }]}>
-              <FontAwesome6 name={isWorker ? 'screwdriver-wrench' : 'store'} size={9} color={colors.primary} solid />
-              <Text style={[styles.kindText, { color: colors.primary }]}>
-                {t(isWorker ? 'homeSearch.worker' : 'homeSearch.shop')}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.resultTags, { color: colors.textMuted }]} numberOfLines={1}>
-            {tags.join(', ')}
-          </Text>
-          <View style={styles.resultMeta}>
-            {isWorker ? <RatingStars average={item.worker.ratingAverage} count={item.worker.ratingCount} /> : null}
-            <Text style={[styles.resultDistance, { color: colors.primary }]}>
-              {t('nearbySearch.distanceAway', {
-                distance: formatDistanceValue(distance),
-              })}
-            </Text>
-          </View>
-        </View>
-        <FontAwesome6 name="chevron-right" size={12} color={colors.textMuted} solid />
-      </Pressable>
+    return item.kind === 'worker' ? (
+      <SearchResultCard kind="worker" worker={item.worker} term={term} onPress={() => openWorker(item.worker)} />
+    ) : (
+      <SearchResultCard kind="shop" shop={item.shop} term={term} onPress={() => openShop(item.shop)} />
     );
   };
 
@@ -305,7 +347,7 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
   const itemTile = (item: { key: string; label: string; icon: string }, partner = false) => (
     <Pressable
       key={`${partner ? 'p' : 'i'}-${item.key}`}
-      onPress={() => applySuggestion(item.label, item.key)}
+      onPress={() => pickItem(item, partner)}
       style={({ pressed }) => [
         styles.itemTile,
         { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
@@ -323,6 +365,20 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
     </Pressable>
   );
 
+  /**
+   * A tapped kind of work / shop (Plumber, Grocery…) becomes a type filter: it's added to the
+   * dropdown and the box is cleared, now for names within it. Partner-made names (not one of
+   * the fixed kinds) and Hire Staff still search by the words.
+   */
+  const pickItem = (item: { key: string; label: string }, partner: boolean) => {
+    if (hasFilters && !partner) {
+      setTypes((current) => (current.includes(item.key) ? current : [...current, item.key]));
+      applySuggestion('', '');
+      return;
+    }
+    applySuggestion(item.label, item.key);
+  };
+
   const renderItems = () => (
     <ScrollView
       showsVerticalScrollIndicator={false}
@@ -338,16 +394,18 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
 
   /** While typing: the matching items (fixed and partner-made) above the people found. */
   const matchesHeader =
-    matchingItems.length > 0 || partnerItems.length > 0 ? (
+    !byName && (matchingItems.length > 0 || partnerItems.length > 0) ? (
       <View style={styles.matches}>
-        <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{t('homeSearch.matchingItems')}</Text>
+        <SectionHeader
+          title={t(scope === 'workers' ? 'homeSearch.groups.workTypes' : scope === 'shops' ? 'homeSearch.groups.shopTypes' : 'homeSearch.groups.staffTypes')}
+          icon={scope === 'shops' ? 'tags' : 'layer-group'}
+          count={Math.min(matchingItems.length, 6) + partnerItems.length}
+          style={styles.resultGroupHeaderFirst}
+        />
         <View style={styles.itemGrid}>
           {matchingItems.slice(0, 6).map((item) => itemTile(item))}
           {partnerItems.map((name) => itemTile({ key: name, label: name, icon: scopeIcon }, true))}
         </View>
-        {rows.length > 0 ? (
-          <Text style={[styles.groupHeader, styles.resultsHeader, { color: colors.textMuted }]}>{t('homeSearch.nearbyResults')}</Text>
-        ) : null}
       </View>
     ) : null;
 
@@ -356,9 +414,13 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
       return renderState('location-crosshairs', t('location.disabledTitle'), t('location.disabledMessage'), refreshLocation);
     }
     if (!coords) return renderState('location-crosshairs', t('services.locating'));
-    if (!input) return renderItems();
-    if (!loading && rows.length === 0 && !matchesHeader && query) {
-      return renderState('magnifying-glass', t('homeSearch.noResultsTitle'), t('homeSearch.noResultsMessage', { query: input }));
+    if (!input && !filtering) return renderItems();
+    if (!loading && rows.length === 0 && !matchesHeader && (query || filtering)) {
+      return renderState(
+        'magnifying-glass',
+        t('homeSearch.noResultsTitle'),
+        input ? t('homeSearch.noResultsMessage', { query: input }) : t('homeSearch.filters.noResults'),
+      );
     }
     return (
       <FlatList
@@ -380,7 +442,8 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
     );
   };
 
-  const searchFill = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.75)';
+  // Controls inside the search card look like Home's search bar (light, with a hairline border).
+  const searchFill = colors.surface;
 
   const scopes: { key: Scope; label: string; icon: React.ComponentProps<typeof FontAwesome6>['name'] }[] = [
     { key: 'workers', label: t('homeSearch.tabServices'), icon: 'screwdriver-wrench' },
@@ -391,7 +454,64 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
     if (next === scope) return;
     setScope(next);
     applySuggestion('', '');
+    resetFilters();
   };
+
+  /** One filter chip: blue and filled when on. */
+  const filterChip = (
+    key: string,
+    label: string,
+    icon: React.ComponentProps<typeof FontAwesome6>['name'],
+    active: boolean,
+    onPress: () => void,
+  ) => (
+    <Pressable key={key} onPress={onPress} accessibilityState={{ selected: active }}>
+      {active ? (
+        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.filterChip}>
+          <FontAwesome6 name={icon} size={11} color="#FFFFFF" solid />
+          <Text style={[styles.filterText, { color: '#FFFFFF' }]}>{label}</Text>
+        </LinearGradient>
+      ) : (
+        <View style={[styles.filterChip, styles.filterChipOff, { backgroundColor: searchFill, borderColor: `${colors.primary}26` }]}>
+          <FontAwesome6 name={icon} size={11} color={colors.primary} solid />
+          <Text style={[styles.filterText, { color: colors.text }]}>{label}</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+
+  const typeOptions =
+    scope === 'workers'
+      ? SKILL_CATEGORIES.map((entry) => ({ key: entry.key, label: t(`workerProfile.skills.${entry.key}`), icon: entry.icon }))
+      : SHOP_CATEGORIES.map((entry) => ({ key: entry.key, label: t(`businessProfile.categories.${entry.key}`), icon: entry.icon }));
+
+  const renderFilters = () =>
+    hasFilters ? (
+      <View style={styles.filters}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.filterRow}
+        >
+          {filterChip('nearest', t('services.sortNearest'), 'location-arrow', nearest, () => setNearest((on) => !on))}
+          {filterChip('rated', t('homeSearch.filters.topRated'), 'star', topRated, () => setTopRated((on) => !on))}
+          {filterChip('trusted', t('homeSearch.filters.trusted'), 'shield-halved', trustedOnly, () => setTrustedOnly((on) => !on))}
+          {scope === 'shops'
+            ? filterChip('delivery', t('sendList.deliveryFilter'), 'truck', deliveryOnly, () => setDeliveryOnly((on) => !on))
+            : null}
+        </ScrollView>
+        <CategoryPicker
+          title={t(scope === 'workers' ? 'homeSearch.filters.workType' : 'homeSearch.filters.shopType')}
+          placeholder={t(scope === 'workers' ? 'homeSearch.filters.anyWork' : 'homeSearch.filters.anyShop')}
+          options={typeOptions}
+          selected={types}
+          onChange={setTypes}
+          clearable
+          fieldIcon="filter"
+        />
+      </View>
+    ) : null;
 
   return (
     <Modal
@@ -416,7 +536,9 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
             <View style={styles.flex}>
               <Text style={styles.headerTitle}>{t(locked ? `homeSearch.${initialScope}Title` : 'homeSearch.title')}</Text>
               <Text style={styles.headerSubtitle}>
-                {t(locked ? `homeSearch.${initialScope}Subtitle` : 'homeSearch.subtitle')}
+                {onPickShop
+                  ? t('homeSearch.pickShopSubtitle')
+                  : t(locked ? `homeSearch.${initialScope}Subtitle` : 'homeSearch.subtitle')}
               </Text>
             </View>
           </View>
@@ -435,12 +557,22 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
           )}
 
           <View style={styles.panelWrap} onLayout={onPanelLayout}>
-            <GlassPanel blurTarget={blurTargetRef} style={[styles.panel, locked ? styles.panelSingle : null]}>
+            {/* The page's own colour, so the card blends into the screen; light inputs on it. */}
+            <View
+              style={[
+                styles.panel,
+                locked && !hasFilters
+                  ? [styles.panelSingle, { backgroundColor: searchFill, borderColor: `${colors.primary}26` }]
+                  : { backgroundColor: colors.background, borderColor: `${colors.primary}1F` },
+              ]}
+            >
               <View
                 style={[
                   styles.searchBox,
-                  // Scoped to one tab there are no chips, so the glass panel itself is the search bar.
-                  locked ? styles.searchBoxSingle : { backgroundColor: searchFill, borderColor: `${colors.primary}26` },
+                  // Scoped to Hire Staff nothing sits under it, so the glass panel itself is the search bar.
+                  locked && !hasFilters
+                    ? styles.searchBoxSingle
+                    : { backgroundColor: searchFill, borderColor: `${colors.primary}26` },
                 ]}
               >
                 <FontAwesome6 name="magnifying-glass" size={14} color={colors.primary} solid />
@@ -449,7 +581,7 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
                   style={[styles.searchInput, { color: colors.text }]}
                   value={input}
                   onChangeText={setInput}
-                  placeholder={t(`homeSearch.${scope}Placeholder`)}
+                  placeholder={byName ? t(`homeSearch.filters.${scope}NamePlaceholder`) : t(`homeSearch.${scope}Placeholder`)}
                   placeholderTextColor={colors.textMuted}
                   returnKeyType="search"
                   onSubmitEditing={() =>
@@ -488,7 +620,8 @@ export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchMo
                   })}
                 </View>
               )}
-            </GlassPanel>
+              {renderFilters()}
+            </View>
           </View>
         </View>
         <ToastHost />
@@ -522,7 +655,14 @@ const styles = StyleSheet.create({
   itemIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   itemLabel: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 17 },
   itemHint: { ...typography.caption, fontSize: 10, marginTop: 1 },
-  matches: { marginBottom: 6 },
+  matches: { marginBottom: 2 },
+  resultGroupHeader: { marginTop: 14, marginBottom: 10 },
+  resultGroupHeaderFirst: { marginTop: 0, marginBottom: 10 },
+  filters: { marginTop: 10, gap: 10 },
+  filterRow: { gap: 8, paddingRight: 4 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, borderRadius: 17, paddingHorizontal: 13 },
+  filterChipOff: { borderWidth: 1 },
+  filterText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12, includeFontPadding: false },
   resultsHeader: { marginTop: 18 },
   loadingRow: { alignItems: 'center', paddingVertical: 20 },
   container: { flex: 1 },
@@ -561,7 +701,8 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
   },
-  panel: { borderRadius: 22, padding: 12 },
+  panel: { borderRadius: 22, padding: 12, borderWidth: 1, overflow: 'hidden' },
+  panelSolid: { borderWidth: 1 },
   panelSingle: { padding: 0, borderRadius: 18 },
   searchBoxSingle: { height: 54, borderWidth: 0, paddingHorizontal: 18, borderRadius: 18 },
   searchBox: {

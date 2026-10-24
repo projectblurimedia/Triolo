@@ -57,6 +57,11 @@ export const nearbySearchQuerySchema = z.object({
     .optional(),
   sort: z.enum(['distance', 'rating']).default('distance'),
   limit: z.coerce.number().int().min(1).max(50).default(20),
+  // With a type already picked, the search box is about names only.
+  nameOnly: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true'),
 });
 
 export const updateWorkerProfileSchema = z

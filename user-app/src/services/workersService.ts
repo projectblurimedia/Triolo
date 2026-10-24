@@ -49,6 +49,8 @@ export interface WorkerNearbyResult extends WorkerProfile {
 }
 
 export interface NearbySearchParams {
+  /** Match `query` against names only (a kind is already picked). */
+  nameOnly?: boolean;
   latitude: number;
   longitude: number;
   radiusKm?: number;
@@ -71,6 +73,7 @@ export const workersService = {
     search.set('longitude', String(params.longitude));
     if (params.radiusKm != null) search.set('radiusKm', String(params.radiusKm));
     if (params.query) search.set('query', params.query);
+    if (params.nameOnly) search.set('nameOnly', 'true');
     if (params.skillCategory) search.set('skillCategory', params.skillCategory);
     if (params.sort) search.set('sort', params.sort);
     if (params.limit != null) search.set('limit', String(params.limit));

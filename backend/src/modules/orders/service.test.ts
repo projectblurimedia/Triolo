@@ -46,6 +46,8 @@ function buildOrder(overrides: Partial<ShopOrder> = {}): ShopOrder {
     id: 'order-1',
     accountId: 'customer-1',
     businessId: 'shop-1',
+    quick: false,
+    shopCategories: [],
     fulfillment: 'pickup',
     status: 'placed',
     latitude: 16.71,
@@ -96,6 +98,10 @@ const orderDto = {
 beforeEach(() => {
   repo = {
     create: jest.fn(),
+    createQuick: jest.fn(),
+    findQuickOffer: jest.fn().mockResolvedValue(null),
+    claimQuick: jest.fn(),
+    declineQuickOffer: jest.fn().mockResolvedValue(false),
     expireStale: jest.fn().mockResolvedValue([]),
     exists: jest.fn(),
     findForCustomer: jest.fn(),
@@ -120,11 +126,67 @@ beforeEach(() => {
   } as unknown as MockRepository;
   businesses = {
     getPublicProfile: jest.fn(),
+    searchNearby: jest.fn(),
     getMyProfile: jest.fn().mockResolvedValue(buildShop()),
     recordRating: jest.fn(),
   } as unknown as jest.Mocked<BusinessesService>;
   notifications = { notify: jest.fn() } as unknown as jest.Mocked<NotificationsService>;
   service = new OrdersService(repo as unknown as OrdersRepository, businesses, notifications);
+});
+
+describe('Quick Order', () => {
+  const quickDto = {
+    shopCategories: ['grocery'],
+    fulfillment: 'delivery' as const,
+    items: [{ name: 'Kandipappu', quantity: '1', unit: 'kg' }],
+    latitude: 16.7,
+    longitude: 81.12,
+  };
+
+  it('creates nothing when no matching shop is nearby', async () => {
+    businesses.searchNearby.mockResolvedValue([]);
+    await expect(service.createQuickOrder('customer-1', quickDto)).rejects.toMatchObject({ code: 'QUICK_ORDER_NO_SHOPS' });
+    expect(repo.createQuick).not.toHaveBeenCalled();
+  });
+
+  it('asks only delivering shops of that kind, makes one offer each and tells every owner', async () => {
+    businesses.searchNearby.mockResolvedValue([
+      { ...buildShop(), id: 'shop-1', accountId: 'owner-1', distanceMeters: 400 },
+      { ...buildShop(), id: 'shop-2', accountId: 'owner-2', distanceMeters: 900 },
+    ] as never);
+    repo.createQuick.mockResolvedValue(buildOrder({ businessId: null, quick: true }));
+    repo.findForCustomer.mockResolvedValue({ ...buildOrder(), shop: {}, pin: null } as unknown as CustomerOrder);
+
+    await service.createQuickOrder('customer-1', quickDto);
+
+    expect(businesses.searchNearby).toHaveBeenCalledWith('customer-1', expect.objectContaining({ shopCategory: 'grocery', deliveryOnly: true }));
+    expect(repo.createQuick.mock.calls[0][0].offers).toEqual([
+      { businessId: 'shop-1', distanceMeters: 400 },
+      { businessId: 'shop-2', distanceMeters: 900 },
+    ]);
+    expect(notifications.notify).toHaveBeenCalledTimes(2);
+  });
+
+  it('the first shop to accept claims it, with its own delivery charge', async () => {
+    repo.findQuickOffer.mockResolvedValue(1200);
+    repo.claimQuick.mockResolvedValue({ order: buildOrder({ status: 'accepted' }), notify: null, shopName: 'Shop' });
+    await service.acceptOrder('owner-1', 'order-1');
+    expect(repo.claimQuick).toHaveBeenCalledWith('order-1', 'shop-1', 1200, expect.any(Number));
+    expect(repo.accept).not.toHaveBeenCalled();
+  });
+
+  it('a shop that loses the race is told another shop took it', async () => {
+    repo.findQuickOffer.mockResolvedValue(1200);
+    repo.claimQuick.mockResolvedValue(null);
+    await expect(service.acceptOrder('owner-1', 'order-1')).rejects.toMatchObject({ statusCode: 409, code: 'ORDER_ALREADY_TAKEN' });
+  });
+
+  it('declining closes only that shop\'s offer', async () => {
+    repo.declineQuickOffer.mockResolvedValue(true);
+    await service.declineOrder('owner-1', 'order-1');
+    expect(repo.decline).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
+  });
 });
 
 describe('createOrder', () => {

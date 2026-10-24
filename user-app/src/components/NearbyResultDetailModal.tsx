@@ -1,25 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  Animated,
   Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { BlurTargetView } from 'expo-blur';
-import { GlassPanel } from './GlassPanel';
-import { ANDROID_REAL_BLUR } from '@/state/blurTargetStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SealedAvatar, TrustedBadge } from './TrustedBadge';
 import { PhotoViewer } from './PhotoViewer';
-import { initialsOf, WorkerProfileFacts, WorkerReviewsSection } from './WorkerProfileGlass';
+import { initialsOf, WorkerReviewsSection } from './WorkerProfileGlass';
 import { BookWorkerModal } from './BookWorkerModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BusinessNearbyResult } from '@/services/businessesService';
@@ -27,13 +21,13 @@ import { WorkerNearbyResult } from '@/services/workersService';
 import { useBusinessReviews, useWorkerReviews } from '@/hooks/useReviews';
 import { useFavoriteToggle } from '@/hooks/useFavorites';
 import { Button } from './Button';
-import { RatingStars } from './RatingStars';
 import { SendListModal } from './SendListModal';
 import { ChooseListModal } from './ChooseListModal';
 import { openNewList } from '@/navigation/navigationRef';
 import { formatAddress } from '@/utils/formatAddress';
 import { formatDistanceValue, isWorkerResult, NearbyResult, NearbySearchMode } from '@/utils/nearbyResult';
-import { COMPACT_AVATAR_SIZE, GlassProfileLayout, GlassHeroButton } from './GlassHero';
+import { PROFILE_AVATAR_SIZE, ProfileCover, ProfilePill, ProfileSection } from './ProfileCover';
+import { SHOP_CATEGORIES, SKILL_CATEGORIES } from '@/constants/categories';
 import { firstName } from '@/utils/firstName';
 import { SmartImage } from './SmartImage';
 
@@ -54,23 +48,11 @@ interface NearbyResultDetailModalProps {
  */
 export function NearbyResultDetailModal({ visible, onClose, mode, result }: NearbyResultDetailModalProps) {
   const { t } = useTranslation();
-  const { colors, isDark } = useThemeColors();
+  const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   // The profile photo, opened on its own by tapping it in the header.
   const [avatarPhoto, setAvatarPhoto] = useState<string | null>(null);
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const [stickyVisible, setStickyVisible] = useState(false);
-  const stickyVisibleRef = useRef(false);
-  const blurTargetRef = useRef<View>(null);
-
-  // Each opened profile starts at the top, with the sticky bar hidden.
-  useEffect(() => {
-    if (!visible) return;
-    scrollY.setValue(0);
-    stickyVisibleRef.current = false;
-    setStickyVisible(false);
-  }, [visible, result, scrollY]);
   const worker = result && isWorkerResult(mode, result) ? result : null;
   const reviews = useWorkerReviews(visible && worker ? worker.id : null);
   const shopId = result && !worker ? result.id : null;
@@ -93,6 +75,14 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
   const customTags = worker
     ? (worker.otherSkillDescription?.split(', ').filter(Boolean) ?? [])
     : ((business as BusinessNearbyResult).otherCategoryDescription?.split(', ').filter(Boolean) ?? []);
+  const kinds = worker ? SKILL_CATEGORIES : SHOP_CATEGORIES;
+  const tagItems = [
+    ...fixedTags.map((key) => ({
+      label: t(worker ? `workerProfile.skills.${key}` : `businessProfile.categories.${key}`),
+      icon: (kinds.find((entry) => entry.key === key)?.icon ?? (worker ? 'screwdriver-wrench' : 'store')) as React.ComponentProps<typeof FontAwesome6>['name'],
+    })),
+    ...customTags.map((label) => ({ label, icon: (worker ? 'screwdriver-wrench' : 'tag') as React.ComponentProps<typeof FontAwesome6>['name'] })),
+  ];
   const tagLabels = [
     ...fixedTags.map((key) => t(worker ? `workerProfile.skills.${key}` : `businessProfile.categories.${key}`)),
     ...customTags,
@@ -101,16 +91,17 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
     distance: formatDistanceValue(result.distanceMeters),
   });
 
-  // Save to (or remove from) the customer's favorites.
+  // Save to (or remove from) the customer's favorites: a frosted round button on the blue cover.
   const heartButton = (
-    <GlassHeroButton
-      icon="heart"
+    <Pressable
       onPress={favorite.toggle}
       disabled={favorite.pending}
-      solid={favorite.saved}
-      active={favorite.saved}
+      hitSlop={8}
       accessibilityLabel={t(favorite.saved ? 'favorites.remove' : 'favorites.save')}
-    />
+      style={[styles.coverButton, favorite.saved ? styles.coverButtonOn : null]}
+    >
+      <FontAwesome6 name="heart" size={16} color={favorite.saved ? '#F43F5E' : '#FFFFFF'} solid={favorite.saved} />
+    </Pressable>
   );
 
   const renderGallery = () =>
@@ -130,72 +121,79 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
       </ScrollView>
     ) : null;
 
-  const renderInfoRow = (icon: React.ComponentProps<typeof FontAwesome6>['name'], text: string) => (
-    <View style={styles.infoRow}>
-      <View style={[styles.infoIconBadge, { backgroundColor: `${colors.primary}14` }]}>
-        <FontAwesome6 name={icon} size={14} color={colors.primary} solid />
-      </View>
-      <Text style={[styles.infoText, { color: colors.text }]}>{text}</Text>
-    </View>
+  /** The round photo for the cover: the picture, or initials / a shop icon on blue. */
+  const renderAvatar = (photo: string | null | undefined, label: string, kind: 'service' | 'business', id: string) => (
+    <Pressable
+      onPress={() => photo && setAvatarPhoto(photo)}
+      disabled={!photo}
+      accessibilityRole="imagebutton"
+      accessibilityLabel={label}
+    >
+      <SealedAvatar size={PROFILE_AVATAR_SIZE} kind={kind} id={id}>
+        {photo ? (
+          <SmartImage source={{ uri: photo }} style={styles.avatar} />
+        ) : (
+          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
+            {kind === 'business' ? (
+              <FontAwesome6 name="store" size={34} color="#FFFFFF" solid />
+            ) : (
+              <Text style={styles.initials}>{initialsOf(label)}</Text>
+            )}
+          </LinearGradient>
+        )}
+      </SealedAvatar>
+    </Pressable>
+  );
+
+  const place = formatAddress(result);
+  const pills = (kind: 'service' | 'business') => (
+    <>
+      <TrustedBadge kind={kind} id={result.id} />
+      <ProfilePill icon="location-arrow" label={distance} filled />
+      {place ? <ProfilePill icon="location-dot" label={place} /> : null}
+    </>
   );
 
   const renderWorker = (w: WorkerNearbyResult) => (
     <>
-      <GlassProfileLayout
+      <ProfileCover
         topInset={insets.top}
         onBack={onClose}
         backLabel={t('common.cancel')}
-        avatar={
-          <Pressable
-            onPress={() => w.profilePhotoUrl && setAvatarPhoto(w.profilePhotoUrl)}
-            disabled={!w.profilePhotoUrl}
-            accessibilityRole="imagebutton"
-            accessibilityLabel={w.accountFullName}
-          >
-          <SealedAvatar size={COMPACT_AVATAR_SIZE} kind="service" id={w.id}>
-            {w.profilePhotoUrl ? (
-              <SmartImage source={{ uri: w.profilePhotoUrl }} style={styles.compactAvatar} />
-            ) : (
-              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
-                <Text style={styles.compactInitials}>{initialsOf(w.accountFullName)}</Text>
-              </LinearGradient>
-            )}
-          </SealedAvatar>
-          </Pressable>
-        }
-        title={firstName(w.accountFullName)}
-        subtitle={distance}
         right={heartButton}
-        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 110 }]}
+        avatar={renderAvatar(w.profilePhotoUrl, w.accountFullName, 'service', w.id)}
+        name={w.accountFullName}
+        pills={pills('service')}
+        kicker={{ icon: 'screwdriver-wrench', label: t('profileView.kickerWorker') }}
+        highlights={{ title: t('profileView.workTheyDo'), items: tagItems }}
+        stats={[
+          {
+            icon: 'star',
+            value: w.ratingAverage != null ? w.ratingAverage.toFixed(1) : t('workerReviews.new'),
+            label: t('workerReviews.statRating'),
+            gold: true,
+          },
+          { icon: 'circle-check', value: String(w.ratingCount), label: t('workerReviews.statRatedJobs') },
+          {
+            icon: 'briefcase',
+            value: t('workerReviews.experienceValue', { count: w.experienceYears }),
+            label: t('workerReviews.statExperience'),
+          },
+        ]}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
       >
-        <WorkerProfileFacts
-          skills={tagLabels}
-          ratingAverage={w.ratingAverage}
-          ratingCount={w.ratingCount}
-          experienceYears={w.experienceYears}
-          badge={
-            <View style={styles.nameBlock}>
-              <Text style={[styles.fullName, { color: colors.text }]}>{w.accountFullName}</Text>
-              <TrustedBadge kind="service" id={w.id} style={styles.trustedCentre} />
-            </View>
-          }
-        />
         {photos.length > 0 ? (
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('workerReviews.workPhotos')}</Text>
+          <ProfileSection title={t('workerReviews.workPhotos')} icon="images" count={photos.length}>
             {renderGallery()}
-          </>
+          </ProfileSection>
         ) : null}
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {renderInfoRow('location-dot', formatAddress(w))}
-        </View>
         <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} />
-      </GlassProfileLayout>
+      </ProfileCover>
       {/* Book this worker personally — only they are asked. */}
       <View
         style={[
           styles.orderBar,
-          { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: colors.border },
+          { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: `${colors.primary}1F` },
         ]}
       >
         <Button
@@ -219,69 +217,76 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
 
   const renderBusiness = (b: BusinessNearbyResult) => (
     <>
-      <GlassProfileLayout
+      <ProfileCover
         topInset={insets.top}
         onBack={onClose}
         backLabel={t('common.cancel')}
-        avatar={
-          <Pressable
-            onPress={() => {
-              const photo = b.profilePhotoUrl;
-              if (photo) setAvatarPhoto(photo);
-            }}
-            disabled={!(b.profilePhotoUrl)}
-            accessibilityRole="imagebutton"
-            accessibilityLabel={b.shopName}
-          >
-          <SealedAvatar size={COMPACT_AVATAR_SIZE} kind="business" id={b.id}>
-            {(b.profilePhotoUrl) ? (
-              <SmartImage source={{ uri: b.profilePhotoUrl }} style={styles.compactAvatar} />
-            ) : (
-              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
-                <FontAwesome6 name="store" size={19} color="#FFFFFF" solid />
-              </LinearGradient>
-            )}
-          </SealedAvatar>
-          </Pressable>
-        }
-        title={b.shopName}
-        titleLines={2}
-        subtitle={distance}
         right={heartButton}
-        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 110 }]}
+        avatar={renderAvatar(b.profilePhotoUrl, b.shopName, 'business', b.id)}
+        name={b.shopName}
+        pills={pills('business')}
+        kicker={{ icon: 'store', label: t('profileView.kickerShop') }}
+        highlights={{ title: t('profileView.whatTheySell'), items: tagItems }}
+        beforeHighlights={
+          b.deliveryAvailable ? (
+            // One slim row: the truck, "Home delivery", and the charges on the right.
+            <LinearGradient colors={DELIVERY_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.deliveryBanner}>
+              <View style={styles.deliveryGlow} />
+              <View style={styles.deliveryBannerIcon}>
+                <FontAwesome6 name="truck-fast" size={14} color="#FFFFFF" solid />
+              </View>
+              <Text style={[styles.deliveryBannerTitle, styles.flex]} numberOfLines={1}>
+                {t('profileView.deliveryTitle')}
+              </Text>
+              {/* One line: "₹10 per km · Min ₹20". */}
+              <View style={styles.deliveryCharges}>
+                <Text style={styles.deliveryChargeValue} numberOfLines={1}>
+                  {t('profileView.deliveryChargeLine', {
+                    perKm: b.deliveryPricePerKm ?? 0,
+                    min: b.deliveryMinCharge ?? b.deliveryPricePerKm ?? 0,
+                  })}
+                </Text>
+              </View>
+            </LinearGradient>
+          ) : (
+            <View style={[styles.pickupRow, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}26` }]}>
+              <View style={[styles.deliveryFactIcon, { backgroundColor: `${colors.primary}1F` }]}>
+                <FontAwesome6 name="store" size={13} color={colors.primary} solid />
+              </View>
+              <Text style={[styles.pickupText, { color: colors.text }]} numberOfLines={2}>
+                {t('profileView.pickupOnly')}
+              </Text>
+            </View>
+          )
+        }
+        stats={[
+          {
+            icon: 'star',
+            value: b.ratingAverage != null ? b.ratingAverage.toFixed(1) : t('workerReviews.new'),
+            label: t('workerReviews.statRating'),
+            gold: true,
+          },
+          { icon: 'users', value: String(b.ratingCount), label: t('profileView.ratings') },
+          {
+            icon: 'truck',
+            value: t(b.deliveryAvailable ? 'profileView.deliversYes' : 'profileView.deliversNo'),
+            label: t('profileView.delivery'),
+          },
+        ]}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
       >
-        <View style={[styles.card, styles.shopFacts, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <RatingStars average={b.ratingAverage} count={b.ratingCount} variant="full" />
-          <TrustedBadge kind="business" id={b.id} />
-        </View>
-        {photos.length > 0 ? <View style={styles.shopGallery}>{renderGallery()}</View> : null}
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('nearbySearch.detailCategoriesLabel')}</Text>
-          <View style={styles.tagRow}>
-            {tagLabels.map((label) => (
-              <LinearGradient key={label} colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.tag}>
-                <Text style={[styles.tagText, { color: '#FFFFFF' }]}>{label}</Text>
-              </LinearGradient>
-            ))}
-          </View>
-        </View>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {renderInfoRow(
-            'truck',
-            b.deliveryAvailable
-              ? t('businessProfile.deliveryCharges', { min: b.deliveryMinCharge ?? 0, perKm: b.deliveryPricePerKm ?? 0 })
-              : t('bazaar.deliveryAvailableNo'),
-          )}
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          {renderInfoRow('location-dot', formatAddress(b))}
-        </View>
+        {photos.length > 0 ? (
+          <ProfileSection title={t('profileView.shopPhotos')} icon="images" count={photos.length}>
+            {renderGallery()}
+          </ProfileSection>
+        ) : null}
         <WorkerReviewsSection summary={shopReviews.data} loading={shopReviews.isLoading} error={shopReviews.isError} />
-      </GlassProfileLayout>
+      </ProfileCover>
       {/* Send the prepared list to this shop. */}
       <View
         style={[
           styles.orderBar,
-          { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: colors.border },
+          { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: `${colors.primary}1F` },
         ]}
       >
         <Button
@@ -328,7 +333,63 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
 const STICKY_START = 140;
 const STICKY_END = 220;
 
+const DELIVERY_GRADIENT = ['#15803D', '#22C55E'] as const;
+
 const styles = StyleSheet.create({
+  deliveryBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 9, marginTop: 14, overflow: 'hidden' },
+  deliveryCharges: {
+    height: 28,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  deliveryChargeValue: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16 },
+  deliveryGlow: { position: 'absolute', width: 110, height: 110, borderRadius: 55, top: -50, right: -30, backgroundColor: 'rgba(255,255,255,0.16)' },
+  deliveryBannerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deliveryBannerTitle: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 20 },
+  deliveryBannerText: { color: 'rgba(255,255,255,0.9)', fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, marginTop: 1 },
+  deliveryFacts: { flexDirection: 'row', gap: 10 },
+  deliveryFact: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 10 },
+  deliveryFactIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  deliveryFactValue: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 21 },
+  deliveryFactLabel: { ...typography.caption, fontSize: 11 },
+  pickupRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 10, marginTop: 14 },
+  pickupText: { ...typography.body, fontSize: 13.5, flex: 1 },
+  coverButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverButtonOn: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+  avatar: {
+    width: PROFILE_AVATAR_SIZE,
+    height: PROFILE_AVATAR_SIZE,
+    borderRadius: PROFILE_AVATAR_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initials: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 34, lineHeight: 42 },
+  tagDot: { width: 6, height: 6, borderRadius: 3 },
+  deliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12, marginTop: 16 },
+  deliveryIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  deliveryText: { ...typography.body, fontSize: 13.5, flex: 1 },
   trustedCentre: { alignSelf: 'center' },
   container: { flex: 1 },
   flex: { flex: 1 },
@@ -364,13 +425,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   distancePillText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
-  compactAvatar: {
-    width: COMPACT_AVATAR_SIZE,
-    height: COMPACT_AVATAR_SIZE,
-    borderRadius: COMPACT_AVATAR_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   compactInitials: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 17 },
   // The first card under the compact header: no top margin of its own (the scroll already
   // clears the header); the gap goes below it, before the shop's photos.
@@ -425,7 +479,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   galleryContent: { gap: 10, paddingBottom: 4 },
-  galleryImage: { width: 180, height: 140, borderRadius: 16 },
+  galleryImage: { width: 200, height: 150, borderRadius: 18 },
   photoCount: {
     position: 'absolute',
     right: 8,
@@ -462,8 +516,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
-  tagText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12 },
+  tag: { flexDirection: 'row', alignItems: 'center', gap: 7, height: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
+  tagText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12.5, lineHeight: 17 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoIconBadge: {
     width: 34,

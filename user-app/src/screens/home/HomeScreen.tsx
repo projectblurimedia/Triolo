@@ -24,7 +24,6 @@ import { useNearbyBusinesses } from '@/hooks/useNearbyBusinesses';
 import { useMyProblems } from '@/hooks/useProblems';
 import { useMyBookings } from '@/hooks/useBookings';
 import { useMyOrders } from '@/hooks/useOrders';
-import { ContinueSteps } from '@/components/ContinueSteps';
 import { WorkerNearbyResult, workersService } from '@/services/workersService';
 import { BusinessNearbyResult, businessesService } from '@/services/businessesService';
 import { NearbySearchMode } from '@/utils/nearbyResult';
@@ -34,6 +33,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { HireStaffModal } from '@/components/HireStaffModal';
 import { ChooseListModal } from '@/components/ChooseListModal';
+import { QuickOrderModal } from '@/components/QuickOrderModal';
 import { SendListModal } from '@/components/SendListModal';
 import { withLocation } from '@/utils/ensureLocationOn';
 
@@ -41,13 +41,13 @@ type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
 // Each quick action keeps its own colour, matching the Services menu drawer's palette.
 const QUICK_ACTIONS: {
-  key: 'quickBook' | 'orderShop' | 'hireStaff' | 'postProblem';
+  key: 'quickBook' | 'quickOrder' | 'hireStaff' | 'postProblem';
   icon: IconName;
   gradient: readonly [string, string, ...string[]];
 }[] = [
   { key: 'quickBook', icon: 'bolt', gradient: headerGradient },
   // Send one of your saved lists to a nearby shop (Prepare List's colour, now the shop action).
-  { key: 'orderShop', icon: 'basket-shopping', gradient: ['#DB2777', '#F472B6'] },
+  { key: 'quickOrder', icon: 'basket-shopping', gradient: ['#DB2777', '#F472B6'] },
   { key: 'hireStaff', icon: 'user-tie', gradient: ['#4338CA', '#7C3AED', '#C026D3'] },
   { key: 'postProblem', icon: 'clipboard-list', gradient: ['#0D9488', '#2DD4BF'] },
 ];
@@ -75,6 +75,7 @@ export function HomeScreen() {
   const firstName = account?.fullName?.split(' ')[0] ?? '';
 
   const [quickBookVisible, setQuickBookVisible] = useState(false);
+  const [quickOrderVisible, setQuickOrderVisible] = useState(false);
   const [hireStaffVisible, setHireStaffVisible] = useState(false);
   const [chooseListVisible, setChooseListVisible] = useState(false);
   const [sendListId, setSendListId] = useState<string | null>(null);
@@ -136,7 +137,7 @@ export function HomeScreen() {
     if (key === 'quickBook') setQuickBookVisible(true);
     else if (key === 'postProblem') setProblemFormVisible(true);
     else if (key === 'hireStaff') setHireStaffVisible(true);
-    else setChooseListVisible(true);
+    else setQuickOrderVisible(true);
   };
 
   const renderSectionHeader = (title: string, onSeeAll?: () => void) => (
@@ -211,7 +212,6 @@ export function HomeScreen() {
             </Text>
           </Pressable>
 
-          <ContinueSteps />
 
           {renderSummary()}
 
@@ -349,6 +349,14 @@ export function HomeScreen() {
       </PullToRefresh>
 
       <QuickBookModal visible={quickBookVisible} onClose={() => setQuickBookVisible(false)} />
+      <QuickOrderModal
+        visible={quickOrderVisible}
+        onClose={() => setQuickOrderVisible(false)}
+        onCreateList={() => {
+          setQuickOrderVisible(false);
+          navigation.navigate('PrepareList', { newList: Date.now() });
+        }}
+      />
       <ChooseListModal
         visible={chooseListVisible}
         onClose={() => setChooseListVisible(false)}

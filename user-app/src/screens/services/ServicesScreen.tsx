@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
@@ -14,22 +13,28 @@ import { SKILL_CATEGORIES } from '@/constants/categories';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
 import { useNearbyWorkers } from '@/hooks/useNearbyWorkers';
-import { NearbyWorkerSort, WorkerNearbyResult, workersService } from '@/services/workersService';
+import { WorkerNearbyResult, workersService } from '@/services/workersService';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistanceValue } from '@/utils/nearbyResult';
-import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { fonts, typography, useThemeColors } from '@/theme';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { MainTabParamList } from '@/navigation/types';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { HomeSearchModal } from '@/components/HomeSearchModal';
-import { CategoryPicker } from '@/components/CategoryPicker';
+import { ContinueSteps } from '@/components/ContinueSteps';
+import { NearbyHero } from '@/components/NearbyHero';
+import { SectionHeader } from '@/components/SectionHeader';
+import { useTrustedIds } from '@/hooks/useSubscription';
 
 const TOP_RATED_LIMIT = 10;
+// "Every worker nearby" in the single-list view (the blue card's See all).
+const ALL = '__all__';
 /**
- * Services tab — verified workers near the device, browsable by category and by rating:
- *  - category chips (All + each skill, with how many are nearby) and a Nearest / Top Rated toggle
- *  - "All": a Top Rated Near You row, then one horizontal row per category with "See all"
- *  - a single category: the full vertical list for that skill
+ * Services tab — verified workers near the device:
+ *  - one search bar; tapping it opens the search screen, where the filters live (Nearest /
+ *    Top rated, Trusted, kind of work)
+ *  - bookings still in progress, one tap from their screen
+ *  - a Top Rated Near You row, then one row per kind of work with "See all" (the full list)
  * Ratings come from customers confirming Your Problems jobs finished (see backend
  * migration 0016). Tapping a worker opens the shared NearbyResultDetailModal and records a
  * profile view, same as Home's Nearby Workers search. The account's own Worker profile (if
@@ -41,7 +46,6 @@ export function ServicesScreen() {
   const { data: workerProfile } = useMyWorkerProfile();
   const [searchVisible, setSearchVisible] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
-  const [sort, setSort] = useState<NearbyWorkerSort>('distance');
   const [selectedWorker, setSelectedWorker] = useState<WorkerNearbyResult | null>(null);
   const route = useRoute<RouteProp<MainTabParamList, 'Services'>>();
   const linkedCategory = route.params?.category;
@@ -61,22 +65,21 @@ export function ServicesScreen() {
     latitude: coords?.latitude ?? null,
     longitude: coords?.longitude ?? null,
     skillCategory: null,
-    sort,
+    sort: 'distance',
   });
+  const showAll = category === ALL;
   const categoryWorkers = useNearbyWorkers({
-    latitude: category ? (coords?.latitude ?? null) : null,
-    longitude: category ? (coords?.longitude ?? null) : null,
+    latitude: category && !showAll ? (coords?.latitude ?? null) : null,
+    longitude: category && !showAll ? (coords?.longitude ?? null) : null,
     skillCategory: category,
-    sort,
+    sort: 'distance',
   });
 
-  const countsByCategory = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const worker of allWorkers.data ?? []) {
-      for (const skill of worker.skillCategories) counts[skill] = (counts[skill] ?? 0) + 1;
-    }
-    return counts;
-  }, [allWorkers.data]);
+  const trustedIds = useTrustedIds();
+  const trustedNearby = useMemo(
+    () => (allWorkers.data ?? []).filter((entry) => !!trustedIds.data?.service?.includes(entry.id)).slice(0, TOP_RATED_LIMIT),
+    [allWorkers.data, trustedIds.data],
+  );
 
   const topRated = useMemo(
     () =>
@@ -99,12 +102,12 @@ export function ServicesScreen() {
       .map((key) => t(`workerProfile.skills.${key}`))
       .join(', ');
 
-  const activeQuery = category ? categoryWorkers : allWorkers;
+  const activeQuery = category && !showAll ? categoryWorkers : allWorkers;
 
   const onRefresh = () => {
     recheckLocation();
     allWorkers.refetch();
-    if (category) categoryWorkers.refetch();
+    if (category && !showAll) categoryWorkers.refetch();
   };
 
   const renderCompactCard = (worker: WorkerNearbyResult) => (
@@ -143,15 +146,19 @@ export function ServicesScreen() {
     </Pressable>
   );
 
-  const renderSectionHeader = (title: string, onSeeAll?: () => void) => (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      {onSeeAll ? (
-        <Pressable onPress={onSeeAll} hitSlop={8}>
-          <Text style={[styles.seeAll, { color: colors.primary }]}>{t('services.seeAll')}</Text>
-        </Pressable>
-      ) : null}
-    </View>
+  const renderSectionHeader = (
+    title: string,
+    icon: React.ComponentProps<typeof FontAwesome6>['name'],
+    options: { count?: number; onSeeAll?: () => void; tone?: 'blue' | 'gold' | 'green' } = {},
+  ) => (
+    <SectionHeader
+      title={title}
+      icon={icon}
+      count={options.count}
+      tone={options.tone}
+      onSeeAll={options.onSeeAll}
+      seeAllLabel={t('services.seeAll')}
+    />
   );
 
   const renderState = (
@@ -226,14 +233,47 @@ export function ServicesScreen() {
     }
 
     if (category) {
-      return <View style={styles.list}>{workers.map(renderWideCard)}</View>;
+      return (
+        <>
+          {/* One kind of work: say which, with the way back to everyone. */}
+          <View style={[styles.categoryBar, { backgroundColor: `${colors.primary}10` }]}>
+            <View style={styles.flex}>
+              <Text style={[styles.categoryBarTitle, { color: colors.text }]} numberOfLines={1}>
+                {showAll
+                  ? t('services.allWorkersNearby')
+                  : category
+                      .split(',')
+                      .map((key) => t(`workerProfile.skills.${key}`))
+                      .join(', ')}
+              </Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+                {t('services.workersNearbyCount', { count: workers.length })}
+              </Text>
+            </View>
+            <Pressable onPress={() => setCategory(null)} hitSlop={8} style={styles.showAll}>
+              <FontAwesome6 name="xmark" size={12} color={colors.primary} solid />
+              <Text style={[styles.seeAll, { color: colors.primary }]}>{t('services.allWorkers')}</Text>
+            </Pressable>
+          </View>
+          <View style={styles.list}>{workers.map(renderWideCard)}</View>
+        </>
+      );
     }
 
     return (
       <>
+        {trustedNearby.length > 0 ? (
+          <>
+            {renderSectionHeader(t('trusted.label'), 'shield-halved', { tone: 'green', count: trustedNearby.length })}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+              {trustedNearby.map(renderCompactCard)}
+            </ScrollView>
+          </>
+        ) : null}
+
         {topRated.length > 0 ? (
           <>
-            {renderSectionHeader(t('services.topRatedTitle'))}
+            {renderSectionHeader(t('services.topRatedTitle'), 'star', { tone: 'gold', count: topRated.length })}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
               {topRated.map(renderCompactCard)}
             </ScrollView>
@@ -245,9 +285,10 @@ export function ServicesScreen() {
           if (inCategory.length === 0) return null;
           return (
             <View key={skill.key}>
-              {renderSectionHeader(`${t(`workerProfile.skills.${skill.key}`)} · ${inCategory.length}`, () =>
-                setCategory(skill.key),
-              )}
+              {renderSectionHeader(t(`workerProfile.skills.${skill.key}`), skill.icon, {
+                count: inCategory.length,
+                onSeeAll: () => setCategory(skill.key),
+              })}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
                 {inCategory.map(renderCompactCard)}
               </ScrollView>
@@ -258,83 +299,41 @@ export function ServicesScreen() {
     );
   };
 
-  const renderChip = (key: string | null, label: string, icon: React.ComponentProps<typeof FontAwesome6>['name']) => {
-    const active = category === key;
-    const count = key ? countsByCategory[key] : allWorkers.data?.length;
-    const content = (
-      <>
-        <FontAwesome6 name={icon} size={12} color={active ? '#FFFFFF' : colors.textMuted} solid />
-        <Text style={[styles.chipLabel, { color: active ? '#FFFFFF' : colors.text }]}>{label}</Text>
-        {count != null ? (
-          <Text style={[styles.chipCount, { color: active ? 'rgba(255,255,255,0.85)' : colors.textMuted }]}>{count}</Text>
-        ) : null}
-      </>
-    );
-    return (
-      <Pressable key={key ?? 'all'} onPress={() => setCategory(key)}>
-        {active ? (
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-            {content}
-          </LinearGradient>
-        ) : (
-          <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            {content}
-          </View>
-        )}
-      </Pressable>
-    );
-  };
 
-  const renderSortOption = (value: NearbyWorkerSort, label: string, icon: React.ComponentProps<typeof FontAwesome6>['name']) => {
-    const active = sort === value;
-    return (
-      <Pressable
-        onPress={() => setSort(value)}
-        style={[styles.sortOption, active ? { backgroundColor: colors.surface } : null]}
-        accessibilityState={{ selected: active }}
-      >
-        <FontAwesome6 name={icon} size={11} color={active ? colors.primary : colors.textMuted} solid />
-        <Text style={[styles.sortLabel, { color: active ? colors.primary : colors.textMuted }]}>{label}</Text>
-      </Pressable>
-    );
-  };
 
   return (
     <ScreenContainer edges={['left', 'right']}>
       <PullToRefresh refreshing={activeQuery.isRefetching} onRefresh={onRefresh}>
         <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
           <Pressable
-            style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: `${colors.primary}26` }]}
             onPress={() => setSearchVisible(true)}
             accessibilityRole="search"
           >
-            <FontAwesome6 name="magnifying-glass" size={15} color={colors.textMuted} solid />
+            <FontAwesome6 name="magnifying-glass" size={15} color={colors.primary} solid />
             <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
               {t('services.searchPlaceholder')}
             </Text>
           </Pressable>
 
+          <NearbyHero
+            icon="screwdriver-wrench"
+            title={t('services.findWorkersTitle')}
+            subtitle={
+              allWorkers.data && allWorkers.data.length > 0
+                ? t('services.workersNearbyCount', { count: allWorkers.data.length })
+                : t('services.heroSubtitle')
+            }
+            count={allWorkers.data?.length ?? null}
+            countCaption={t('services.heroCountCaption')}
+          />
+
+
           {workerProfile ? <WorkerProfileCard profile={workerProfile} /> : null}
 
-          <View style={styles.titleRow}>
-            <Text style={[styles.pageTitle, { color: colors.text }]}>{t('services.findWorkersTitle')}</Text>
-            <View style={[styles.sortToggle, { backgroundColor: `${colors.primary}10` }]}>
-              {renderSortOption('distance', t('services.sortNearest'), 'location-arrow')}
-              {renderSortOption('rating', t('services.sortTopRated'), 'star')}
-            </View>
-          </View>
+          {/* Bookings still going (as on Home). */}
+          <ContinueSteps only="bookings" />
 
-          <CategoryPicker
-            title={t('services.filterTitle')}
-            placeholder={t('services.allCategories')}
-            allLabel={t('picker.allCount', { count: allWorkers.data?.length ?? 0 })}
-            options={SKILL_CATEGORIES.map((skill) => ({ key: skill.key, label: t(`workerProfile.skills.${skill.key}`), icon: skill.icon }))}
-            selected={category ? category.split(',') : []}
-            onChange={(keys) => setCategory(keys.length > 0 ? keys.join(',') : null)}
-            counts={countsByCategory}
-            fieldIcon="filter"
-            style={styles.picker}
-          />
 
           {renderBody()}
         </ScrollView>
@@ -352,7 +351,6 @@ export function ServicesScreen() {
 }
 
 const styles = StyleSheet.create({
-  picker: { marginBottom: 16 },
   // Opens the full search screen, like Home's search bar.
   searchBar: {
     flexDirection: 'row',
@@ -379,6 +377,11 @@ const styles = StyleSheet.create({
   chipCount: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 10 },
   sectionTitle: { ...typography.body, fontFamily: fonts.semiBold },
+  sectionSubtitle: { ...typography.caption, fontSize: 12, marginTop: 1 },
+  categoryBar: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 12, marginTop: 4 },
+  categoryBarTitle: { ...typography.body, fontFamily: fonts.semiBold },
+  showAll: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  flex: { flex: 1 },
   seeAll: { ...typography.caption, fontFamily: fonts.semiBold },
   carousel: { gap: 12, paddingRight: 4 },
   compactSkills: { ...typography.caption, fontSize: 11, textAlign: 'center' },

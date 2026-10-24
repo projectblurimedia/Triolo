@@ -18,7 +18,7 @@ export interface PlaceValue {
 }
 
 // Google's geocoder often returns a Plus Code ("7JCM+2X") as the place's `name` — never show that.
-const PLUS_CODE = /^[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{0,3}/i;
+const PLUS_CODE = /\b[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{0,3}\b/gi;
 
 /** A readable address part, or undefined for blanks, Plus Codes and bare numbers (pincodes). */
 export function clean(value: string | null | undefined): string | undefined {
@@ -26,7 +26,7 @@ export function clean(value: string | null | undefined): string | undefined {
   const text = (value ?? '')
     .trim()
     .replace(PLUS_CODE, '')
-    .replace(/^[\s,]+/, '')
+    .replace(/^[\s,]+|[\s,]+$/g, '')
     .trim();
   if (!text || /^[0-9\s,-]+$/.test(text)) return undefined;
   return text;

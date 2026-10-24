@@ -833,6 +833,29 @@ export function useAdGate(open: boolean, spot: AdSpot): { adLoading: boolean; wa
   return { adLoading, waitForAd };
 }
 
+/**
+ * Keeps a button spinning from the tap until its whole action is done — the location check,
+ * the ad, the payment step and the request itself — so there's never a still moment before
+ * or after an ad that makes it look like the tap didn't work. A second tap while it runs is
+ * ignored.
+ */
+export function useBusyAction(): { busy: boolean; run: (action: () => Promise<unknown> | unknown) => Promise<void> } {
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false);
+  const run = useCallback(async (action: () => Promise<unknown> | unknown) => {
+    if (running.current) return;
+    running.current = true;
+    setBusy(true);
+    try {
+      await action();
+    } finally {
+      running.current = false;
+      setBusy(false);
+    }
+  }, []);
+  return { busy, run };
+}
+
 /** Mounted once at the app root: shows the ad `showAdBefore` found, then runs the action. */
 export function AdActionHost() {
   const ad = useActionAd((state) => state.ad);

@@ -12,7 +12,7 @@ import { NotificationsService } from '@/modules/notifications/service';
 import { OrdersController } from './controller';
 import { OrdersRepository } from './repository';
 import { OrdersService } from './service';
-import { createOrderSchema, customerCancelSchema, rateOrderSchema, saveItemsSchema, shopCancelSchema, verifyOrderPinSchema } from './validation';
+import { createOrderSchema, createQuickOrderSchema, customerCancelSchema, rateOrderSchema, saveItemsSchema, shopCancelSchema, verifyOrderPinSchema } from './validation';
 
 // Own instances over the shared pool — same wiring style as bookings/routes.ts.
 const notificationsService = new NotificationsService(new NotificationsRepository(pool));
@@ -36,6 +36,8 @@ ordersRouter.get('/shop/:id', authenticate, controller.getShop);
 
 // Customer side.
 ordersRouter.post('/', authenticate, validateBody(createOrderSchema), controller.create);
+// Quick Order: to every matching shop nearby at once (registered before /:id).
+ordersRouter.post('/quick', authenticate, validateBody(createQuickOrderSchema), controller.createQuick);
 ordersRouter.get('/mine', authenticate, controller.listMine);
 ordersRouter.get('/:id', authenticate, controller.getMine);
 ordersRouter.post('/:id/cancel', authenticate, validateBody(customerCancelSchema), controller.cancel);

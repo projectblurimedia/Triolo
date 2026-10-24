@@ -13,6 +13,7 @@ import {
   requestLoginOtpSchema,
   requestRegistrationOtpSchema,
   updateLanguageSchema,
+  updateWaitTimesSchema,
   updateProfileSchema,
   verifyLoginOtpSchema,
   verifyRegistrationOtpSchema,
@@ -46,3 +47,6 @@ authRouter.patch('/me', authenticate, validateBody(updateProfileSchema), control
 authRouter.put('/me/photo', authenticate, upload.single('photo'), logUploadedFiles, controller.setProfilePhoto);
 authRouter.delete('/me/photo', authenticate, controller.removeProfilePhoto);
 authRouter.patch('/me/language', authenticate, validateBody(updateLanguageSchema), controller.updateLanguage);
+// How long the customer's Quick Book / personal booking / shop order requests wait for an answer.
+authRouter.get('/me/wait-times', authenticate, controller.getWaitTimes);
+authRouter.put('/me/wait-times', authenticate, validateBody(updateWaitTimesSchema), controller.updateWaitTimes);

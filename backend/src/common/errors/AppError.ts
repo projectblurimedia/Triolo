@@ -26,7 +26,7 @@ export class AppError extends Error {
     return new AppError(404, code, message);
   }
 
-  static conflict(message: string, code = 'CONFLICT'): AppError {
-    return new AppError(409, code, message);
+  static conflict(message: string, code = 'CONFLICT', details?: unknown): AppError {
+    return new AppError(409, code, message, details);
   }
 }

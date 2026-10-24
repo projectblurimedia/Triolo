@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -12,8 +12,9 @@ import {
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { SendListModal } from '@/components/SendListModal';
+import { ToastHost } from '@/components/ToastHost';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { listFallbackName, SavedList, useListStore } from '@/state/listStore';
+import { isListNameTaken, listFallbackName, SavedList, useListStore } from '@/state/listStore';
 import { showToast } from '@/state/toastStore';
 import { parseVoiceListText } from '@/utils/parseVoiceList';
 import { RouteProp, useRoute } from '@react-navigation/native';
@@ -21,7 +22,6 @@ import { MainTabParamList } from '@/navigation/types';
 
 const MIC_SIZE = 84;
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
-const PREVIEW_ITEMS = 3;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Built by hand — Hermes on Android doesn't reliably ship Intl date formatting.
@@ -59,12 +59,11 @@ export function PrepareListScreen() {
   const discardDraft = useListStore((state) => state.discardDraft);
   const deleteList = useListStore((state) => state.deleteList);
 
-  // An unfinished draft (from before the app was closed) reopens in the editor; otherwise the
-  // saved lists come first, and with no lists at all the editor is the only thing to show.
+  // My Lists is always the tab; New List / Edit open the editor in its own full screen. An
+  // unfinished draft (from before the app was closed) reopens it.
   const [screen, setScreen] = useState<'lists' | 'editor'>(() => {
     const state = useListStore.getState();
-    if (state.draft.items.length > 0 || state.draft.listId) return 'editor';
-    return state.lists.length > 0 ? 'lists' : 'editor';
+    return state.draft.items.length > 0 || state.draft.listId ? 'editor' : 'lists';
   });
   const [recognizing, setRecognizing] = useState(false);
   const [interimText, setInterimText] = useState('');
@@ -113,6 +112,8 @@ export function PrepareListScreen() {
 
   const items = draft.items;
   const isEditingSaved = draft.listId !== null;
+  // List names are unique: warn while typing, before Save is even tapped.
+  const nameTaken = isListNameTaken(lists, draft.name, draft.listId);
 
   // Same floating-tab-bar clearance as ProfileScreen's own ScrollView — CustomTabBar is
   // position:'absolute' and contributes ~0 height to layout.
@@ -197,9 +198,13 @@ export function PrepareListScreen() {
 
   const handleSave = () => {
     stopListening();
-    const savedId = saveDraft(listFallbackName(t('prepareList.defaultListName')));
-    if (!savedId) {
+    const result = saveDraft(listFallbackName(t('prepareList.defaultListName')));
+    if (result.status === 'empty') {
       showToast({ variant: 'info', title: t('prepareList.emptyDraftTitle'), message: t('prepareList.emptyDraftMessage') });
+      return;
+    }
+    if (result.status === 'duplicate') {
+      showToast({ variant: 'error', title: t('prepareList.duplicateNameTitle'), message: t('prepareList.duplicateNameMessage') });
       return;
     }
     showToast({ variant: 'success', title: t('prepareList.savedTitle') });
@@ -251,24 +256,22 @@ export function PrepareListScreen() {
         </Pressable>
       </Pressable>
 
-      <View style={[styles.preview, { borderColor: colors.border }]}>
-        {list.items.slice(0, PREVIEW_ITEMS).map((item, index) => (
-          <View key={item.id} style={styles.previewRow}>
-            <Text style={[styles.previewIndex, { color: colors.textMuted }]}>{index + 1}.</Text>
+      {/* The items as small cards, one sideways row (names only). */}
+      <ScrollView
+        horizontal
+        style={styles.previewScroll}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.previewRow}
+      >
+        {list.items.map((item) => (
+          <View key={item.id} style={[styles.previewItem, { backgroundColor: colors.background, borderColor: `${colors.primary}1F` }]}>
+            <FontAwesome6 name="basket-shopping" size={10} color={colors.primary} solid />
             <Text style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
               {item.name}
             </Text>
-            <Text style={[styles.previewQty, { color: colors.textMuted }]}>
-              {[item.quantity, item.unit].filter(Boolean).join(' ')}
-            </Text>
           </View>
         ))}
-        {list.items.length > PREVIEW_ITEMS ? (
-          <Text style={[styles.more, { color: colors.primary }]}>
-            {t('prepareList.more', { count: list.items.length - PREVIEW_ITEMS })}
-          </Text>
-        ) : null}
-      </View>
+      </ScrollView>
 
       <View style={styles.cardActions}>
         <Pressable style={[styles.outlineButton, { borderColor: colors.primary }]} onPress={() => handleEdit(list)}>
@@ -312,29 +315,29 @@ export function PrepareListScreen() {
 
   const renderEditor = () => (
     <>
-      <View style={styles.editorTop}>
-        {lists.length > 0 || isEditingSaved ? (
-          <Pressable
-            style={[styles.backButton, { borderColor: `${colors.primary}40`, backgroundColor: `${colors.primary}10` }]}
-            onPress={handleBack}
-            hitSlop={8}
-            accessibilityLabel={t('prepareList.backToLists')}
-          >
-            <FontAwesome6 name="chevron-left" size={15} color={colors.primary} solid />
-          </Pressable>
-        ) : null}
-        <Text style={[styles.editorTitle, { color: colors.text }]}>
-          {t(isEditingSaved ? 'prepareList.editingTitle' : 'prepareList.newListTitle')}
-        </Text>
+      <View style={styles.fieldLabelRow}>
+        <View style={[styles.fieldLabelIcon, { backgroundColor: `${colors.primary}14` }]}>
+          <FontAwesome6 name="tag" size={11} color={colors.primary} solid />
+        </View>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('prepareList.listNameLabel')}</Text>
       </View>
       <TextInput
-        style={[styles.nameField, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+        style={[
+          styles.nameField,
+          { color: colors.text, borderColor: nameTaken ? colors.error : `${colors.primary}26`, backgroundColor: colors.surface },
+        ]}
         value={draft.name}
         onChangeText={setDraftName}
         maxLength={60}
         placeholder={t('prepareList.listNamePlaceholder')}
         placeholderTextColor={colors.textMuted}
       />
+      {nameTaken ? (
+        <View style={styles.nameError}>
+          <FontAwesome6 name="circle-exclamation" size={12} color={colors.error} solid />
+          <Text style={[styles.nameErrorText, { color: colors.error }]}>{t('prepareList.duplicateNameMessage')}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.micSection}>
         <View style={styles.micWrap}>
@@ -365,27 +368,21 @@ export function PrepareListScreen() {
         </Text>
       </View>
 
-      <View style={styles.listHeaderRow}>
-        <Text style={[styles.listHeading, { color: colors.text }]}>
-          {t('prepareList.yourListHeading', { count: items.length })}
-        </Text>
-        {items.length ? (
+      {items.length ? (
+        <View style={styles.listHeaderRow}>
+          <Text style={[styles.listHeading, { color: colors.text }]}>
+            {t('prepareList.yourListHeading', { count: items.length })}
+          </Text>
           <Pressable onPress={() => setShowClearConfirm(true)} hitSlop={8}>
             <Text style={[styles.clearAllText, { color: colors.error }]}>{t('prepareList.clearAll')}</Text>
           </Pressable>
-        ) : null}
-      </View>
-
-      {items.length === 0 ? (
-        <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <FontAwesome6 name="microphone-lines" size={26} color={colors.textMuted} solid />
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('prepareList.emptyMessage')}</Text>
         </View>
-      ) : (
-        items.map((item, index) => (
+      ) : null}
+
+      {items.map((item, index) => (
           <View
             key={item.id}
-            style={[styles.itemRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.itemRow, { backgroundColor: colors.surface, borderColor: `${colors.primary}26` }]}
             onLayout={(event) => {
               const firstLayout = rowYs.current[item.id] === undefined;
               rowYs.current[item.id] = event.nativeEvent.layout.y;
@@ -393,56 +390,80 @@ export function PrepareListScreen() {
               if (firstLayout && item.id === focusItemId) setTimeout(() => scrollToRow(item.id), 80);
             }}
           >
-            <Text style={[styles.itemIndex, { color: colors.textMuted }]}>{index + 1}.</Text>
-            <View style={styles.itemFields}>
+            <View style={[styles.itemBadge, { backgroundColor: `${colors.primary}14` }]}>
+              <Text style={[styles.itemBadgeText, { color: colors.primary }]}>{index + 1}</Text>
+            </View>
+            <TextInput
+              style={[styles.nameInput, { color: colors.text }]}
+              value={item.name}
+              onChangeText={(text) => updateItem(item.id, { name: text })}
+              placeholder={t('prepareList.namePlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              autoFocus={item.id === focusItemId}
+              onFocus={() => {
+                activeRowId.current = item.id;
+                scrollToRow(item.id);
+              }}
+            />
+            {/* Quantity and unit together in one small pill. */}
+            <View style={[styles.qtyPill, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <TextInput
-                style={[styles.nameInput, { color: colors.text }]}
-                value={item.name}
-                onChangeText={(text) => updateItem(item.id, { name: text })}
-                placeholder={t('prepareList.namePlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                autoFocus={item.id === focusItemId}
+                style={[styles.qtyInput, { color: colors.text }]}
+                value={item.quantity}
+                onChangeText={(text) => updateItem(item.id, { quantity: text })}
                 onFocus={() => {
                   activeRowId.current = item.id;
                   scrollToRow(item.id);
                 }}
+                placeholder={t('prepareList.quantityPlaceholder')}
+                placeholderTextColor={colors.textMuted}
+                textAlign="center"
               />
-              <View style={styles.qtyRow}>
-                <TextInput
-                  style={[styles.qtyInput, { color: colors.textMuted, borderColor: colors.border }]}
-                  value={item.quantity}
-                  onChangeText={(text) => updateItem(item.id, { quantity: text })}
-                  onFocus={() => {
-                    activeRowId.current = item.id;
-                    scrollToRow(item.id);
-                  }}
-                  placeholder={t('prepareList.quantityPlaceholder')}
-                  placeholderTextColor={colors.textMuted}
-                />
-                <TextInput
-                  style={[styles.unitInput, { color: colors.textMuted, borderColor: colors.border }]}
-                  value={item.unit}
-                  onChangeText={(text) => updateItem(item.id, { unit: text.toUpperCase() })}
-                  onFocus={() => {
-                    activeRowId.current = item.id;
-                    scrollToRow(item.id);
-                  }}
-                  placeholder={t('prepareList.unitPlaceholder')}
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="characters"
-                />
-              </View>
+              <View style={[styles.qtyDivider, { backgroundColor: colors.border }]} />
+              <TextInput
+                style={[styles.unitInput, { color: colors.primary }]}
+                value={item.unit}
+                onChangeText={(text) => updateItem(item.id, { unit: text.toUpperCase() })}
+                onFocus={() => {
+                  activeRowId.current = item.id;
+                  scrollToRow(item.id);
+                }}
+                placeholder={t('prepareList.unitPlaceholder')}
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="characters"
+                textAlign="center"
+              />
             </View>
-            <Pressable onPress={() => removeItem(item.id)} hitSlop={8} style={styles.iconButton}>
-              <FontAwesome6 name="trash" size={16} color={colors.error} solid />
+            <Pressable
+              onPress={() => removeItem(item.id)}
+              hitSlop={8}
+              style={[styles.removeButton, { backgroundColor: `${colors.error}12` }]}
+              accessibilityLabel={t('common.delete')}
+            >
+              <FontAwesome6 name="xmark" size={13} color={colors.error} solid />
             </Pressable>
           </View>
-        ))
-      )}
+        ))}
 
-      <Pressable style={[styles.addRow, { borderColor: colors.border }]} onPress={handleAddBlankItem}>
-        <FontAwesome6 name="plus" size={14} color={colors.primary} solid />
-        <Text style={[styles.addRowText, { color: colors.primary }]}>{t('prepareList.addItemManually')}</Text>
+      <Pressable
+        onPress={handleAddBlankItem}
+        style={({ pressed }) => [
+          styles.addRow,
+          { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}40`, opacity: pressed ? 0.85 : 1 },
+        ]}
+      >
+        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.addIcon}>
+          <FontAwesome6 name="keyboard" size={15} color="#FFFFFF" solid />
+        </LinearGradient>
+        <View style={styles.flex}>
+          <Text style={[styles.addRowText, { color: colors.text }]}>{t('prepareList.addItemManually')}</Text>
+          <Text style={[styles.addRowHint, { color: colors.textMuted }]} numberOfLines={1}>
+            {t('prepareList.addItemManuallyHint')}
+          </Text>
+        </View>
+        <View style={[styles.addPlus, { borderColor: colors.primary }]}>
+          <FontAwesome6 name="plus" size={12} color={colors.primary} solid />
+        </View>
       </Pressable>
       {items.length ? (
         <Pressable style={styles.saveButton} onPress={handleSave}>
@@ -458,39 +479,76 @@ export function PrepareListScreen() {
   return (
     <ScreenContainer edges={['left', 'right']}>
       <ScrollView
-        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: tabBarClearance + keyboardHeight }}
+        contentContainerStyle={{ paddingBottom: tabBarClearance }}
       >
-        {screen === 'lists' ? renderLists() : renderEditor()}
+        {renderLists()}
       </ScrollView>
+
+      {/* The list editor: its own full-screen window over the tab. */}
+      <Modal visible={screen === 'editor'} animationType="fade" statusBarTranslucent onRequestClose={handleBack}>
+        <View style={[styles.flex, { backgroundColor: colors.background }]}>
+          <LinearGradient
+            colors={headerGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.editorHeader, { paddingTop: insets.top + 14 }]}
+          >
+            <Pressable
+              style={styles.editorBack}
+              onPress={handleBack}
+              hitSlop={8}
+              accessibilityLabel={t('prepareList.backToLists')}
+            >
+              <FontAwesome6 name="chevron-left" size={17} color="#FFFFFF" solid />
+            </Pressable>
+            <View style={styles.flex}>
+              <Text style={styles.editorHeaderTitle}>
+                {t(isEditingSaved ? 'prepareList.editingTitle' : 'prepareList.newListTitle')}
+              </Text>
+              <Text style={styles.editorHeaderSubtitle} numberOfLines={1}>
+                {t('prepareList.editorSubtitle')}
+              </Text>
+            </View>
+          </LinearGradient>
+          <ScrollView
+            ref={scrollRef}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[styles.editorBody, { paddingBottom: insets.bottom + 32 + keyboardHeight }]}
+          >
+            {renderEditor()}
+          </ScrollView>
+          <ConfirmModal
+            visible={showClearConfirm}
+            icon="trash"
+            gradient={DELETE_GRADIENT}
+            title={t('prepareList.clearAllConfirmTitle')}
+            message={t('prepareList.clearAllConfirmMessage')}
+            confirmLabel={t('prepareList.clearAll')}
+            onConfirm={() => {
+              clearDraftItems();
+              setShowClearConfirm(false);
+            }}
+            onCancel={() => setShowClearConfirm(false)}
+          />
+          <ConfirmModal
+            visible={showDiscardConfirm}
+            icon="rotate-left"
+            gradient={DELETE_GRADIENT}
+            title={t('prepareList.discardTitle')}
+            message={t('prepareList.discardMessage')}
+            confirmLabel={t('prepareList.discard')}
+            onConfirm={leaveEditor}
+            onCancel={() => setShowDiscardConfirm(false)}
+          />
+          <ToastHost />
+        </View>
+      </Modal>
 
       <SendListModal visible={sendListId !== null} listId={sendListId} onClose={() => setSendListId(null)} />
 
-      <ConfirmModal
-        visible={showClearConfirm}
-        icon="trash"
-        gradient={DELETE_GRADIENT}
-        title={t('prepareList.clearAllConfirmTitle')}
-        message={t('prepareList.clearAllConfirmMessage')}
-        confirmLabel={t('prepareList.clearAll')}
-        onConfirm={() => {
-          clearDraftItems();
-          setShowClearConfirm(false);
-        }}
-        onCancel={() => setShowClearConfirm(false)}
-      />
-      <ConfirmModal
-        visible={showDiscardConfirm}
-        icon="rotate-left"
-        gradient={DELETE_GRADIENT}
-        title={t('prepareList.discardTitle')}
-        message={t('prepareList.discardMessage')}
-        confirmLabel={t('prepareList.discard')}
-        onConfirm={leaveEditor}
-        onCancel={() => setShowDiscardConfirm(false)}
-      />
       <ConfirmModal
         visible={deleteTarget !== null}
         icon="trash"
@@ -524,12 +582,10 @@ const styles = StyleSheet.create({
   listName: { ...typography.body, fontFamily: fonts.semiBold },
   listMeta: { ...typography.caption, fontSize: 12, marginTop: 1 },
   iconButton: { padding: 6 },
-  preview: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
-  previewRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 },
-  previewIndex: { ...typography.caption, width: 18 },
-  previewName: { ...typography.body, fontSize: 14, flex: 1 },
-  previewQty: { ...typography.caption, fontSize: 12 },
-  more: { ...typography.caption, fontFamily: fonts.semiBold, marginTop: 4 },
+  previewScroll: { flexGrow: 0 },
+  previewRow: { gap: 8, paddingRight: 4 },
+  previewItem: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, borderRadius: 12, borderWidth: 1, paddingHorizontal: 11, maxWidth: 170 },
+  previewName: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12.5, lineHeight: 17, flexShrink: 1 },
   cardActions: { flexDirection: 'row', gap: 10 },
   outlineButton: {
     flex: 1,
@@ -547,43 +603,67 @@ const styles = StyleSheet.create({
   sendButtonText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, color: '#FFFFFF' },
   // The first row sits right under the header with only the screen's own padding, like every other tab.
   firstRow: { marginTop: 0 },
-  editorTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  editorHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingBottom: 16 },
+  editorBack: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editorHeaderTitle: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 18 },
+  editorHeaderSubtitle: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
+  editorBody: { padding: 16 },
+  fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  fieldLabelIcon: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  fieldLabel: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
   backButton: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   editorTitle: { ...typography.subheading, fontFamily: fonts.semiBold },
-  nameField: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 46, ...typography.body },
+  nameField: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, height: 46, ...typography.body, includeFontPadding: false },
   micSection: { alignItems: 'center', paddingVertical: 18 },
   micWrap: { width: MIC_SIZE, height: MIC_SIZE, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   pulseRing: { position: 'absolute', width: MIC_SIZE, height: MIC_SIZE, borderRadius: MIC_SIZE / 2 },
   mic: { width: MIC_SIZE, height: MIC_SIZE, borderRadius: MIC_SIZE / 2, alignItems: 'center', justifyContent: 'center' },
   micStatus: { ...typography.subheading, fontFamily: fonts.semiBold, marginBottom: 6 },
   micHint: { ...typography.caption, textAlign: 'center', paddingHorizontal: 24 },
+  nameError: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingHorizontal: 2 },
+  nameErrorText: { ...typography.caption, fontSize: 12, flex: 1 },
+  // One clean line per item: number, name, a quantity · unit pill, remove.
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 14,
     borderWidth: 1,
-    padding: 12,
-    marginBottom: 10,
-    gap: 10,
+    paddingVertical: 5,
+    paddingLeft: 10,
+    paddingRight: 8,
+    marginBottom: 8,
+    gap: 8,
   },
-  itemIndex: { ...typography.body, fontFamily: fonts.semiBold, width: 20 },
-  itemFields: { flex: 1, gap: 8 },
-  nameInput: { ...typography.body, fontFamily: fonts.medium, padding: 0 },
-  qtyRow: { flexDirection: 'row', gap: 8 },
-  qtyInput: { ...typography.caption, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, flex: 1 },
-  unitInput: { ...typography.caption, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, width: 80 },
+  itemBadge: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  itemBadgeText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16 },
+  nameInput: { ...typography.body, fontFamily: fonts.medium, padding: 0, flex: 1, minWidth: 0, height: 36 },
+  qtyPill: { flexDirection: 'row', alignItems: 'center', height: 34, borderRadius: 17, borderWidth: 1, overflow: 'hidden' },
+  qtyInput: { ...typography.caption, fontFamily: fonts.semiBold, width: 44, padding: 0, height: 34 },
+  qtyDivider: { width: 1, height: 18 },
+  unitInput: { ...typography.caption, fontFamily: fonts.semiBold, width: 50, padding: 0, height: 34 },
+  removeButton: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   addRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    paddingVertical: 14,
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 12,
     marginTop: 4,
   },
+  addIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   addRowText: { ...typography.body, fontFamily: fonts.semiBold },
+  addRowHint: { ...typography.caption, fontSize: 12, marginTop: 1 },
+  addPlus: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   saveButton: { marginTop: 14, borderRadius: 14, overflow: 'hidden' },
   saveButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48 },
   saveButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },

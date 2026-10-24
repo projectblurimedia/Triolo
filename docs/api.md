@@ -112,10 +112,25 @@ Permanently remove the caller's worker profile.
 - 200: `{ success: true, message: "Worker profile deleted", data: null }`
 - 404: `WORKER_PROFILE_NOT_FOUND`
 
+### POST /orders/quick
+Quick Order: the customer's list goes to every verified shop nearby of the chosen kinds (that deliver, for delivery) at once; the first shop to accept (`POST /orders/:id/accept`) gets it, then it is an ordinary order.
+- Auth: Bearer access token
+- Body: `{ shopCategories: string[] (1–10 shop category keys), fulfillment: "pickup" | "delivery", items: [{ name, quantity, unit? }], latitude, longitude, locationAddress?, note? }`
+- 201: the order (`quick: true`, `businessId: null` and an empty `shop.name` until a shop accepts)
+- 404: `QUICK_ORDER_NO_SHOPS` — no matching shop nearby (nothing is created or charged)
+- Shop side: `GET /orders/shop/mine` and `/orders/shop/:id` include Quick Orders offered to the shop and not taken yet (`distanceMeters` = that shop's own distance). Accept: 409 `ORDER_ALREADY_TAKEN` when another shop was first. Decline closes only that shop's offer.
+
+### GET /auth/me/wait-times · PUT /auth/me/wait-times
+How long the caller's requests wait for an answer before ending by themselves (Profile → Waiting Time). Read live by every "still open?" check, so a change also applies to requests already waiting.
+- Auth: Bearer access token
+- PUT body: `{ quickBookMinutes, directMinutes, orderMinutes, quickOrderMinutes? }` — whole minutes, each 5–1440 (defaults: Quick Book and Quick Order 15, direct and order 1440; without `quickOrderMinutes` it is left as it is)
+- 200: `{ success: true, data: { quickBookMinutes, directMinutes, orderMinutes } }`
+- 400: `VALIDATION_ERROR` (out of range)
+
 ### GET /workers/nearby
 Search for verified workers near a given point — backs both Home's Nearby Workers search and the Services tab. Distance is computed server-side (Haversine, in SQL) — this is not a client-side filter over a full list. Excludes the caller's own worker profile, if any.
 - Auth: Bearer access token
-- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against the worker's name, skill category, `otherSkillDescription`, place name, city, and area), `skillCategory?: string` (only workers who have this skill; a valid `worker_skill_category`), `sort?: "distance" | "rating"` (default `distance`; `rating` = best average first, unrated workers last, more ratings then distance breaking ties), `limit?: number` (default 20, max 50)
+- Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against the worker's name, skill category, `otherSkillDescription`, place name, city, and area), `skillCategory?: string` (only workers who have this skill — or several, comma-separated, any of them matching; each a valid `worker_skill_category`), `nameOnly?: "true"` (match `query` against the worker's name only — used once a kind of work is picked), `sort?: "distance" | "rating"` (default `distance`; `rating` = best average first, unrated workers last, more ratings then distance breaking ties), `limit?: number` (default 20, max 50)
 - Every `WorkerProfile` (this endpoint and `/workers/me/profile`) now carries `ratingAverage: number | null` (1 decimal; null before the first rating) and `ratingCount: number` — from customers rating finished Your Problems jobs (`POST /problems/:id/complete`)
 - 200: `{ success: true, data: Array<WorkerProfile & { distanceMeters: number; accountFullName: string }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned; `accountFullName` is included so a result has a "who" (mobile/email are deliberately not exposed here — no booking/contact flow exists yet)
 - 400: `VALIDATION_ERROR` — missing/invalid `latitude`/`longitude`, or an out-of-range `radiusKm`/`limit`
@@ -158,7 +173,7 @@ Permanently remove the caller's business profile.
 - 404: `BUSINESS_PROFILE_NOT_FOUND`
 
 ### GET /businesses/nearby
-Search for verified businesses near a given point, ordered nearest-first — mirrors `GET /workers/nearby` exactly, shop-shaped instead of skill-shaped. Excludes the caller's own business profile, if any.
+Search for verified businesses near a given point, ordered nearest-first — mirrors `GET /workers/nearby` exactly, shop-shaped instead of skill-shaped. Also takes `shopCategory` (comma-separated, any match), `delivery=true` and `nameOnly=true` (`query` matches the shop name only). Excludes the caller's own business profile, if any.
 - Auth: Bearer access token
 - Query params: `latitude: number` (required, -90..90), `longitude: number` (required, -180..180), `radiusKm?: number` (default 10, 0.1-50), `query?: string` (optional free-text, matched against shop name, shop category, `otherCategoryDescription`, city, and area), `limit?: number` (default 20, max 50), `shopCategory?: string` (only shops in this category), `delivery?: "true"` (only shops that deliver), `sort?: "distance" | "rating"` (default `distance`; `rating` = best average first, unrated last)
 - 200: `{ success: true, data: Array<BusinessProfile & { distanceMeters: number }> }` — only `verification_status: "verified"` profiles with a captured `latitude`/`longitude` are returned. Every `BusinessProfile` carries `ratingAverage: number | null` and `ratingCount` (customers rating completed orders, migration `0021`)
@@ -574,7 +589,7 @@ All require auth; `query` (1–40 characters) is matched anywhere in the name; a
 - `GET /businesses/custom-categories?query=` — categories verified shops typed under "other".
 - `GET /job-seekers/custom-titles?query=` — kinds of work on live posts in the "other" category.
 
-`POST /bookings/quick` and `POST /bookings/direct` take `skillCategories` as fixed skill keys and/or such names (max 10, names cleaned of dots and colons, at most 5 kept); bookings return the names in place of `other`.
+Both refuse a repeat while the same customer already has a request for some of the same work waiting (Quick Book: any open broadcast; direct: the same worker): 409 `BOOKING_ALREADY_WAITING`, `error.details.bookingRequestId` = the waiting one. `POST /bookings/quick` and `POST /bookings/direct` take `skillCategories` as fixed skill keys and/or such names (max 10, names cleaned of dots and colons, at most 5 kept); bookings return the names in place of `other`.
 
 ## Subscriptions Module
 

@@ -9,7 +9,7 @@ import { usePayHint, withFee } from '@/hooks/useSubscription';
 import { payIfNeeded } from '@/state/payGateStore';
 import { GlassBackdrop, GlassCard } from './Glass';
 import { ToastHost } from './ToastHost';
-import { useAdGate } from './Ads';
+import { useAdGate, useBusyAction } from './Ads';
 import { addressFor } from './QuickBookModal';
 import { SKILL_CATEGORIES } from '@/constants/categories';
 import { bookingsService } from '@/services/bookingsService';
@@ -21,6 +21,8 @@ import { askForLocation } from '@/utils/ensureLocationOn';
 import { firstName } from '@/utils/firstName';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { bookingQueryKey } from '@/hooks/useBookings';
+import { waitingBookingIdFrom } from '@/utils/waitingBooking';
 
 interface BookWorkerModalProps {
   worker: WorkerNearbyResult | null;
@@ -44,6 +46,7 @@ export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalPr
   const [sending, setSending] = useState(false);
   const preparing = useRef(false);
   const { adLoading, waitForAd } = useAdGate(!!worker, 'book_worker');
+  const { busy, run } = useBusyAction();
 
   // The work this worker does; one kind is chosen for you.
   const skills = worker ? worker.skillCategories : [];
@@ -90,10 +93,22 @@ export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalPr
         longitude: here.longitude,
         locationAddress,
       });
+      // Load it while the button still spins, so the tracker opens on it (no spinner there).
+      await queryClient
+        .prefetchQuery({ queryKey: bookingQueryKey(result.bookingRequestId), queryFn: () => bookingsService.getBooking(result.bookingRequestId) })
+        .catch(() => {});
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       openBookingTracker(result.bookingRequestId);
       onBooked();
     } catch (error) {
+      // This worker already has your request for this work: open that one.
+      const waitingId = waitingBookingIdFrom(error);
+      if (waitingId) {
+        showToast({ variant: 'info', title: t('quickBook.alreadyWaitingTitle'), message: t('directBook.alreadyWaitingMessage', { name }) });
+        openBookingTracker(waitingId);
+        onBooked();
+        return;
+      }
       showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) });
       setSending(false);
     }
@@ -144,8 +159,8 @@ export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalPr
 
           <Button
             label={withFee(t('directBook.send'), bookFee)}
-            onPress={send}
-            loading={sending || adLoading}
+            onPress={() => run(send)}
+            loading={sending || adLoading || busy}
             disabled={selected.length === 0}
           />
           <Pressable onPress={onClose} disabled={sending} style={styles.cancel} hitSlop={6}>

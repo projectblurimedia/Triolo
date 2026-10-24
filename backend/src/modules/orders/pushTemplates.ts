@@ -3,6 +3,7 @@ import { PreferredLanguage } from '@/modules/auth/interfaces';
 /** Every order step that notifies someone (the customer, or for 'placed'/'cancelled_by_customer' the shop). */
 export type OrderEvent =
   | 'placed'
+  | 'quick_placed'
   | 'accepted'
   | 'declined'
   | 'packed'
@@ -28,6 +29,10 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
     placed: ({ count }) => ({
       title: 'New Order',
       body: `A customer sent a list of ${count} item(s). Accept it to start packing.`,
+    }),
+    quick_placed: ({ count }) => ({
+      title: 'Quick Order — be first',
+      body: `A customer nearby wants ${count} item(s). The first shop to accept gets the order.`,
     }),
     accepted: ({ shop }) => ({ title: 'Order Accepted', body: `${shop} is checking and packing your list.` }),
     declined: ({ shop }) => ({ title: 'Order Declined', body: `${shop} can't take your list right now. Try another shop.` }),
@@ -56,6 +61,10 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
     placed: ({ count }) => ({
       title: 'కొత్త ఆర్డర్',
       body: `ఒక కస్టమర్ ${count} వస్తువుల జాబితా పంపారు. ప్యాక్ చేయడం ప్రారంభించడానికి అంగీకరించండి.`,
+    }),
+    quick_placed: ({ count }) => ({
+      title: 'క్విక్ ఆర్డర్ — ముందుగా అంగీకరించండి',
+      body: `దగ్గరలోని ఒక కస్టమర్‌కు ${count} వస్తువులు కావాలి. ముందుగా అంగీకరించిన దుకాణానికే ఆర్డర్.`,
     }),
     accepted: ({ shop }) => ({ title: 'ఆర్డర్ అంగీకరించబడింది', body: `${shop} మీ జాబితాను చూసి ప్యాక్ చేస్తోంది.` }),
     declined: ({ shop }) => ({

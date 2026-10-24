@@ -9,6 +9,7 @@ import { LogoutConfirmModal } from './LogoutConfirmModal';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
 import { EditProfileModal } from './EditProfileModal';
+import { WaitingTimeModal } from './WaitingTimeModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
@@ -17,13 +18,14 @@ import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
 const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
+const TEAL_GRADIENT = ['#0891B2', '#22D3EE'] as const;
 
 interface ProfileMenuModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
-/** Profile's menu (edit profile, language, theme, logout) — the same glass SideMenuDrawer as every other menu in the app. */
+/** Profile's menu (edit profile, waiting time, language, theme, logout) — the same glass SideMenuDrawer as every other menu in the app. */
 export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
@@ -35,6 +37,7 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
+  const [waitVisible, setWaitVisible] = useState(false);
 
   const handleLogoutConfirm = () => {
     setLogoutConfirmVisible(false);
@@ -64,6 +67,17 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
           }}
         />
 
+        <DrawerMenuItem
+          icon="hourglass-half"
+          gradient={TEAL_GRADIENT}
+          title={t('waitTime.title')}
+          subtitle={t('waitTime.menuSubtitle')}
+          onPress={() => {
+            onClose();
+            setWaitVisible(true);
+          }}
+        />
+
         <Text style={[styles.sectionTitle, styles.sectionGap, { color: colors.textMuted }]}>{t('homeMenu.settingsSection')}</Text>
         <DrawerMenuItem
           icon="language"
@@ -89,6 +103,7 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
       </SideMenuDrawer>
 
       <EditProfileModal visible={editVisible} onClose={() => setEditVisible(false)} />
+      <WaitingTimeModal visible={waitVisible} onClose={() => setWaitVisible(false)} />
       <ThemePickerModal visible={themePickerVisible} onClose={() => setThemePickerVisible(false)} />
       <LanguagePickerModal
         visible={languagePickerVisible}

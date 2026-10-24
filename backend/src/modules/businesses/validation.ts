@@ -64,6 +64,11 @@ export const nearbySearchQuerySchema = z.object({
     .trim()
     .refine((value) => value.split(',').every((key) => (BUSINESS_SHOP_CATEGORIES as string[]).includes(key)), 'Unknown shop category')
     .optional(),
+  // With a type already picked, the search box is about names only.
+  nameOnly: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true'),
   // Query strings are text: only the literal 'true' turns the delivery filter on.
   delivery: z
     .enum(['true', 'false'])

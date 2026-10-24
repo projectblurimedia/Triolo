@@ -12,8 +12,14 @@ const WAITING_POLL_MS = 4000;
 const WORK_POLL_MS = 10000;
 const HISTORY_POLL_MS = 20000;
 
+/**
+ * One booking for its tracking screen. It opens on whichever copy is newer — its own, or the
+ * one in My Bookings / Continue (polled anyway) — so it shows the right step at once instead
+ * of an old one, or a spinner, while it fetches.
+ */
 export function useBooking(id: string | null) {
-  return useQuery({
+  const list = useQuery({ queryKey: MY_BOOKINGS_QUERY_KEY, queryFn: bookingsService.listMine, enabled: false });
+  const query = useQuery({
     queryKey: bookingQueryKey(id),
     queryFn: () => bookingsService.getBooking(id as string),
     enabled: id !== null,
@@ -25,6 +31,10 @@ export function useBooking(id: string | null) {
       return false;
     },
   });
+  const fromList = id ? list.data?.find((booking) => booking.id === id) : undefined;
+  const useList = !!fromList && list.dataUpdatedAt > query.dataUpdatedAt;
+  const data = useList ? fromList : query.data;
+  return { ...query, data, isLoading: query.isLoading && !data };
 }
 
 /** Booking history (and the Home active-booking card). */

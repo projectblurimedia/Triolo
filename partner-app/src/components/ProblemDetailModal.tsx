@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -163,7 +164,7 @@ export function ProblemDetailModal({ problem, onClose, onAccept, accepting }: Pr
 
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 {problem.locationAddress
-                  ? renderInfoRow('location-dot', t('problemDetail.location'), problem.locationAddress)
+                  ? renderInfoRow('location-dot', t('problemDetail.location'), placeName(problem.locationAddress))
                   : null}
                 {renderInfoRow(
                   'align-left',

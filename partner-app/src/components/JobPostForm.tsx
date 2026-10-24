@@ -1,4 +1,5 @@
 import React, { ReactNode, useEffect, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -84,7 +85,7 @@ export function JobPostForm({
     setExperience(String(post.experienceYears));
     setSkills(post.skills);
     setDescription(post.description ?? '');
-    setPlace({ latitude: post.latitude, longitude: post.longitude, locationName: post.locationAddress });
+    setPlace({ latitude: post.latitude, longitude: post.longitude, locationName: placeName(post.locationAddress) || post.locationAddress });
     setNewPhoto(null);
     setPhotoRemoved(false);
   }, [post]);
@@ -125,7 +126,7 @@ export function JobPostForm({
         latitude: place.latitude,
         longitude: place.longitude,
         // Only the place name is shown to customers.
-        locationAddress: place.locationName,
+        locationAddress: placeName(place.locationName) || place.locationName,
       });
       try {
         if (newPhoto) saved = await jobSeekerService.uploadPhoto(newPhoto);

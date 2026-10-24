@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ACTIVE_ORDER_STATUSES, CreateOrderParams, ordersService } from '@/services/ordersService';
+import { ACTIVE_ORDER_STATUSES, CreateOrderParams, CustomerOrder, ordersService } from '@/services/ordersService';
 import { useAuthStore } from '@/state/authStore';
 
 export const MY_ORDERS_QUERY_KEY = ['orders', 'mine'];
@@ -9,8 +9,13 @@ export const orderQueryKey = (id: string | null) => ['orders', 'detail', id];
 const ACTIVE_POLL_MS = 5000;
 const LIST_POLL_MS = 15000;
 
+/**
+ * One order for its tracking screen. It opens on whichever copy is newer — its own, or the one
+ * in My Orders / Continue (polled anyway) — so the header shows the right step at once.
+ */
 export function useOrder(id: string | null) {
-  return useQuery({
+  const list = useQuery({ queryKey: MY_ORDERS_QUERY_KEY, queryFn: ordersService.listMine, enabled: false });
+  const query = useQuery({
     queryKey: orderQueryKey(id),
     queryFn: () => ordersService.get(id as string),
     enabled: id !== null,
@@ -19,6 +24,10 @@ export function useOrder(id: string | null) {
       return !status || ACTIVE_ORDER_STATUSES.includes(status) ? ACTIVE_POLL_MS : false;
     },
   });
+  const fromList = id ? list.data?.find((order) => order.id === id) : undefined;
+  const useList = !!fromList && list.dataUpdatedAt > query.dataUpdatedAt;
+  const data = useList ? fromList : query.data;
+  return { ...query, data, isLoading: query.isLoading && !data };
 }
 
 export function useMyOrders(enabled = true) {
@@ -48,6 +57,8 @@ export function useCreateOrder() {
     onSuccess: (order) => {
       // The tracker opens straight onto the new order — no loading flash.
       queryClient.setQueryData(orderQueryKey(order.id), order);
+      // In My Orders, Continue and the Bazaar tab count at once, not at the next refresh.
+      queryClient.setQueryData<CustomerOrder[]>(MY_ORDERS_QUERY_KEY, (list) => [order, ...(list ?? []).filter((item) => item.id !== order.id)]);
       invalidate();
     },
   });

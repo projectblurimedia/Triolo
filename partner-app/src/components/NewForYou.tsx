@@ -36,7 +36,7 @@ export function NewForYou({ isWorker, isShop }: { isWorker: boolean; isShop: boo
         key: `order-${order.id}`,
         icon: 'basket-shopping',
         name: order.customerFullName,
-        stepTitle: `${t('newForYou.newOrder')} · ${t('continueSteps.itemCount', { count: order.items.length })}`,
+        stepTitle: `${t(order.quick ? 'newForYou.quickOrder' : 'newForYou.newOrder')} · ${t('continueSteps.itemCount', { count: order.items.length })}`,
         hint: t('newForYou.orderHint'),
         action: t('newForYou.view'),
         onPress: () => openShopOrder(order.id),

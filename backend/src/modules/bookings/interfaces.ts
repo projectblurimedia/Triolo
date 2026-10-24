@@ -31,9 +31,10 @@ export const MAX_PIN_ATTEMPTS = 5;
  * How long a Quick Book request keeps looking for a worker. After this it is 'expired' and no
  * longer offered to anyone — the customer gets a "no worker found, try again" screen.
  */
-export const BROADCAST_TTL_MINUTES = 3;
+export const BROADCAST_TTL_MINUTES = 15;
 /** A request sent to one particular worker waits longer for them to answer. */
-export const DIRECT_TTL_MINUTES = 10;
+export const DIRECT_TTL_MINUTES = 1440;
+// Both are only defaults: each customer sets their own (accounts.wait_*, migrations 0048–0050).
 /**
  * A worker who accepted this long ago and still hasn't arrived counts as late: the customer may
  * then cancel and rate them (otherwise a cancel carries no rating).

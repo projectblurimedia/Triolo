@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -333,7 +334,7 @@ function IncomingRequestsList({ visible, offers, orders }: { visible: boolean; o
                   t(offer.direct ? 'newForYou.bookedYou' : 'newForYou.jobRequest'),
                   formatDistance(offer.distanceMeters),
                 )}
-                {renderPerson(offer.customerFullName, offer.locationAddress)}
+                {renderPerson(offer.customerFullName, placeName(offer.locationAddress))}
                 {renderChips(offer.skillCategories.map((key) => t(`workerProfile.skills.${key}`)))}
                 <View style={styles.actions}>
                   {renderDecline(() => decline(offer.bookingRequestId), declining)}
@@ -351,10 +352,10 @@ function IncomingRequestsList({ visible, offers, orders }: { visible: boolean; o
               <View key={`order:${order.id}`} style={cardStyle}>
                 {renderTop(
                   'basket-shopping',
-                  `${t('newForYou.newOrder')} · ${t('shopOrders.itemsCount', { count: order.items.length })}`,
+                  `${t(order.quick ? 'newForYou.quickOrder' : 'newForYou.newOrder')} · ${t('shopOrders.itemsCount', { count: order.items.length })}`,
                   formatDistance(order.distanceMeters),
                 )}
-                {renderPerson(order.customerFullName, order.locationAddress)}
+                {renderPerson(order.customerFullName, placeName(order.locationAddress))}
                 <Text style={[styles.fulfillment, { color: colors.textMuted }]}>
                   {t(order.fulfillment === 'delivery' ? 'shopOrders.fulfillmentDelivery' : 'shopOrders.fulfillmentPickup')}
                 </Text>

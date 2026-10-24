@@ -11,8 +11,9 @@ import { NearbyResultDetailModal } from './NearbyResultDetailModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { workersService, WorkerNearbyResult } from '@/services/workersService';
 import { businessesService, BusinessNearbyResult } from '@/services/businessesService';
-import { formatAddress } from '@/utils/formatAddress';
-import { Avatar } from './WorkerMiniCard';
+import { SearchResultCard } from './SearchResultCard';
+import { SectionHeader } from './SectionHeader';
+import { matchesTerm } from './HighlightText';
 import { formatDistanceValue, isWorkerResult, NearbyResult, NearbySearchMode } from '@/utils/nearbyResult';
 
 export type { NearbySearchMode, NearbyResult };
@@ -259,80 +260,52 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
     record.catch(() => {});
   };
 
-  const renderItem = ({ item }: { item: NearbyResult }) => {
-    const worker = isWorkerResult(mode, item) ? item : null;
-    const business = !worker ? (item as BusinessNearbyResult) : null;
-    const title = worker ? worker.accountFullName : (business as BusinessNearbyResult).shopName;
-    const fixedTags = worker
-      ? worker.skillCategories.filter((key) => key !== 'other')
-      : (business as BusinessNearbyResult).shopCategories.filter((key) => key !== 'other');
-    const customTags = worker
-      ? (worker.otherSkillDescription?.split(', ').filter(Boolean) ?? [])
-      : ((business as BusinessNearbyResult).otherCategoryDescription?.split(', ').filter(Boolean) ?? []);
+  // While searching, the list is split into names that match and those found by their kind of
+  // work / shop (or place); the searched words are marked in the cards.
+  type ListRow =
+    | { type: 'header'; key: string; title: string; icon: React.ComponentProps<typeof FontAwesome6>['name']; count: number }
+    | { type: 'item'; key: string; item: NearbyResult };
+  const term = query.trim();
+  const nameOf = (item: NearbyResult) =>
+    isWorkerResult(mode, item) ? item.accountFullName : (item as BusinessNearbyResult).shopName;
+  const buildRows = (items: NearbyResult[]): ListRow[] => {
+    const asRows = (list: NearbyResult[]) => list.map((item): ListRow => ({ type: 'item', key: item.id, item }));
+    if (!term) return asRows(items);
+    const named = items.filter((item) => matchesTerm(nameOf(item), term));
+    const other = items.filter((item) => !matchesTerm(nameOf(item), term));
+    const rows: ListRow[] = [];
+    if (named.length > 0) {
+      rows.push({
+        type: 'header',
+        key: 'h-named',
+        title: t(isWorker ? 'homeSearch.groups.workers' : 'homeSearch.groups.shops'),
+        icon: isWorker ? 'user' : 'store',
+        count: named.length,
+      });
+      rows.push(...asRows(named));
+    }
+    if (other.length > 0) {
+      rows.push({
+        type: 'header',
+        key: 'h-other',
+        title: t(isWorker ? 'homeSearch.groups.workersByWork' : 'homeSearch.groups.shopsByType'),
+        icon: isWorker ? 'screwdriver-wrench' : 'tags',
+        count: other.length,
+      });
+      rows.push(...asRows(other));
+    }
+    return rows;
+  };
 
-    return (
-      <Pressable
-        style={[styles.resultCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        onPress={() => handleSelectResult(item)}
-      >
-        <View style={styles.resultHeaderRow}>
-          {/* The photo, with the Trusted by Triolo seal when bought. */}
-          <Avatar
-            photoUrl={
-              worker
-                ? (worker.profilePhotoUrl)
-                : ((business as BusinessNearbyResult).profilePhotoUrl)
-            }
-            name={title}
-            size={44}
-            seal={
-              worker
-                ? { kind: 'service', id: worker.id }
-                : { kind: 'business', id: item.id }
-            }
-          />
-          <View style={styles.resultHeaderInfo}>
-            <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={1}>
-              {title}
-            </Text>
-            {worker ? (
-              <Text style={[styles.resultMetaText, { color: colors.textMuted }]}>
-                {t('services.experienceYears', { count: worker.experienceYears })}
-              </Text>
-            ) : null}
-          </View>
-          <View style={[styles.distancePill, { backgroundColor: `${accentColor}16` }]}>
-            <FontAwesome6 name="location-dot" size={13} color={accentColor} solid />
-            <Text style={[styles.distanceText, { color: accentColor }]}>
-              {t('nearbySearch.distanceAway', { distance: formatDistanceValue(item.distanceMeters) })}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.tagRow}>
-          {fixedTags.map((key) => (
-            <View key={key} style={[styles.tag, { backgroundColor: `${accentColor}14` }]}>
-              <Text style={[styles.tagText, { color: accentColor }]}>
-                {t(worker ? `workerProfile.skills.${key}` : `businessProfile.categories.${key}`)}
-              </Text>
-            </View>
-          ))}
-          {customTags.map((entry) => (
-            <View key={entry} style={[styles.tag, { backgroundColor: `${accentColor}14` }]}>
-              <Text style={[styles.tagText, { color: accentColor }]} numberOfLines={1}>
-                {entry}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.resultMetaRow}>
-          <FontAwesome6 name="map" size={11} color={colors.textMuted} solid />
-          <Text style={[styles.resultMetaText, { color: colors.textMuted, flex: 1 }]} numberOfLines={1}>
-            {formatAddress(item)}
-          </Text>
-        </View>
-      </Pressable>
+  const renderItem = ({ item: row, index }: { item: ListRow; index: number }) => {
+    if (row.type === 'header') {
+      return <SectionHeader title={row.title} icon={row.icon} count={row.count} style={index === 0 ? styles.groupFirst : styles.group} />;
+    }
+    const item = row.item;
+    return isWorkerResult(mode, item) ? (
+      <SearchResultCard kind="worker" worker={item} term={term} onPress={() => handleSelectResult(item)} />
+    ) : (
+      <SearchResultCard kind="shop" shop={item as BusinessNearbyResult} term={term} onPress={() => handleSelectResult(item)} />
     );
   };
 
@@ -441,8 +414,8 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
 
     return (
       <FlatList
-        data={results.items}
-        keyExtractor={(item) => item.id}
+        data={buildRows(results.items)}
+        keyExtractor={(row) => row.key}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
@@ -654,6 +627,8 @@ const styles = StyleSheet.create({
   // No paddingTop — filterRow's own marginBottom already provides the gap above the list;
   // a top padding here on top of that doubled the space, per explicit feedback.
   listContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  groupFirst: { marginTop: 0, marginBottom: 10 },
+  group: { marginTop: 14, marginBottom: 10 },
   resultCard: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },
   resultHeaderRow: { flexDirection: 'row', alignItems: 'center' },
   resultAvatar: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

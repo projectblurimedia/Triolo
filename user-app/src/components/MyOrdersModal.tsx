@@ -11,6 +11,8 @@ import { openOrderTracker } from '@/state/orderTrackerStore';
 import { CustomerOrder, formatRupees, isOrderOpen, orderStatusTitleKey, OrderStatus } from '@/services/ordersService';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from './PullToRefresh';
+import { CountBadge } from './CountBadge';
+import { orderShopName } from '@/utils/orderShopName';
 
 type Tab = 'active' | 'history';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -63,11 +65,11 @@ export function MyOrdersModal({ visible, onClose }: { visible: boolean; onClose:
         ]}
         onPress={() => openOrderTracker(item.id)}
       >
-        <Avatar photoUrl={item.shop.photoUrl ?? undefined} name={item.shop.name} size={46} />
+        <Avatar photoUrl={item.shop.photoUrl ?? undefined} name={orderShopName(item, t)} size={46} />
         <View style={styles.flex}>
           <View style={styles.titleRow}>
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
-              {item.shop.name}
+              {orderShopName(item, t)}
             </Text>
             <View style={[styles.pill, { backgroundColor: `${tone}1A` }]}>
               <Text style={[styles.pillText, { color: tone }]} numberOfLines={1}>
@@ -115,8 +117,8 @@ export function MyOrdersModal({ visible, onClose }: { visible: boolean; onClose:
             >
               <Text style={[styles.segmentText, { color: tab === key ? colors.primary : colors.textMuted }]}>
                 {t(key === 'active' ? 'myOrders.active' : 'myOrders.history')}
-                {key === 'active' && active.length > 0 ? ` · ${active.length}` : ''}
               </Text>
+              {key === 'active' ? <CountBadge count={active.length} /> : null}
             </Pressable>
           ))}
         </View>
@@ -167,8 +169,9 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 18 },
   headerSubtitle: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
   segment: { flexDirection: 'row', borderRadius: 14, padding: 4, margin: 16, marginBottom: 6 },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11 },
-  segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
+  segmentItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 11 },
+  // Fixed line height, no font padding: the text and the red count line up in the middle.
+  segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, includeFontPadding: false, textAlignVertical: 'center' },
   list: { padding: 16, gap: 12, flexGrow: 1 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

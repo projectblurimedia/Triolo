@@ -28,6 +28,7 @@ import {
   RequestLoginOtpDto,
   RequestRegistrationOtpDto,
   UpdateLanguageDto,
+  WaitTimes,
   VerifyLoginOtpDto,
   VerifyRegistrationOtpDto,
 } from './dto';
@@ -203,6 +204,19 @@ export class AuthService {
     if (!result) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
     if (result.previousUrl) await deletePhotosFromCloudinary([result.previousUrl]);
     return result.account;
+  }
+
+  /** Profile → Waiting Time. Saving applies at once, also to requests already waiting. */
+  async getWaitTimes(accountId: string): Promise<WaitTimes> {
+    const times = await this.repository.getWaitTimes(accountId);
+    if (!times) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
+    return times;
+  }
+
+  async updateWaitTimes(accountId: string, dto: WaitTimes): Promise<WaitTimes> {
+    const times = await this.repository.updateWaitTimes(accountId, dto);
+    if (!times) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
+    return times;
   }
 
   async updateLanguage(accountId: string, dto: UpdateLanguageDto): Promise<Account> {

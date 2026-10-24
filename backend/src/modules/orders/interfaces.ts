@@ -45,8 +45,21 @@ export const ACTIVE_ORDER_STATUSES: ShopOrderStatus[] = [
   'out_for_delivery',
 ];
 
-/** A list the shop doesn't answer within this many minutes ends as 'expired'. */
-export const ORDER_TTL_MINUTES = 30;
+/**
+ * A list the shop doesn't answer within this many minutes ends as 'expired' — the default;
+ * each customer sets their own (accounts.wait_order_minutes, migration 0048).
+ */
+export const ORDER_TTL_MINUTES = 1440;
+/** The customer's own waiting time for shop order `o`'s alias (read live, see migration 0048). */
+export const ORDER_WAIT_SQL = (alias: string) =>
+  `make_interval(mins => COALESCE((SELECT CASE WHEN ${alias}.quick THEN wa.wait_quick_order_minutes ELSE wa.wait_order_minutes END
+     FROM accounts wa WHERE wa.id = ${alias}.account_id), CASE WHEN ${alias}.quick THEN ${QUICK_ORDER_TTL_MINUTES} ELSE ${ORDER_TTL_MINUTES} END))`;
+/** A Quick Order's own waiting time (accounts.wait_quick_order_minutes) — the fallback. */
+export const QUICK_ORDER_TTL_MINUTES = 15;
+/** How far a Quick Order reaches (the same testing radius as Quick Book). */
+export const QUICK_ORDER_RADIUS_KM = 50;
+/** At most this many shops are asked at once. */
+export const QUICK_ORDER_MAX_SHOPS = 50;
 /**
  * An accepted order with no progress for this long counts as stalled: the customer may then
  * cancel it and rate the shop (otherwise only a just-placed order can be cancelled).
@@ -77,7 +90,12 @@ export interface ShopOrderItem {
 export interface ShopOrder {
   id: string;
   accountId: string;
-  businessId: string;
+  /** null for a Quick Order no shop has accepted yet. */
+  businessId: string | null;
+  /** Sent to every matching shop nearby at once (first to accept gets it). */
+  quick: boolean;
+  /** Quick Order: the kinds of shop asked. */
+  shopCategories: string[];
   fulfillment: ShopOrderFulfillment;
   status: ShopOrderStatus;
   latitude: number;
@@ -161,6 +179,18 @@ export interface CreateOrderParams {
   items: { name: string; quantity: string; unit: string | null }[];
 }
 
+export interface CreateQuickOrderParams {
+  accountId: string;
+  fulfillment: ShopOrderFulfillment;
+  shopCategories: string[];
+  latitude: number;
+  longitude: number;
+  locationAddress: string | null;
+  note: string | null;
+  items: { name: string; quantity: string; unit: string | null }[];
+  offers: { businessId: string; distanceMeters: number }[];
+}
+
 export interface ItemUpdate {
   id: string;
   status: ShopOrderItemStatus;
@@ -195,5 +225,6 @@ export interface AdminOrderCancelResult {
   order: ShopOrder;
   shopName: string;
   customer: { accountId: string; preferredLanguage: 'en' | 'te' };
-  shopOwner: { accountId: string; preferredLanguage: 'en' | 'te' };
+  /** null for a Quick Order no shop had taken. */
+  shopOwner: { accountId: string; preferredLanguage: 'en' | 'te' } | null;
 }

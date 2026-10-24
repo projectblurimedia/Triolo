@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +13,7 @@ import { JobPostHomeSection } from '@/components/JobPostHomeSection';
 import { useMyJobPost } from '@/hooks/useJobPost';
 import { ContinueSteps } from '@/components/ContinueSteps';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { useAdGate } from '@/components/Ads';
+import { useAdGate, useBusyAction } from '@/components/Ads';
 import { LocationNeededCard } from '@/components/LocationNeededCard';
 import { BackgroundAlertsCard } from '@/components/BackgroundAlertsCard';
 import { FindJobsButton } from '@/components/FindJobsButton';
@@ -58,6 +59,7 @@ export function HomeScreen() {
   const { t } = useTranslation();
   // Mark Work Done: location, then a local business's ad while that job's button spins.
   const { adLoading, waitForAd } = useAdGate(true, 'work_done');
+  const { run: runWorkDone } = useBusyAction();
   const [adForJob, setAdForJob] = useState<string | null>(null);
   const { colors } = useThemeColors();
   const account = useAuthStore((state) => state.account);
@@ -216,7 +218,7 @@ export function HomeScreen() {
           </Pressable>
         </View>
 
-        {renderMeta('location-dot', job.locationAddress)}
+        {renderMeta('location-dot', placeName(job.locationAddress))}
         {job.description ? <Text style={[styles.description, { color: colors.text }]}>{job.description}</Text> : null}
         {renderPhotos(job.photoUrls)}
 
@@ -228,14 +230,20 @@ export function HomeScreen() {
           ) : (
             <Button
               label={t('problems.markWorkDone')}
-              onPress={async () => {
-                if (adLoading || !(await askForLocation())) return;
-                setAdForJob(job.id);
-                const ok = await waitForAd();
-                setAdForJob(null);
-                if (ok) setConfirmDoneFor(job);
-              }}
-              loading={adLoading && adForJob === job.id}
+              onPress={() =>
+                runWorkDone(async () => {
+                  if (adLoading) return;
+                  // Spins from the tap (the location check can take a moment) until the ad is done.
+                  setAdForJob(job.id);
+                  try {
+                    if (!(await askForLocation())) return;
+                    if (await waitForAd()) setConfirmDoneFor(job);
+                  } finally {
+                    setAdForJob(null);
+                  }
+                })
+              }
+              loading={adForJob === job.id}
               gradient={DONE_GRADIENT}
             />
           )}
@@ -265,7 +273,7 @@ export function HomeScreen() {
         </View>
       </View>
       <Text style={[styles.quotation, { color: colors.primary }]}>₹{problem.quotationAmount.toLocaleString('en-IN')}</Text>
-      {renderMeta('location-dot', problem.locationAddress)}
+      {renderMeta('location-dot', placeName(problem.locationAddress))}
       {problem.description ? (
         <Text style={[styles.description, { color: colors.text }]} numberOfLines={2}>
           {problem.description}

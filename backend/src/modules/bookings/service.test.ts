@@ -34,6 +34,7 @@ function createMockRepository(): MockRepository {
     findRatedForWorker: jest.fn(),
     findStatuses: jest.fn(),
     expireStaleBroadcasts: jest.fn().mockResolvedValue([]),
+    findWaitingForSameWork: jest.fn().mockResolvedValue(null),
     findWorkerContact: jest.fn(),
     findAccountName: jest.fn(),
     declineDirect: jest.fn(),
@@ -100,6 +101,20 @@ function transition(notifyAccountId: string | null, overrides: Partial<BookingRe
 const asWorker = () => workers.getMyProfile.mockResolvedValue({ id: 'worker-1' } as never);
 
 describe('createQuickBooking', () => {
+  it('refuses the same work again while the first request still waits, pointing to it', async () => {
+    repo.findWaitingForSameWork.mockResolvedValue('waiting-1');
+    await expect(
+      service.createQuickBooking('account-1', {
+        skillCategories: ['electrician'],
+        latitude: 17.385,
+        longitude: 78.4867,
+        radiusKm: 10,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409, code: 'BOOKING_ALREADY_WAITING', details: { bookingRequestId: 'waiting-1' } });
+    expect(repo.findWaitingForSameWork).toHaveBeenCalledWith('account-1', ['electrician'], [], null);
+    expect(repo.createRequest).not.toHaveBeenCalled();
+  });
+
   it('creates the request (with address), matches workers, stores offers, and pushes every matched worker', async () => {
     repo.createRequest.mockResolvedValue(buildRequest());
     workers.findMatchingForBroadcast.mockResolvedValue([

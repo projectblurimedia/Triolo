@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -85,7 +86,8 @@ export function IncomingOrderModal() {
     <IncomingRequestScreen
       visible={focusedId !== null && !orderScreenOpen}
       onRequestClose={() => !declineOrder.isPending && close()}
-      kicker={t('shopOrders.newOrderKicker')}
+      // A Quick Order went to several shops: say the first to accept gets it.
+      kicker={order?.quick ? t('shopOrders.quickKicker') : t('shopOrders.newOrderKicker')}
       icon="basket-shopping"
       state={gone ? 'gone' : order ? 'ready' : 'loading'}
       goneTitle={t('shopOrders.orderGoneTitle')}
@@ -97,7 +99,7 @@ export function IncomingOrderModal() {
           : undefined
       }
       personName={order?.customerFullName}
-      personLine={order?.locationAddress}
+      personLine={placeName(order?.locationAddress) || undefined}
       chips={itemChips}
       details={
         order?.note ? (

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { FlatList, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -214,7 +215,7 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
               <View style={styles.metaRow}>
                 <FontAwesome6 name="location-dot" size={11} color={colors.textMuted} solid />
                 <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
-                  {item.locationAddress}
+                  {placeName(item.locationAddress)}
                 </Text>
               </View>
             ) : null}

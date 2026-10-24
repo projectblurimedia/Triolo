@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import {
   Dimensions,
   Keyboard,
@@ -20,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
-import { useAdGate } from './Ads';
+import { useAdGate, useBusyAction } from './Ads';
 import { LiveMap, MapPoint } from './LiveMap';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ToastHost } from './ToastHost';
@@ -110,10 +111,12 @@ export function JobTrackingModal() {
   const visible = jobId !== null;
   // Mark Work Done: location, then a local business's ad while the button spins, then confirm.
   const { adLoading, waitForAd } = useAdGate(visible, 'work_done');
-  const markDone = async () => {
-    if (adLoading || !(await askForLocation())) return;
-    if (await waitForAd()) setConfirmDone(true);
-  };
+  const { busy: markingDone, run } = useBusyAction();
+  const markDone = () =>
+    run(async () => {
+      if (adLoading || !(await askForLocation())) return;
+      if (await waitForAd()) setConfirmDone(true);
+    });
   const status = job?.status;
   const tripText = { title: t('job.trackingTitle'), body: t('job.trackingBody') };
 
@@ -346,7 +349,7 @@ export function JobTrackingModal() {
       {j.locationAddress ? (
         <View style={[styles.addressRow, { borderTopColor: colors.border }]}>
           <FontAwesome6 name="location-dot" size={13} color={colors.primary} solid />
-          <Text style={[styles.addressText, { color: colors.text }]}>{j.locationAddress}</Text>
+          <Text style={[styles.addressText, { color: colors.text }]}>{placeName(j.locationAddress)}</Text>
         </View>
       ) : null}
     </View>
@@ -449,7 +452,7 @@ export function JobTrackingModal() {
     if (j.status === 'arrived') return renderPinEntry(j);
     if (j.status === 'in_progress') {
       // A local business's ad first (when one is running nearby), then the confirmation.
-      return <Button label={t('job.markWorkDone')} onPress={markDone} loading={adLoading} gradient={DONE_GRADIENT} />;
+      return <Button label={t('job.markWorkDone')} onPress={markDone} loading={adLoading || markingDone} gradient={DONE_GRADIENT} />;
     }
     if (j.status === 'work_done') {
       return <Text style={[styles.waiting, { color: colors.textMuted }]}>{t('job.waitingForCustomer')}</Text>;

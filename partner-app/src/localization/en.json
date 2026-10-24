@@ -483,7 +483,8 @@
     "AD_NOT_PAYABLE": "This boost doesn't need paying.",
     "SUBSCRIPTION_ACTIVE": "Your plan is already active.",
     "PAYMENT_REQUIRED": "Pay once or subscribe to continue.",
-    "PASS_NOT_FOUND": "We couldn't find that payment."
+    "PASS_NOT_FOUND": "We couldn't find that payment.",
+    "ORDER_ALREADY_TAKEN": "Another shop accepted this order first."
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -617,7 +618,12 @@
     "experienceValue_one": "{{count}} yr",
     "experienceValue_other": "{{count}} yrs",
     "new": "New",
-    "workPhotos": "Work photos"
+    "workPhotos": "Work photos",
+    "sortNewest": "Newest",
+    "sortHigh": "High to low",
+    "sortLow": "Low to high",
+    "showMore": "Show {{count}} more",
+    "showLess": "Show less"
   },
   "problemDetail": {
     "title": "Problem Details",
@@ -757,7 +763,10 @@
     "later": "Later",
     "openOrder": "Open Order",
     "respondWithin": "Respond within",
-    "lateReason": "no progress for over an hour"
+    "lateReason": "no progress for over an hour",
+    "quickKicker": "QUICK ORDER · FIRST TO ACCEPT",
+    "quickTitle": "Quick Order — be the first",
+    "quickMessage": "This list went to several shops nearby. Accept it first and it is yours."
   },
   "shopHome": {
     "myShop": "My Shop",
@@ -1157,7 +1166,8 @@
     "newOrder": "New order",
     "orderHint": "A customer sent a list · tap to answer",
     "view": "View",
-    "open": "Open"
+    "open": "Open",
+    "quickOrder": "Quick Order"
   },
   "grow": {
     "intro": "Partner Plus gets you jobs first and puts you at the top of lists. A Trusted badge and a Boost help customers pick you.",

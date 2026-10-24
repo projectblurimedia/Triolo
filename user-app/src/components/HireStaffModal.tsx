@@ -28,9 +28,12 @@ import { callStaff } from '@/utils/callStaff';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { useAdGate } from './Ads';
+import { placeName } from '@/utils/formatAddress';
+import { useTrustedIds } from '@/hooks/useSubscription';
+import { HighlightText } from './HighlightText';
+import { SectionHeader } from './SectionHeader';
 
 const CALL_GRADIENT = ['#16A34A', '#22C55E'] as const;
-const SKILLS_SHOWN = 4;
 // Tile colours on the intro, one per kind of work in turn (no orange — that's the shop colour).
 const TILE_COLORS = ['#0055D3', '#0D9488', '#7C3AED', '#16A34A', '#DB2777', '#2563EB'];
 
@@ -57,7 +60,11 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
 
   const [category, setCategory] = useState<JobCategory | null>(null);
   const [payPeriod, setPayPeriod] = useState<PayPeriod | null>(null);
-  const [sort, setSort] = useState<JobSeekerSort>('distance');
+  const [nearest, setNearest] = useState(true);
+  const [lowestPay, setLowestPay] = useState(false);
+  const sort: JobSeekerSort = lowestPay ? 'pay' : 'distance';
+  const [trustedOnly, setTrustedOnly] = useState(false);
+  const trusted = useTrustedIds();
   const [query, setQuery] = useState('');
   // The search that's run: set when the search icon or the keyboard's search key is pressed.
   const [appliedQuery, setAppliedQuery] = useState('');
@@ -68,24 +75,31 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
   const startingRef = useRef(false);
   const { waitForAd } = useAdGate(visible, 'hire_staff');
 
-  // Every opening starts on the intro again.
+  // Every opening starts fresh and goes straight to the people nearby, grouped by work.
   useEffect(() => {
     if (!visible) return;
     setStarted(false);
+    startingRef.current = false;
+    setTimeout(() => begin(), 0);
     setCategory(null);
     setPayPeriod(null);
-    setSort('distance');
+    setNearest(true);
+    setLowestPay(false);
+    setTrustedOnly(false);
     setQuery('');
     setAppliedQuery('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   /** Location first, then the ad, then the list. */
   const begin = async () => {
-    if (started || startingRef.current) return;
+    // Only one start at a time (the opening calls it before the reset state has re-rendered).
+    if (startingRef.current) return;
     startingRef.current = true;
     try {
-      if (!(await askForLocation())) return;
+      // Spins from the tap: the location check can take a moment, then the ad.
       setStarting(true);
+      if (!(await askForLocation())) return;
       if (!(await waitForAd())) return;
       setStarted(true);
     } finally {
@@ -110,11 +124,10 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
   /** A kind of work from the dropdown: a listed one filters by it, anything else (typed by someone) searches by name. */
   const chooseWork = (key?: string) => {
     if (!key) {
-      // Cleared: back to the start — nobody is listed until a kind of work is chosen again.
+      // Cleared: back to everyone nearby, grouped by work.
       setCategory(null);
       setQuery('');
       setAppliedQuery('');
-      setStarted(false);
       return;
     }
     if (JOB_CATEGORIES.some((entry) => entry.key === key)) {
@@ -158,104 +171,90 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
           <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{label}</Text>
         </LinearGradient>
       ) : (
-        <View style={[styles.chip, { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }]}>
-          {icon ? <FontAwesome6 name={icon as never} size={11} color={colors.textMuted} solid /> : null}
+        <View style={[styles.chip, { borderWidth: 1, borderColor: `${colors.primary}26`, backgroundColor: colors.surface }]}>
+          {icon ? <FontAwesome6 name={icon as never} size={11} color={colors.primary} solid /> : null}
           <Text style={[styles.chipText, { color: colors.text }]}>{label}</Text>
         </View>
       )}
     </Pressable>
   );
 
-  const renderPerson = ({ item }: { item: JobSeeker }) => {
-    const extraSkills = item.skills.length - SKILLS_SHOWN;
+  const renderPerson = ({ item }: { item: JobSeeker }, compact = false) => {
     const categoryIcon = JOB_CATEGORIES.find((entry) => entry.key === item.category)?.icon ?? 'user-tie';
+    const place = placeName(item.locationAddress);
+    const term = appliedQuery;
     return (
       <Pressable
         style={({ pressed }) => [
           styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.92 : 1 },
+          { backgroundColor: colors.surface, borderColor: `${colors.primary}1F`, opacity: pressed ? 0.92 : 1 },
         ]}
         onPress={() => setSelected(item)}
       >
         <View style={styles.cardTop}>
-          <Avatar photoUrl={item.photoUrl ?? undefined} name={item.fullName} size={50} seal={{ kind: 'job_post', id: item.id }} />
+          <Avatar photoUrl={item.photoUrl ?? undefined} name={item.fullName} size={compact ? 42 : 54} seal={{ kind: 'job_post', id: item.id }} />
           <View style={styles.flex}>
-            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
-              {item.fullName}
-            </Text>
-            <Text style={[styles.jobTitle, { color: colors.textMuted }]} numberOfLines={1}>
-              {jobSeekerTitle(item, t)}
-            </Text>
+            <HighlightText text={item.fullName} term={term} style={[styles.name, { color: colors.text }]} numberOfLines={1} />
+            <View style={styles.workRow}>
+              <FontAwesome6 name={categoryIcon as never} size={11} color={colors.primary} solid />
+              <HighlightText text={jobSeekerTitle(item, t)} term={term} style={[styles.jobTitle, { color: colors.primary }]} numberOfLines={1} />
+            </View>
           </View>
-          <View style={[styles.distancePill, { backgroundColor: `${colors.primary}12` }]}>
-            <FontAwesome6 name="location-arrow" size={10} color={colors.primary} solid />
-            <Text style={[styles.distanceText, { color: colors.primary }]}>{formatDistanceValue(item.distanceMeters)}</Text>
-          </View>
+          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.distancePill}>
+            <FontAwesome6 name="location-arrow" size={10} color="#FFFFFF" solid />
+            <Text style={[styles.distanceText, { color: '#FFFFFF' }]}>{formatDistanceValue(item.distanceMeters)}</Text>
+          </LinearGradient>
         </View>
 
-        <View style={styles.payRow}>
-          <Text style={[styles.pay, { color: colors.text }]}>{formatRupees(item.payAmount)}</Text>
-          <Text style={[styles.per, { color: colors.textMuted }]}> / {t(`hireStaff.per.${item.payPeriod}`)}</Text>
-        </View>
-
-        <View style={styles.tags}>
-          <View style={[styles.tag, { backgroundColor: `${colors.primary}12` }]}>
-            <FontAwesome6 name={categoryIcon as never} size={10} color={colors.primary} solid />
-            <Text style={[styles.tagText, { color: colors.primary }]}>{t(`hireStaff.categories.${item.category}`)}</Text>
+        {/* Pay, how often, and experience at a glance. */}
+        <View style={[styles.factsRow, { backgroundColor: colors.background, borderColor: `${colors.primary}14` }]}>
+          <View style={styles.fact}>
+            <Text style={[styles.pay, { color: colors.text }]}>{formatRupees(item.payAmount)}</Text>
+            <Text style={[styles.factLabel, { color: colors.textMuted }]}>{t(`hireStaff.per.${item.payPeriod}`)}</Text>
           </View>
-          <View style={[styles.tag, { backgroundColor: `${brandColors.success}14` }]}>
-            <FontAwesome6 name="clock" size={10} color={brandColors.success} solid />
-            <Text style={[styles.tagText, { color: brandColors.success }]}>
+          <View style={[styles.factDivider, { backgroundColor: `${colors.primary}1F` }]} />
+          <View style={styles.fact}>
+            <Text style={[styles.factValue, { color: brandColors.success }]} numberOfLines={1}>
               {t(`hireStaff.availability.${item.availability}`)}
             </Text>
+            <Text style={[styles.factLabel, { color: colors.textMuted }]}>{t('hireStaff.availabilityLabel')}</Text>
           </View>
-          {item.experienceYears > 0 ? (
-            <View style={[styles.tag, { backgroundColor: `${colors.text}0D` }]}>
-              <FontAwesome6 name="briefcase" size={10} color={colors.textMuted} solid />
-              <Text style={[styles.tagText, { color: colors.textMuted }]}>
-                {t('hireStaff.experience', { count: item.experienceYears })}
-              </Text>
+          <View style={[styles.factDivider, { backgroundColor: `${colors.primary}1F` }]} />
+          <View style={styles.fact}>
+            <Text style={[styles.factValue, { color: colors.text }]} numberOfLines={1}>
+              {item.experienceYears > 0 ? t('hireStaff.years', { count: item.experienceYears }) : t('hireStaff.fresher')}
+            </Text>
+            <Text style={[styles.factLabel, { color: colors.textMuted }]}>{t('hireStaff.experienceLabel')}</Text>
+          </View>
+        </View>
+
+        {/* One row: the first skill, the place, and Call. */}
+        <View style={[styles.contactRow, { borderTopColor: `${colors.primary}14` }]}>
+          {/* The skill and the place: the same pill, so always the same height. The pill never
+              shrinks; only its text is capped (a shrinking text inside a shrinking row can
+              collapse to nothing on Android, which hid the skill). */}
+          <View style={styles.pillsRow}>
+          {item.skills.length > 0 ? (
+            <View style={[styles.pill, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}40` }]}>
+              <FontAwesome6 name={categoryIcon as never} size={10} color={colors.primary} solid />
+              <HighlightText
+                text={item.skills.length > 1 ? `${item.skills[0]} +${item.skills.length - 1}` : item.skills[0]}
+                term={term}
+                style={[styles.pillText, { color: colors.primary }]}
+                numberOfLines={1}
+              />
             </View>
           ) : null}
-        </View>
-
-        {item.skills.length > 0 ? (
-          <Text style={[styles.skills, { color: colors.text }]} numberOfLines={1}>
-            {item.skills.slice(0, SKILLS_SHOWN).join(' · ')}
-            {extraSkills > 0 ? `  +${extraSkills}` : ''}
-          </Text>
-        ) : null}
-
-        {item.description ? (
-          <Text style={[styles.description, { color: colors.textMuted }]} numberOfLines={2}>
-            {item.description}
-          </Text>
-        ) : null}
-
-        <View style={styles.locationRow}>
-          <FontAwesome6 name="location-dot" size={11} color={colors.textMuted} solid />
-          <Text style={[styles.locationText, { color: colors.textMuted }]} numberOfLines={1}>
-            {item.locationAddress}
-          </Text>
-        </View>
-
-        <View style={styles.viewProfile}>
-          <Text style={[styles.more, { color: colors.primary }]}>{t('hireStaff.viewProfile')}</Text>
-          <FontAwesome6 name="chevron-right" size={10} color={colors.primary} solid />
-        </View>
-
-        <View style={[styles.contactRow, { borderTopColor: colors.border }]}>
-          <View style={styles.phoneGroup}>
-            <View style={[styles.phoneIcon, { backgroundColor: `${brandColors.success}14` }]}>
-              <FontAwesome6 name="phone" size={12} color={brandColors.success} solid />
-            </View>
-            <Text style={[styles.phone, { color: colors.text }]} selectable>
-              {item.mobileNumber ?? t('hireStaff.numberHidden')}
+          <View style={[styles.pill, { backgroundColor: colors.text, borderColor: colors.text }]}>
+            <FontAwesome6 name="location-dot" size={10} color={colors.background} solid />
+            <Text style={[styles.pillText, { color: colors.background }]} numberOfLines={1}>
+              {place || t('hireStaff.nearYou')}
             </Text>
+          </View>
           </View>
           <Pressable onPress={() => callStaff(item, () => results.refetch())} accessibilityLabel={`${t('hireStaff.call')} ${item.fullName}`}>
             <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>
-              <FontAwesome6 name={item.mobileNumber ? 'phone' : 'lock-open'} size={13} color="#FFFFFF" solid />
+              <FontAwesome6 name="phone" size={12} color="#FFFFFF" solid />
               <Text style={styles.callText}>{t('hireStaff.call')}</Text>
             </LinearGradient>
           </Pressable>
@@ -297,6 +296,65 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
     </ScrollView>
   );
 
+  type ListRow = { key: string; person: JobSeeker } | { key: string; group: { key: string; title: string; icon: string; people: JobSeeker[] } };
+  const people = (results.data ?? [])
+    .filter((person) => !trustedOnly || !!trusted.data?.job_post?.includes(person.id))
+    .sort((a, b) =>
+      lowestPay && nearest
+        ? a.payAmount - b.payAmount || a.distanceMeters - b.distanceMeters
+        : lowestPay
+          ? a.payAmount - b.payAmount
+          : a.distanceMeters - b.distanceMeters,
+    );
+  // Nothing picked or searched: everyone nearby in rows by kind of work (like Services / Bazaar).
+  const browsing = !category && !appliedQuery;
+  const groups = browsing
+    ? [
+        ...JOB_CATEGORIES.filter((entry) => entry.key !== 'other').map((entry) => ({
+          key: entry.key,
+          title: t(`hireStaff.categories.${entry.key}`),
+          icon: entry.icon as string,
+          people: people.filter((person) => person.category === entry.key),
+        })),
+        // Work people typed themselves, one row per title.
+        ...Array.from(new Set(people.filter((p) => p.category === 'other').map((p) => p.title))).map((title) => ({
+          key: `other-${title}`,
+          title,
+          icon: 'user-tie',
+          people: people.filter((person) => person.category === 'other' && person.title === title),
+        })),
+      ].filter((group) => group.people.length > 0)
+    : [];
+  const listRows: ListRow[] = browsing
+    ? groups.map((group) => ({ key: group.key, group }))
+    : people.map((person) => ({ key: person.id, person }));
+
+  const renderRow = ({ item: row }: { item: ListRow }) => {
+    if ('person' in row) return renderPerson({ item: row.person });
+    const { group } = row;
+    return (
+      <View>
+        <SectionHeader
+          title={group.title}
+          icon={group.icon as React.ComponentProps<typeof FontAwesome6>['name']}
+          count={group.people.length}
+          style={styles.groupHeader}
+          seeAllLabel={t('services.seeAll')}
+          onSeeAll={() =>
+            JOB_CATEGORIES.some((entry) => entry.key === group.key) ? chooseWork(group.key) : chooseWork(group.title)
+          }
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+          {group.people.map((person) => (
+            <View key={person.id} style={styles.carouselCard}>
+              {renderPerson({ item: person }, true)}
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
   const renderBody = () => {
     if (starting) {
       return (
@@ -333,11 +391,16 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
       );
     }
     return (
-      <PullToRefresh refreshing={results.isRefetching} onRefresh={() => results.refetch()}>
-        <FlatList
-          data={results.data ?? []}
-          keyExtractor={(item) => item.id}
-          renderItem={renderPerson}
+      // A new search / filter gets a fresh list, placed past the pull-to-refresh room from the start.
+      <PullToRefresh
+        key={JSON.stringify([category, payPeriod, appliedQuery, trustedOnly, nearest, lowestPay])}
+        refreshing={results.isRefetching}
+        onRefresh={() => results.refetch()}
+      >
+        <FlatList<ListRow>
+          data={listRows}
+          keyExtractor={(row) => row.key}
+          renderItem={renderRow}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
@@ -382,8 +445,8 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
           </View>
         </LinearGradient>
 
-        {/* Search and filters sit below the header — headers carry only the title. */}
-        <View style={styles.filters}>
+        {/* Search and filters in one card under the header (headers carry only the title). */}
+        <View style={[styles.filterCard, { backgroundColor: colors.background, borderColor: `${colors.primary}1F` }]}>
           {/* What kind of work: one searchable dropdown (it also finds work people typed themselves). */}
           <CategoryPicker
             title={t('hireStaff.chooseType')}
@@ -397,39 +460,38 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
             fieldIcon="user-tie"
             clearable
           />
-          {/* Pay and sort once a kind of work is chosen. */}
-          {category || appliedQuery ? (
-          <View style={styles.optionRow}>
-            <View style={[styles.segment, { backgroundColor: `${colors.primary}10` }]}>
-              {([null, 'daily', 'monthly'] as (PayPeriod | null)[]).map((value) => (
-                <Pressable
-                  key={value ?? 'any'}
-                  onPress={() => pick(() => setPayPeriod(value))}
-                  style={[styles.segmentItem, started && payPeriod === value ? { backgroundColor: colors.surface } : null]}
-                >
-                  <Text
-                    style={[styles.segmentText, { color: started && payPeriod === value ? colors.primary : colors.textMuted }]}
-                  >
-                    {value ? t(`hireStaff.period.${value}`) : t('hireStaff.anyPay')}
-                  </Text>
+          {/* Pay: one choice of three (a radio). */}
+          <View style={[styles.segment, { backgroundColor: colors.surface, borderColor: `${colors.primary}26` }]}>
+            {([null, 'daily', 'monthly'] as (PayPeriod | null)[]).map((value) => {
+              const active = payPeriod === value;
+              const label = value ? t(`hireStaff.period.${value}`) : t('hireStaff.anyPay');
+              return (
+                <Pressable key={value ?? 'any'} style={styles.segmentItem} onPress={() => pick(() => setPayPeriod(value))}>
+                  {active ? (
+                    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.segmentFill}>
+                      <Text style={[styles.segmentText, { color: '#FFFFFF' }]}>{label}</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.segmentFill}>
+                      <Text style={[styles.segmentText, { color: colors.text }]}>{label}</Text>
+                    </View>
+                  )}
                 </Pressable>
-              ))}
-            </View>
-            <View style={[styles.segment, { backgroundColor: `${colors.primary}10` }]}>
-              {(['distance', 'pay'] as JobSeekerSort[]).map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() => pick(() => setSort(value))}
-                  style={[styles.segmentItem, started && sort === value ? { backgroundColor: colors.surface } : null]}
-                >
-                  <Text style={[styles.segmentText, { color: started && sort === value ? colors.primary : colors.textMuted }]}>
-                    {t(value === 'distance' ? 'hireStaff.sortNearest' : 'hireStaff.sortPay')}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+              );
+            })}
           </View>
-          ) : null}
+          {/* Toggles that combine: Trusted, Nearest, Lowest pay. */}
+          <ScrollView
+            horizontal
+            style={styles.chipScroll}
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.chips}
+          >
+            {chip('trusted', t('homeSearch.filters.trusted'), trustedOnly, () => pick(() => setTrustedOnly((on) => !on)), 'shield-halved')}
+            {chip('nearest', t('hireStaff.sortNearest'), nearest, () => pick(() => setNearest((on) => !on)), 'location-arrow')}
+            {chip('pay', t('hireStaff.sortPay'), lowestPay, () => pick(() => setLowestPay((on) => !on)), 'arrow-down-short-wide')}
+          </ScrollView>
         </View>
 
         {renderBody()}
@@ -478,7 +540,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 18 },
   headerSubtitle: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
-  filters: { paddingHorizontal: 16, paddingTop: 14, gap: 12 },
+  filterCard: { marginHorizontal: 16, marginTop: 14, borderWidth: 1, borderRadius: 18, padding: 12, gap: 10 },
+  chipScroll: { flexGrow: 0 },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -489,52 +552,96 @@ const styles = StyleSheet.create({
     height: 46,
   },
   searchInput: { flex: 1, ...typography.body, fontSize: 14, padding: 0 },
-  chips: { gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7 },
+  chips: { gap: 8, alignItems: 'center', justifyContent: 'center', flexGrow: 1 },
+  chipDivider: { width: 1, height: 22, marginHorizontal: 2 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, borderRadius: 17, paddingHorizontal: 13 },
   chipText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12 },
   optionRow: { flexDirection: 'row', gap: 8 },
-  segment: { flex: 1, flexDirection: 'row', borderRadius: 14, padding: 3 },
-  segmentItem: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 32, borderRadius: 11 },
+  segment: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 3 },
+  segmentItem: { flex: 1 },
+  segmentFill: { alignItems: 'center', justifyContent: 'center', height: 34, borderRadius: 11 },
   segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11.5 },
-  list: { padding: 16, gap: 14, flexGrow: 1 },
-  card: { borderRadius: 18, borderWidth: 1, padding: 14 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  name: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16 },
-  jobTitle: { ...typography.caption, fontSize: 12.5, marginTop: 1 },
-  distancePill: {
+  list: { paddingHorizontal: 16, paddingTop: 12, gap: 12, flexGrow: 1 },
+  groupHeader: { marginTop: 4, marginBottom: 10 },
+  carousel: { gap: 12, paddingRight: 4 },
+  carouselCard: { width: 300 },
+  card: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    shadowColor: '#0B3A8A',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  workRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  factsRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, paddingVertical: 9, marginTop: 12 },
+  fact: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  factDivider: { width: 1, height: 28 },
+  factValue: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12.5, lineHeight: 18 },
+  factLabel: { ...typography.caption, fontSize: 10.5, lineHeight: 14, marginTop: 1 },
+  // Same size as the skill pill beside it.
+  placeGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
-    borderRadius: 10,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    flexShrink: 1,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    maxWidth: 130,
   },
-  distanceText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  name: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16 },
+  jobTitle: { ...typography.caption, fontSize: 12.5, fontFamily: fonts.medium, flexShrink: 1 },
+  distancePill: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, borderRadius: 14, paddingHorizontal: 10 },
+  distanceText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16 },
   payRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 12 },
-  pay: { fontFamily: fonts.semiBold, fontSize: 22, lineHeight: 28 },
+  pay: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 20 },
   per: { ...typography.body, fontSize: 13 },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  tag: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
-  tagText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+  // The skill and the place: each as wide as its words, both exactly this height.
+  tag: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, height: 28, borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, maxWidth: 130, flexShrink: 1 },
+  rowSpacer: { flex: 1 },
+  // The skill and place pills take the room left of Call (never more), each shrinking with
+  // its text cut short — but the text keeps a minimum width, so it can't vanish (it did when it
+  // could shrink to nothing).
+  pillsRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  pillText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 14, maxWidth: 110, minWidth: 34, flexShrink: 1 },
+  tagText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11, lineHeight: 14, includeFontPadding: false, flexShrink: 1 },
   skills: { ...typography.body, fontSize: 13, marginTop: 10 },
   description: { ...typography.caption, fontSize: 12.5, lineHeight: 18, marginTop: 6 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  locationText: { ...typography.caption, fontSize: 12, flex: 1 },
+  locationText: { ...typography.caption, fontSize: 11, lineHeight: 14, fontFamily: fonts.medium, includeFontPadding: false, flexShrink: 1 },
   more: { ...typography.caption, fontFamily: fonts.semiBold },
   viewProfile: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 10,
+    paddingTop: 10,
   },
   phoneGroup: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   phoneIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   phone: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, letterSpacing: 0.3 },
-  callButton: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, paddingHorizontal: 18, borderRadius: 20 },
-  callText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14, color: '#FFFFFF' },
+  callButton: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 14, borderRadius: 17 },
+  callText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 13.5, color: '#FFFFFF', letterSpacing: 0.2 },
   state: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 40, paddingHorizontal: 24 },
   stateTitle: { ...typography.body, fontFamily: fonts.semiBold, textAlign: 'center' },
   stateText: { ...typography.caption, textAlign: 'center', lineHeight: 18 },

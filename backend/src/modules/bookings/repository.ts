@@ -121,12 +121,15 @@ const CUSTOMER_BOOKING_SELECT = `
   LEFT JOIN accounts ta ON ta.id = tw.account_id`;
 
 /**
- * Whether a request (alias `br`) is still young enough to be offered or accepted: a Quick Book
- * broadcast for BROADCAST_TTL_MINUTES, a booking of a particular worker for DIRECT_TTL_MINUTES.
- * (Constants only — no user input in this SQL.)
+ * Whether a request (alias `br`) is still young enough to be offered or accepted: the
+ * customer's own waiting time (Profile → Waiting Time; accounts.wait_quick_book_minutes /
+ * wait_direct_minutes), read live so a change also applies to requests already waiting. The
+ * constants are only a fallback. (No user input in this SQL.)
  */
-const STILL_OPEN = `br.created_at > now() - make_interval(mins => CASE WHEN br.target_worker_id IS NULL
-  THEN ${BROADCAST_TTL_MINUTES} ELSE ${DIRECT_TTL_MINUTES} END)`;
+const STILL_OPEN = `br.created_at > now() - make_interval(mins => COALESCE(
+  (SELECT CASE WHEN br.target_worker_id IS NULL THEN wa.wait_quick_book_minutes ELSE wa.wait_direct_minutes END
+     FROM accounts wa WHERE wa.id = br.account_id),
+  CASE WHEN br.target_worker_id IS NULL THEN ${BROADCAST_TTL_MINUTES} ELSE ${DIRECT_TTL_MINUTES} END))`;
 
 const WORKER_JOB_SELECT = `
   SELECT br.*, ca.full_name AS customer_full_name, ca.mobile_number AS customer_mobile_number,
@@ -369,6 +372,30 @@ export class BookingsRepository {
    * read, so nothing has to run on a timer; the offer and accept queries also check the age
    * themselves, so a stale request can never be offered or won even before this runs.
    */
+  /**
+   * A request of this customer still waiting for an answer that asks for some of the same
+   * work — for the same worker (a personal booking) or for anyone nearby (Quick Book). Asking
+   * again would only send the same workers the same job twice.
+   */
+  async findWaitingForSameWork(
+    accountId: string,
+    skills: string[],
+    customSkills: string[],
+    targetWorkerId: string | null,
+  ): Promise<string | null> {
+    const result = await this.pool.query(
+      `SELECT br.id FROM booking_requests br
+       WHERE br.account_id = $1 AND br.status = 'broadcasting' AND ${STILL_OPEN}
+         AND br.target_worker_id IS NOT DISTINCT FROM $2
+         AND (br.skill_categories && $3::worker_skill_category[]
+              OR EXISTS (SELECT 1 FROM unnest(COALESCE(br.custom_skills, '{}')) c
+                         WHERE lower(c) = ANY (SELECT lower(x) FROM unnest($4::text[]) x)))
+       ORDER BY br.created_at DESC LIMIT 1`,
+      [accountId, targetWorkerId, skills, customSkills],
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
   /** Ends Quick Books nobody took in time; returns their ids. */
   async expireStaleBroadcasts(): Promise<string[]> {
     const result = await this.pool.query(

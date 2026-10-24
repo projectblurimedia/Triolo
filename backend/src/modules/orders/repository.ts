@@ -2,12 +2,13 @@ import { timingSafeEqual } from 'crypto';
 import { Pool, PoolClient, QueryResultRow } from 'pg';
 import {
   CreateOrderParams,
+  CreateQuickOrderParams,
   CUSTOMER_CANCELLABLE,
   CustomerOrder,
   HANDOVER_STATUSES,
   ItemUpdate,
   MAX_PIN_ATTEMPTS,
-  ORDER_TTL_MINUTES,
+  ORDER_WAIT_SQL,
   ORDER_LATE_AFTER_MINUTES,
   ORDER_LATE_STATUSES,
   OrderTransition,
@@ -27,6 +28,13 @@ import {
 
 const toNumber = (value: unknown): number | null => (value == null ? null : Number(value));
 
+/** Postgres enum arrays arrive as text like {grocery,dairy}. */
+function parseCategories(value: unknown): string[] {
+  if (Array.isArray(value)) return value as string[];
+  if (typeof value !== 'string' || value.length < 2) return [];
+  return value.slice(1, -1).split(',').filter(Boolean);
+}
+
 function mapItem(row: QueryResultRow): ShopOrderItem {
   return {
     id: row.id,
@@ -43,13 +51,16 @@ function mapOrder(row: QueryResultRow, items: ShopOrderItem[]): ShopOrder {
   return {
     id: row.id,
     accountId: row.account_id,
-    businessId: row.business_id,
+    businessId: row.business_id ?? null,
+    quick: !!row.quick,
+    shopCategories: parseCategories(row.shop_categories),
     fulfillment: row.fulfillment,
     status: row.status,
     latitude: row.latitude,
     longitude: row.longitude,
     locationAddress: row.location_address ?? null,
-    distanceMeters: Number(row.distance_meters),
+    // A shop looking at a Quick Order it hasn't won yet sees its own distance to the customer.
+    distanceMeters: Number(row.offer_distance_meters ?? row.distance_meters),
     deliveryCharge: Number(row.delivery_charge ?? 0),
     itemsTotal: toNumber(row.items_total),
     totalAmount: toNumber(row.total_amount),
@@ -81,8 +92,8 @@ const CUSTOMER_SELECT = `
          b.latitude AS shop_latitude, b.longitude AS shop_longitude, b.area AS shop_area, b.city AS shop_city,
          oa.mobile_number AS shop_mobile_number
   FROM shop_orders o
-  JOIN business_profiles b ON b.id = o.business_id
-  JOIN accounts oa ON oa.id = b.account_id`;
+  LEFT JOIN business_profiles b ON b.id = o.business_id
+  LEFT JOIN accounts oa ON oa.id = b.account_id`;
 
 // Shop view: who ordered and how to reach them.
 const SHOP_SELECT = `
@@ -90,11 +101,19 @@ const SHOP_SELECT = `
   FROM shop_orders o
   JOIN accounts ca ON ca.id = o.account_id`;
 
+// The shop's own view, including Quick Orders offered to it and not taken yet ($1 = the shop).
+const SHOP_SELECT_FOR_SHOP = `
+  SELECT o.*, ca.full_name AS customer_full_name, ca.mobile_number AS customer_mobile_number,
+         CASE WHEN o.business_id IS NULL THEN qo.distance_meters END AS offer_distance_meters
+  FROM shop_orders o
+  JOIN accounts ca ON ca.id = o.account_id
+  LEFT JOIN quick_order_offers qo ON qo.order_id = o.id AND qo.business_id = $1`;
+
 // Wraps a status change so it also returns who to tell: the customer, or the shop's owner.
 const NOTIFY_CUSTOMER = `SELECT u.*, a.id AS notify_account_id, a.preferred_language AS notify_language, b.shop_name
-  FROM updated u JOIN accounts a ON a.id = u.account_id JOIN business_profiles b ON b.id = u.business_id`;
+  FROM updated u JOIN accounts a ON a.id = u.account_id LEFT JOIN business_profiles b ON b.id = u.business_id`;
 const NOTIFY_SHOP = `SELECT u.*, a.id AS notify_account_id, a.preferred_language AS notify_language, b.shop_name
-  FROM updated u JOIN business_profiles b ON b.id = u.business_id JOIN accounts a ON a.id = b.account_id`;
+  FROM updated u LEFT JOIN business_profiles b ON b.id = u.business_id LEFT JOIN accounts a ON a.id = b.account_id`;
 
 export class OrdersRepository {
   constructor(private readonly pool: Pool) {}
@@ -138,16 +157,91 @@ export class OrdersRepository {
     });
   }
 
+  /** A Quick Order: no shop yet, one offer per shop asked. */
+  async createQuick(params: CreateQuickOrderParams): Promise<ShopOrder> {
+    return this.inTransaction(async (client) => {
+      const result = await client.query(
+        `INSERT INTO shop_orders (account_id, business_id, quick, shop_categories, fulfillment, latitude, longitude,
+                                  location_address, distance_meters, delivery_charge, note)
+         VALUES ($1, NULL, true, $2::business_shop_category[], $3, $4, $5, $6, 0, 0, $7)
+         RETURNING *`,
+        [params.accountId, params.shopCategories, params.fulfillment, params.latitude, params.longitude, params.locationAddress, params.note],
+      );
+      const order = result.rows[0];
+      const items = await client.query(
+        `INSERT INTO shop_order_items (order_id, position, name, quantity, unit)
+         SELECT $1, ord, name, quantity, unit
+         FROM unnest($2::text[], $3::text[], $4::text[]) WITH ORDINALITY AS t(name, quantity, unit, ord)
+         RETURNING *`,
+        [order.id, params.items.map((item) => item.name), params.items.map((item) => item.quantity), params.items.map((item) => item.unit)],
+      );
+      await client.query(
+        `INSERT INTO quick_order_offers (order_id, business_id, distance_meters)
+         SELECT $1, business_id, distance FROM unnest($2::uuid[], $3::float8[]) AS t(business_id, distance)`,
+        [order.id, params.offers.map((offer) => offer.businessId), params.offers.map((offer) => offer.distanceMeters)],
+      );
+      return mapOrder(
+        order,
+        items.rows.map(mapItem).sort((a, b) => a.position - b.position),
+      );
+    });
+  }
+
+  /** This shop's still-open offer of a Quick Order nobody has taken: its distance, or null. */
+  async findQuickOffer(orderId: string, businessId: string): Promise<number | null> {
+    const result = await this.pool.query(
+      `SELECT qo.distance_meters FROM quick_order_offers qo JOIN shop_orders so ON so.id = qo.order_id
+       WHERE qo.order_id = $1 AND qo.business_id = $2 AND qo.status = 'pending'
+         AND so.business_id IS NULL AND so.status = 'placed'`,
+      [orderId, businessId],
+    );
+    return result.rows[0] ? Number(result.rows[0].distance_meters) : null;
+  }
+
+  /**
+   * The first shop to accept a Quick Order gets it: the UPDATE only matches while it still has
+   * no shop, so two accepts at once can never both win (the second finds nothing). The other
+   * offers are closed. The order then carries on like any other.
+   */
+  async claimQuick(orderId: string, businessId: string, distanceMeters: number, deliveryCharge: number): Promise<OrderTransition | null> {
+    const result = await this.pool.query(
+      `WITH updated AS (
+         UPDATE shop_orders so SET business_id = $2, status = 'accepted', accepted_at = now(), updated_at = now(),
+           distance_meters = $3, delivery_charge = $4
+         WHERE so.id = $1 AND so.quick AND so.business_id IS NULL AND so.status = 'placed'
+           AND so.created_at > now() - ${ORDER_WAIT_SQL('so')}
+           AND EXISTS (SELECT 1 FROM quick_order_offers qo WHERE qo.order_id = so.id AND qo.business_id = $2 AND qo.status = 'pending')
+         RETURNING so.*
+       ) ${NOTIFY_CUSTOMER}`,
+      [orderId, businessId, distanceMeters, deliveryCharge],
+    );
+    if (!result.rows[0]) return null;
+    await this.pool.query(
+      `UPDATE quick_order_offers SET status = CASE WHEN business_id = $2 THEN 'won'::quick_order_offer_status ELSE 'lost'::quick_order_offer_status END
+       WHERE order_id = $1 AND status = 'pending'`,
+      [orderId, businessId],
+    );
+    return this.toTransition(result.rows[0]);
+  }
+
+  /** A shop turns down a Quick Order: only its own offer closes; the others can still take it. */
+  async declineQuickOffer(orderId: string, businessId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE quick_order_offers SET status = 'declined' WHERE order_id = $1 AND business_id = $2 AND status = 'pending'`,
+      [orderId, businessId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
   /**
    * Ends every order the shop didn't answer in time. Run lazily before orders are read, so
    * nothing has to run on a timer; accept() also refuses a stale order on its own.
    */
   async expireStale(): Promise<string[]> {
     const result = await this.pool.query(
-      `UPDATE shop_orders SET status = 'expired', expired_at = now(), updated_at = now()
-       WHERE status = 'placed' AND created_at <= now() - make_interval(mins => $1)
-       RETURNING id`,
-      [ORDER_TTL_MINUTES],
+      `UPDATE shop_orders so SET status = 'expired', expired_at = now(), updated_at = now()
+       WHERE so.status = 'placed' AND so.created_at <= now() - ${ORDER_WAIT_SQL('so')}
+       RETURNING so.id`,
     );
     return result.rows.map((row) => row.id);
   }
@@ -174,7 +268,11 @@ export class OrdersRepository {
   }
 
   async findForShop(id: string, businessId: string): Promise<ShopSideOrder | null> {
-    const result = await this.pool.query(`${SHOP_SELECT} WHERE o.id = $1 AND o.business_id = $2`, [id, businessId]);
+    const result = await this.pool.query(
+      `${SHOP_SELECT_FOR_SHOP}
+       WHERE o.id = $2 AND (o.business_id = $1 OR (o.business_id IS NULL AND o.status = 'placed' AND qo.status = 'pending'))`,
+      [businessId, id],
+    );
     const [order] = await this.withShopShape(result.rows);
     return order ?? null;
   }
@@ -182,8 +280,8 @@ export class OrdersRepository {
   /** Active orders first (newest first), then history. */
   async listForShop(businessId: string, limit: number): Promise<ShopSideOrder[]> {
     const result = await this.pool.query(
-      `${SHOP_SELECT}
-       WHERE o.business_id = $1
+      `${SHOP_SELECT_FOR_SHOP}
+       WHERE o.business_id = $1 OR (o.business_id IS NULL AND o.status = 'placed' AND qo.status = 'pending')
        ORDER BY (o.status IN ('completed', 'cancelled', 'declined', 'expired')) ASC, o.created_at DESC
        LIMIT $2`,
       [businessId, limit],
@@ -263,12 +361,12 @@ export class OrdersRepository {
   async accept(id: string, businessId: string): Promise<OrderTransition | null> {
     const result = await this.pool.query(
       `WITH updated AS (
-         UPDATE shop_orders SET status = 'accepted', accepted_at = now(), updated_at = now()
-         WHERE id = $1 AND business_id = $2 AND status = 'placed'
-           AND created_at > now() - make_interval(mins => $3)
-         RETURNING *
+         UPDATE shop_orders so SET status = 'accepted', accepted_at = now(), updated_at = now()
+         WHERE so.id = $1 AND so.business_id = $2 AND so.status = 'placed'
+           AND so.created_at > now() - ${ORDER_WAIT_SQL('so')}
+         RETURNING so.*
        ) ${NOTIFY_CUSTOMER}`,
-      [id, businessId, ORDER_TTL_MINUTES],
+      [id, businessId],
     );
     return this.toTransition(result.rows[0]);
   }
@@ -446,7 +544,8 @@ export class OrdersRepository {
       return {
         ...mapOrder(row, items.get(row.id) ?? []),
         shop: {
-          name: row.shop_name,
+          // Empty for a Quick Order no shop has taken yet (the app shows 'Finding a shop').
+          name: row.shop_name ?? '',
           // The shop's own profile photo only (never one of its shop pictures).
           photoUrl: row.shop_profile_photo_url ?? null,
           ratingAverage: ratingCount > 0 ? Math.round((Number(row.shop_rating_sum) / ratingCount) * 10) / 10 : null,
@@ -554,9 +653,9 @@ export class OrdersRepository {
        SELECT u.*, b.shop_name, ca.id AS customer_id, ca.preferred_language AS customer_language,
               oa.id AS owner_id, oa.preferred_language AS owner_language
        FROM updated u
-       JOIN business_profiles b ON b.id = u.business_id
+       LEFT JOIN business_profiles b ON b.id = u.business_id
        JOIN accounts ca ON ca.id = u.account_id
-       JOIN accounts oa ON oa.id = b.account_id`,
+       LEFT JOIN accounts oa ON oa.id = b.account_id`,
       [id, reason, ACTIVE_ORDER_STATUSES],
     );
     const row = result.rows[0];
@@ -564,16 +663,17 @@ export class OrdersRepository {
     const items = await this.itemsFor([row.id]);
     return {
       order: mapOrder(row, items.get(row.id) ?? []),
-      shopName: row.shop_name,
+      shopName: row.shop_name ?? '',
       customer: { accountId: row.customer_id, preferredLanguage: row.customer_language },
-      shopOwner: { accountId: row.owner_id, preferredLanguage: row.owner_language },
+      // A Quick Order no shop took yet has no owner to tell.
+      shopOwner: row.owner_id ? { accountId: row.owner_id, preferredLanguage: row.owner_language } : null,
     };
   }
 
   /** Unfinished orders an account is part of, as the customer or as the shop owner. */
   async adminActiveIdsForAccount(accountId: string): Promise<string[]> {
     const result = await this.pool.query(
-      `SELECT o.id FROM shop_orders o JOIN business_profiles b ON b.id = o.business_id
+      `SELECT o.id FROM shop_orders o LEFT JOIN business_profiles b ON b.id = o.business_id
        WHERE (o.account_id = $1 OR b.account_id = $1) AND o.status = ANY($2::shop_order_status[])`,
       [accountId, ACTIVE_ORDER_STATUSES],
     );
@@ -619,5 +719,5 @@ const ADMIN_SELECT = `SELECT o.*, ca.full_name AS customer_full_name, ca.mobile_
   b.shop_name, b.account_id AS shop_account_id, oa.full_name AS owner_full_name, oa.mobile_number AS owner_mobile_number`;
 const ADMIN_FROM = `FROM shop_orders o
   JOIN accounts ca ON ca.id = o.account_id
-  JOIN business_profiles b ON b.id = o.business_id
-  JOIN accounts oa ON oa.id = b.account_id`;
+  LEFT JOIN business_profiles b ON b.id = o.business_id
+  LEFT JOIN accounts oa ON oa.id = b.account_id`;

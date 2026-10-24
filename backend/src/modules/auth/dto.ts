@@ -32,6 +32,14 @@ export interface LogoutDto {
   refreshToken: string;
 }
 
+/** Minutes each kind of request waits for an answer before it ends by itself. */
+export interface WaitTimes {
+  quickBookMinutes: number;
+  directMinutes: number;
+  orderMinutes: number;
+  quickOrderMinutes?: number;
+}
+
 export interface UpdateLanguageDto {
   preferredLanguage: PreferredLanguage;
 }

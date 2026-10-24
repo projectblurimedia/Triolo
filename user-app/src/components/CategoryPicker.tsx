@@ -43,6 +43,8 @@ interface CategoryPickerProps {
   fieldIcon?: IconName;
   /** A ✕ on the field clears the choice (a filter with an "All" label always has it). */
   clearable?: boolean;
+  /** The closed field's fill — e.g. the page colour when it sits inside a card. */
+  fieldBackground?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -59,7 +61,8 @@ const byLabel = (a: PickerOption, b: PickerOption) => a.label.localeCompare(b.la
 /**
  * (Copied in partner-app — keep in sync.)
  * A searchable dropdown for categories: tap the field and a screen opens with a search box and
- * the whole list A–Z, the picked ones on top. Pick as many as needed (or one, with `single`);
+ * the whole list A–Z. A tap only ticks or unticks a row — nothing ever moves, so a pick never
+ * seems to vanish; what is picked also shows as chips in a strip at the top. Pick as many as needed (or one, with `single`);
  * Done closes it and the picks show as cards under the field. While searching it also offers
  * matching categories partners made themselves, and (with `allowAdd`) adding a new one.
  */
@@ -78,6 +81,7 @@ export function CategoryPicker({
   counts,
   fieldIcon = 'magnifying-glass',
   clearable,
+  fieldBackground,
   style,
 }: CategoryPickerProps) {
   const { t } = useTranslation();
@@ -138,27 +142,19 @@ export function CategoryPicker({
   const rows = useMemo<Row[]>(() => {
     const text = query.trim().toLowerCase();
     const sorted = [...options].sort(byLabel);
-    const picked = (single ? selected : draft).map(optionFor);
     const list: Row[] = [];
     if (allLabel && single && !text) list.push({ kind: 'all', key: 'all' });
     if (!text) {
-      if (picked.length > 0 && !single) {
-        list.push({ kind: 'header', key: 'h-picked', title: t('picker.selected', { count: picked.length }) });
-        picked.forEach((option) => list.push({ kind: 'option', key: `p-${option.key}`, option, custom: !byKey.has(option.key) }));
-        list.push({ kind: 'header', key: 'h-all', title: t('picker.all') });
-      }
-      sorted
-        .filter((option) => single || !picked.some((entry) => entry.key === option.key))
-        .forEach((option) => list.push({ kind: 'option', key: option.key, option }));
+      // Always A–Z, ticks in place: nothing moves when a row is picked.
+      sorted.forEach((option) => list.push({ kind: 'option', key: option.key, option }));
+      // Names added by hand (not in the list) get rows too, so they can be unticked.
+      draft
+        .filter((key) => !byKey.has(key))
+        .forEach((key) => list.push({ kind: 'option', key: `c-${key}`, option: optionFor(key), custom: true }));
       return list;
     }
     const matches = sorted.filter((option) => option.label.toLowerCase().includes(text));
-    // Picked ones first, even while searching.
-    const ordered = [
-      ...matches.filter((option) => draft.includes(option.key)),
-      ...matches.filter((option) => !draft.includes(option.key)),
-    ];
-    ordered.forEach((option) => list.push({ kind: 'option', key: option.key, option }));
+    matches.forEach((option) => list.push({ kind: 'option', key: option.key, option }));
     const known = new Set([...options.map((option) => option.label.toLowerCase()), ...draft.map((key) => optionFor(key).label.toLowerCase())]);
     const partnerMade = custom.filter((name) => !known.has(name.toLowerCase()));
     const pickedCustom = draft.filter((key) => !byKey.has(key) && key.toLowerCase().includes(text));
@@ -297,7 +293,11 @@ export function CategoryPicker({
         accessibilityRole="button"
         style={({ pressed }) => [
           styles.field,
-          { backgroundColor: colors.surface, borderColor: pickedOptions.length ? colors.primary : colors.border, opacity: pressed ? 0.85 : 1 },
+          {
+            backgroundColor: fieldBackground ?? colors.surface,
+            borderColor: pickedOptions.length ? colors.primary : colors.border,
+            opacity: pressed ? 0.85 : 1,
+          },
         ]}
       >
         <FontAwesome6 name={pickedOptions.length && single ? ((pickedOptions[0].icon ?? fieldIcon) as IconName) : fieldIcon} size={14} color={colors.primary} solid />
@@ -384,6 +384,33 @@ export function CategoryPicker({
             contentContainerStyle={[styles.list, { paddingBottom: single ? insets.bottom + 24 : 24 }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              // What is picked, at a glance (the rows below stay where they are).
+              !single && draft.length > 0 ? (
+                <View style={[styles.pickedStrip, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}2E` }]}>
+                  <Text style={[styles.pickedTitle, { color: colors.primary }]}>{t('picker.selected', { count: draft.length })}</Text>
+                  <View style={styles.cards}>
+                    {draft.map((key) => {
+                      const option = optionFor(key);
+                      return (
+                        <Pressable
+                          key={key}
+                          onPress={() => toggle(key)}
+                          accessibilityLabel={t('picker.remove', { name: option.label })}
+                          style={[styles.card, { backgroundColor: colors.surface, borderColor: `${colors.primary}40` }]}
+                        >
+                          <FontAwesome6 name={(option.icon ?? customIcon) as IconName} size={12} color={colors.primary} solid />
+                          <Text style={[styles.cardText, { color: colors.text }]} numberOfLines={1}>
+                            {option.label}
+                          </Text>
+                          <FontAwesome6 name="xmark" size={11} color={colors.textMuted} solid />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null
+            }
             ListEmptyComponent={<Text style={[styles.empty, { color: colors.textMuted }]}>{t('picker.noMatch')}</Text>}
           />
 
@@ -399,6 +426,8 @@ export function CategoryPicker({
 }
 
 const styles = StyleSheet.create({
+  pickedStrip: { borderWidth: 1, borderRadius: 16, padding: 12, marginBottom: 12, gap: 8 },
+  pickedTitle: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
   flex: { flex: 1 },
   field: { height: 50, borderRadius: 14, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
   fieldText: { ...typography.body, flex: 1, includeFontPadding: false },

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -8,7 +9,7 @@ import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { useAdGate } from './Ads';
+import { useAdGate, useBusyAction } from './Ads';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ToastHost } from './ToastHost';
 import { useShopOrder, useShopOrderAction } from '@/hooks/useShopOrders';
@@ -82,6 +83,7 @@ export function ShopOrderModal() {
   const { data: order, isLoading, isError, refetch } = useShopOrder(orderId);
   // Handover: location, then a local business's ad while the button spins, then the PIN check.
   const { adLoading, waitForAd } = useAdGate(orderId !== null, 'order_pin');
+  const { busy: pinBusy, run: runPin } = useBusyAction();
 
   const accept = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.accept(id), 'accept');
   const decline = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.decline(id));
@@ -240,9 +242,13 @@ export function ShopOrderModal() {
           <FontAwesome6 name={STATUS_ICONS[o.status]} size={16} color="#FFFFFF" solid />
         </View>
         <View style={styles.flex}>
-          <Text style={[styles.bannerTitle, { color: colors.text }]}>{t(`shopOrders.status.${o.status}.title`)}</Text>
+          <Text style={[styles.bannerTitle, { color: colors.text }]}>
+            {o.quick && !o.businessId ? t('shopOrders.quickTitle') : t(`shopOrders.status.${o.status}.title`)}
+          </Text>
           <Text style={[styles.bannerMessage, { color: colors.textMuted }]}>
-            {o.status === 'cancelled' && o.cancelledBy === 'admin'
+            {o.quick && !o.businessId
+              ? t('shopOrders.quickMessage')
+              : o.status === 'cancelled' && o.cancelledBy === 'admin'
               ? t('shopOrders.adminCancelled')
               : t(`shopOrders.status.${o.status}.message`, { name: o.customerFullName })}
             {o.status === 'cancelled' && o.cancelReason
@@ -277,7 +283,7 @@ export function ShopOrderModal() {
         <Text style={[styles.infoText, { color: colors.text }]}>
           {o.fulfillment === 'delivery'
             ? t('shopOrders.deliverTo', {
-                address: o.locationAddress || t('shopOrders.customerLocation'),
+                address: placeName(o.locationAddress) || t('shopOrders.customerLocation'),
                 distance: formatDistance(o.distanceMeters),
               })
             : t('shopOrders.pickupFromShop')}
@@ -507,11 +513,13 @@ export function ShopOrderModal() {
         <Button
           label={t('shopOrders.verifyPin')}
           // Handover finishes the order: a local business's ad first (when one is running nearby).
-          onPress={async () => {
-            if (adLoading || !(await askForLocation())) return;
-            if (await waitForAd()) handleVerifyPin(o);
-          }}
-          loading={verifyPin.isPending || adLoading}
+          onPress={() =>
+            runPin(async () => {
+              if (adLoading || !(await askForLocation())) return;
+              if (await waitForAd()) handleVerifyPin(o);
+            })
+          }
+          loading={verifyPin.isPending || adLoading || pinBusy}
           disabled={pin.length !== 4}
         />
       </View>

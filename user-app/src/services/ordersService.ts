@@ -47,7 +47,12 @@ export interface OrderItem {
 
 export interface CustomerOrder {
   id: string;
-  businessId: string;
+  /** null for a Quick Order no shop has accepted yet. */
+  businessId: string | null;
+  /** Sent to every matching shop nearby at once; the first to accept gets it. */
+  quick?: boolean;
+  /** Quick Order: the kinds of shop asked. */
+  shopCategories?: string[];
   fulfillment: OrderFulfillment;
   status: OrderStatus;
   latitude: number;
@@ -96,8 +101,25 @@ export interface CreateOrderParams {
   note?: string;
 }
 
+export interface CreateQuickOrderParams {
+  shopCategories: string[];
+  fulfillment: OrderFulfillment;
+  items: { name: string; quantity: string; unit?: string | null }[];
+  latitude: number;
+  longitude: number;
+  locationAddress?: string;
+  note?: string;
+}
+
+/** A Quick Order still looking for a shop (no shop has accepted it yet). */
+export function isFindingShop(order: Pick<CustomerOrder, 'quick' | 'businessId' | 'status'>): boolean {
+  return !!order.quick && !order.businessId && order.status === 'placed';
+}
+
 export const ordersService = {
   create: (params: CreateOrderParams) => apiClient.post<CustomerOrder>('/orders', params, true),
+  /** Quick Order: to every matching shop nearby at once (404 QUICK_ORDER_NO_SHOPS when none). */
+  createQuick: (params: CreateQuickOrderParams) => apiClient.post<CustomerOrder>('/orders/quick', params, true),
   listMine: () => apiClient.get<CustomerOrder[]>('/orders/mine', true),
   get: (orderId: string) => apiClient.get<CustomerOrder>(`/orders/${orderId}`, true),
   /** With a rating: cancelling an order the shop hasn't moved on for over an hour. */

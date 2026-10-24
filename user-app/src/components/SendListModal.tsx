@@ -9,13 +9,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from './Button';
 import { CategoryPicker } from './CategoryPicker';
+import { useTrustedIds } from '@/hooks/useSubscription';
+import { SHOP_CATEGORIES } from '@/constants/categories';
 import { usePayHint, withFee } from '@/hooks/useSubscription';
 import { payIfNeeded } from '@/state/payGateStore';
 import { LoadingIndicator } from './LoadingIndicator';
 import { RatingStars } from './RatingStars';
 import { ToastHost } from './ToastHost';
 import { Avatar } from './WorkerMiniCard';
-import { SHOP_CATEGORIES } from '@/constants/categories';
 import { useListStore } from '@/state/listStore';
 import { ensureLocation } from '@/state/locationStore';
 import { openOrderTracker } from '@/state/orderTrackerStore';
@@ -23,15 +24,14 @@ import { showToast } from '@/state/toastStore';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
 import { useCreateOrder } from '@/hooks/useOrders';
 import { SERVICES_RADIUS_KM } from '@/hooks/useNearbyWorkers';
-import { BusinessNearbyResult, businessesService, NearbyShopSort } from '@/services/businessesService';
+import { BusinessNearbyResult, businessesService } from '@/services/businessesService';
 import { formatRupees, OrderFulfillment } from '@/services/ordersService';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { openNewList } from '@/navigation/navigationRef';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { useAdGate } from './Ads';
-import { DeliveryToggle } from './DeliveryToggle';
+import { useAdGate, useBusyAction } from './Ads';
 
 interface SendListModalProps {
   visible: boolean;
@@ -45,6 +45,9 @@ interface SendListModalProps {
 }
 
 const SHOP_LIMIT = 50;
+const SEARCH_DEBOUNCE_MS = 350;
+// "Top rated" keeps shops rated this many stars and up.
+const TOP_RATED_MIN = 4;
 const GEOCODE_TIMEOUT_MS = 4000;
 // Lets the order screen finish fading in on top before this one closes underneath it.
 const MODAL_HANDOFF_MS = 350;
@@ -81,7 +84,7 @@ async function addressFor(latitude: number, longitude: number): Promise<string |
 export function SendListModal({ visible, onClose, shop: preselected, listId: initialListId, onLeave }: SendListModalProps) {
   const { t } = useTranslation();
   const orderFee = usePayHint('order');
-  const { colors } = useThemeColors();
+  const { colors, isDark } = useThemeColors();
   const insets = useSafeAreaInsets();
   const lists = useListStore((state) => state.lists);
   const [listId, setListId] = useState<string | null>(null);
@@ -93,9 +96,15 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
 
   const [selected, setSelected] = useState<BusinessNearbyResult | null>(null);
   const [fulfillment, setFulfillment] = useState<OrderFulfillment>('pickup');
+  // Search and filters right here, results just below (the same filters as the Bazaar search).
+  const [input, setInput] = useState('');
+  const [query, setQuery] = useState('');
+  const [nearest, setNearest] = useState(false);
+  const [topRated, setTopRated] = useState(false);
+  const [trustedOnly, setTrustedOnly] = useState(false);
   const [deliveryOnly, setDeliveryOnly] = useState(false);
-  const [category, setCategory] = useState<string | null>(null);
-  const [sort, setSort] = useState<NearbyShopSort>('distance');
+  const [types, setTypes] = useState<string[]>([]);
+  const trusted = useTrustedIds();
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -106,23 +115,66 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
     setFulfillment('pickup');
     setNote('');
     setSending(false);
+    setInput('');
+    setQuery('');
+    setNearest(false);
+    setTopRated(false);
+    setTrustedOnly(false);
+    setDeliveryOnly(false);
+    setTypes([]);
   }, [visible, preselected, initialListId]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(input.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [input]);
+
+  const typeKey = types.length > 0 ? types.join(',') : undefined;
+  const sort: 'distance' | 'rating' = topRated && !nearest ? 'rating' : 'distance';
+
   const shops = useQuery({
-    queryKey: ['businesses', 'nearby', 'send-list', coords?.latitude, coords?.longitude, deliveryOnly, category, sort],
+    queryKey: ['businesses', 'nearby', 'send-list', coords?.latitude, coords?.longitude, query, typeKey, deliveryOnly, sort],
     queryFn: () =>
       businessesService.searchNearby({
         latitude: coords!.latitude,
         longitude: coords!.longitude,
         radiusKm: SERVICES_RADIUS_KM,
         limit: SHOP_LIMIT,
+        query: query || undefined,
+        // A kind is picked: the box looks for shop names within it.
+        nameOnly: types.length > 0,
+        shopCategory: typeKey,
         deliveryOnly,
-        shopCategory: category,
         sort,
       }),
     enabled: visible && !preselected && coords !== null,
     staleTime: 60_000,
+    // Keep the last results on screen while the next search loads (no flashing).
+    placeholderData: (previous) => previous,
   });
+
+  /** One filter chip: blue and filled when on. */
+  const filterChip = (
+    key: string,
+    label: string,
+    icon: React.ComponentProps<typeof FontAwesome6>['name'],
+    active: boolean,
+    onPress: () => void,
+  ) => (
+    <Pressable key={key} onPress={onPress} accessibilityState={{ selected: active }}>
+      {active ? (
+        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.filterChip}>
+          <FontAwesome6 name={icon} size={11} color="#FFFFFF" solid />
+          <Text style={[styles.filterText, { color: '#FFFFFF' }]}>{label}</Text>
+        </LinearGradient>
+      ) : (
+        <View style={[styles.filterChip, styles.filterChipOff, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <FontAwesome6 name={icon} size={11} color={colors.primary} solid />
+          <Text style={[styles.filterText, { color: colors.text }]}>{label}</Text>
+        </View>
+      )}
+    </Pressable>
+  );
 
   const choose = (shop: BusinessNearbyResult) => {
     setSelected(shop);
@@ -132,6 +184,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
   // Asking for location / showing the ad: a second tap must not send the list twice.
   const preparing = useRef(false);
   const { adLoading, waitForAd } = useAdGate(visible, 'send_list');
+  const { busy, run } = useBusyAction();
 
   const handleSend = async () => {
     if (!selected || sending || preparing.current) return;
@@ -318,7 +371,10 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
         </View>
       );
     }
-    const list = shops.data ?? [];
+    const list = (shops.data ?? []).filter(
+      (shop) =>
+        (!trustedOnly || !!trusted.data?.business?.includes(shop.id)) && (!topRated || (shop.ratingAverage ?? 0) >= TOP_RATED_MIN),
+    );
     if (list.length === 0) {
       return (
         <View style={styles.state}>
@@ -393,8 +449,8 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
         />
         <Button
           label={withFee(t('sendList.send', { count: items.length }), orderFee)}
-          onPress={handleSend}
-          loading={sending || adLoading}
+          onPress={() => run(handleSend)}
+          loading={sending || adLoading || busy}
         />
       </View>
     );
@@ -445,38 +501,46 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
               {renderListPreview()}
               {preselected ? null : (
                 <>
-                  <View style={styles.titleRow}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('sendList.chooseShop')}</Text>
-                    <View style={[styles.sortToggle, { backgroundColor: `${colors.primary}10` }]}>
-                      {(['distance', 'rating'] as NearbyShopSort[]).map((value) => (
-                        <Pressable
-                          key={value}
-                          onPress={() => setSort(value)}
-                          style={[styles.sortOption, sort === value ? { backgroundColor: colors.surface } : null]}
-                        >
-                          <Text style={[styles.sortLabel, { color: sort === value ? colors.primary : colors.textMuted }]}>
-                            {t(value === 'distance' ? 'services.sortNearest' : 'services.sortTopRated')}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                  <View style={styles.filterRow}>
-                    <CategoryPicker
-                      title={t('bazaar.filterTitle')}
-                      placeholder={t('services.allCategories')}
-                      allLabel={t('services.allCategories')}
-                      options={SHOP_CATEGORIES.map((entry) => ({
-                        key: entry.key,
-                        label: t(`businessProfile.categories.${entry.key}`),
-                        icon: entry.icon,
-                      }))}
-                      selected={category ? category.split(',') : []}
-                      onChange={(keys) => setCategory(keys.length > 0 ? keys.join(',') : null)}
-                      fieldIcon="filter"
-                      style={styles.flex1}
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('sendList.chooseShop')}</Text>
+                  {/* Search and filters right here, in one card; the shops update just below. */}
+                  {/* The page's own colour, so the card blends into the screen; light inputs on it. */}
+                  <View style={[styles.filterCard, { backgroundColor: colors.background, borderColor: `${colors.primary}1F` }]}>
+                  <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: `${colors.primary}26` }]}>
+                    <FontAwesome6 name="magnifying-glass" size={14} color={colors.primary} solid />
+                    <TextInput
+                      style={[styles.searchInput, { color: colors.text }]}
+                      value={input}
+                      onChangeText={setInput}
+                      placeholder={types.length > 0 ? t('homeSearch.filters.shopsNamePlaceholder') : t('sendList.searchShops')}
+                      placeholderTextColor={colors.textMuted}
+                      returnKeyType="search"
+                      autoCorrect={false}
                     />
-                    <DeliveryToggle on={deliveryOnly} onPress={() => setDeliveryOnly((value) => !value)} label={t('sendList.deliveryFilter')} />
+                    {input ? (
+                      <Pressable onPress={() => setInput('')} hitSlop={8} accessibilityLabel={t('common.close')}>
+                        <FontAwesome6 name="circle-xmark" size={15} color={colors.textMuted} solid />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.chipRow}>
+                    {filterChip('nearest', t('services.sortNearest'), 'location-arrow', nearest, () => setNearest((on) => !on))}
+                    {filterChip('rated', t('homeSearch.filters.topRated'), 'star', topRated, () => setTopRated((on) => !on))}
+                    {filterChip('trusted', t('homeSearch.filters.trusted'), 'shield-halved', trustedOnly, () => setTrustedOnly((on) => !on))}
+                    {filterChip('delivery', t('sendList.deliveryFilter'), 'truck', deliveryOnly, () => setDeliveryOnly((on) => !on))}
+                  </ScrollView>
+                  <CategoryPicker
+                    title={t('homeSearch.filters.shopType')}
+                    placeholder={t('homeSearch.filters.anyShop')}
+                    options={SHOP_CATEGORIES.map((entry) => ({
+                      key: entry.key,
+                      label: t(`businessProfile.categories.${entry.key}`),
+                      icon: entry.icon,
+                    }))}
+                    selected={types}
+                    onChange={setTypes}
+                    clearable
+                    fieldIcon="filter"
+                  />
                   </View>
                 </>
               )}
@@ -493,8 +557,24 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
 }
 
 const styles = StyleSheet.create({
-  filterRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  flex1: { flex: 1 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 50, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: fonts.regular, padding: 0 },
+  filterCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    padding: 12,
+    gap: 10,
+    shadowColor: '#0B3A8A',
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    // No Android elevation: it shows through translucent glass as a grey box (as on the tab bar).
+  },
+  chipRow: { gap: 8, paddingRight: 4 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, borderRadius: 17, paddingHorizontal: 13 },
+  filterChipOff: { borderWidth: 1 },
+  filterText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12, includeFontPadding: false },
   container: { flex: 1 },
   flex: { flex: 1 },
   gap: { gap: 12 },

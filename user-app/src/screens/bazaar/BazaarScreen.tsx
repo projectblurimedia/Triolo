@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -12,30 +11,39 @@ import { Avatar } from '@/components/WorkerMiniCard';
 import { ShopMiniCard } from '@/components/ShopMiniCard';
 import { NearbyResultDetailModal } from '@/components/NearbyResultDetailModal';
 import { SendListModal } from '@/components/SendListModal';
+import { ChooseListModal } from '@/components/ChooseListModal';
+import { ContinueSteps } from '@/components/ContinueSteps';
+import { NearbyHero } from '@/components/NearbyHero';
+import { SectionHeader } from '@/components/SectionHeader';
+import { useTrustedIds } from '@/hooks/useSubscription';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
+import { MainTabParamList } from '@/navigation/types';
+import { withLocation } from '@/utils/ensureLocationOn';
 import { BusinessProfileCard } from '@/components/BusinessProfileCard';
 import { SHOP_CATEGORIES } from '@/constants/categories';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
 import { SERVICES_RADIUS_KM } from '@/hooks/useNearbyWorkers';
-import { useListStore } from '@/state/listStore';
-import { BusinessNearbyResult, businessesService, NearbyShopSort } from '@/services/businessesService';
+import { BusinessNearbyResult, businessesService } from '@/services/businessesService';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistanceValue } from '@/utils/nearbyResult';
-import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { HomeSearchModal } from '@/components/HomeSearchModal';
-import { CategoryPicker } from '@/components/CategoryPicker';
-import { DeliveryToggle } from '@/components/DeliveryToggle';
 
 const SHOP_LIMIT = 50;
+// "Every shop nearby" in the single-list view (the blue card's See all).
+const ALL = '__all__';
 const TOP_RATED_LIMIT = 10;
 
 /**
  * Bazaar tab — verified shops near the device, the shop-side twin of the Services tab:
- *  - a "Send your list" banner (Prepare List → a nearby shop packs it)
- *  - category chips with nearby counts, a Delivery filter, and Nearest / Top Rated
- *  - "All": a Top Rated Near You row, then one row per category with "See all";
- *    a single category: the full list
+ *  - one search bar; tapping it opens the search screen, where the filters live (Nearest /
+ *    Top rated, Trusted, Delivery, shop type)
+ *  - orders still in progress, one tap from their screen
+ *  - a "Send your list" banner: pick one of your lists (or make a new one), then a shop
+ *  - a Top Rated Near You row, then one row per kind of shop with "See all" (the full list)
  * Tapping a shop opens its profile (rating, reviews, favorite, "Order from this shop").
  * The account's own Business profile (if any) keeps its summary card at the top.
  */
@@ -44,18 +52,18 @@ export function BazaarScreen() {
   const { colors } = useThemeColors();
   const { data: businessProfile } = useMyBusinessProfile();
   const [searchVisible, setSearchVisible] = useState(false);
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const [category, setCategory] = useState<string | null>(null);
-  const [deliveryOnly, setDeliveryOnly] = useState(false);
-  const [sort, setSort] = useState<NearbyShopSort>('distance');
   const [selectedShop, setSelectedShop] = useState<BusinessNearbyResult | null>(null);
-  const [sendVisible, setSendVisible] = useState(false);
-  const listCount = useListStore((state) => state.lists.length);
+  // Send your list: first pick a list (or make one), then the shop.
+  const [chooseListVisible, setChooseListVisible] = useState(false);
+  const [sendListId, setSendListId] = useState<string | null>(null);
 
   const { location, refresh: refreshLocation, recheck: recheckLocation } = useDeviceLocation();
   const coords = location.status === 'ready' ? location : null;
 
   const shopsQuery = (shopCategory: string | null) => ({
-    queryKey: ['businesses', 'nearby', 'bazaar', coords?.latitude, coords?.longitude, shopCategory, deliveryOnly, sort],
+    queryKey: ['businesses', 'nearby', 'bazaar', coords?.latitude, coords?.longitude, shopCategory],
     queryFn: () =>
       businessesService.searchNearby({
         latitude: coords!.latitude,
@@ -63,23 +71,20 @@ export function BazaarScreen() {
         radiusKm: SERVICES_RADIUS_KM,
         limit: SHOP_LIMIT,
         shopCategory,
-        deliveryOnly,
-        sort,
       }),
     staleTime: 60_000,
   });
   // The "All" set always loads — it also drives the per-category counts on the chips.
   const allShops = useQuery({ ...shopsQuery(null), enabled: coords !== null });
-  const categoryShops = useQuery({ ...shopsQuery(category), enabled: coords !== null && category !== null });
-  const activeQuery = category ? categoryShops : allShops;
+  const showAll = category === ALL;
+  const categoryShops = useQuery({ ...shopsQuery(category), enabled: coords !== null && category !== null && !showAll });
+  const activeQuery = category && !showAll ? categoryShops : allShops;
 
-  const countsByCategory = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const shop of allShops.data ?? []) {
-      for (const key of shop.shopCategories) counts[key] = (counts[key] ?? 0) + 1;
-    }
-    return counts;
-  }, [allShops.data]);
+  const trustedIds = useTrustedIds();
+  const trustedNearby = useMemo(
+    () => (allShops.data ?? []).filter((entry) => !!trustedIds.data?.business?.includes(entry.id)).slice(0, TOP_RATED_LIMIT),
+    [allShops.data, trustedIds.data],
+  );
 
   const topRated = useMemo(
     () =>
@@ -98,7 +103,7 @@ export function BazaarScreen() {
   const onRefresh = () => {
     recheckLocation();
     allShops.refetch();
-    if (category) categoryShops.refetch();
+    if (category && !showAll) categoryShops.refetch();
   };
 
   const categoryLabel = (keys: string[]) =>
@@ -139,15 +144,19 @@ export function BazaarScreen() {
     </Pressable>
   );
 
-  const renderSectionHeader = (title: string, onSeeAll?: () => void) => (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      {onSeeAll ? (
-        <Pressable onPress={onSeeAll} hitSlop={8}>
-          <Text style={[styles.seeAll, { color: colors.primary }]}>{t('services.seeAll')}</Text>
-        </Pressable>
-      ) : null}
-    </View>
+  const renderSectionHeader = (
+    title: string,
+    icon: React.ComponentProps<typeof FontAwesome6>['name'],
+    options: { count?: number; onSeeAll?: () => void; tone?: 'blue' | 'gold' | 'green' } = {},
+  ) => (
+    <SectionHeader
+      title={title}
+      icon={icon}
+      count={options.count}
+      tone={options.tone}
+      onSeeAll={options.onSeeAll}
+      seeAllLabel={t('services.seeAll')}
+    />
   );
 
   const renderState = (
@@ -202,17 +211,51 @@ export function BazaarScreen() {
       return renderState(
         'store-slash',
         t('bazaar.emptyTitle'),
-        deliveryOnly ? t('bazaar.emptyDeliveryMessage') : t('bazaar.emptyMessage'),
+        t('bazaar.emptyMessage'),
       );
     }
     if (category) {
-      return <View style={styles.list}>{shops.map(renderWideCard)}</View>;
+      return (
+        <>
+          {/* One kind of shop: say which, with the way back to all of them. */}
+          <View style={[styles.categoryBar, { backgroundColor: `${colors.primary}10` }]}>
+            <View style={styles.flex}>
+              <Text style={[styles.categoryBarTitle, { color: colors.text }]} numberOfLines={1}>
+                {showAll
+                  ? t('bazaar.allShopsNearby')
+                  : category
+                      .split(',')
+                      .map((key) => t(`businessProfile.categories.${key}`))
+                      .join(', ')}
+              </Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+                {t('bazaar.shopsNearbyCount', { count: shops.length })}
+              </Text>
+            </View>
+            <Pressable onPress={() => setCategory(null)} hitSlop={8} style={styles.showAll}>
+              <FontAwesome6 name="xmark" size={12} color={colors.primary} solid />
+              <Text style={[styles.seeAll, { color: colors.primary }]}>{t('bazaar.allShops')}</Text>
+            </Pressable>
+          </View>
+          <View style={styles.list}>{shops.map(renderWideCard)}</View>
+        </>
+      );
     }
     return (
       <>
+        {trustedNearby.length > 0 ? (
+          <>
+            {renderSectionHeader(t('trusted.label'), 'shield-halved', { tone: 'green', count: trustedNearby.length })}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+              {trustedNearby.map((shop) => (
+                <ShopMiniCard key={shop.id} shop={shop} onPress={() => openShop(shop)} />
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
         {topRated.length > 0 ? (
           <>
-            {renderSectionHeader(t('bazaar.topRatedTitle'))}
+            {renderSectionHeader(t('bazaar.topRatedTitle'), 'star', { tone: 'gold', count: topRated.length })}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
               {topRated.map((shop) => (
                 <ShopMiniCard key={shop.id} shop={shop} onPress={() => openShop(shop)} />
@@ -225,9 +268,10 @@ export function BazaarScreen() {
           if (inCategory.length === 0) return null;
           return (
             <View key={entry.key}>
-              {renderSectionHeader(`${t(`businessProfile.categories.${entry.key}`)} · ${inCategory.length}`, () =>
-                setCategory(entry.key),
-              )}
+              {renderSectionHeader(t(`businessProfile.categories.${entry.key}`), entry.icon, {
+                count: inCategory.length,
+                onSeeAll: () => setCategory(entry.key),
+              })}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
                 {inCategory.map((shop) => (
                   <ShopMiniCard key={shop.id} shop={shop} onPress={() => openShop(shop)} />
@@ -240,111 +284,40 @@ export function BazaarScreen() {
     );
   };
 
-  const renderChip = (
-    key: string,
-    label: string,
-    active: boolean,
-    onPress: () => void,
-    icon: React.ComponentProps<typeof FontAwesome6>['name'],
-    count?: number,
-  ) => {
-    const content = (
-      <>
-        <FontAwesome6 name={icon} size={12} color={active ? '#FFFFFF' : colors.textMuted} solid />
-        <Text style={[styles.chipLabel, { color: active ? '#FFFFFF' : colors.text }]}>{label}</Text>
-        {count != null ? (
-          <Text style={[styles.chipCount, { color: active ? 'rgba(255,255,255,0.85)' : colors.textMuted }]}>{count}</Text>
-        ) : null}
-      </>
-    );
-    return (
-      <Pressable key={key} onPress={onPress}>
-        {active ? (
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-            {content}
-          </LinearGradient>
-        ) : (
-          <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            {content}
-          </View>
-        )}
-      </Pressable>
-    );
-  };
-
   return (
     <ScreenContainer edges={['left', 'right']}>
       <PullToRefresh refreshing={activeQuery.isRefetching} onRefresh={onRefresh}>
         <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
           <Pressable
-            style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: `${colors.primary}26` }]}
             onPress={() => setSearchVisible(true)}
             accessibilityRole="search"
           >
-            <FontAwesome6 name="magnifying-glass" size={15} color={colors.textMuted} solid />
+            <FontAwesome6 name="magnifying-glass" size={15} color={colors.primary} solid />
             <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
               {t('bazaar.searchPlaceholder')}
             </Text>
           </Pressable>
 
+          <NearbyHero
+            icon="store"
+            title={t('bazaar.shopsNearYou')}
+            subtitle={
+              allShops.data && allShops.data.length > 0
+                ? t('bazaar.shopsNearbyCount', { count: allShops.data.length })
+                : t('bazaar.heroSubtitle')
+            }
+            count={allShops.data?.length ?? null}
+            countCaption={t('services.heroCountCaption')}
+          />
+
+
           {businessProfile ? <BusinessProfileCard profile={businessProfile} /> : null}
 
-          <Pressable onPress={() => setSendVisible(true)}>
-            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
-              <View style={styles.bannerIcon}>
-                <FontAwesome6 name="basket-shopping" size={20} color="#FFFFFF" solid />
-              </View>
-              <View style={styles.flex}>
-                <Text style={styles.bannerTitle}>{t('bazaar.sendListTitle')}</Text>
-                <Text style={styles.bannerText}>
-                  {listCount > 0 ? t('bazaar.sendListReady', { count: listCount }) : t('bazaar.sendListEmpty')}
-                </Text>
-              </View>
-              <FontAwesome6 name="chevron-right" size={13} color="#FFFFFF" solid />
-            </LinearGradient>
-          </Pressable>
+          {/* Lists already sent to a shop and still going (as on Home). */}
+          <ContinueSteps only="orders" />
 
-          <View style={styles.titleRow}>
-            <Text style={[styles.pageTitle, { color: colors.text }]}>{t('bazaar.shopsNearYou')}</Text>
-            <View style={[styles.sortToggle, { backgroundColor: `${colors.primary}10` }]}>
-              {(['distance', 'rating'] as NearbyShopSort[]).map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() => setSort(value)}
-                  style={[styles.sortOption, sort === value ? { backgroundColor: colors.surface } : null]}
-                >
-                  <FontAwesome6
-                    name={value === 'distance' ? 'location-arrow' : 'star'}
-                    size={11}
-                    color={sort === value ? colors.primary : colors.textMuted}
-                    solid
-                  />
-                  <Text style={[styles.sortLabel, { color: sort === value ? colors.primary : colors.textMuted }]}>
-                    {t(value === 'distance' ? 'services.sortNearest' : 'services.sortTopRated')}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
 
-          <View style={styles.filterRow}>
-            <CategoryPicker
-              title={t('bazaar.filterTitle')}
-              placeholder={t('services.allCategories')}
-              allLabel={t('picker.allCount', { count: allShops.data?.length ?? 0 })}
-              options={SHOP_CATEGORIES.map((entry) => ({
-                key: entry.key,
-                label: t(`businessProfile.categories.${entry.key}`),
-                icon: entry.icon,
-              }))}
-              selected={category ? category.split(',') : []}
-              onChange={(keys) => setCategory(keys.length > 0 ? keys.join(',') : null)}
-              counts={countsByCategory}
-              fieldIcon="filter"
-              style={styles.flex1}
-            />
-            <DeliveryToggle on={deliveryOnly} onPress={() => setDeliveryOnly((value) => !value)} label={t('sendList.deliveryFilter')} />
-          </View>
 
           {renderBody()}
         </ScrollView>
@@ -356,15 +329,33 @@ export function BazaarScreen() {
         mode="business"
         result={selectedShop}
       />
-      <SendListModal visible={sendVisible} onClose={() => setSendVisible(false)} />
+      <ChooseListModal
+        visible={chooseListVisible}
+        onClose={() => setChooseListVisible(false)}
+        // Choosing a shop lists shops near you: location is asked for here.
+        onPick={(listId) =>
+          withLocation(() => {
+            setChooseListVisible(false);
+            setSendListId(listId);
+          })
+        }
+        onCreate={() => {
+          setChooseListVisible(false);
+          navigation.navigate('PrepareList', { newList: Date.now() });
+        }}
+      />
+      <SendListModal
+        visible={sendListId !== null}
+        listId={sendListId}
+        onClose={() => setSendListId(null)}
+        onLeave={() => setSendListId(null)}
+      />
       <HomeSearchModal visible={searchVisible} onClose={() => setSearchVisible(false)} initialScope="shops" />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  filterRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 16 },
-  flex1: { flex: 1 },
   // Opens the full search screen, like Home's search bar.
   searchBar: {
     flexDirection: 'row',
@@ -403,6 +394,10 @@ const styles = StyleSheet.create({
   chipCount: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 10 },
   sectionTitle: { ...typography.body, fontFamily: fonts.semiBold },
+  sectionSubtitle: { ...typography.caption, fontSize: 12, marginTop: 1 },
+  categoryBar: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 12, marginTop: 4 },
+  categoryBarTitle: { ...typography.body, fontFamily: fonts.semiBold },
+  showAll: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   seeAll: { ...typography.caption, fontFamily: fonts.semiBold },
   carousel: { gap: 12, paddingRight: 4 },
   metaStrong: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { placeName } from '@/utils/formatAddress';
 import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -35,6 +36,8 @@ import { BlurScope } from './Glass';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { payIfNeeded } from '@/state/payGateStore';
 import { bookingStatusTitle } from '@/utils/bookingStatusText';
+import { waitingBookingIdFrom } from '@/utils/waitingBooking';
+import { WaitCountdown } from './WaitCountdown';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -174,7 +177,14 @@ export function BookingTrackingModal() {
       }
       openBookingTracker(result.bookingRequestId);
     } catch (error) {
-      showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) });
+      // Already asking for this work: show that one instead.
+      const waitingId = waitingBookingIdFrom(error);
+      if (waitingId) {
+        showToast({ variant: 'info', title: t('quickBook.alreadyWaitingTitle'), message: t('quickBook.alreadyWaitingMessage') });
+        openBookingTracker(waitingId);
+      } else {
+        showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) });
+      }
     } finally {
       setRebooking(false);
     }
@@ -309,7 +319,7 @@ export function BookingTrackingModal() {
       {b.locationAddress ? (
         <View style={[styles.card, styles.locationRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <FontAwesome6 name="location-dot" size={14} color={colors.primary} solid />
-          <Text style={[styles.locationText, { color: colors.text }]}>{b.locationAddress}</Text>
+          <Text style={[styles.locationText, { color: colors.text }]}>{placeName(b.locationAddress)}</Text>
         </View>
       ) : null}
     </>
@@ -357,27 +367,102 @@ export function BookingTrackingModal() {
         booking.skillCategories.length === 1
           ? (SKILL_CATEGORIES.find((skill) => skill.key === booking.skillCategories[0])?.icon ?? 'screwdriver-wrench')
           : 'screwdriver-wrench';
+      // Booked personally: waiting for that one worker, not searching.
+      const directName = booking.directWorker && !rebooking ? booking.directWorker.fullName : null;
+      const waitingSteps = [
+        { key: 'sent', label: t('waiting.stepSent'), at: booking.createdAt },
+        {
+          key: 'accept',
+          label: directName ? t('waiting.stepAcceptName', { name: directName }) : t('waiting.stepAcceptAny'),
+          at: null,
+          current: true,
+        },
+        ...STEPS.slice(1).map((step) => ({ key: step.key, label: t(`tracking.step.${step.key}`), at: null })),
+      ];
       return (
-        <View style={styles.center}>
-          <RadarPulse icon={radarIcon} />
-          {/* Booked personally: waiting for that one worker, not searching. */}
-          <Text style={[styles.searchTitle, { color: colors.text }]}>
-            {booking.directWorker && !rebooking
-              ? t('directBook.waitingTitle', { name: booking.directWorker.fullName })
-              : t('quickBook.searchingTitle')}
-          </Text>
-          <Text style={[styles.searchMessage, { color: colors.textMuted }]}>
-            {booking.directWorker && !rebooking
-              ? t('directBook.waitingMessage', { name: booking.directWorker.fullName })
-              : t('quickBook.searchingMessage')}
-          </Text>
-          <Text style={[styles.searchSkills, { color: colors.primary }]}>{skillLabels}</Text>
+        <ScrollView contentContainerStyle={[styles.waitingBody, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
+          <View style={styles.waitingHero}>
+            <RadarPulse icon={radarIcon} />
+            <Text style={[styles.searchTitle, { color: colors.text }]}>
+              {directName ? t('directBook.waitingTitle', { name: directName }) : t('quickBook.searchingTitle')}
+            </Text>
+            <Text style={[styles.searchMessage, { color: colors.textMuted }]}>
+              {directName ? t('directBook.waitingMessage', { name: directName }) : t('quickBook.searchingMessage')}
+            </Text>
+            <Text style={[styles.searchSkills, { color: colors.primary }]}>{skillLabels}</Text>
+          </View>
+
+          {/* How long it waits before ending by itself — changeable right here. */}
+          {rebooking ? null : (
+            <WaitCountdown createdAt={booking.createdAt} kind={directName ? 'directMinutes' : 'quickBookMinutes'} />
+          )}
+
+          {/* The steps; below them, that there is no need to wait here. */}
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('tracking.progress')}</Text>
+            {waitingSteps.map((step, index) => {
+              const done = !!step.at;
+              const current = 'current' in step && step.current;
+              const last = index === waitingSteps.length - 1;
+              return (
+                <View key={step.key} style={styles.stepRow}>
+                  <View style={styles.stepRail}>
+                    <View
+                      style={[
+                        styles.stepDot,
+                        done
+                          ? { backgroundColor: brandColors.success, borderColor: brandColors.success }
+                          : current
+                            ? { borderColor: colors.primary, backgroundColor: `${colors.primary}1F` }
+                            : { borderColor: colors.border },
+                      ]}
+                    >
+                      {done ? <FontAwesome6 name="check" size={9} color="#FFFFFF" solid /> : null}
+                    </View>
+                    {!last ? <View style={[styles.stepLine, { backgroundColor: done ? brandColors.success : colors.border }]} /> : null}
+                  </View>
+                  <View style={styles.stepText}>
+                    <Text
+                      style={[
+                        styles.stepTitle,
+                        { color: done || current ? colors.text : colors.textMuted },
+                        current ? { color: colors.primary } : null,
+                      ]}
+                    >
+                      {step.label}
+                    </Text>
+                    {step.at ? (
+                      <Text style={[styles.stepTime, { color: colors.textMuted }]}>{formatTime(step.at)}</Text>
+                    ) : current ? (
+                      <Text style={[styles.stepTime, { color: colors.primary }]}>{t('waiting.now')}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={[styles.notifyCard, { backgroundColor: `${colors.primary}0F`, borderColor: `${colors.primary}2E` }]}>
+            <View style={[styles.notifyIcon, { backgroundColor: `${colors.primary}1F` }]}>
+              <FontAwesome6 name="bell" size={15} color={colors.primary} solid />
+            </View>
+            <View style={styles.flex}>
+              <Text style={[styles.notifyTitle, { color: colors.text }]}>{t('waiting.notifyTitle')}</Text>
+              <Text style={[styles.notifyText, { color: colors.textMuted }]}>
+                {directName ? t('waiting.notifyName', { name: directName }) : t('waiting.notifyAny')}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.waitingAction}>
+            <Button label={t('waiting.goBack')} onPress={close} />
+          </View>
+
           <CancelButton
             label={t('tracking.cancelBooking')}
             hint={t('tracking.cancelHint')}
             onPress={() => setConfirmCancel(true)}
           />
-        </View>
+        </ScrollView>
       );
     }
 
@@ -530,6 +615,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   retryWrap: { alignSelf: 'stretch', marginTop: 16 },
   expiredIcon: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  flex: { flex: 1 },
+  waitingBody: { padding: 20, gap: 14 },
+  waitingHero: { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
+  waitingAction: { alignSelf: 'stretch' },
+  notifyCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 16, padding: 14 },
+  notifyIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  notifyTitle: { ...typography.body, fontFamily: fonts.semiBold },
+  notifyText: { ...typography.caption, fontSize: 13, lineHeight: 18, marginTop: 2 },
   searchTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginTop: 28, textAlign: 'center' },
   searchMessage: { ...typography.body, textAlign: 'center', marginTop: 6, lineHeight: 20 },
   searchSkills: { ...typography.body, fontFamily: fonts.semiBold, marginTop: 10, textAlign: 'center' },

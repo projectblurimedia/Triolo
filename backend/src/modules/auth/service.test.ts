@@ -28,6 +28,8 @@ function createMockRepository(): MockRepository {
     adminList: jest.fn(),
     adminSetStatus: jest.fn(),
     adminStats: jest.fn(),
+    getWaitTimes: jest.fn(),
+    updateWaitTimes: jest.fn(),
   } as unknown as MockRepository;
 }
 
@@ -536,5 +538,32 @@ describe('AuthService Edit Profile', () => {
   it('needs a photo file', async () => {
     const service = new AuthService(createMockRepository() as unknown as AuthRepository);
     await expect(service.setProfilePhoto('account-1', undefined)).rejects.toMatchObject({ code: 'PHOTO_REQUIRED' });
+  });
+});
+
+describe('AuthService wait times', () => {
+  const times = { quickBookMinutes: 10, directMinutes: 300, orderMinutes: 600 };
+
+  it('returns the waiting times of the account', async () => {
+    const repository = createMockRepository();
+    repository.getWaitTimes.mockResolvedValue(times);
+    const service = new AuthService(repository as unknown as AuthRepository);
+    await expect(service.getWaitTimes('account-1')).resolves.toEqual(times);
+  });
+
+  it('saves new waiting times', async () => {
+    const repository = createMockRepository();
+    const next = { quickBookMinutes: 30, directMinutes: 120, orderMinutes: 1440 };
+    repository.updateWaitTimes.mockResolvedValue(next);
+    const service = new AuthService(repository as unknown as AuthRepository);
+    await expect(service.updateWaitTimes('account-1', next)).resolves.toEqual(next);
+    expect(repository.updateWaitTimes).toHaveBeenCalledWith('account-1', next);
+  });
+
+  it('404s for a missing account', async () => {
+    const repository = createMockRepository();
+    repository.getWaitTimes.mockResolvedValue(null);
+    const service = new AuthService(repository as unknown as AuthRepository);
+    await expect(service.getWaitTimes('nobody')).rejects.toMatchObject({ code: 'ACCOUNT_NOT_FOUND' });
   });
 });

@@ -20,10 +20,10 @@ export function useMySubscription() {
  * on and they have no plan and no paid pass left, else null (free). Shown on final buttons;
  * payIfNeeded() takes the payment.
  */
-export function usePayHint(kind: 'book' | 'order'): number | null {
+export function usePayHint(kind: 'book' | 'order' | 'staff_contact'): number | null {
   const { data } = useMySubscription();
   if (!data?.enabled || data.active) return null;
-  if ((data.passes?.[kind] ?? 0) > 0) return null;
+  if (kind !== 'staff_contact' && (data.passes?.[kind] ?? 0) > 0) return null;
   const fee = data.fees?.[kind] ?? 0;
   return fee > 0 ? fee : null;
 }

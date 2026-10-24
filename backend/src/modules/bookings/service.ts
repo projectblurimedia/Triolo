@@ -106,8 +106,9 @@ export class BookingsService {
     accountId: string,
     dto: CreateQuickBookingDto,
   ): Promise<{ bookingRequestId: string; matchedWorkerCount: number }> {
-    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'book')) ?? null;
     const skills = splitSkills(dto.skillCategories);
+    await this.refuseSameWorkWaiting(accountId, skills, null);
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'book')) ?? null;
     const request = await this.repository.createRequest({
       accountId,
       skillCategories: skills.fixed,
@@ -193,6 +194,7 @@ export class BookingsService {
         ? distanceMeters(dto.latitude, dto.longitude, worker.latitude, worker.longitude)
         : null;
 
+    await this.refuseSameWorkWaiting(accountId, skills, worker.id);
     const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'book')) ?? null;
     const request = await this.repository.createRequest({
       accountId,
@@ -225,6 +227,24 @@ export class BookingsService {
 
   /** Polled by user-app's tracking screen: status, worker, live location and (while travelling) the PIN. */
   /** Ends stale Quick Books and gives back what was paid for them. */
+  /**
+   * Booking the same work again while the first request still waits (going back and tapping
+   * Book Nearby once more) would only ask the same workers twice: point to the waiting one.
+   */
+  private async refuseSameWorkWaiting(
+    accountId: string,
+    skills: { fixed: string[]; custom: string[] },
+    targetWorkerId: string | null,
+  ): Promise<void> {
+    await this.expireStale();
+    const waitingId = await this.repository.findWaitingForSameWork(accountId, skills.fixed, skills.custom, targetWorkerId);
+    if (waitingId) {
+      throw AppError.conflict('A request for this work is already waiting for an answer.', 'BOOKING_ALREADY_WAITING', {
+        bookingRequestId: waitingId,
+      });
+    }
+  }
+
   private async expireStale(): Promise<void> {
     const expired = await this.repository.expireStaleBroadcasts();
     if (expired.length > 0) await this.subscriptionStatus?.restorePasses(expired);

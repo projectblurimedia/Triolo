@@ -17,7 +17,7 @@ import { ProblemPost, problemsService } from '@/services/problemsService';
 import { MY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
-import { useAdGate } from './Ads';
+import { useAdGate, useBusyAction } from './Ads';
 
 interface ProblemFormModalProps {
   visible: boolean;
@@ -91,6 +91,7 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
   // Asking for location / showing the ad: a second tap must not post twice.
   const preparing = useRef(false);
   const { adLoading, waitForAd } = useAdGate(visible, 'post_problem');
+  const { busy, run } = useBusyAction();
 
   const handleSubmit = async () => {
     if (!canSubmit || submitting || preparing.current) return;
@@ -253,8 +254,8 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
           ) : null}
           <Button
             label={t(isEditMode ? 'common.saveChanges' : 'problemForm.submit')}
-            onPress={handleSubmit}
-            loading={submitting || adLoading}
+            onPress={() => run(handleSubmit)}
+            loading={submitting || adLoading || busy}
             disabled={!canSubmit}
           />
         </View>

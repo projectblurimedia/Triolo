@@ -75,3 +75,13 @@ export const updateProfileSchema = z
 export const updateLanguageSchema = z.object({
   preferredLanguage,
 });
+
+/** Profile → Waiting Time: how long the customer's requests wait for an answer (minutes). */
+export const updateWaitTimesSchema = z.object({
+  // The same choices for all three: 5 min to 1 day.
+  quickBookMinutes: z.number().int().min(5).max(1440),
+  directMinutes: z.number().int().min(5).max(1440),
+  orderMinutes: z.number().int().min(5).max(1440),
+  // Optional so an older app (three times) still saves; it then keeps its current value.
+  quickOrderMinutes: z.number().int().min(5).max(1440).optional(),
+});
