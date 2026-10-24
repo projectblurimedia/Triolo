@@ -77,7 +77,7 @@ function shopAddress(row: QueryResultRow): string {
 
 // Customer view: the shop's public details (owner phone only once accepted).
 const CUSTOMER_SELECT = `
-  SELECT o.*, b.shop_name, b.shop_photo_urls, b.rating_sum AS shop_rating_sum, b.rating_count AS shop_rating_count,
+  SELECT o.*, b.shop_name, b.shop_photo_urls, b.profile_photo_url AS shop_profile_photo_url, b.rating_sum AS shop_rating_sum, b.rating_count AS shop_rating_count,
          b.latitude AS shop_latitude, b.longitude AS shop_longitude, b.area AS shop_area, b.city AS shop_city,
          oa.mobile_number AS shop_mobile_number
   FROM shop_orders o
@@ -142,12 +142,14 @@ export class OrdersRepository {
    * Ends every order the shop didn't answer in time. Run lazily before orders are read, so
    * nothing has to run on a timer; accept() also refuses a stale order on its own.
    */
-  async expireStale(): Promise<void> {
-    await this.pool.query(
+  async expireStale(): Promise<string[]> {
+    const result = await this.pool.query(
       `UPDATE shop_orders SET status = 'expired', expired_at = now(), updated_at = now()
-       WHERE status = 'placed' AND created_at <= now() - make_interval(mins => $1)`,
+       WHERE status = 'placed' AND created_at <= now() - make_interval(mins => $1)
+       RETURNING id`,
       [ORDER_TTL_MINUTES],
     );
+    return result.rows.map((row) => row.id);
   }
 
   async exists(id: string): Promise<boolean> {
@@ -445,7 +447,8 @@ export class OrdersRepository {
         ...mapOrder(row, items.get(row.id) ?? []),
         shop: {
           name: row.shop_name,
-          photoUrl: row.shop_photo_urls?.[0] ?? null,
+          // The shop's own profile photo only (never one of its shop pictures).
+          photoUrl: row.shop_profile_photo_url ?? null,
           ratingAverage: ratingCount > 0 ? Math.round((Number(row.shop_rating_sum) / ratingCount) * 10) / 10 : null,
           ratingCount,
           latitude: row.shop_latitude ?? null,

@@ -25,8 +25,11 @@ import { PortalHost } from '@/components/Portal';
 import { registerAdPromotions } from '@/utils/adPromotions';
 import { IncomingJobModal } from '@/components/IncomingJobModal';
 import { IncomingOrderModal } from '@/components/IncomingOrderModal';
+import { IncomingRequestsHub } from '@/components/IncomingRequestsHub';
 import { JobTrackingModal } from '@/components/JobTrackingModal';
 import { ShopOrderModal } from '@/components/ShopOrderModal';
+import { SubscribeModal } from '@/components/SubscribeModal';
+import { PayGateSheet } from '@/components/PayGateSheet';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -180,9 +183,15 @@ export default function App() {
         <IncomingJobModal />
         {/* A new shop order pops up the same way, over whatever screen is open. */}
         <IncomingOrderModal />
+        {/* Decides which of the two opens, or one list when several requests come at once. */}
+        <IncomingRequestsHub />
         {/* The worker's live Quick Book job screen — opened from anywhere via jobFocusStore. */}
         <JobTrackingModal />
         <ShopOrderModal />
+        {/* Plans, opened from Profile (Grow your profiles) or the menu. */}
+        <SubscribeModal />
+        {/* Pay once (no plan) before accepting a job / order or publishing a job post. */}
+        <PayGateSheet />
         {/* A local business's ad when the app opens (if the admin has it on). */}
         {/* A local business's ad before a key action (see showAdBefore). */}
         <AdActionHost />

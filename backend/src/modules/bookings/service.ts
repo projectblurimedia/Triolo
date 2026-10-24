@@ -1,4 +1,5 @@
 import { randomInt } from 'crypto';
+import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
 import { WorkersService } from '@/modules/workers/service';
 import { WorkerProfile } from '@/modules/workers/interfaces';
@@ -30,6 +31,7 @@ import {
   TripEvent,
   tripTemplate,
 } from './pushTemplates';
+import { displaySkills, splitSkills } from './skills';
 
 const BOOKING_OFFER_CHANNEL = 'booking-offers';
 const HISTORY_LIMIT = 50;
@@ -67,6 +69,8 @@ export class BookingsService {
     private readonly repository: BookingsRepository,
     private readonly workersService: WorkersService,
     private readonly notificationsService: NotificationsService,
+    // Customer subscriptions (Quick Book / booking a worker) and subscribed workers' head start.
+    private readonly subscriptionStatus?: SubscriptionStatusService,
   ) {}
 
   /** The problems module, told when a trip started from one of its posts ends. */
@@ -102,53 +106,62 @@ export class BookingsService {
     accountId: string,
     dto: CreateQuickBookingDto,
   ): Promise<{ bookingRequestId: string; matchedWorkerCount: number }> {
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'book')) ?? null;
+    const skills = splitSkills(dto.skillCategories);
     const request = await this.repository.createRequest({
       accountId,
-      skillCategories: dto.skillCategories,
+      skillCategories: skills.fixed,
+      customSkills: skills.custom,
       latitude: dto.latitude,
       longitude: dto.longitude,
       locationAddress: dto.locationAddress || null,
       radiusKm: dto.radiusKm,
     });
+    await this.subscriptionStatus?.attachPass(passId, request.id);
 
     const matches = await this.workersService.findMatchingForBroadcast(
       accountId,
-      dto.skillCategories,
+      skills.fixed,
       dto.latitude,
       dto.longitude,
       dto.radiusKm,
+      skills.custom,
     );
 
     if (matches.length > 0) {
+      // Subscribed workers hear first; the others see (and are pushed) the offer after the head start.
+      const headStart = await this.subscriptionStatus?.headStart();
+      const delayFor = (accountId: string) => (headStart && !headStart.subscriberIds.has(accountId) ? headStart.seconds : 0);
       await this.repository.createOffers(
         request.id,
-        matches.map((match) => ({ workerId: match.workerId, distanceMeters: match.distanceMeters })),
+        matches.map((match) => ({ workerId: match.workerId, distanceMeters: match.distanceMeters, delaySeconds: delayFor(match.accountId) })),
       );
 
       // Fire every push in parallel — a slow/failed send to one worker must never delay or
       // block delivery to the others (each is independently best-effort, see pushSender.ts).
-      // dataOnly: true — FCM's own `notification` payload type can't carry Accept/Reject
-      // action buttons on Android, so the client composes and displays the actual
-      // actionable notification itself (see partner-app's backgroundNotificationTask.ts),
-      // which also runs while the app is fully closed.
+      // A normal (OS-shown) notification, not data-only: many phones won't start a closed
+      // app's background service for a data-only message, so it only arrived once the app
+      // was opened. Shown by Android itself, it always arrives; tapping it opens the
+      // full-screen request with Accept / Decline (no buttons on the notification itself).
       await Promise.all(
-        matches.map((match) =>
+        matches.filter((match) => delayFor(match.accountId) === 0).map((match) =>
           this.notificationsService.sendRawPush(
             match.accountId,
             bookingOfferTitle(match.preferredLanguage),
-            bookingOfferBody(match.distanceMeters, dto.skillCategories, match.preferredLanguage),
+            bookingOfferBody(match.distanceMeters, displaySkills(skills.fixed, skills.custom), match.preferredLanguage),
             {
               data: { kind: 'booking_offer', bookingRequestId: request.id },
               tag: request.id,
               channelId: BOOKING_OFFER_CHANNEL,
               priority: 'max',
-              dataOnly: true,
-            },
+              },
           ),
         ),
       );
     }
 
+    // Nobody to ask: the app cancels it, and the payment is kept for next time.
+    if (matches.length === 0) await this.subscriptionStatus?.restorePasses([request.id]);
     return { bookingRequestId: request.id, matchedWorkerCount: matches.length };
   }
 
@@ -165,8 +178,10 @@ export class BookingsService {
     if (worker.accountId === accountId) {
       throw AppError.badRequest('You cannot book yourself.', 'BOOKING_OWN_PROFILE');
     }
+    const skills = splitSkills(dto.skillCategories);
     const offered = new Set<string>(worker.skillCategories);
-    if (!dto.skillCategories.every((skill) => offered.has(skill))) {
+    const ownWords = (worker.otherSkillDescription ?? '').toLowerCase();
+    if (!skills.fixed.every((skill) => offered.has(skill)) || !skills.custom.every((name) => ownWords.includes(name.toLowerCase()))) {
       throw AppError.badRequest('This worker does not do that work.', 'BOOKING_SKILL_MISMATCH');
     }
     const contact = await this.repository.findWorkerContact(worker.id);
@@ -178,28 +193,30 @@ export class BookingsService {
         ? distanceMeters(dto.latitude, dto.longitude, worker.latitude, worker.longitude)
         : null;
 
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'book')) ?? null;
     const request = await this.repository.createRequest({
       accountId,
-      skillCategories: dto.skillCategories,
+      skillCategories: skills.fixed,
+      customSkills: skills.custom,
       latitude: dto.latitude,
       longitude: dto.longitude,
       locationAddress: dto.locationAddress || null,
       radiusKm: 50,
       targetWorkerId: worker.id,
     });
+    await this.subscriptionStatus?.attachPass(passId, request.id);
     await this.repository.createOffers(request.id, [{ workerId: worker.id, distanceMeters: distance ?? 0 }]);
 
     const customerName = (await this.repository.findAccountName(accountId)) ?? '';
     await this.notificationsService.sendRawPush(
       contact.accountId,
       directOfferTitle(contact.preferredLanguage),
-      directOfferBody(customerName, distance, dto.skillCategories, contact.preferredLanguage),
+      directOfferBody(customerName, distance, displaySkills(skills.fixed, skills.custom), contact.preferredLanguage),
       {
         data: { kind: 'booking_offer', bookingRequestId: request.id, direct: 'true' },
         tag: request.id,
         channelId: BOOKING_OFFER_CHANNEL,
         priority: 'max',
-        dataOnly: true,
         audience: 'partner',
       },
     );
@@ -207,8 +224,16 @@ export class BookingsService {
   }
 
   /** Polled by user-app's tracking screen: status, worker, live location and (while travelling) the PIN. */
+  /** Ends stale Quick Books and gives back what was paid for them. */
+  private async expireStale(): Promise<void> {
+    const expired = await this.repository.expireStaleBroadcasts();
+    if (expired.length > 0) await this.subscriptionStatus?.restorePasses(expired);
+  }
+
   async getRequestStatus(accountId: string, bookingRequestId: string): Promise<CustomerBooking> {
-    await this.repository.expireStaleBroadcasts();
+    await this.expireStale();
+    // The customer's tracker asks every few seconds while searching: delayed offers go out on time.
+    await this.releaseDueOffers();
     const request = await this.repository.findByIdForAccount(bookingRequestId, accountId);
     if (!request) {
       throw AppError.notFound('Booking request not found.', 'BOOKING_REQUEST_NOT_FOUND');
@@ -217,7 +242,7 @@ export class BookingsService {
   }
 
   async listMyBookings(accountId: string): Promise<CustomerBooking[]> {
-    await this.repository.expireStaleBroadcasts();
+    await this.expireStale();
     return this.repository.findForCustomer(accountId, HISTORY_LIMIT);
   }
 
@@ -240,6 +265,9 @@ export class BookingsService {
       await this.workersService.recordRating(result.request.acceptedWorkerId, dto.rating as number);
     }
     await this.notify(result, late ? 'cancelled_late' : 'cancelled', 'booking_cancelled');
+    // Cancelled before anyone accepted, or because the worker was late: the payment is kept
+    // for the next booking. Cancelling an accepted, on-time worker uses it up.
+    if (!result.request.acceptedWorkerId || late) await this.subscriptionStatus?.restorePasses([bookingRequestId]);
     // A problem's trip cancelled by the customer reopens the problem for other workers.
     if (result.request.problemPostId && this.lifecycleListener) {
       await this.lifecycleListener.onProblemTripCancelled(result.request.problemPostId);
@@ -265,7 +293,28 @@ export class BookingsService {
   // --- Worker side ---
 
   /** Feeds partner-app's Bookings tab — every offer this worker can still accept. */
+  /** Pushes the delayed offers (workers without the head start) whose time has come. */
+  async releaseDueOffers(): Promise<void> {
+    const due = await this.repository.claimDueOffers().catch(() => []);
+    await Promise.all(
+      due.map((offer) =>
+        this.notificationsService.sendRawPush(
+          offer.accountId,
+          bookingOfferTitle(offer.preferredLanguage as never),
+          bookingOfferBody(offer.distanceMeters, offer.skillCategories as never, offer.preferredLanguage as never),
+          {
+            data: { kind: 'booking_offer', bookingRequestId: offer.bookingRequestId },
+            tag: offer.bookingRequestId,
+            channelId: BOOKING_OFFER_CHANNEL,
+            priority: 'max',
+          },
+        ),
+      ),
+    );
+  }
+
   async getMyOffers(workerAccountId: string): Promise<PendingOffer[]> {
+    await this.releaseDueOffers();
     const profile = await this.workersService.getMyProfile(workerAccountId);
     if (!profile) {
       return [];
@@ -284,7 +333,17 @@ export class BookingsService {
     const latitude = here?.latitude ?? worker.latitude;
     const longitude = here?.longitude ?? worker.longitude;
     if (latitude != null && longitude != null) {
-      await this.repository.addOffersForOpenRequests(worker.id, workerAccountId, worker.skillCategories, latitude, longitude);
+      const headStart = await this.subscriptionStatus?.headStart();
+      const minAge = headStart && !headStart.subscriberIds.has(workerAccountId) ? headStart.seconds : 0;
+      await this.repository.addOffersForOpenRequests(
+        worker.id,
+        workerAccountId,
+        worker.skillCategories,
+        latitude,
+        longitude,
+        minAge,
+        worker.otherSkillDescription ?? null,
+      );
     }
     return this.repository.findPendingOffersForWorker(worker.id);
   }
@@ -309,11 +368,17 @@ export class BookingsService {
 
   async acceptOffer(workerAccountId: string, bookingRequestId: string): Promise<void> {
     const profile = await this.requireWorker(workerAccountId);
+    const passId = (await this.subscriptionStatus?.usePartnerPass(workerAccountId, 'accept')) ?? null;
 
-    const result = await this.repository.acceptOffer(bookingRequestId, profile.id, generateArrivalPin());
+    const result = await this.repository.acceptOffer(bookingRequestId, profile.id, generateArrivalPin()).catch(async (error) => {
+      await this.subscriptionStatus?.restorePasses([], [passId]);
+      throw error;
+    });
     if (!result.won) {
+      await this.subscriptionStatus?.restorePasses([], [passId]);
       throw AppError.conflict('This job has already been taken by another worker.', 'BOOKING_ALREADY_TAKEN');
     }
+    await this.subscriptionStatus?.attachPass(passId, bookingRequestId);
 
     // Best-effort, in parallel: tell the customer, and replace the original notification on
     // every losing worker's device with a "taken" message (same identifier/data-only
@@ -330,7 +395,6 @@ export class BookingsService {
             data: { kind: 'booking_taken', bookingRequestId },
             tag: bookingRequestId,
             channelId: BOOKING_OFFER_CHANNEL,
-            dataOnly: true,
             audience: 'partner',
           },
         ),
@@ -347,6 +411,8 @@ export class BookingsService {
     }
     const problemPostId = result.request.problemPostId;
     await this.notify(result, problemPostId ? 'worker_cancelled_problem' : 'worker_cancelled', 'booking_cancelled');
+    // Not the customer's doing: their payment is kept for the next booking.
+    await this.subscriptionStatus?.restorePasses([bookingRequestId]);
     if (problemPostId && this.lifecycleListener) {
       await this.lifecycleListener.onProblemTripCancelled(problemPostId);
     }
@@ -359,7 +425,10 @@ export class BookingsService {
     // A booking of this worker in particular has nobody else to ask: it ends, and the
     // customer is told so they can try Quick Book.
     const ended = await this.repository.declineDirect(bookingRequestId, profile.id);
-    if (ended) await this.notify(ended, 'worker_declined', 'booking_cancelled');
+    if (ended) {
+      await this.notify(ended, 'worker_declined', 'booking_cancelled');
+      await this.subscriptionStatus?.restorePasses([bookingRequestId]);
+    }
   }
 
   async startTrip(workerAccountId: string, bookingRequestId: string): Promise<void> {
@@ -485,6 +554,7 @@ export class BookingsService {
       });
     };
     await Promise.all([tell(result.customer, 'user'), ...(result.worker ? [tell(result.worker, 'partner')] : [])]);
+    await this.subscriptionStatus?.restorePasses([id]);
     if (result.request.problemPostId && this.lifecycleListener) {
       await this.lifecycleListener.onProblemTripCancelled(result.request.problemPostId);
     }

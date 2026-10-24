@@ -32,7 +32,7 @@ export class ServicePromotionResolver implements PromotionResolver {
       return {
         kind,
         name: worker.accountFullName,
-        photoUrl: worker.profilePhotoUrl ?? worker.portfolioPhotoUrls[0] ?? null,
+        photoUrl: worker.profilePhotoUrl ?? null,
         tags: worker.skillCategories.filter((code) => code !== 'other'),
         customTags: split(worker.otherSkillDescription),
         headline: null,
@@ -51,7 +51,7 @@ export class ServicePromotionResolver implements PromotionResolver {
       return {
         kind,
         name: shop.shopName,
-        photoUrl: shop.profilePhotoUrl ?? shop.shopPhotoUrls[0] ?? null,
+        photoUrl: shop.profilePhotoUrl ?? null,
         tags: shop.shopCategories.filter((code) => code !== 'other'),
         customTags: split(shop.otherCategoryDescription),
         headline: null,

@@ -1,4 +1,4 @@
-import { NotificationsService } from './service';
+import { NotificationsService, setProfileViewerReveal } from './service';
 import { NotificationsRepository } from './repository';
 import { AppNotification } from './interfaces';
 import * as pushSender from './pushSender';
@@ -57,6 +57,7 @@ describe('NotificationsService.notifyProfileViewed', () => {
       type: 'profile_view',
       title: 'Profile Viewed',
       body: 'Someone viewed your profile.',
+      actorAccountId: 'viewer-1',
     });
   });
 
@@ -82,7 +83,7 @@ describe('NotificationsService.notifyProfileViewed', () => {
       'device-token-123',
       'Profile Viewed',
       'Someone viewed your profile.',
-      undefined,
+      { data: { notificationId: 'notification-1' } },
     );
   });
 
@@ -99,13 +100,16 @@ describe('NotificationsService.notifyProfileViewed', () => {
 });
 
 describe('NotificationsService.listForAccount', () => {
-  it('returns the repository result unchanged', async () => {
+  it('returns the repository result, with no viewer for a partner who isn\'t subscribed', async () => {
     const repo = createMockRepository();
     const result = { items: [buildNotification()], unreadCount: 1 };
     repo.findForAccount.mockResolvedValue(result);
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
-    await expect(service.listForAccount('account-1')).resolves.toBe(result);
+    await expect(service.listForAccount('account-1')).resolves.toEqual({
+      items: [{ ...buildNotification(), createdAt: expect.any(Date), viewer: null }],
+      unreadCount: 1,
+    });
     expect(repo.findForAccount).toHaveBeenCalledWith('account-1', 50);
   });
 });
@@ -286,5 +290,34 @@ describe('push tokens per app', () => {
 
     expect(repository.upsertPushToken).toHaveBeenCalledWith('account-1', 'phone', 'partner');
     expect(repository.removePushToken).toHaveBeenCalledWith('account-1', 'partner', 'phone');
+  });
+});
+
+describe('NotificationsService — who viewed (subscribed partners)', () => {
+  afterEach(() => setProfileViewerReveal(async () => false));
+
+  it('a subscribed partner sees the viewer’s name, never their number', async () => {
+    setProfileViewerReveal(async () => true);
+    const repo = createMockRepository();
+    repo.findForAccount.mockResolvedValue({
+      items: [{ ...buildNotification(), actorAccountId: 'viewer-1', actorName: 'Haritha Kotha', actorMobile: '9491754784' }],
+      unreadCount: 1,
+    });
+    const service = new NotificationsService(repo as unknown as NotificationsRepository);
+    const list = await service.listForAccount('account-1');
+    expect(list.items[0]).toMatchObject({ title: 'Haritha Kotha viewed your profile', viewer: { name: 'Haritha Kotha' } });
+    expect(JSON.stringify(list.items[0])).not.toContain('9491754784');
+    expect(list.items[0]).not.toHaveProperty('actorMobile');
+  });
+
+  it('without a subscription the viewer stays hidden', async () => {
+    const repo = createMockRepository();
+    repo.findForAccount.mockResolvedValue({
+      items: [{ ...buildNotification(), actorAccountId: 'viewer-1', actorName: 'Haritha Kotha', actorMobile: '9491754784' }],
+      unreadCount: 1,
+    });
+    const service = new NotificationsService(repo as unknown as NotificationsRepository);
+    const list = await service.listForAccount('account-1');
+    expect(list.items[0]).toMatchObject({ title: 'Profile Viewed', viewer: null });
   });
 });

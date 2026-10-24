@@ -112,6 +112,8 @@ export interface WorkerJob extends BookingRequest {
 export interface CreateBookingRequestParams {
   accountId: string;
   skillCategories: string[];
+  /** Partner-made skills asked for (names), alongside 'other' in skillCategories. */
+  customSkills?: string[];
   latitude: number;
   longitude: number;
   locationAddress: string | null;
@@ -122,6 +124,17 @@ export interface CreateBookingRequestParams {
 export interface BookingOfferInsert {
   workerId: string;
   distanceMeters: number;
+  /** Seconds before this worker sees (and is pushed) the offer: the subscribers' head start. */
+  delaySeconds?: number;
+}
+
+/** A delayed offer whose time has come: pushed now. */
+export interface DueOffer {
+  bookingRequestId: string;
+  distanceMeters: number;
+  skillCategories: string[];
+  accountId: string;
+  preferredLanguage: string;
 }
 
 /** A worker's own view of one still-open offer — feeds partner-app's Bookings tab list. */

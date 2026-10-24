@@ -1,28 +1,30 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, Vibration, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { IncomingRequestScreen } from './IncomingRequestScreen';
-import { useShopOrders } from '@/hooks/useShopOrders';
+import { useShopOrderAction, useShopOrders } from '@/hooks/useShopOrders';
+import { shopOrdersService } from '@/services/shopOrdersService';
+import { showToast } from '@/state/toastStore';
+import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { useAuthStore } from '@/state/authStore';
 import { openShopOrder, useShopOrderFocusStore } from '@/state/shopOrderFocusStore';
+import { useIncomingStore } from '@/state/incomingStore';
 import { ShopOrder } from '@/services/shopOrdersService';
 import { formatDistance } from '@/utils/formatDistance';
 import { typography, useThemeColors } from '@/theme';
 
 // Lets the order screen finish fading in on top before this one closes underneath it.
 const MODAL_HANDOFF_MS = 350;
-// A list this fresh when the app first loads still pops up (the push may have been missed).
-const FRESH_ORDER_MS = 2 * 60 * 1000;
 const PREVIEW_ITEMS = 4;
 
 /**
  * The shop's "new order" takeover — the same full-screen request screen as a Quick Book job.
- * Mounted once at the app root. It opens whenever the shop's order list (polled every few
- * seconds) shows a list in `placed` that hasn't been seen yet, so it pops up over whatever
- * screen the shopkeeper is on. "Open Order" opens the order screen (accept, pack, bill);
- * "Later" just closes this — the order stays in Bookings → Orders.
+ * Mounted once at the app root; IncomingRequestsHub opens it (incomingStore.orderId) when a
+ * list in `placed` comes in on its own, so it pops up over whatever screen is open. "Open Order" opens the order screen (accept, pack, bill);
+ * "Decline" turns the list down (the customer is told to try another shop); Back just closes
+ * this — the order stays in Bookings → Orders.
  */
 export function IncomingOrderModal() {
   const { t } = useTranslation();
@@ -31,32 +33,11 @@ export function IncomingOrderModal() {
   const { data: shop } = useMyBusinessProfile(!!accessToken);
   const { data: orders } = useShopOrders(!!shop);
   const orderScreenOpen = useShopOrderFocusStore((state) => state.orderId !== null);
-  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const focusedId = useIncomingStore((state) => state.orderId);
+  const clearOrder = useIncomingStore((state) => state.clearOrder);
   const [handingOff, setHandingOff] = useState(false);
-  const seenRef = useRef<Set<string> | null>(null);
   const lastOrderRef = useRef<ShopOrder | null>(null);
-
-  useEffect(() => {
-    if (!orders) return;
-    const placed = orders.filter((order) => order.status === 'placed');
-    if (seenRef.current === null) {
-      seenRef.current = new Set(placed.map((order) => order.id));
-      const fresh = placed.find((order) => Date.now() - new Date(order.createdAt).getTime() < FRESH_ORDER_MS);
-      if (fresh) {
-        setFocusedId(fresh.id);
-        Vibration.vibrate([0, 400, 200, 400]);
-      }
-      return;
-    }
-    const seen = seenRef.current;
-    const fresh = placed.find((order) => !seen.has(order.id));
-    placed.forEach((order) => seen.add(order.id));
-    // Don't pop up over the order screen itself.
-    if (fresh && !focusedId && !useShopOrderFocusStore.getState().orderId) {
-      setFocusedId(fresh.id);
-      Vibration.vibrate([0, 400, 200, 400]);
-    }
-  }, [orders, focusedId]);
+  const declineOrder = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.decline(id));
 
   const liveOrder = orders?.find((order) => order.id === focusedId) ?? null;
   if (liveOrder) lastOrderRef.current = liveOrder;
@@ -64,14 +45,31 @@ export function IncomingOrderModal() {
   // Accepted, cancelled or expired while this was up.
   const gone = !!focusedId && !handingOff && (!liveOrder || liveOrder.status !== 'placed');
 
-  const close = () => setFocusedId(null);
+  const close = () => clearOrder();
+
+  const decline = () => {
+    if (!order || gone) {
+      close();
+      return;
+    }
+    declineOrder.mutate(
+      { id: order.id },
+      {
+        onSuccess: () => {
+          showToast({ variant: 'info', title: t('shopOrders.declinedToast') });
+          close();
+        },
+        onError: (err) => showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(err, t) }),
+      },
+    );
+  };
 
   const openOrder = () => {
     if (!order) return;
     setHandingOff(true);
     openShopOrder(order.id);
     setTimeout(() => {
-      setFocusedId(null);
+      clearOrder();
       setHandingOff(false);
     }, MODAL_HANDOFF_MS);
   };
@@ -86,7 +84,7 @@ export function IncomingOrderModal() {
   return (
     <IncomingRequestScreen
       visible={focusedId !== null && !orderScreenOpen}
-      onRequestClose={close}
+      onRequestClose={() => !declineOrder.isPending && close()}
       kicker={t('shopOrders.newOrderKicker')}
       icon="basket-shopping"
       state={gone ? 'gone' : order ? 'ready' : 'loading'}
@@ -109,13 +107,19 @@ export function IncomingOrderModal() {
           </View>
         ) : null
       }
-      decline={{ label: t(gone ? 'common.close' : 'shopOrders.later'), icon: 'clock', onPress: close, disabled: handingOff }}
+      decline={{
+        label: t(gone ? 'common.close' : 'shopOrders.decline'),
+        icon: 'xmark',
+        onPress: decline,
+        loading: declineOrder.isPending,
+        disabled: handingOff || declineOrder.isPending,
+      }}
       accept={{
         label: t('shopOrders.openOrder'),
         icon: 'arrow-right',
         onPress: openOrder,
         loading: handingOff,
-        disabled: !order || gone,
+        disabled: !order || gone || declineOrder.isPending,
       }}
     />
   );

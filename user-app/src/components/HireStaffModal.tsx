@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from './Button';
+import { CategoryPicker } from './CategoryPicker';
 import { LoadingIndicator } from './LoadingIndicator';
 import { PullToRefresh } from './PullToRefresh';
 import { ToastHost } from './ToastHost';
@@ -23,7 +24,7 @@ import {
 } from '@/services/jobSeekersService';
 import { formatRupees } from '@/services/ordersService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
-import { callPhone } from '@/utils/tripLinks';
+import { callStaff } from '@/utils/callStaff';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { useAdGate } from './Ads';
@@ -99,6 +100,34 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
     if (!started) begin();
   };
 
+  // The kinds of work, for the dropdowns (A–Z inside the picker).
+  const workOptions = JOB_CATEGORIES.filter((entry) => entry.key !== 'other').map((entry) => ({
+    key: entry.key,
+    label: t(`hireStaff.categories.${entry.key}`),
+    icon: entry.icon,
+  }));
+
+  /** A kind of work from the dropdown: a listed one filters by it, anything else (typed by someone) searches by name. */
+  const chooseWork = (key?: string) => {
+    if (!key) {
+      // Cleared: back to the start — nobody is listed until a kind of work is chosen again.
+      setCategory(null);
+      setQuery('');
+      setAppliedQuery('');
+      setStarted(false);
+      return;
+    }
+    if (JOB_CATEGORIES.some((entry) => entry.key === key)) {
+      setQuery('');
+      setAppliedQuery('');
+      pick(() => setCategory(key as JobCategory));
+    } else {
+      setQuery(key);
+      setAppliedQuery(key);
+      pick(() => setCategory(null));
+    }
+  };
+
   /** Runs the typed search (the first one also asks for location and shows the ad). */
   const submitSearch = () => {
     setAppliedQuery(query.trim());
@@ -149,7 +178,7 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
         onPress={() => setSelected(item)}
       >
         <View style={styles.cardTop}>
-          <Avatar photoUrl={item.photoUrl ?? undefined} name={item.fullName} size={50} />
+          <Avatar photoUrl={item.photoUrl ?? undefined} name={item.fullName} size={50} seal={{ kind: 'job_post', id: item.id }} />
           <View style={styles.flex}>
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
               {item.fullName}
@@ -221,12 +250,12 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
               <FontAwesome6 name="phone" size={12} color={brandColors.success} solid />
             </View>
             <Text style={[styles.phone, { color: colors.text }]} selectable>
-              {item.mobileNumber}
+              {item.mobileNumber ?? t('hireStaff.numberHidden')}
             </Text>
           </View>
-          <Pressable onPress={() => callPhone(item.mobileNumber)} accessibilityLabel={`${t('hireStaff.call')} ${item.fullName}`}>
+          <Pressable onPress={() => callStaff(item, () => results.refetch())} accessibilityLabel={`${t('hireStaff.call')} ${item.fullName}`}>
             <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>
-              <FontAwesome6 name="phone" size={13} color="#FFFFFF" solid />
+              <FontAwesome6 name={item.mobileNumber ? 'phone' : 'lock-open'} size={13} color="#FFFFFF" solid />
               <Text style={styles.callText}>{t('hireStaff.call')}</Text>
             </LinearGradient>
           </Pressable>
@@ -241,30 +270,6 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[styles.intro, { paddingBottom: insets.bottom + 28 }]}
     >
-      <Text style={[styles.introHeading, { color: colors.text }]}>{t('hireStaff.chooseType')}</Text>
-      <View style={styles.tiles}>
-        {JOB_CATEGORIES.map((entry, index) => {
-          const tint = TILE_COLORS[index % TILE_COLORS.length];
-          return (
-            <Pressable
-              key={entry.key}
-              onPress={() => pick(() => setCategory(entry.key))}
-              style={({ pressed }) => [
-                styles.tile,
-                { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
-              ]}
-            >
-              <View style={[styles.tileIcon, { backgroundColor: `${tint}16` }]}>
-                <FontAwesome6 name={entry.icon as never} size={18} color={tint} solid />
-              </View>
-              <Text style={[styles.tileText, { color: colors.text }]} numberOfLines={2}>
-                {t(`hireStaff.categories.${entry.key}`)}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
       <Text style={[styles.introHeading, { color: colors.text }]}>{t('hireStaff.howTitle')}</Text>
       <View style={[styles.howCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {(
@@ -379,44 +384,21 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
 
         {/* Search and filters sit below the header — headers carry only the title. */}
         <View style={styles.filters}>
-          <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Pressable onPress={submitSearch} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.search')}>
-              <FontAwesome6 name="magnifying-glass" size={14} color={colors.primary} solid />
-            </Pressable>
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t('hireStaff.searchPlaceholder')}
-              placeholderTextColor={colors.textMuted}
-              returnKeyType="search"
-              onSubmitEditing={submitSearch}
-              maxLength={60}
-            />
-            {query ? (
-              <Pressable
-                onPress={() => {
-                  setQuery('');
-                  setAppliedQuery('');
-                }}
-                hitSlop={8}
-              >
-                <FontAwesome6 name="circle-xmark" size={15} color={colors.textMuted} solid />
-              </Pressable>
-            ) : null}
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            {chip('all', t('hireStaff.all'), started && category === null, () => pick(() => setCategory(null)))}
-            {JOB_CATEGORIES.map((entry) =>
-              chip(
-                entry.key,
-                t(`hireStaff.categories.${entry.key}`),
-                started && category === entry.key,
-                () => pick(() => setCategory(entry.key)),
-                entry.icon,
-              ),
-            )}
-          </ScrollView>
+          {/* What kind of work: one searchable dropdown (it also finds work people typed themselves). */}
+          <CategoryPicker
+            title={t('hireStaff.chooseType')}
+            placeholder={t('hireStaff.selectType')}
+            options={workOptions}
+            selected={category ? [category] : appliedQuery ? [appliedQuery] : []}
+            onChange={([key]) => chooseWork(key)}
+            single
+            searchCustom={jobSeekersService.customTitles}
+            customIcon="user-tie"
+            fieldIcon="user-tie"
+            clearable
+          />
+          {/* Pay and sort once a kind of work is chosen. */}
+          {category || appliedQuery ? (
           <View style={styles.optionRow}>
             <View style={[styles.segment, { backgroundColor: `${colors.primary}10` }]}>
               {([null, 'daily', 'monthly'] as (PayPeriod | null)[]).map((value) => (
@@ -447,6 +429,7 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
               ))}
             </View>
           </View>
+          ) : null}
         </View>
 
         {renderBody()}

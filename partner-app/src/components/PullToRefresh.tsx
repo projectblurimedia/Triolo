@@ -11,6 +11,7 @@ import React, {
 } from 'react';
 import {
   Animated,
+  AppState,
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -32,10 +33,17 @@ const BUBBLE = 40;
 const MIN_SPIN_MS = 700;
 const DONE_MS = 420;
 const MAX_WAIT_MS = 15000;
-// Until the list is seen resting past the room, it's placed there again every so often (a
-// placement made while something covers the screen — the app-open ad — can be lost).
-const PLACE_RETRY_MS = 400;
-const PLACE_RETRY_FOR_MS = 30000;
+// Settling: the watchdog's beat, how long the list must be still first, and when a fling
+// that never reported its end is treated as over.
+const WATCHDOG_MS = 250;
+const SETTLE_AFTER_MS = 260;
+const STUCK_FLING_MS = 900;
+// How long our own animated scroll (opening / closing the room) is left alone.
+const AUTO_SCROLL_MS = 380;
+// A drag that never reported its end (the touch was taken elsewhere) is treated as over.
+const STUCK_DRAG_MS = 2500;
+// How often a still list re-asserts its place (see the watchdog).
+const PIN_EVERY_MS = 500;
 // The list stays invisible until it's been placed past the room (so it never shows a jump up
 // on opening): shown a moment after that placement, or after this at the latest.
 const REVEAL_AFTER_PLACE_MS = 60;
@@ -48,6 +56,7 @@ interface ScrollableProps {
   onScroll?: (event: ScrollEvent) => void;
   onScrollBeginDrag?: (event: ScrollEvent) => void;
   onScrollEndDrag?: (event: ScrollEvent) => void;
+  onMomentumScrollBegin?: (event: ScrollEvent) => void;
   onMomentumScrollEnd?: (event: ScrollEvent) => void;
   onContentSizeChange?: (width: number, height: number) => void;
   onLayout?: (event: LayoutChangeEvent) => void;
@@ -116,18 +125,25 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
   const [roomOpenable, setRoomOpenable] = useState(false);
   const roomOpenableRef = useRef(false);
   const scroller = useRef<Scroller | null>(null);
-  // Unknown until the list reports; 0 makes the first content size place it past the room
-  // (in case the platform ignores the starting `contentOffset`).
+  // 0 until the list reports, so the first layout places it past the room (in case the
+  // platform ignores the starting `contentOffset`).
   const y = useRef(0);
   const dragging = useRef(false);
-  // The person themselves pulled the room open (only that may refresh or leave it open).
+  const momentum = useRef(false);
+  const lastScrollAt = useRef(0);
+  // While our own animated scroll runs, nothing re-settles the list (it would restart it).
+  const autoScrollUntil = useRef(0);
+  const lastPinAt = useRef(0);
+  // The person themselves pulled the room open (only that may refresh).
   const userPull = useRef(false);
-  // The list has been seen resting past the room at least once.
-  const placed = useRef(false);
   const [revealed, setRevealed] = useState(false);
   const revealedRef = useRef(false);
   const contentHeight = useRef(0);
   const viewport = useRef(0);
+  // Space added under short content so the list can always rest past the room (a minimum
+  // height alone isn't always honoured — then the room stayed showing above the content).
+  const [pad, setPad] = useState(0);
+  const padRef = useRef(0);
   const refreshingRef = useRef(refreshing);
   const onRefreshRef = useRef(onRefresh);
   const mounted = useRef(true);
@@ -154,6 +170,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
   };
 
   const scrollTo = (to: number, animated: boolean) => {
+    if (animated) autoScrollUntil.current = Date.now() + AUTO_SCROLL_MS;
     const target = scroller.current;
     if (target?.scrollToOffset) target.scrollToOffset({ offset: to, animated });
     else target?.scrollTo?.({ x: 0, y: to, animated });
@@ -167,7 +184,8 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
     setOpenable(true);
     const startedAt = Date.now();
     try {
-      await onRefreshRef.current();
+      // A refresh that never answers can't hold the spinner open for ever.
+      await Promise.race([Promise.resolve(onRefreshRef.current()), sleep(MAX_WAIT_MS)]);
     } catch {
       // The screen shows its own error state; the spinner just closes.
     }
@@ -180,32 +198,37 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
     setPhaseBoth('done');
     await sleep(DONE_MS);
     if (!mounted.current) return;
-    setPhaseBoth('idle');
     setOpenable(false);
-    if (y.current < ROOM) scrollTo(ROOM, true);
-  };
-
-  /** After the finger is off: pulled fully open → refresh; closed → back to idle. */
-  const settle = () => {
-    if (dragging.current || busy()) return;
-    if (y.current <= 1) {
-      if (userPull.current) runRefresh();
-      else scrollTo(ROOM, false);
-    } else if (y.current >= ROOM - 1) {
-      setPhaseBoth('idle');
-      setOpenable(false);
-      userPull.current = false;
-    }
+    scrollTo(ROOM, true);
+    // The bubble fades out with the closing room; idle once it's shut.
+    await sleep(AUTO_SCROLL_MS);
+    if (mounted.current && phaseRef.current === 'done') setPhaseBoth('idle');
   };
 
   /**
-   * The room must never be left showing unless the person pulled it open: if the list comes
-   * to rest inside it any other way (content arriving, the keyboard closing, a layout change),
-   * it's closed again.
+   * Whenever the list has come to rest (finger off, no fling, not our own scroll): pulled
+   * past halfway by the person → open fully and refresh; anything else that leaves the room
+   * showing — a short pull, new content, a list swapped in, the keyboard — closes it again.
+   * So the room (and its arrow) can never stay showing on its own.
    */
-  const keepClosed = (animated: boolean) => {
-    if (dragging.current || busy() || userPull.current || roomOpenableRef.current) return;
-    if (y.current < ROOM - 0.5) scrollTo(ROOM, animated);
+  const settle = () => {
+    if (dragging.current || momentum.current || busy() || Date.now() < autoScrollUntil.current) return;
+    const top = y.current;
+    if (top >= ROOM - 0.5) {
+      userPull.current = false;
+      setOpenable(false);
+      if (phaseRef.current === 'pulling') setPhaseBoth('idle');
+      return;
+    }
+    if (userPull.current && ROOM - top >= HALF) {
+      if (top > 1) scrollTo(0, true);
+      runRefresh();
+      return;
+    }
+    userPull.current = false;
+    setOpenable(false);
+    scrollTo(ROOM, revealedRef.current && top > 1);
+    if (phaseRef.current === 'pulling') setPhaseBoth('idle');
   };
 
   const reveal = () => {
@@ -214,7 +237,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
     if (mounted.current) setRevealed(true);
   };
 
-  /** Once the content is tall enough to rest past the room, place it there and then show it. */
+  /** Place the list past the room (out of sight), then show it. */
   const placeThenReveal = () => {
     if (revealedRef.current || viewport.current === 0 || contentHeight.current < viewport.current + ROOM - 1) return;
     scrollTo(ROOM, false);
@@ -222,8 +245,42 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
   };
 
   useEffect(() => {
-    const timer = setTimeout(reveal, REVEAL_AT_LATEST_MS);
-    return () => clearTimeout(timer);
+    // At the latest: place it once more, then show it.
+    const timer = setTimeout(() => {
+      scrollTo(ROOM, false);
+      setTimeout(reveal, REVEAL_AFTER_PLACE_MS);
+    }, REVEAL_AT_LATEST_MS);
+    // A light watchdog: once the list has been still for a moment, settle it. Catches every
+    // case no scroll event reports (a release with no fling, a list that changed under it).
+    const watchdog = setInterval(() => {
+      const still = Date.now() - lastScrollAt.current;
+      if (still > STUCK_FLING_MS) momentum.current = false;
+      if (still > STUCK_DRAG_MS) dragging.current = false;
+      if (still > SETTLE_AFTER_MS) {
+        settle();
+        // Android can move a list back to the top with no scroll event (a screen re-attached
+        // when the app opens or a tab comes back), uncovering the room while we still think
+        // it's in place. So once it's still, its last known place is asserted again — a no-op
+        // when nothing moved, and the gap is closed within a beat when something did.
+        const now = Date.now();
+        if (
+          now - lastPinAt.current > PIN_EVERY_MS &&
+          !dragging.current &&
+          !momentum.current &&
+          !busy() &&
+          !userPull.current &&
+          now >= autoScrollUntil.current &&
+          AppState.currentState === 'active'
+        ) {
+          lastPinAt.current = now;
+          scrollTo(Math.max(y.current, ROOM), false);
+        }
+      }
+    }, WATCHDOG_MS);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(watchdog);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -232,10 +289,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
 
   const onScroll = (event: ScrollEvent) => {
     y.current = event.nativeEvent.contentOffset.y;
-    if (y.current >= ROOM - 1) {
-      placed.current = true;
-      reveal();
-    }
+    lastScrollAt.current = Date.now();
     const pulled = Math.max(0, ROOM - y.current);
     pull.setValue(pulled);
     if (dragging.current && !busy()) {
@@ -246,65 +300,72 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
         userPull.current = true;
       }
     }
-    settle();
     props.onScroll?.(event);
   };
 
   const onScrollBeginDrag = (event: ScrollEvent) => {
     dragging.current = true;
-    placed.current = true;
+    momentum.current = false;
+    autoScrollUntil.current = 0;
+    reveal();
     props.onScrollBeginDrag?.(event);
   };
 
   const onScrollEndDrag = (event: ScrollEvent) => {
     dragging.current = false;
     y.current = event.nativeEvent.contentOffset.y;
-    settle();
-    // A drag that ended inside the room without having pulled it (it was already showing).
-    setTimeout(() => keepClosed(true), 160);
+    lastScrollAt.current = Date.now();
+    // A fling (and its snap) reports its own end; without one this settles it.
+    setTimeout(settle, 140);
     props.onScrollEndDrag?.(event);
   };
 
+  const onMomentumScrollBegin = (event: ScrollEvent) => {
+    momentum.current = true;
+    props.onMomentumScrollBegin?.(event);
+  };
+
   const onMomentumScrollEnd = (event: ScrollEvent) => {
+    momentum.current = false;
     y.current = event.nativeEvent.contentOffset.y;
     settle();
-    keepClosed(true);
     props.onMomentumScrollEnd?.(event);
   };
 
-  const onContentSizeChange = (width: number, height: number) => {
-    // New content (and the room's minimum height, in any order) must not uncover the room.
-    contentHeight.current = height;
-    keepClosed(false);
-    placeThenReveal();
-    props.onContentSizeChange?.(width, height);
+  /** Keeps the content at least a screen plus the room tall, so it can rest past the room. */
+  const fitPad = () => {
+    if (!viewport.current || !contentHeight.current) return;
+    const own = contentHeight.current - padRef.current;
+    const next = Math.max(0, Math.ceil(viewport.current + ROOM - own));
+    if (Math.abs(next - padRef.current) > 1) {
+      padRef.current = next;
+      if (mounted.current) setPad(next);
+    }
   };
 
-  // Keep placing the list past the room until it's seen there (or the person touches it).
-  useEffect(() => {
-    const startedAt = Date.now();
-    const timer = setInterval(() => {
-      if (placed.current || Date.now() - startedAt > PLACE_RETRY_FOR_MS) {
-        clearInterval(timer);
-        return;
-      }
-      keepClosed(false);
-    }, PLACE_RETRY_MS);
-    return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const onContentSizeChange = (width: number, height: number) => {
+    contentHeight.current = height;
+    // Content that shrank pulls the list up with it, without a scroll event: follow it.
+    if (viewport.current) y.current = Math.min(y.current, Math.max(0, height - viewport.current));
+    fitPad();
+    placeThenReveal();
+    settle();
+    props.onContentSizeChange?.(width, height);
+  };
 
   const onLayout = (event: LayoutChangeEvent) => {
     setViewportHeight(event.nativeEvent.layout.height);
     viewport.current = event.nativeEvent.layout.height;
-    keepClosed(false);
+    fitPad();
     placeThenReveal();
+    settle();
     props.onLayout?.(event);
   };
 
   const childRef = (props as { ref?: Ref<unknown> }).ref ?? (child as unknown as { ref?: Ref<unknown> }).ref;
   const setRef = useCallback(
     (node: unknown) => {
+      if (node && node !== scroller.current) y.current = 0;
       scroller.current = node as Scroller | null;
       if (typeof childRef === 'function') childRef(node);
       else if (childRef && typeof childRef === 'object') (childRef as { current: unknown }).current = node;
@@ -313,6 +374,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
   );
 
   const room = <View style={{ height: ROOM }} />;
+  const spacer = pad ? <View style={{ height: pad }} /> : null;
   const isList = props.renderItem !== undefined;
   const scrollable = cloneElement(
     child,
@@ -321,6 +383,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
       onScroll,
       onScrollBeginDrag,
       onScrollEndDrag,
+      onMomentumScrollBegin,
       onMomentumScrollEnd,
       onContentSizeChange,
       onLayout,
@@ -343,10 +406,16 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
                 {renderHeader(props.ListHeaderComponent)}
               </>
             ),
+            ListFooterComponent: (
+              <>
+                {renderHeader((props as { ListFooterComponent?: ScrollableProps['ListHeaderComponent'] }).ListFooterComponent)}
+                {spacer}
+              </>
+            ),
           }
         : {}),
     } as Partial<ScrollableProps>,
-    ...(isList ? [] : [room, props.children]),
+    ...(isList ? [] : [room, props.children, spacer]),
   );
 
   // The bubble rides in the gap the pull opens up, fading and growing in as you pull.
@@ -364,7 +433,10 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
   return (
     <View style={[styles.fill, style]}>
       <View style={[styles.fill, { opacity: revealed ? 1 : 0 }]}>{scrollable}</View>
-      <Animated.View pointerEvents="none" style={[styles.bubbleWrap, { transform: [{ translateY: bubbleY }] }]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.bubbleWrap, { opacity: phase === 'idle' ? 0 : 1, transform: [{ translateY: bubbleY }] }]}
+      >
         <Animated.View
           style={[
             styles.bubble,

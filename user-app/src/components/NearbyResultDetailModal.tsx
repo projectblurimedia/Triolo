@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { VerificationBadge } from './VerificationBadge';
+import { SealedAvatar, TrustedBadge } from './TrustedBadge';
 import { PhotoViewer } from './PhotoViewer';
 import { initialsOf, WorkerProfileFacts, WorkerReviewsSection } from './WorkerProfileGlass';
 import { BookWorkerModal } from './BookWorkerModal';
@@ -57,6 +57,8 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
   const { colors, isDark } = useThemeColors();
   const insets = useSafeAreaInsets();
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  // The profile photo, opened on its own by tapping it in the header.
+  const [avatarPhoto, setAvatarPhoto] = useState<string | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const [stickyVisible, setStickyVisible] = useState(false);
   const stickyVisibleRef = useRef(false);
@@ -144,13 +146,22 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
         onBack={onClose}
         backLabel={t('common.cancel')}
         avatar={
-          w.profilePhotoUrl ? (
-            <SmartImage source={{ uri: w.profilePhotoUrl }} style={styles.compactAvatar} />
-          ) : (
-            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
-              <Text style={styles.compactInitials}>{initialsOf(w.accountFullName)}</Text>
-            </LinearGradient>
-          )
+          <Pressable
+            onPress={() => w.profilePhotoUrl && setAvatarPhoto(w.profilePhotoUrl)}
+            disabled={!w.profilePhotoUrl}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={w.accountFullName}
+          >
+          <SealedAvatar size={COMPACT_AVATAR_SIZE} kind="service" id={w.id}>
+            {w.profilePhotoUrl ? (
+              <SmartImage source={{ uri: w.profilePhotoUrl }} style={styles.compactAvatar} />
+            ) : (
+              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
+                <Text style={styles.compactInitials}>{initialsOf(w.accountFullName)}</Text>
+              </LinearGradient>
+            )}
+          </SealedAvatar>
+          </Pressable>
         }
         title={firstName(w.accountFullName)}
         subtitle={distance}
@@ -165,7 +176,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
           badge={
             <View style={styles.nameBlock}>
               <Text style={[styles.fullName, { color: colors.text }]}>{w.accountFullName}</Text>
-              <VerificationBadge status={w.verificationStatus} />
+              <TrustedBadge kind="service" id={w.id} style={styles.trustedCentre} />
             </View>
           }
         />
@@ -187,7 +198,10 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
           { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: colors.border },
         ]}
       >
-        <Button label={t('directBook.button', { name: firstName(w.accountFullName) })} onPress={() => setBookVisible(true)} />
+        <Button
+          label={t('directBook.button', { name: firstName(w.accountFullName) })}
+          onPress={() => setBookVisible(true)}
+        />
       </View>
       <BookWorkerModal
         worker={bookVisible ? w : null}
@@ -210,13 +224,25 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
         onBack={onClose}
         backLabel={t('common.cancel')}
         avatar={
-          (b.shopPhotoUrls[0] ?? b.profilePhotoUrl) ? (
-            <SmartImage source={{ uri: b.shopPhotoUrls[0] ?? b.profilePhotoUrl }} style={styles.compactAvatar} />
-          ) : (
-            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
-              <FontAwesome6 name="store" size={19} color="#FFFFFF" solid />
-            </LinearGradient>
-          )
+          <Pressable
+            onPress={() => {
+              const photo = b.profilePhotoUrl;
+              if (photo) setAvatarPhoto(photo);
+            }}
+            disabled={!(b.profilePhotoUrl)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={b.shopName}
+          >
+          <SealedAvatar size={COMPACT_AVATAR_SIZE} kind="business" id={b.id}>
+            {(b.profilePhotoUrl) ? (
+              <SmartImage source={{ uri: b.profilePhotoUrl }} style={styles.compactAvatar} />
+            ) : (
+              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.compactAvatar}>
+                <FontAwesome6 name="store" size={19} color="#FFFFFF" solid />
+              </LinearGradient>
+            )}
+          </SealedAvatar>
+          </Pressable>
         }
         title={b.shopName}
         titleLines={2}
@@ -226,17 +252,9 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
       >
         <View style={[styles.card, styles.shopFacts, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <RatingStars average={b.ratingAverage} count={b.ratingCount} variant="full" />
-          <VerificationBadge status={b.verificationStatus} />
+          <TrustedBadge kind="business" id={b.id} />
         </View>
-        {photos.length > 0 ? (
-          <View style={styles.shopGallery}>{renderGallery()}</View>
-        ) : (
-          <View style={styles.heroPlaceholderWrap}>
-            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroPlaceholder}>
-              <FontAwesome6 name="store" size={36} color="#FFFFFF" solid />
-            </LinearGradient>
-          </View>
-        )}
+        {photos.length > 0 ? <View style={styles.shopGallery}>{renderGallery()}</View> : null}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('nearbySearch.detailCategoriesLabel')}</Text>
           <View style={styles.tagRow}>
@@ -300,6 +318,7 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {worker ? renderWorker(worker) : renderBusiness(business as BusinessNearbyResult)}
         <PhotoViewer photos={photos} startIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
+        <PhotoViewer photos={avatarPhoto ? [avatarPhoto] : []} startIndex={avatarPhoto ? 0 : null} onClose={() => setAvatarPhoto(null)} />
       </View>
     </Modal>
   );
@@ -310,6 +329,7 @@ const STICKY_START = 140;
 const STICKY_END = 220;
 
 const styles = StyleSheet.create({
+  trustedCentre: { alignSelf: 'center' },
   container: { flex: 1 },
   flex: { flex: 1 },
   sticky: { position: 'absolute', top: 0, left: 0, right: 0 },
@@ -332,8 +352,8 @@ const styles = StyleSheet.create({
   stickyName: { fontFamily: fonts.semiBold, fontSize: 17, lineHeight: 23 },
   stickyMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   stickyMetaText: { ...typography.caption, fontSize: 12 },
-  nameBlock: { alignSelf: 'stretch', gap: 8 },
-  fullName: { fontFamily: fonts.semiBold, fontSize: 20, lineHeight: 27 },
+  nameBlock: { alignSelf: 'stretch', alignItems: 'center', gap: 8 },
+  fullName: { fontFamily: fonts.semiBold, fontSize: 20, lineHeight: 27, textAlign: 'center' },
   factsTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', alignSelf: 'stretch', gap: 10 },
   distancePill: {
     flexDirection: 'row',

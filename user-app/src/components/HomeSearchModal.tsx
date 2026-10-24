@@ -10,42 +10,46 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { RatingStars } from './RatingStars';
 import { Avatar } from './WorkerMiniCard';
 import { NearbyResultDetailModal } from './NearbyResultDetailModal';
+import { JobSeekerDetailModal, jobSeekerTitle } from './JobSeekerDetailModal';
 import { ToastHost } from './ToastHost';
 import { GlassPanel } from './GlassPanel';
 import { ANDROID_REAL_BLUR } from '@/state/blurTargetStore';
-import { SKILL_CATEGORIES } from '@/constants/categories';
+import { SHOP_CATEGORIES, SKILL_CATEGORIES } from '@/constants/categories';
 import { locationActionLabel, useDeviceLocation } from '@/hooks/useDeviceLocation';
 import { SERVICES_RADIUS_KM } from '@/hooks/useNearbyWorkers';
 import { WorkerNearbyResult, workersService } from '@/services/workersService';
 import { BusinessNearbyResult, businessesService } from '@/services/businessesService';
+import { JOB_CATEGORIES, JobSeeker, jobSeekersService } from '@/services/jobSeekersService';
+import { formatRupees } from '@/services/ordersService';
 import { formatDistanceValue, NearbySearchMode } from '@/utils/nearbyResult';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 interface HomeSearchModalProps {
   visible: boolean;
   onClose: () => void;
-  /** Which results it opens on: Services opens on workers, Bazaar on shops. */
+  /** Services opens it on workers, Bazaar on shops (and it stays there); Home lets you switch. */
   initialScope?: Scope;
 }
 
-export type Scope = 'all' | 'workers' | 'shops';
+export type Scope = 'workers' | 'shops' | 'staff';
 type Row =
   | { kind: 'header'; key: string; title: string }
   | { kind: 'worker'; key: string; worker: WorkerNearbyResult }
-  | { kind: 'shop'; key: string; shop: BusinessNearbyResult };
+  | { kind: 'shop'; key: string; shop: BusinessNearbyResult }
+  | { kind: 'staff'; key: string; person: JobSeeker };
 
 const DEBOUNCE_MS = 350;
 const RESULT_LIMIT = 20;
-const SHOP_SUGGESTIONS = ['grocery', 'restaurant', 'pharmacy', 'electronics', 'clothing'];
+const STAFF_SUGGESTIONS = JOB_CATEGORIES.filter((entry) => entry.key !== 'other');
 
 /**
- * Home's search — one box over BOTH workers and marketplace shops near the device (the
- * Services tab and Nearby Workers/Shops searches are each one-sided). All / Workers / Shops
- * scopes; before typing, suggestion chips (skills and shop categories) fill the box. Uses the
- * same nearby endpoints' free-text `query` (skill/category, name, city, area) and the shared
- * device location; tapping a result opens the shared detail view and records a profile view.
+ * Home's search, all in one: a search box, then Services / Shops / Hire Staff tabs (Services
+ * first). Before typing, the tab's items are listed A–Z (tap one to search it); while typing,
+ * matching items (also ones partners made themselves) come first, then the people nearby.
+ * Uses the nearby endpoints' free-text `query` and the shared device location; tapping a
+ * result opens the shared detail view and records a profile view.
  */
-export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: HomeSearchModalProps) {
+export function HomeSearchModal({ visible, onClose, initialScope }: HomeSearchModalProps) {
   const { t } = useTranslation();
   const { colors, isDark } = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -55,12 +59,13 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
   const suggestionRef = useRef<{ label: string; key: string } | null>(null);
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
-  const [scope, setScope] = useState<Scope>(initialScope);
-  const locked = initialScope !== 'all';
+  const [scope, setScope] = useState<Scope>(initialScope ?? 'workers');
+  const locked = initialScope !== undefined;
   const [selected, setSelected] = useState<{
     mode: NearbySearchMode;
     result: WorkerNearbyResult | BusinessNearbyResult;
   } | null>(null);
+  const [person, setPerson] = useState<JobSeeker | null>(null);
   const { location, refresh: refreshLocation } = useDeviceLocation();
   // The glass search panel floats over the results; content starts below it and scrolls
   // under it (blurred), like the bottom tab bar.
@@ -74,8 +79,9 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
     if (!visible) return;
     setInput('');
     setQuery('');
-    setScope(initialScope);
+    setScope(initialScope ?? 'workers');
     setSelected(null);
+    setPerson(null);
   }, [visible, initialScope]);
 
   useEffect(() => {
@@ -96,7 +102,7 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
         query,
         limit: RESULT_LIMIT,
       }),
-    enabled: searching && scope !== 'shops',
+    enabled: searching && scope === 'workers',
   });
   const shops = useQuery({
     queryKey: ['homeSearch', 'shops', query, coords?.latitude, coords?.longitude],
@@ -108,34 +114,69 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
         query,
         limit: RESULT_LIMIT,
       }),
-    enabled: searching && scope !== 'workers',
+    enabled: searching && scope === 'shops',
+  });
+  const staff = useQuery({
+    queryKey: ['homeSearch', 'staff', query, coords?.latitude, coords?.longitude],
+    queryFn: () =>
+      jobSeekersService.search({
+        latitude: coords!.latitude,
+        longitude: coords!.longitude,
+        radiusKm: SERVICES_RADIUS_KM,
+        query,
+        sort: 'distance',
+      }),
+    enabled: searching && scope === 'staff',
   });
 
-  const workerResults = scope === 'shops' ? [] : (workers.data ?? []);
-  const shopResults = scope === 'workers' ? [] : (shops.data ?? []);
+  const showWorkers = scope === 'workers';
+  const showShops = scope === 'shops';
+  const showStaff = scope === 'staff';
+  const workerResults = showWorkers ? (workers.data ?? []) : [];
+  const shopResults = showShops ? (shops.data ?? []) : [];
+  const staffResults = showStaff ? (staff.data ?? []).slice(0, RESULT_LIMIT) : [];
   const loading =
-    (scope !== 'shops' && workers.isLoading && workers.fetchStatus !== 'idle') ||
-    (scope !== 'workers' && shops.isLoading && shops.fetchStatus !== 'idle');
+    (showWorkers && workers.isLoading && workers.fetchStatus !== 'idle') ||
+    (showShops && shops.isLoading && shops.fetchStatus !== 'idle') ||
+    (showStaff && staff.isLoading && staff.fetchStatus !== 'idle');
 
   const rows: Row[] = [];
   if (workerResults.length > 0) {
-    if (scope === 'all')
-      rows.push({
-        kind: 'header',
-        key: 'h-workers',
-        title: t('homeSearch.workersCount', { count: workerResults.length }),
-      });
     workerResults.forEach((worker) => rows.push({ kind: 'worker', key: `w-${worker.id}`, worker }));
   }
   if (shopResults.length > 0) {
-    if (scope === 'all')
-      rows.push({
-        kind: 'header',
-        key: 'h-shops',
-        title: t('homeSearch.shopsCount', { count: shopResults.length }),
-      });
     shopResults.forEach((shop) => rows.push({ kind: 'shop', key: `s-${shop.id}`, shop }));
   }
+  if (staffResults.length > 0) {
+    staffResults.forEach((entry) => rows.push({ kind: 'staff', key: `j-${entry.id}`, person: entry }));
+  }
+
+  const scopeItems = (
+    scope === 'workers'
+      ? SKILL_CATEGORIES.map((entry) => ({ key: entry.key, label: t(`workerProfile.skills.${entry.key}`), icon: entry.icon as string }))
+      : scope === 'shops'
+        ? SHOP_CATEGORIES.map((entry) => ({ key: entry.key, label: t(`businessProfile.categories.${entry.key}`), icon: entry.icon as string }))
+        : STAFF_SUGGESTIONS.map((entry) => ({ key: entry.key, label: t(`hireStaff.categories.${entry.key}`), icon: entry.icon as string }))
+  ).sort((a, b) => a.label.localeCompare(b.label));
+  const typed = input.trim();
+  // A tapped item shows its label in the box; that's a chosen item, not something typed.
+  const chosen = !!suggestionRef.current && suggestionRef.current.label === input;
+  const matchingItems = typed && !chosen ? scopeItems.filter((item) => item.label.toLowerCase().includes(typed.toLowerCase())) : [];
+  const partnerMade = useQuery({
+    queryKey: ['homeSearch', 'custom', scope, typed],
+    queryFn: () =>
+      scope === 'workers'
+        ? workersService.customSkills(typed)
+        : scope === 'shops'
+          ? businessesService.customCategories(typed)
+          : jobSeekersService.customTitles(typed),
+    enabled: visible && typed.length >= 2 && !chosen,
+    staleTime: 60_000,
+  });
+  const partnerItems = (partnerMade.data ?? [])
+    .filter((name) => !scopeItems.some((item) => item.label.toLowerCase() === name.toLowerCase()))
+    .slice(0, 6);
+  const scopeIcon = scope === 'workers' ? 'screwdriver-wrench' : scope === 'shops' ? 'store' : 'user-tie';
 
   const openWorker = (worker: WorkerNearbyResult) => {
     setSelected({ mode: 'worker', result: worker });
@@ -156,11 +197,42 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
     if (item.kind === 'header') {
       return <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{item.title}</Text>;
     }
+    if (item.kind === 'staff') {
+      const entry = item.person;
+      return (
+        <Pressable
+          style={[styles.resultRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          onPress={() => setPerson(entry)}
+        >
+          <Avatar photoUrl={entry.photoUrl ?? undefined} name={entry.fullName} size={48} seal={{ kind: 'job_post', id: entry.id }} />
+          <View style={styles.resultInfo}>
+            <View style={styles.resultTitleRow}>
+              <Text style={[styles.resultName, { color: colors.text }]} numberOfLines={1}>
+                {entry.fullName}
+              </Text>
+              <View style={[styles.kindPill, { backgroundColor: `${colors.primary}14` }]}>
+                <FontAwesome6 name="user-tie" size={9} color={colors.primary} solid />
+                <Text style={[styles.kindText, { color: colors.primary }]}>{t('homeSearch.staff')}</Text>
+              </View>
+            </View>
+            <Text style={[styles.resultTags, { color: colors.textMuted }]} numberOfLines={1}>
+              {jobSeekerTitle(entry, t)} · {formatRupees(entry.payAmount)} / {t(`hireStaff.per.${entry.payPeriod}`)}
+            </Text>
+            <View style={styles.resultMeta}>
+              <Text style={[styles.resultDistance, { color: colors.primary }]}>
+                {t('nearbySearch.distanceAway', { distance: formatDistanceValue(entry.distanceMeters) })}
+              </Text>
+            </View>
+          </View>
+          <FontAwesome6 name="chevron-right" size={12} color={colors.textMuted} solid />
+        </Pressable>
+      );
+    }
     const isWorker = item.kind === 'worker';
     const name = isWorker ? item.worker.accountFullName : item.shop.shopName;
     const photo = isWorker
-      ? (item.worker.profilePhotoUrl ?? item.worker.portfolioPhotoUrls[0])
-      : (item.shop.shopPhotoUrls[0] ?? item.shop.profilePhotoUrl);
+      ? (item.worker.profilePhotoUrl)
+      : (item.shop.profilePhotoUrl);
     const tags = isWorker
       ? item.worker.skillCategories.filter((k) => k !== 'other').map((k) => t(`workerProfile.skills.${k}`))
       : item.shop.shopCategories.filter((k) => k !== 'other').map((k) => t(`businessProfile.categories.${k}`));
@@ -170,7 +242,16 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
         style={[styles.resultRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
         onPress={() => (isWorker ? openWorker(item.worker) : openShop(item.shop))}
       >
-        <Avatar photoUrl={photo} name={name} size={48} />
+        <Avatar
+          photoUrl={photo}
+          name={name}
+          size={48}
+          seal={
+            isWorker
+              ? { kind: 'service', id: item.worker.id }
+              : { kind: 'business', id: item.shop.id }
+          }
+        />
         <View style={styles.resultInfo}>
           <View style={styles.resultTitleRow}>
             <Text style={[styles.resultName, { color: colors.text }]} numberOfLines={1}>
@@ -220,70 +301,78 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
     </View>
   );
 
-  const renderSuggestions = () => (
+  /** One item tile (A–Z grid before typing, and the matches while typing). */
+  const itemTile = (item: { key: string; label: string; icon: string }, partner = false) => (
+    <Pressable
+      key={`${partner ? 'p' : 'i'}-${item.key}`}
+      onPress={() => applySuggestion(item.label, item.key)}
+      style={({ pressed }) => [
+        styles.itemTile,
+        { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+      ]}
+    >
+      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.itemIcon}>
+        <FontAwesome6 name={item.icon as never} size={14} color="#FFFFFF" solid />
+      </LinearGradient>
+      <View style={styles.flex}>
+        <Text style={[styles.itemLabel, { color: colors.text }]} numberOfLines={2}>
+          {item.label}
+        </Text>
+        {partner ? <Text style={[styles.itemHint, { color: colors.textMuted }]}>{t('picker.partnerMade')}</Text> : null}
+      </View>
+    </Pressable>
+  );
+
+  const renderItems = () => (
     <ScrollView
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[styles.suggestions, { paddingTop: contentTop }]}
     >
-      {initialScope === 'shops' ? null : (
-        <>
-          <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{t('homeSearch.tryServices')}</Text>
-          <View style={styles.chipRow}>
-            {SKILL_CATEGORIES.map((skill) => (
-              <Pressable
-                key={skill.key}
-                style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
-                onPress={() => applySuggestion(t(`workerProfile.skills.${skill.key}`), skill.key)}
-              >
-                <FontAwesome6 name={skill.icon} size={11} color={colors.primary} solid />
-                <Text style={[styles.chipText, { color: colors.text }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </>
-      )}
-      {initialScope === 'workers' ? null : (
-        <>
-          <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{t('homeSearch.tryShops')}</Text>
-          <View style={styles.chipRow}>
-            {SHOP_SUGGESTIONS.map((key) => (
-              <Pressable
-                key={key}
-                style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.surface }]}
-                onPress={() => applySuggestion(t(`businessProfile.categories.${key}`), key)}
-              >
-                <FontAwesome6 name="store" size={11} color={colors.primary} solid />
-                <Text style={[styles.chipText, { color: colors.text }]}>{t(`businessProfile.categories.${key}`)}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </>
-      )}
+      <Text style={[styles.groupHeader, { color: colors.textMuted }]}>
+        {t(`homeSearch.browse.${scope}`, { count: scopeItems.length })}
+      </Text>
+      <View style={styles.itemGrid}>{scopeItems.map((item) => itemTile(item))}</View>
     </ScrollView>
   );
+
+  /** While typing: the matching items (fixed and partner-made) above the people found. */
+  const matchesHeader =
+    matchingItems.length > 0 || partnerItems.length > 0 ? (
+      <View style={styles.matches}>
+        <Text style={[styles.groupHeader, { color: colors.textMuted }]}>{t('homeSearch.matchingItems')}</Text>
+        <View style={styles.itemGrid}>
+          {matchingItems.slice(0, 6).map((item) => itemTile(item))}
+          {partnerItems.map((name) => itemTile({ key: name, label: name, icon: scopeIcon }, true))}
+        </View>
+        {rows.length > 0 ? (
+          <Text style={[styles.groupHeader, styles.resultsHeader, { color: colors.textMuted }]}>{t('homeSearch.nearbyResults')}</Text>
+        ) : null}
+      </View>
+    ) : null;
 
   const renderBody = () => {
     if (location.status === 'denied' || location.status === 'disabled' || location.status === 'error') {
       return renderState('location-crosshairs', t('location.disabledTitle'), t('location.disabledMessage'), refreshLocation);
     }
     if (!coords) return renderState('location-crosshairs', t('services.locating'));
-    if (!query) return renderSuggestions();
-    if (loading) {
-      return (
-        <View style={[styles.stateBody, { paddingTop: contentTop }]}>
-          <LoadingIndicator size={36} dotSize={5} color={colors.primary} />
-        </View>
-      );
-    }
-    if (rows.length === 0) {
-      return renderState('magnifying-glass', t('homeSearch.noResultsTitle'), t('homeSearch.noResultsMessage', { query }));
+    if (!input) return renderItems();
+    if (!loading && rows.length === 0 && !matchesHeader && query) {
+      return renderState('magnifying-glass', t('homeSearch.noResultsTitle'), t('homeSearch.noResultsMessage', { query: input }));
     }
     return (
       <FlatList
         data={rows}
         keyExtractor={(row) => row.key}
         renderItem={renderRow}
+        ListHeaderComponent={matchesHeader}
+        ListFooterComponent={
+          loading || query !== (chosen ? suggestionRef.current?.key : typed) ? (
+            <View style={styles.loadingRow}>
+              <LoadingIndicator size={30} dotSize={4} color={colors.primary} />
+            </View>
+          ) : null
+        }
         contentContainerStyle={[styles.listContent, { paddingTop: contentTop }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -293,11 +382,16 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
 
   const searchFill = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.75)';
 
-  const scopes: { key: Scope; label: string }[] = [
-    { key: 'all', label: t('homeSearch.scopeAll') },
-    { key: 'workers', label: t('homeSearch.scopeWorkers') },
-    { key: 'shops', label: t('homeSearch.scopeShops') },
+  const scopes: { key: Scope; label: string; icon: React.ComponentProps<typeof FontAwesome6>['name'] }[] = [
+    { key: 'workers', label: t('homeSearch.tabServices'), icon: 'screwdriver-wrench' },
+    { key: 'shops', label: t('homeSearch.tabShops'), icon: 'store' },
+    { key: 'staff', label: t('homeSearch.tabStaff'), icon: 'user-tie' },
   ];
+  const changeScope = (next: Scope) => {
+    if (next === scope) return;
+    setScope(next);
+    applySuggestion('', '');
+  };
 
   return (
     <Modal
@@ -355,7 +449,7 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
                   style={[styles.searchInput, { color: colors.text }]}
                   value={input}
                   onChangeText={setInput}
-                  placeholder={t(locked ? `homeSearch.${initialScope}Placeholder` : 'homeSearch.placeholder')}
+                  placeholder={t(`homeSearch.${scope}Placeholder`)}
                   placeholderTextColor={colors.textMuted}
                   returnKeyType="search"
                   onSubmitEditing={() =>
@@ -369,32 +463,25 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
                 ) : null}
               </View>
               {locked ? null : (
-                <View style={styles.scopeRow}>
+                <View style={[styles.scopeRow, { backgroundColor: `${colors.primary}12` }]}>
                   {scopes.map((option) => {
                     const active = scope === option.key;
+                    const content = (
+                      <>
+                        <FontAwesome6 name={option.icon} size={12} color={active ? '#FFFFFF' : colors.primary} solid />
+                        <Text style={[styles.scopeText, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
+                          {option.label}
+                        </Text>
+                      </>
+                    );
                     return (
-                      <Pressable key={option.key} onPress={() => setScope(option.key)} style={styles.scopeChipWrap}>
+                      <Pressable key={option.key} onPress={() => changeScope(option.key)} style={styles.scopeChipWrap}>
                         {active ? (
-                          <LinearGradient
-                            colors={headerGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.scopeChip}
-                          >
-                            <Text style={[styles.scopeText, { color: '#FFFFFF' }]}>{option.label}</Text>
+                          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.scopeChip}>
+                            {content}
                           </LinearGradient>
                         ) : (
-                          <View
-                            style={[
-                              styles.scopeChip,
-                              {
-                                borderColor: `${colors.primary}33`,
-                                borderWidth: 1,
-                              },
-                            ]}
-                          >
-                            <Text style={[styles.scopeText, { color: colors.text }]}>{option.label}</Text>
-                          </View>
+                          <View style={styles.scopeChip}>{content}</View>
                         )}
                       </Pressable>
                     );
@@ -413,11 +500,31 @@ export function HomeSearchModal({ visible, onClose, initialScope = 'all' }: Home
         mode={selected?.mode ?? 'worker'}
         result={selected?.result ?? null}
       />
+      <JobSeekerDetailModal person={person} onClose={() => setPerson(null)} />
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  itemGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  itemTile: {
+    width: '48%',
+    flexGrow: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    minHeight: 58,
+  },
+  itemIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  itemLabel: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 17 },
+  itemHint: { ...typography.caption, fontSize: 10, marginTop: 1 },
+  matches: { marginBottom: 6 },
+  resultsHeader: { marginTop: 18 },
+  loadingRow: { alignItems: 'center', paddingVertical: 20 },
   container: { flex: 1 },
   header: { paddingBottom: 14, paddingHorizontal: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -467,9 +574,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   searchInput: { flex: 1, fontSize: 14, fontFamily: fonts.regular, padding: 0 },
-  scopeRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  scopeChipWrap: { borderRadius: 16, overflow: 'hidden' },
-  scopeChip: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 16 },
+  scopeRow: { flexDirection: 'row', gap: 4, marginTop: 10, borderRadius: 14, padding: 4 },
+  scopeChipWrap: { flex: 1, borderRadius: 11, overflow: 'hidden' },
+  scopeChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 11, paddingHorizontal: 6 },
   scopeText: { ...typography.caption, fontFamily: fonts.semiBold },
   listContent: { padding: 20, paddingBottom: 40 },
   groupHeader: {

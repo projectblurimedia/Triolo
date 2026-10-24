@@ -28,13 +28,15 @@ import {
   AdminBookingDetail,
   AdminBookingListFilter,
   AdminCancelResult,
+  DueOffer,
 } from './interfaces';
+import { displaySkills } from './skills';
 
 function mapBookingRequest(row: QueryResultRow): BookingRequest {
   return {
     id: row.id,
     accountId: row.account_id,
-    skillCategories: parsePgArray(row.skill_categories),
+    skillCategories: displaySkills(parsePgArray(row.skill_categories), parsePgArray(row.custom_skills ?? '{}')),
     latitude: row.latitude,
     longitude: row.longitude,
     locationAddress: row.location_address ?? null,
@@ -147,8 +149,8 @@ export class BookingsRepository {
 
   async createRequest(params: CreateBookingRequestParams): Promise<BookingRequest> {
     const result = await this.pool.query(
-      `INSERT INTO booking_requests (account_id, skill_categories, latitude, longitude, location_address, radius_km, target_worker_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO booking_requests (account_id, skill_categories, latitude, longitude, location_address, radius_km, target_worker_id, custom_skills)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         params.accountId,
@@ -158,6 +160,7 @@ export class BookingsRepository {
         params.locationAddress,
         params.radiusKm,
         params.targetWorkerId ?? null,
+        params.customSkills ?? [],
       ],
     );
     return mapBookingRequest(result.rows[0]);
@@ -207,7 +210,7 @@ export class BookingsRepository {
   /** Finished, rated or reviewed trips for one worker, newest first — their public reviews. */
   async findRatedForWorker(workerId: string, limit: number): Promise<RatedJob[]> {
     const result = await this.pool.query(
-      `SELECT br.worker_rating, br.worker_review, br.skill_categories,
+      `SELECT br.worker_rating, br.worker_review, br.skill_categories, br.custom_skills,
               COALESCE(br.completed_at, br.cancelled_at) AS completed_at, ca.full_name AS customer_full_name
        FROM booking_requests br
        JOIN accounts ca ON ca.id = br.account_id
@@ -221,7 +224,7 @@ export class BookingsRepository {
       rating: row.worker_rating ?? null,
       review: row.worker_review ?? null,
       customerFullName: row.customer_full_name,
-      skillCategories: parsePgArray(row.skill_categories),
+      skillCategories: displaySkills(parsePgArray(row.skill_categories), parsePgArray(row.custom_skills ?? '{}')),
       completedAt: row.completed_at,
     }));
   }
@@ -229,10 +232,18 @@ export class BookingsRepository {
   /** Bulk insert via `unnest` — one round trip regardless of how many workers matched. */
   async createOffers(bookingRequestId: string, offers: BookingOfferInsert[]): Promise<void> {
     if (offers.length === 0) return;
+    // A delayed offer is hidden (and not pushed) until its visible_after; the rest are pushed now.
     await this.pool.query(
-      `INSERT INTO booking_offers (booking_request_id, worker_id, distance_meters)
-       SELECT $1, worker_id, distance_meters FROM unnest($2::uuid[], $3::float8[]) AS t(worker_id, distance_meters)`,
-      [bookingRequestId, offers.map((o) => o.workerId), offers.map((o) => o.distanceMeters)],
+      `INSERT INTO booking_offers (booking_request_id, worker_id, distance_meters, visible_after, pushed_at)
+       SELECT $1, worker_id, distance_meters, now() + make_interval(secs => delay),
+              CASE WHEN delay > 0 THEN NULL ELSE now() END
+       FROM unnest($2::uuid[], $3::float8[], $4::int[]) AS t(worker_id, distance_meters, delay)`,
+      [
+        bookingRequestId,
+        offers.map((o) => o.workerId),
+        offers.map((o) => o.distanceMeters),
+        offers.map((o) => Math.max(0, Math.round(o.delaySeconds ?? 0))),
+      ],
     );
   }
 
@@ -358,11 +369,14 @@ export class BookingsRepository {
    * read, so nothing has to run on a timer; the offer and accept queries also check the age
    * themselves, so a stale request can never be offered or won even before this runs.
    */
-  async expireStaleBroadcasts(): Promise<void> {
-    await this.pool.query(
+  /** Ends Quick Books nobody took in time; returns their ids. */
+  async expireStaleBroadcasts(): Promise<string[]> {
+    const result = await this.pool.query(
       `UPDATE booking_requests br SET status = 'expired', expired_at = now()
-       WHERE br.status = 'broadcasting' AND NOT (${STILL_OPEN})`,
+       WHERE br.status = 'broadcasting' AND NOT (${STILL_OPEN})
+       RETURNING br.id`,
     );
+    return result.rows.map((row) => row.id);
   }
 
   /**
@@ -378,10 +392,13 @@ export class BookingsRepository {
     skillCategories: string[],
     latitude: number,
     longitude: number,
+    // A worker without the head start only finds requests at least this old.
+    minAgeSeconds = 0,
+    otherSkillDescription: string | null = null,
   ): Promise<number> {
     const result = await this.pool.query(
-      `INSERT INTO booking_offers (booking_request_id, worker_id, distance_meters)
-       SELECT sub.id, $1, sub.distance_meters FROM (
+      `INSERT INTO booking_offers (booking_request_id, worker_id, distance_meters, pushed_at)
+       SELECT sub.id, $1, sub.distance_meters, now() FROM (
          SELECT br.id, br.radius_km,
            (6371000 * acos(LEAST(1.0, GREATEST(-1.0,
              cos(radians($3)) * cos(radians(br.latitude)) * cos(radians(br.longitude) - radians($4)) + sin(radians($3)) * sin(radians(br.latitude))
@@ -392,23 +409,48 @@ export class BookingsRepository {
            AND ${STILL_OPEN}
            AND br.account_id != $2
            AND br.skill_categories <@ $5::worker_skill_category[]
+           AND NOT EXISTS (SELECT 1 FROM unnest(br.custom_skills) c WHERE COALESCE($7, '') NOT ILIKE '%' || c || '%')
+           AND br.created_at <= now() - make_interval(secs => $6)
        ) sub
        WHERE sub.distance_meters <= sub.radius_km * 1000
        ON CONFLICT (booking_request_id, worker_id)
          DO UPDATE SET status = 'pending' WHERE booking_offers.status = 'declined'`,
-      [workerId, workerAccountId, latitude, longitude, skillCategories],
+      [workerId, workerAccountId, latitude, longitude, skillCategories, minAgeSeconds, otherSkillDescription],
     );
     return result.rowCount ?? 0;
   }
 
+  /**
+   * Delayed offers (workers without the head start) whose time has come, marked pushed in the
+   * same statement so two callers never push the same one twice.
+   */
+  async claimDueOffers(): Promise<DueOffer[]> {
+    const result = await this.pool.query(
+      `UPDATE booking_offers bo SET pushed_at = now()
+       FROM booking_requests br, worker_profiles w, accounts a
+       WHERE bo.pushed_at IS NULL AND bo.visible_after <= now() AND bo.status = 'pending'
+         AND br.id = bo.booking_request_id AND br.status = 'broadcasting' AND ${STILL_OPEN}
+         AND w.id = bo.worker_id AND a.id = w.account_id
+       RETURNING bo.booking_request_id, bo.distance_meters, br.skill_categories, br.custom_skills, a.id AS account_id, a.preferred_language`,
+    );
+    return result.rows.map((row) => ({
+      bookingRequestId: row.booking_request_id,
+      distanceMeters: Number(row.distance_meters),
+      skillCategories: displaySkills(parsePgArray(row.skill_categories), parsePgArray(row.custom_skills ?? '{}')),
+      accountId: row.account_id,
+      preferredLanguage: row.preferred_language,
+    }));
+  }
+
   async findPendingOffersForWorker(workerId: string): Promise<PendingOffer[]> {
     const result = await this.pool.query(
-      `SELECT bo.id AS offer_id, bo.booking_request_id, bo.distance_meters, bo.created_at, br.skill_categories,
+      `SELECT bo.id AS offer_id, bo.booking_request_id, bo.distance_meters, bo.created_at, br.skill_categories, br.custom_skills,
               br.location_address, br.target_worker_id, ca.full_name AS customer_full_name
        FROM booking_offers bo
        JOIN booking_requests br ON br.id = bo.booking_request_id
        JOIN accounts ca ON ca.id = br.account_id
        WHERE bo.worker_id = $1 AND bo.status = 'pending' AND br.status = 'broadcasting'
+         AND bo.visible_after <= now()
          AND ${STILL_OPEN}
        ORDER BY bo.created_at DESC`,
       [workerId],
@@ -416,7 +458,7 @@ export class BookingsRepository {
     return result.rows.map((row) => ({
       offerId: row.offer_id,
       bookingRequestId: row.booking_request_id,
-      skillCategories: parsePgArray(row.skill_categories),
+      skillCategories: displaySkills(parsePgArray(row.skill_categories), parsePgArray(row.custom_skills ?? '{}')),
       distanceMeters: Number(row.distance_meters),
       customerFullName: row.customer_full_name,
       locationAddress: row.location_address ?? null,

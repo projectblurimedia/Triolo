@@ -36,17 +36,14 @@ export type MainStackParamList = {
 /**
  * The verified-partner tab shell — nested inside MainStackParamList's `MainTabs` screen, so
  * its screens can still reach sibling stack routes (WorkerRegistration/BusinessRegistration/
- * MyInfo) via the composite navigation prop. Bookings and Earnings are the two concretely
- * planned near-term features for a Worker/Business partner (see .cloud/project-context.md's
- * roadmap — the booking/order-flow pipeline and the post-MVP worker earnings dashboard), so
- * they replace a generic unexplained "Search" tab that didn't map to anything a partner
- * actually does in this product.
+ * MyInfo) via the composite navigation prop. Home (what's new and what's in progress), Bookings
+ * (requests, active, history), Grow (Partner Plus, Trusted badge, Boost) and Profile.
  */
 export type MainTabParamList = {
   Home: undefined;
   // `mode` opens a dual (worker + shop) partner's Bookings on that side; `linkedAt` makes a
   // repeat navigation with the same mode still apply after the user switched sides by hand.
   Bookings: { mode?: 'jobs' | 'orders'; tab?: 'requests' | 'active' | 'history'; linkedAt?: number } | undefined;
-  Earnings: undefined;
+  Grow: undefined;
   Profile: undefined;
 };

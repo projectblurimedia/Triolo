@@ -96,7 +96,7 @@ const orderDto = {
 beforeEach(() => {
   repo = {
     create: jest.fn(),
-    expireStale: jest.fn(),
+    expireStale: jest.fn().mockResolvedValue([]),
     exists: jest.fn(),
     findForCustomer: jest.fn(),
     listForCustomer: jest.fn(),

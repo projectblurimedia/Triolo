@@ -1,4 +1,5 @@
 import fs from 'fs';
+import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { JobSeekersRepository } from './repository';
@@ -18,23 +19,50 @@ const PHOTO_FOLDER = 'triolo/job-seekers';
  * module. A partner keeps one post; customers find nearby posts and call the poster directly.
  */
 export class JobSeekersService {
-  constructor(private readonly repository: JobSeekersRepository) {}
+  constructor(
+    private readonly repository: JobSeekersRepository,
+    // Subscribed partners' posts come first in searches (optional: tests and admin don't need it).
+    private readonly subscriptionStatus?: SubscriptionStatusService,
+  ) {}
 
-  /** One live post (e.g. an ad's "Contact"). */
-  async getPublic(id: string): Promise<JobSeekerSearchResult> {
+  /** One live post (e.g. an ad's "Contact"). The phone number shows only with a plan or once paid for. */
+  async getPublic(id: string, viewerAccountId?: string): Promise<JobSeekerSearchResult> {
     const post = await this.repository.findPublicById(id);
     if (!post) throw AppError.notFound('This job post is not available.', 'JOB_POST_NOT_FOUND');
-    return post;
+    if (!viewerAccountId) return post;
+    const [shown] = await this.withContactAccess(viewerAccountId, [post]);
+    return shown;
+  }
+
+  /** Hides phone numbers the viewer hasn't paid to see (while customer plans are on and they have none). */
+  private async withContactAccess(viewerAccountId: string, posts: JobSeekerSearchResult[]): Promise<JobSeekerSearchResult[]> {
+    const access = await this.subscriptionStatus?.staffContactAccess(viewerAccountId);
+    if (!access || access.all) return posts.map((post) => ({ ...post, contactLocked: false }));
+    return posts.map((post) =>
+      access.ids.has(post.id) || post.accountId === viewerAccountId
+        ? { ...post, contactLocked: false }
+        : { ...post, mobileNumber: null, contactLocked: true },
+    );
   }
 
   getMine(accountId: string): Promise<JobSeekerPost | null> {
     return this.repository.findByAccount(accountId);
   }
 
-  saveMine(accountId: string, params: SaveJobSeekerPostParams): Promise<JobSeekerPost> {
+  async saveMine(accountId: string, params: SaveJobSeekerPostParams): Promise<JobSeekerPost> {
     const skills = [...new Set(params.skills.map((skill) => skill.trim()).filter(Boolean))];
     const description = params.description?.trim() ? params.description.trim() : null;
-    return this.repository.upsert(accountId, { ...params, skills, description });
+    // A new post (not an edit) takes a paid pass when the partner has no plan.
+    const isNew = !(await this.repository.findByAccount(accountId));
+    const passId = isNew ? ((await this.subscriptionStatus?.usePartnerPass(accountId, 'job_post')) ?? null) : null;
+    try {
+      const post = await this.repository.upsert(accountId, { ...params, skills, description });
+      await this.subscriptionStatus?.attachPass(passId, post.id);
+      return post;
+    } catch (error) {
+      await this.subscriptionStatus?.restorePasses([], [passId]);
+      throw error;
+    }
   }
 
   async setActive(accountId: string, isActive: boolean): Promise<JobSeekerPost> {
@@ -74,8 +102,9 @@ export class JobSeekersService {
     return result.post;
   }
 
-  search(accountId: string, params: JobSeekerSearchParams): Promise<JobSeekerSearchResult[]> {
-    return this.repository.search(accountId, params);
+  async search(accountId: string, params: JobSeekerSearchParams): Promise<JobSeekerSearchResult[]> {
+    const priorityAccountIds = (await this.subscriptionStatus?.priorityPartnerIds()) ?? [];
+    return this.withContactAccess(accountId, await this.repository.search(accountId, { ...params, priorityAccountIds }));
   }
 
   // --- Admin ---
@@ -115,5 +144,10 @@ export class JobSeekersService {
 
   adminCounts() {
     return this.repository.adminCounts();
+  }
+
+  /** Kinds of work people typed themselves ("other") on live posts, matching a search. */
+  searchCustomTitles(query: string): Promise<string[]> {
+    return this.repository.findCustomTitles(query);
   }
 }

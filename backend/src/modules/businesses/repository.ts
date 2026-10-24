@@ -270,9 +270,9 @@ export class BusinessesRepository {
        ) sub
        WHERE sub.distance_meters <= $4
          AND ($5::text IS NULL OR sub.shop_name ILIKE $5 OR sub.other_category_description ILIKE $5 OR sub.location_name ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.shop_categories, ',') ILIKE $5)
-         AND ($7::business_shop_category IS NULL OR $7::business_shop_category = ANY(sub.shop_categories))
+         AND ($7::business_shop_category[] IS NULL OR sub.shop_categories && $7::business_shop_category[])
          AND ($8::boolean IS NOT TRUE OR sub.delivery_available)
-       ORDER BY ${orderBy}
+       ORDER BY (sub.account_id = ANY($9::uuid[])) DESC, ${orderBy}
        LIMIT $6`,
       [
         filter.latitude,
@@ -281,8 +281,9 @@ export class BusinessesRepository {
         filter.radiusKm * 1000,
         like,
         filter.limit,
-        filter.shopCategory ?? null,
+        filter.shopCategory ? filter.shopCategory.split(',') : null,
         filter.deliveryOnly ?? false,
+        filter.priorityAccountIds ?? [],
       ],
     );
     return result.rows.map((row) => ({ ...mapBusinessProfile(row), distanceMeters: Number(row.distance_meters) }));
@@ -304,5 +305,20 @@ export class BusinessesRepository {
       verified: Number(row.verified),
       rejected: Number(row.rejected),
     };
+  }
+
+  async findCustomCategories(query: string): Promise<string[]> {
+    const result = await this.pool.query(
+      `SELECT DISTINCT ON (lower(name)) name FROM (
+         SELECT trim(unnest(string_to_array(other_category_description, ','))) AS name
+         FROM business_profiles
+         WHERE verification_status = 'verified' AND other_category_description IS NOT NULL
+       ) s
+       WHERE name <> '' AND name ILIKE $1
+       ORDER BY lower(name)
+       LIMIT 15`,
+      [`%${query}%`],
+    );
+    return result.rows.map((row) => row.name);
   }
 }

@@ -1,8 +1,11 @@
 import { Pool, QueryResultRow } from 'pg';
 import { AppNotification, NotificationListResult, NotificationType, PushApp } from './interfaces';
 
-function mapNotification(row: QueryResultRow): AppNotification {
+function mapNotification(row: QueryResultRow): AppNotification & { actorAccountId?: string | null; actorName?: string | null; actorMobile?: string | null } {
   return {
+    actorAccountId: row.actor_account_id ?? null,
+    actorName: row.actor_name ?? null,
+    actorMobile: row.actor_mobile ?? null,
     id: row.id,
     accountId: row.account_id,
     type: row.type,
@@ -16,20 +19,38 @@ function mapNotification(row: QueryResultRow): AppNotification {
 export class NotificationsRepository {
   constructor(private readonly pool: Pool) {}
 
-  async create(params: { accountId: string; type: NotificationType; title: string; body: string }): Promise<AppNotification> {
+  async create(params: {
+    accountId: string;
+    type: NotificationType;
+    title: string;
+    body: string;
+    actorAccountId?: string | null;
+  }): Promise<AppNotification> {
     const result = await this.pool.query(
-      `INSERT INTO notifications (account_id, type, title, body) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [params.accountId, params.type, params.title, params.body],
+      `INSERT INTO notifications (account_id, type, title, body, actor_account_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [params.accountId, params.type, params.title, params.body, params.actorAccountId ?? null],
     );
     return mapNotification(result.rows[0]);
   }
 
   async findForAccount(accountId: string, limit: number): Promise<NotificationListResult> {
     const [rows, unread] = await Promise.all([
-      this.pool.query(`SELECT * FROM notifications WHERE account_id = $1 ORDER BY created_at DESC LIMIT $2`, [accountId, limit]),
+      // The actor's (viewer's) name is read for display; the service decides who sees it.
+      this.pool.query(
+        `SELECT n.*, a.full_name AS actor_name
+         FROM notifications n LEFT JOIN accounts a ON a.id = n.actor_account_id
+         WHERE n.account_id = $1 ORDER BY n.created_at DESC LIMIT $2`,
+        [accountId, limit],
+      ),
       this.pool.query(`SELECT COUNT(*) FROM notifications WHERE account_id = $1 AND is_read = false`, [accountId]),
     ]);
     return { items: rows.rows.map(mapNotification), unreadCount: Number(unread.rows[0].count) };
+  }
+
+  /** A viewer's name (for a subscribed partner's push). */
+  async accountName(accountId: string): Promise<string | null> {
+    const result = await this.pool.query(`SELECT full_name FROM accounts WHERE id = $1`, [accountId]);
+    return result.rows[0]?.full_name ?? null;
   }
 
   async markRead(accountId: string, id: string): Promise<void> {

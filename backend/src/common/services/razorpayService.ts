@@ -49,6 +49,16 @@ export interface RazorpayPayment {
   method?: string;
 }
 
+export interface RazorpayPaymentLink {
+  id: string;
+  short_url: string;
+  /** created → paid (or partially_paid / expired / cancelled). */
+  status: string;
+  amount: number;
+  amount_paid: number;
+  payments?: { payment_id: string; amount: number; status: string }[] | null;
+}
+
 export const razorpayService = {
   keyId(): string {
     return credentials().keyId;
@@ -73,6 +83,42 @@ export const razorpayService = {
 
   refund(paymentId: string, amountPaise: number, notes: Record<string, string>): Promise<{ id: string }> {
     return call<{ id: string }>('POST', `/payments/${paymentId}/refund`, { amount: amountPaise, notes });
+  },
+
+  /**
+   * A payment link (the apps open it in the phone's browser, where UPI apps work), for
+   * `amountPaise`. `referenceId` (≤ 40 characters, unique) ties it to what's being paid for.
+   */
+  createPaymentLink(params: {
+    amountPaise: number;
+    description: string;
+    referenceId: string;
+    customer: { name: string; contact: string };
+    notes: Record<string, string>;
+  }): Promise<RazorpayPaymentLink> {
+    return call<RazorpayPaymentLink>('POST', '/payment_links', {
+      amount: params.amountPaise,
+      currency: 'INR',
+      accept_partial: false,
+      description: params.description.slice(0, 2048),
+      reference_id: params.referenceId.slice(0, 40),
+      customer: { name: params.customer.name, contact: `+91${params.customer.contact.replace(/\D/g, '').slice(-10)}` },
+      notify: { sms: false, email: false },
+      reminder_enable: false,
+      notes: params.notes,
+    });
+  },
+
+  paymentLink(id: string): Promise<RazorpayPaymentLink> {
+    return call<RazorpayPaymentLink>('GET', `/payment_links/${id}`);
+  },
+
+  /** The captured payment of a paid link, for the full amount — or null when it isn't paid. */
+  async paidLinkPayment(id: string, amountPaise: number): Promise<string | null> {
+    const link = await razorpayService.paymentLink(id);
+    if (link.status !== 'paid' || Number(link.amount_paid) < amountPaise) return null;
+    const payment = (link.payments ?? []).find((item) => item.status === 'captured') ?? link.payments?.[0];
+    return payment?.payment_id ?? null;
   },
 
   /** Checkout's signature: HMAC-SHA256 of "order_id|payment_id" with the key secret. */

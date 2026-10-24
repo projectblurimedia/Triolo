@@ -391,12 +391,14 @@ export function BookingsScreen() {
             keyExtractor={(item) => item.offerId}
             contentContainerStyle={styles.listContent}
             renderItem={renderOffer}
-            ListHeaderComponent={isWorker ? <FindJobsButton variant="bar" /> : null}
             ListEmptyComponent={renderEmpty('bell', t('bookings.emptyTitle'), t('bookings.emptyMessage'))}
           />
         </PullToRefresh>
-      ) : (
-        <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
+      ) : null}
+      {!loading && tab === 'requests' && isWorker ? <FindJobsButton variant="fab" /> : null}
+      {loading || tab === 'requests' ? null : (
+        // Each tab gets its own list, placed fresh (never opening on the refresh gap).
+        <PullToRefresh key={tab} refreshing={refreshing} onRefresh={onRefresh}>
           <FlatList
             showsVerticalScrollIndicator={false}
             showsHorizontalScrollIndicator={false}
@@ -441,7 +443,7 @@ const styles = StyleSheet.create({
   modeText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
   modeBadge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   modeBadgeText: { fontSize: 10, fontFamily: fonts.semiBold },
-  segment: { flexDirection: 'row', borderRadius: 14, padding: 4, marginBottom: 14 },
+  segment: { flexDirection: 'row', borderRadius: 14, padding: 4, marginBottom: 10 },
   segmentItem: {
     flex: 1,
     flexDirection: 'row',

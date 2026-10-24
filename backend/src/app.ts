@@ -16,6 +16,15 @@ import { ordersRouter } from '@/modules/orders/routes';
 import { favoritesRouter } from '@/modules/favorites/routes';
 import { jobSeekersRouter } from '@/modules/jobSeekers/routes';
 import { adsRouter } from '@/modules/ads/routes';
+import { subscriptionsRouter } from '@/modules/subscriptions/routes';
+import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
+import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
+import { setProfileViewerReveal } from '@/modules/notifications/service';
+import { pool } from '@/config/database';
+
+// Subscribed partners see who viewed their profile (notifications asks, without depending on subscriptions).
+const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
+setProfileViewerReveal((accountId) => subscriptionStatus.revealsProfileViewers(accountId));
 
 export function createApp(): Express {
   const app = express();
@@ -64,6 +73,7 @@ export function createApp(): Express {
   app.use('/api/v1/favorites', favoritesRouter);
   app.use('/api/v1/job-seekers', jobSeekersRouter);
   app.use('/api/v1/ads', adsRouter);
+  app.use('/api/v1/subscriptions', subscriptionsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -74,6 +74,7 @@ function mapAd(row: any): Ad {
     promoteMobile: row.promote_mobile ?? null,
     needsPayment: !!row.needs_payment,
     razorpayOrderId: row.razorpay_order_id ?? null,
+    razorpayLinkId: row.razorpay_link_id ?? null,
     razorpayPaymentId: row.razorpay_payment_id ?? null,
     paidAt: row.paid_at ? new Date(row.paid_at).toISOString() : null,
     refundId: row.refund_id ?? null,
@@ -299,6 +300,31 @@ export class AdsRepository {
   /** Remembers the Razorpay order a payment for this ad is being made against. */
   async setOrder(id: string, orderId: string): Promise<void> {
     await this.pool.query(`UPDATE ads SET razorpay_order_id = $2, updated_at = now() WHERE id = $1`, [id, orderId]);
+  }
+
+  /** Remembers the payment link a boost is being paid through. */
+  async setPaymentLink(id: string, linkId: string): Promise<void> {
+    await this.pool.query(`UPDATE ads SET razorpay_link_id = $2, updated_at = now() WHERE id = $1`, [id, linkId]);
+  }
+
+  /** Records a payment made through the ad's payment link. */
+  async markPaidByLink(id: string, linkId: string, paymentId: string): Promise<Ad | null> {
+    const result = await this.pool.query(
+      `WITH paid AS (
+         UPDATE ads SET payment_method = 'online', razorpay_payment_id = $3, paid_at = now(), updated_at = now()
+         WHERE id = $1 AND razorpay_link_id = $2 AND payment_method = 'pending' AND deleted_at IS NULL
+         RETURNING *
+       )
+       SELECT ${AD_COLUMNS} FROM paid a`,
+      [id, linkId, paymentId],
+    );
+    return result.rows[0] ? mapAd(result.rows[0]) : null;
+  }
+
+  /** The booking business's name and mobile, for the payment page. */
+  async ownerContact(accountId: string): Promise<{ name: string; mobile: string } | null> {
+    const result = await this.pool.query(`SELECT full_name, mobile_number FROM accounts WHERE id = $1`, [accountId]);
+    return result.rows[0] ? { name: result.rows[0].full_name, mobile: result.rows[0].mobile_number } : null;
   }
 
   /** Records the online payment; null when the ad was already paid (or isn't waiting for it). */

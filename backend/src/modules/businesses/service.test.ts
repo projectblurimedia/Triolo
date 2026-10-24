@@ -405,7 +405,7 @@ describe('BusinessesService.searchNearby', () => {
 
     const filter = { latitude: 17.385, longitude: 78.4867, radiusKm: 10, limit: 20 };
     await expect(service.searchNearby('account-1', filter)).resolves.toBe(results);
-    expect(repo.findNearby).toHaveBeenCalledWith('account-1', filter);
+    expect(repo.findNearby).toHaveBeenCalledWith('account-1', { ...filter, priorityAccountIds: [] });
   });
 });
 

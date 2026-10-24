@@ -83,7 +83,7 @@ export function ShopOrderModal() {
   // Handover: location, then a local business's ad while the button spins, then the PIN check.
   const { adLoading, waitForAd } = useAdGate(orderId !== null, 'order_pin');
 
-  const accept = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.accept(id));
+  const accept = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.accept(id), 'accept');
   const decline = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.decline(id));
   const saveItems = useShopOrderAction(({ id, items }: { id: string; items: ItemUpdate[] }) =>
     shopOrdersService.saveItems(id, items),

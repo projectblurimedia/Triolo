@@ -1,7 +1,4 @@
-export type WorkerSkillCategory =
-  'electrician' | 'plumber' | 'painter' | 'carpenter' | 'mechanic' | 'cleaner' | 'mason' | 'other';
-
-export const WORKER_SKILL_CATEGORIES: WorkerSkillCategory[] = [
+const WORKER_SKILL_CATEGORIES_LIST = [
   'electrician',
   'plumber',
   'painter',
@@ -9,8 +6,51 @@ export const WORKER_SKILL_CATEGORIES: WorkerSkillCategory[] = [
   'mechanic',
   'cleaner',
   'mason',
+  'ac_technician',
+  'appliance_repair',
+  'mobile_repair',
+  'computer_repair',
+  'tv_repair',
+  'ro_water_purifier',
+  'cctv_technician',
+  'solar_technician',
+  'welder',
+  'fabricator',
+  'tiles_worker',
+  'false_ceiling',
+  'waterproofing',
+  'glass_aluminium',
+  'locksmith',
+  'borewell',
+  'pest_control',
+  'bike_mechanic',
+  'car_wash',
+  'driver',
+  'movers_packers',
+  'gardener',
+  'cook',
+  'caterer',
+  'tailor',
+  'beautician',
+  'barber',
+  'mehendi_artist',
+  'photographer',
+  'event_decorator',
+  'priest',
+  'tutor',
+  'fitness_trainer',
+  'nurse',
+  'physiotherapist',
+  'interior_designer',
+  'architect',
+  'contractor',
+  'labour',
   'other',
-];
+] as const;
+
+export type WorkerSkillCategory = (typeof WORKER_SKILL_CATEGORIES_LIST)[number];
+
+export const WORKER_SKILL_CATEGORIES: WorkerSkillCategory[] = [...WORKER_SKILL_CATEGORIES_LIST];
 
 export type ProfileVerificationStatus = 'pending_verification' | 'verified' | 'rejected';
 
@@ -74,6 +114,8 @@ export interface NearbySearchFilter {
   skillCategory?: string;
   sort?: 'distance' | 'rating';
   limit: number;
+  /** Subscribed partners' accounts: listed first. */
+  priorityAccountIds?: string[];
 }
 
 /**

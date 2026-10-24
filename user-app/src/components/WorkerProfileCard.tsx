@@ -17,7 +17,7 @@ interface WorkerProfileCardProps {
 export function WorkerProfileCard({ profile }: WorkerProfileCardProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const thumbnail = profile.profilePhotoUrl ?? profile.portfolioPhotoUrls[0];
+  const thumbnail = profile.profilePhotoUrl;
   const fixedSkills = profile.skillCategories.filter((key) => key !== 'other');
 
   return (

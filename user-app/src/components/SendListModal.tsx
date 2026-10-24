@@ -8,6 +8,9 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from './Button';
+import { CategoryPicker } from './CategoryPicker';
+import { usePayHint, withFee } from '@/hooks/useSubscription';
+import { payIfNeeded } from '@/state/payGateStore';
 import { LoadingIndicator } from './LoadingIndicator';
 import { RatingStars } from './RatingStars';
 import { ToastHost } from './ToastHost';
@@ -28,6 +31,7 @@ import { colors as brandColors, fonts, headerGradient, typography, useThemeColor
 import { openNewList } from '@/navigation/navigationRef';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { useAdGate } from './Ads';
+import { DeliveryToggle } from './DeliveryToggle';
 
 interface SendListModalProps {
   visible: boolean;
@@ -76,6 +80,7 @@ async function addressFor(latitude: number, longitude: number): Promise<string |
  */
 export function SendListModal({ visible, onClose, shop: preselected, listId: initialListId, onLeave }: SendListModalProps) {
   const { t } = useTranslation();
+  const orderFee = usePayHint('order');
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const lists = useListStore((state) => state.lists);
@@ -135,6 +140,8 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
       // Location first, then a local business's ad (when one is running), then the order goes.
       if (!(await askForLocation())) return;
       if (!(await waitForAd())) return;
+      // No plan: pay once at this last step — or subscribe.
+      if (!(await payIfNeeded('order'))) return;
     } finally {
       preparing.current = false;
     }
@@ -256,7 +263,12 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           },
         ]}
       >
-        <Avatar photoUrl={item.shopPhotoUrls[0] ?? item.profilePhotoUrl} name={item.shopName} size={46} />
+        <Avatar
+          photoUrl={item.profilePhotoUrl}
+          name={item.shopName}
+          size={46}
+          seal={{ kind: 'business', id: item.id }}
+        />
         <View style={styles.flex}>
           <Text style={[styles.shopName, { color: colors.text }]} numberOfLines={1}>
             {item.shopName}
@@ -379,7 +391,11 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           placeholder={t('sendList.notePlaceholder')}
           placeholderTextColor={colors.textMuted}
         />
-        <Button label={t('sendList.send', { count: items.length })} onPress={handleSend} loading={sending || adLoading} />
+        <Button
+          label={withFee(t('sendList.send', { count: items.length }), orderFee)}
+          onPress={handleSend}
+          loading={sending || adLoading}
+        />
       </View>
     );
   };
@@ -445,25 +461,23 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
                       ))}
                     </View>
                   </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-                    {renderChip(
-                      'delivery',
-                      t('sendList.deliveryFilter'),
-                      deliveryOnly,
-                      () => setDeliveryOnly((value) => !value),
-                      'truck',
-                    )}
-                    {renderChip('all', t('services.allCategories'), category === null, () => setCategory(null))}
-                    {SHOP_CATEGORIES.map((entry) =>
-                      renderChip(
-                        entry.key,
-                        t(`businessProfile.categories.${entry.key}`),
-                        category === entry.key,
-                        () => setCategory(entry.key),
-                        entry.icon,
-                      ),
-                    )}
-                  </ScrollView>
+                  <View style={styles.filterRow}>
+                    <CategoryPicker
+                      title={t('bazaar.filterTitle')}
+                      placeholder={t('services.allCategories')}
+                      allLabel={t('services.allCategories')}
+                      options={SHOP_CATEGORIES.map((entry) => ({
+                        key: entry.key,
+                        label: t(`businessProfile.categories.${entry.key}`),
+                        icon: entry.icon,
+                      }))}
+                      selected={category ? category.split(',') : []}
+                      onChange={(keys) => setCategory(keys.length > 0 ? keys.join(',') : null)}
+                      fieldIcon="filter"
+                      style={styles.flex1}
+                    />
+                    <DeliveryToggle on={deliveryOnly} onPress={() => setDeliveryOnly((value) => !value)} label={t('sendList.deliveryFilter')} />
+                  </View>
                 </>
               )}
               {renderShops()}
@@ -479,6 +493,8 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
 }
 
 const styles = StyleSheet.create({
+  filterRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  flex1: { flex: 1 },
   container: { flex: 1 },
   flex: { flex: 1 },
   gap: { gap: 12 },

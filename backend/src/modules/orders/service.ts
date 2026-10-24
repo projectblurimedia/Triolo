@@ -1,4 +1,5 @@
 import { randomInt } from 'crypto';
+import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
 import { BusinessesService } from '@/modules/businesses/service';
 import { BusinessProfile } from '@/modules/businesses/interfaces';
@@ -42,6 +43,8 @@ export class OrdersService {
     private readonly repository: OrdersRepository,
     private readonly businessesService: BusinessesService,
     private readonly notificationsService: NotificationsService,
+    // Ordering needs a customer subscription while those are on.
+    private readonly subscriptionStatus?: SubscriptionStatusService,
   ) {}
 
   // --- Customer side ---
@@ -62,6 +65,7 @@ export class OrdersService {
       shop.latitude != null && shop.longitude != null
         ? distanceMeters(dto.latitude, dto.longitude, shop.latitude, shop.longitude)
         : 0;
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'order')) ?? null;
     const order = await this.repository.create({
       accountId,
       businessId: shop.id,
@@ -75,6 +79,8 @@ export class OrdersService {
       items: dto.items.map((item) => ({ name: item.name, quantity: item.quantity, unit: item.unit || null })),
     });
 
+    await this.subscriptionStatus?.attachPass(passId, order.id);
+
     const language = await this.repository.languageOf(shop.accountId);
     const text = orderTemplate('placed', language, { shop: shop.shopName, count: order.items.length });
     await this.notificationsService.notify(shop.accountId, 'order_placed', text.title, text.body, {
@@ -85,8 +91,14 @@ export class OrdersService {
     return this.getOrder(accountId, order.id);
   }
 
+  /** Ends unanswered orders and gives back what was paid for them. */
+  private async expireStale(): Promise<void> {
+    const expired = await this.repository.expireStale();
+    if (expired.length > 0) await this.subscriptionStatus?.restorePasses(expired);
+  }
+
   async getOrder(accountId: string, orderId: string): Promise<CustomerOrder> {
-    await this.repository.expireStale();
+    await this.expireStale();
     const order = await this.repository.findForCustomer(orderId, accountId);
     if (!order) {
       throw AppError.notFound('Order not found.', 'ORDER_NOT_FOUND');
@@ -95,7 +107,7 @@ export class OrdersService {
   }
 
   async listMyOrders(accountId: string): Promise<CustomerOrder[]> {
-    await this.repository.expireStale();
+    await this.expireStale();
     return this.repository.listForCustomer(accountId, LIST_LIMIT);
   }
 
@@ -114,6 +126,7 @@ export class OrdersService {
       }
       await this.businessesService.recordRating(stalled.businessId, dto.rating);
       await this.notify(stalled.transition, 'cancelled_late', 'order_cancelled');
+      await this.subscriptionStatus?.restorePasses([orderId]);
       return;
     }
     const result = await this.repository.cancelByCustomer(orderId, accountId);
@@ -121,6 +134,8 @@ export class OrdersService {
       throw await this.transitionError(orderId, 'This order can no longer be cancelled from the app.');
     }
     await this.notify(result, 'cancelled_by_customer', 'order_cancelled');
+    // Cancelled before the shop answered: the payment is kept for next time.
+    await this.subscriptionStatus?.restorePasses([orderId]);
   }
 
   async rateOrder(accountId: string, orderId: string, dto: RateOrderDto): Promise<void> {
@@ -152,8 +167,13 @@ export class OrdersService {
 
   async acceptOrder(ownerAccountId: string, orderId: string): Promise<void> {
     const shop = await this.requireShop(ownerAccountId);
+    const passId = (await this.subscriptionStatus?.usePartnerPass(ownerAccountId, 'accept')) ?? null;
     const result = await this.repository.accept(orderId, shop.id);
-    if (!result) throw await this.transitionError(orderId, 'This order can no longer be accepted.');
+    if (!result) {
+      await this.subscriptionStatus?.restorePasses([], [passId]);
+      throw await this.transitionError(orderId, 'This order can no longer be accepted.');
+    }
+    await this.subscriptionStatus?.attachPass(passId, `accept-${orderId}`);
     await this.notify(result, 'accepted', 'order_accepted');
   }
 
@@ -162,6 +182,7 @@ export class OrdersService {
     const result = await this.repository.decline(orderId, shop.id, reason || null);
     if (!result) throw await this.transitionError(orderId, 'This order can no longer be declined.');
     await this.notify(result, 'declined', 'order_declined');
+    await this.subscriptionStatus?.restorePasses([orderId]);
   }
 
   async saveItems(ownerAccountId: string, orderId: string, dto: SaveItemsDto): Promise<ShopSideOrder> {
@@ -213,6 +234,8 @@ export class OrdersService {
     const result = await this.repository.cancelByShop(orderId, shop.id, reason || null);
     if (!result) throw await this.transitionError(orderId, 'This order can no longer be cancelled.');
     await this.notify(result, 'cancelled_by_shop', 'order_cancelled');
+    // Not the customer's doing: their payment is kept for the next order.
+    await this.subscriptionStatus?.restorePasses([orderId]);
   }
 
   /** Rated, completed orders — for the shop's public reviews (reviews module). */
@@ -289,6 +312,7 @@ export class OrdersService {
         });
       }),
     );
+    await this.subscriptionStatus?.restorePasses([id]);
   }
 
   /** Cancels every unfinished order an account is part of (when it's suspended or banned). */

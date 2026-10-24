@@ -49,7 +49,12 @@ export const nearbySearchQuerySchema = z.object({
   longitude: z.coerce.number().min(-180).max(180),
   radiusKm: z.coerce.number().min(0.1).max(50).default(10),
   query: z.string().trim().max(100).optional(),
-  skillCategory: z.enum(WORKER_SKILL_CATEGORIES as [string, ...string[]]).optional(),
+  // One skill, or several separated by commas (any of them matches).
+  skillCategory: z
+    .string()
+    .trim()
+    .refine((value) => value.split(',').every((key) => (WORKER_SKILL_CATEGORIES as string[]).includes(key)), 'Unknown skill')
+    .optional(),
   sort: z.enum(['distance', 'rating']).default('distance'),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });

@@ -7,6 +7,7 @@ import { ACTIVE_BOOKING_STATUSES } from '@/services/bookingsService';
 import { isOrderOpen, orderStatusTitleKey } from '@/services/ordersService';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { openOrderTracker } from '@/state/orderTrackerStore';
+import { bookingStatusMessage, bookingStatusTitle } from '@/utils/bookingStatusText';
 
 type Step = StackStep & { createdAt: string };
 
@@ -31,9 +32,9 @@ export function ContinueSteps() {
         return {
           key: `booking-${booking.id}`,
           icon: booking.problemPostId ? 'clipboard-list' : 'bolt',
-          name: workerName ?? t('continueSteps.searching'),
-          stepTitle: `${t(`tracking.status.${booking.status}.title`)} · ${skills(booking.skillCategories)}`,
-          hint: t(`tracking.status.${booking.status}.message`, { name: workerName ?? t('tracking.yourWorker') }),
+          name: workerName ?? booking.directWorker?.fullName ?? t('continueSteps.searching'),
+          stepTitle: `${bookingStatusTitle(booking, t)} · ${skills(booking.skillCategories)}`,
+          hint: bookingStatusMessage(booking, t, workerName ?? t('tracking.yourWorker')),
           action: t('continueSteps.continue'),
           createdAt: booking.createdAt,
           onPress: () => openBookingTracker(booking.id),

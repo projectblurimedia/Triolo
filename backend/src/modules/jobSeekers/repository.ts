@@ -131,11 +131,13 @@ export class JobSeekersRepository {
       values.push(`%${params.query}%`);
       const i = values.length;
       filters.push(
-        `(p.title ILIKE $${i} OR a.full_name ILIKE $${i} OR p.description ILIKE $${i} OR array_to_string(p.skills, ' ') ILIKE $${i})`,
+        `(p.title ILIKE $${i} OR p.category::text ILIKE $${i} OR a.full_name ILIKE $${i} OR p.description ILIKE $${i} OR array_to_string(p.skills, ' ') ILIKE $${i})`,
       );
     }
     values.push(params.limit);
     const limitIndex = values.length;
+    values.push(params.priorityAccountIds ?? []);
+    const priorityIndex = values.length;
     // Sorting by pay compares like with like: a daily rate as roughly 26 working days a month.
     const order =
       params.sort === 'pay'
@@ -151,7 +153,7 @@ export class JobSeekersRepository {
            ${filters.map((filter) => `AND ${filter}`).join(' ')}
        ) sub
        WHERE distance_meters <= $4
-       ORDER BY ${order}
+       ORDER BY (account_id = ANY($${priorityIndex}::uuid[])) DESC, ${order}
        LIMIT $${limitIndex}`,
       values,
     );
@@ -235,9 +237,20 @@ export class JobSeekersRepository {
     );
     return { total: Number(result.rows[0].total), live: Number(result.rows[0].live) };
   }
+  async findCustomTitles(query: string): Promise<string[]> {
+    const result = await this.pool.query(
+      `SELECT DISTINCT ON (lower(title)) title FROM job_seeker_posts
+       WHERE category = 'other' AND is_active AND title ILIKE $1
+       ORDER BY lower(title)
+       LIMIT 15`,
+      [`%${query}%`],
+    );
+    return result.rows.map((row) => row.title);
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapAdminPost(row: any): AdminJobSeekerPost {
   return { ...mapPost(row), fullName: row.full_name, mobileNumber: row.mobile_number, accountStatus: row.account_status };
+
 }

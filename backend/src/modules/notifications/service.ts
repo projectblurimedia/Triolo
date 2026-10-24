@@ -5,6 +5,25 @@ import { AUDIENCE_BY_TYPE, NotificationListResult, NotificationType, PushApp, Pu
 const DEFAULT_LIST_LIMIT = 50;
 
 /**
+ * Whether a partner may see who viewed their profile (a subscription perk). Set once at
+ * startup by the app (app.ts) from the subscriptions module, so this module needs no
+ * dependency on it; until set, nobody does.
+ */
+let profileViewerReveal: ((accountId: string) => Promise<boolean>) | null = null;
+
+export function setProfileViewerReveal(reveal: (accountId: string) => Promise<boolean>): void {
+  profileViewerReveal = reveal;
+}
+
+async function revealsViewers(accountId: string): Promise<boolean> {
+  try {
+    return profileViewerReveal ? await profileViewerReveal(accountId) : false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * First slice of the Notifications module (Pending Module 6) — in-app only, polled by the
  * client (see partner-app's `useNotifications` hook), not push/FCM yet. Other modules call
  * into this one's service (never its repository/table directly) to raise a notification —
@@ -23,13 +42,23 @@ export class NotificationsService {
     }
     const title = 'Profile Viewed';
     const body = 'Someone viewed your profile.';
-    await this.repository.create({ accountId: recipientAccountId, type: 'profile_view', title, body });
+    // The viewer is remembered; a subscribed partner sees who it was (here and in the list).
+    const saved = await this.repository.create({ accountId: recipientAccountId, type: 'profile_view', title, body, actorAccountId: viewerAccountId });
+    // Tapping it opens this notification in the partner app (who it was, Call Now).
+    const data = { notificationId: saved?.id ?? '' };
+    if (await revealsViewers(recipientAccountId)) {
+      const name = await this.repository.accountName(viewerAccountId);
+      if (name) {
+        await this.pushTo(recipientAccountId, 'partner', `${name} viewed your profile`, 'Open Triolo Partner to see your profile views.', { data });
+        return;
+      }
+    }
 
     // Best-effort, real-time delivery on top of the in-app row above — reaches the
     // recipient's device even if their app is fully closed (see pushSender.ts), same as the
     // in-app list either way once they open the app. No-ops silently if the recipient never
     // registered a push token, or if push isn't configured on this server at all.
-    await this.pushTo(recipientAccountId, 'partner', title, body);
+    await this.pushTo(recipientAccountId, 'partner', title, body, { data });
   }
 
   async registerPushToken(accountId: string, token: string, app: PushApp | 'legacy' = 'legacy'): Promise<void> {
@@ -94,7 +123,21 @@ export class NotificationsService {
   }
 
   async listForAccount(accountId: string): Promise<NotificationListResult> {
-    return this.repository.findForAccount(accountId, DEFAULT_LIST_LIMIT);
+    const result = await this.repository.findForAccount(accountId, DEFAULT_LIST_LIMIT);
+    const reveal = result.items.some((item) => item.type === 'profile_view') && (await revealsViewers(accountId));
+    return {
+      ...result,
+      items: result.items.map((item) => {
+        const row = item as typeof item & { actorAccountId?: string | null; actorName?: string | null; actorMobile?: string | null };
+        const { actorAccountId: _id, actorName, actorMobile: _mobile, ...rest } = row;
+        void _id;
+        void _mobile;
+        if (rest.type === 'profile_view' && reveal && actorName) {
+          return { ...rest, title: `${actorName} viewed your profile`, viewer: { name: actorName } };
+        }
+        return { ...rest, viewer: null };
+      }),
+    };
   }
 
   async markRead(accountId: string, id: string): Promise<void> {

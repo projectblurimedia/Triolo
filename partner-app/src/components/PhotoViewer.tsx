@@ -70,9 +70,14 @@ export function PhotoViewer({ photos, startIndex, onClose, onPhotoPress, hint }:
         />
 
         <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
-          <Text style={styles.counter}>
-            {index + 1} / {photos.length}
-          </Text>
+          {/* A count only makes sense with more than one photo. */}
+          {photos.length > 1 ? (
+            <Text style={styles.counter}>
+              {index + 1} / {photos.length}
+            </Text>
+          ) : (
+            <View />
+          )}
           <Pressable style={styles.closeButton} onPress={onClose} hitSlop={10} accessibilityLabel="Close">
             <FontAwesome6 name="xmark" size={18} color="#FFFFFF" solid />
           </Pressable>

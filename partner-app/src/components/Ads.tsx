@@ -23,6 +23,7 @@ import { useLocationStore } from '@/state/locationStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { LoadingIndicator } from './LoadingIndicator';
 import { SmartImage } from './SmartImage';
+import { sealSizeFor, TrustedSeal } from './TrustedSeal';
 
 /*
  * (Copied between user-app and partner-app — keep in sync. Only `AD_APP` in adsService differs.)
@@ -636,9 +637,7 @@ function ProfileAdCard({
             <Text style={styles.profileInitials}>{initials(card.name)}</Text>
           </LinearGradient>
         )}
-        <View style={[styles.profileVerified, { backgroundColor: look.gradient[0], borderColor: pal.card }]}>
-          <FontAwesome6 name="check" size={10} color="#FFFFFF" solid />
-        </View>
+        {card.trusted ? <TrustedSeal size={sealSizeFor(104)} style={styles.profileSeal} /> : null}
       </View>
       <View style={styles.profileBody}>
         <Text style={[styles.profileName, { color: pal.name }]} numberOfLines={2}>
@@ -986,18 +985,7 @@ const styles = StyleSheet.create({
   },
   profileAvatar: { width: 104, height: 104, borderRadius: 52 },
   profileInitials: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 34 },
-  profileVerified: {
-    position: 'absolute',
-    right: 6,
-    bottom: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  profileSeal: { position: 'absolute', top: 2, right: 2 },
   profileBody: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20, alignItems: 'center' },
   profileName: { fontFamily: fonts.semiBold, fontSize: 22, lineHeight: 28, color: '#0C0F14', textAlign: 'center' },
   profileRating: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },

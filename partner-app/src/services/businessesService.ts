@@ -47,6 +47,9 @@ export interface BusinessProfile {
 
 export const businessesService = {
   getMyProfile: () => apiClient.get<BusinessProfile | null>('/businesses/me/profile', true),
+  /** Categories other shops added themselves (names) matching a search. */
+  customCategories: (query: string) =>
+    apiClient.get<string[]>(`/businesses/custom-categories?query=${encodeURIComponent(query)}`, true),
 
   createProfile: (params: CreateBusinessProfileParams) => {
     const formData = new FormData();

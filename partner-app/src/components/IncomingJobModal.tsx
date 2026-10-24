@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Vibration } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import * as Notifications from 'expo-notifications';
@@ -7,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { IncomingRequestScreen } from './IncomingRequestScreen';
 import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from '@/hooks/useBookingOffers';
 import { usePendingOfferStore } from '@/state/pendingOfferStore';
+import { useIncomingStore } from '@/state/incomingStore';
 import { openJob } from '@/state/jobFocusStore';
 import { showToast } from '@/state/toastStore';
 import { ApiError } from '@/services/apiClient';
@@ -17,8 +17,6 @@ import { jobsService } from '@/services/jobsService';
 
 // Lets the job screen finish fading in on top before this one closes underneath it.
 const MODAL_HANDOFF_MS = 350;
-// An offer this fresh when the app first loads still pops up (the push may have been missed).
-const FRESH_OFFER_MS = 90 * 1000;
 
 /**
  * The Rapido/Uber-driver-style "incoming job" takeover (IncomingRequestScreen), mounted ONCE at
@@ -27,9 +25,9 @@ const FRESH_OFFER_MS = 90 * 1000;
  * It opens for a new Quick Book offer two ways, whichever comes first:
  *  - a push while the app is open (`usePushNotifications.ts` sets the focused offer), or a tap
  *    on the notification;
- *  - the offer list itself (polled every few seconds): any offer not seen before opens this
- *    screen. This is what makes it reliable while the worker is using the app, even when the
- *    push is late or the phone drops it.
+ *  - the offer list itself (polled every few seconds): IncomingRequestsHub opens it for an
+ *    offer not seen before, so it's reliable even when the push is late or dropped. When more
+ *    than one request is new at once the hub shows them together in one list instead.
  */
 export function IncomingJobModal() {
   const { t } = useTranslation();
@@ -40,9 +38,9 @@ export function IncomingJobModal() {
   const declineMutation = useDeclineBookingOffer();
 
   const focusedBookingRequestId = usePendingOfferStore((state) => state.focusedBookingRequestId);
-  const setFocusedOffer = usePendingOfferStore((state) => state.setFocusedOffer);
   const clearFocusedOffer = usePendingOfferStore((state) => state.clearFocusedOffer);
-  const visible = focusedBookingRequestId !== null;
+  const listOpen = useIncomingStore((state) => state.listOpen);
+  const visible = focusedBookingRequestId !== null && !listOpen;
   const liveOffer = offers?.find((item) => item.bookingRequestId === focusedBookingRequestId) ?? null;
   // Accepting takes the offer out of the list (it's no longer an open offer, it's this
   // worker's job) while the job screen is still loading — keep showing the offer the worker
@@ -52,28 +50,6 @@ export function IncomingJobModal() {
   const accepting = acceptMutation.isPending || acceptMutation.isSuccess || handingOff;
   const offer =
     liveOffer ?? (accepting && lastOfferRef.current?.bookingRequestId === focusedBookingRequestId ? lastOfferRef.current : null);
-
-  // Open for any offer the list shows that hasn't been seen yet.
-  const seenRef = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    if (!offers) return;
-    if (seenRef.current === null) {
-      seenRef.current = new Set(offers.map((item) => item.bookingRequestId));
-      const fresh = offers.find((item) => Date.now() - new Date(item.createdAt).getTime() < FRESH_OFFER_MS);
-      if (fresh && !usePendingOfferStore.getState().focusedBookingRequestId) {
-        setFocusedOffer(fresh.bookingRequestId);
-        Vibration.vibrate([0, 400, 200, 400]);
-      }
-      return;
-    }
-    const seen = seenRef.current;
-    const fresh = offers.find((item) => !seen.has(item.bookingRequestId));
-    offers.forEach((item) => seen.add(item.bookingRequestId));
-    if (fresh && !usePendingOfferStore.getState().focusedBookingRequestId) {
-      setFocusedOffer(fresh.bookingRequestId);
-      Vibration.vibrate([0, 400, 200, 400]);
-    }
-  }, [offers, setFocusedOffer]);
 
   // The push opens this screen instantly, but the offer list is only polled every few
   // seconds — so a brand-new offer usually isn't in the cached list yet. Fetch right away
@@ -85,7 +61,6 @@ export function IncomingJobModal() {
       setCheckedForId(null);
       return;
     }
-    seenRef.current?.add(focusedBookingRequestId);
     let cancelled = false;
     refetchOffers().finally(() => {
       if (!cancelled) setCheckedForId(focusedBookingRequestId);
@@ -168,11 +143,15 @@ export function IncomingJobModal() {
   const autoAccepting = autoAccept && !notFound && !acceptMutation.isError;
 
   const busy = accepting || declineMutation.isPending || autoAccepting;
+  useEffect(() => {
+    useIncomingStore.getState().setJobBusy(busy);
+  }, [busy]);
 
   return (
     <IncomingRequestScreen
       visible={visible}
-      onRequestClose={() => !busy && handleDecline()}
+      // Back just closes it: the request stays in Bookings → Requests. Only Decline declines.
+      onRequestClose={() => !busy && clearFocusedOffer()}
       // A customer who picked this worker in particular: say so, it's not a broadcast.
       kicker={t(offer?.direct ? 'bookings.directKicker' : 'bookings.newJobKicker')}
       icon={offer?.direct ? 'user-check' : 'bolt'}

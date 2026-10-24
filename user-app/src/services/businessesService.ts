@@ -71,6 +71,9 @@ export const businessesService = {
   /** One verified shop (e.g. from an ad's Order from this Shop). */
   getPublic: (id: string) => apiClient.get<BusinessProfile>(`/businesses/public/${id}`, true),
 
+  /** Categories shops added themselves (names) matching a search. */
+  customCategories: (query: string) =>
+    apiClient.get<string[]>(`/businesses/custom-categories?query=${encodeURIComponent(query)}`, true),
   searchNearby: (params: NearbySearchParams) => {
     const search = new URLSearchParams();
     search.set('latitude', String(params.latitude));

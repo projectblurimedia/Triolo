@@ -22,6 +22,7 @@ import { RouteProp, useRoute } from '@react-navigation/native';
 import { MainTabParamList } from '@/navigation/types';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { HomeSearchModal } from '@/components/HomeSearchModal';
+import { CategoryPicker } from '@/components/CategoryPicker';
 
 const TOP_RATED_LIMIT = 10;
 /**
@@ -116,7 +117,12 @@ export function ServicesScreen() {
       onPress={() => openWorker(worker)}
       style={[styles.wideCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
-      <Avatar photoUrl={worker.profilePhotoUrl ?? worker.portfolioPhotoUrls[0]} name={worker.accountFullName} size={56} />
+      <Avatar
+        photoUrl={worker.profilePhotoUrl}
+        name={worker.accountFullName}
+        size={56}
+        seal={{ kind: 'service', id: worker.id }}
+      />
       <View style={styles.wideInfo}>
         <Text style={[styles.wideName, { color: colors.text }]} numberOfLines={1}>
           {worker.accountFullName}
@@ -209,7 +215,12 @@ export function ServicesScreen() {
         'user-slash',
         t('services.emptyTitle'),
         category
-          ? t('services.emptyCategoryMessage', { category: t(`workerProfile.skills.${category}`) })
+          ? t('services.emptyCategoryMessage', {
+              category: category
+                .split(',')
+                .map((key) => t(`workerProfile.skills.${key}`))
+                .join(', '),
+            })
           : t('services.emptyMessage'),
       );
     }
@@ -313,10 +324,17 @@ export function ServicesScreen() {
             </View>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            {renderChip(null, t('services.allCategories'), 'border-all')}
-            {SKILL_CATEGORIES.map((skill) => renderChip(skill.key, t(`workerProfile.skills.${skill.key}`), skill.icon))}
-          </ScrollView>
+          <CategoryPicker
+            title={t('services.filterTitle')}
+            placeholder={t('services.allCategories')}
+            allLabel={t('picker.allCount', { count: allWorkers.data?.length ?? 0 })}
+            options={SKILL_CATEGORIES.map((skill) => ({ key: skill.key, label: t(`workerProfile.skills.${skill.key}`), icon: skill.icon }))}
+            selected={category ? category.split(',') : []}
+            onChange={(keys) => setCategory(keys.length > 0 ? keys.join(',') : null)}
+            counts={countsByCategory}
+            fieldIcon="filter"
+            style={styles.picker}
+          />
 
           {renderBody()}
         </ScrollView>
@@ -334,6 +352,7 @@ export function ServicesScreen() {
 }
 
 const styles = StyleSheet.create({
+  picker: { marginBottom: 16 },
   // Opens the full search screen, like Home's search bar.
   searchBar: {
     flexDirection: 'row',

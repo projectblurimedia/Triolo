@@ -63,6 +63,8 @@ export const workersService = {
   /** One verified worker as customers see them (e.g. from an ad's Book Now). */
   getPublic: (id: string) => apiClient.get<WorkerProfile & { accountFullName: string }>(`/workers/public/${id}`, true),
 
+  /** Skills workers added themselves (names) matching a search — for the skill picker. */
+  customSkills: (query: string) => apiClient.get<string[]>(`/workers/custom-skills?query=${encodeURIComponent(query)}`, true),
   searchNearby: (params: NearbySearchParams) => {
     const search = new URLSearchParams();
     search.set('latitude', String(params.latitude));

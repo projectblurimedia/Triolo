@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faBars,
+  faCrown,
   faBolt,
   faBriefcase,
   faBullhorn,
@@ -18,6 +19,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { useAuthStore } from '@/state/authStore';
 import { adminApi, Stats } from '@/services/adminApi';
+import { subscriptionsApi } from '@/services/subscriptionsApi';
 import { ConfirmModal } from './ConfirmModal';
 import { Avatar, ToastHost } from './ui';
 
@@ -90,7 +92,17 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   },
   {
     title: 'Promotions',
-    items: [{ to: '/ads', label: 'Ads', icon: faBullhorn, gradient: 'linear-gradient(135deg,#ea580c,#f59e0b)' }],
+    items: [
+      { to: '/ads', label: 'Ads', icon: faBullhorn, gradient: 'linear-gradient(135deg,#ea580c,#f59e0b)' },
+      {
+        to: '/subscriptions',
+        label: 'Subscriptions',
+        icon: faCrown,
+        gradient: 'linear-gradient(135deg,#7c3aed,#f59e0b)',
+        // Trusted badges whose rating dropped.
+        badge: (stats) => stats.badgesToReview ?? 0,
+      },
+    ],
   },
 ];
 
@@ -153,9 +165,8 @@ export function Layout() {
   const [stats, setStats] = useState<Stats | null>(null);
 
   const refreshStats = () => {
-    adminApi
-      .stats()
-      .then(setStats)
+    Promise.all([adminApi.stats(), subscriptionsApi.overview().catch(() => null)])
+      .then(([next, subscriptions]) => setStats({ ...next, badgesToReview: subscriptions?.badgesToReview ?? 0 }))
       .catch(() => undefined);
   };
 

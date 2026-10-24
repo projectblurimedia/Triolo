@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
+import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
 import { validateBody } from '@/common/middleware/validate';
@@ -29,7 +31,8 @@ import {
 const notificationsService = new NotificationsService(new NotificationsRepository(pool));
 const workersService = new WorkersService(new WorkersRepository(pool), notificationsService);
 const repository = new BookingsRepository(pool);
-const service = new BookingsService(repository, workersService, notificationsService);
+const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
+const service = new BookingsService(repository, workersService, notificationsService, subscriptionStatus);
 // Trips started from a Your Problems post report back when they finish or are cancelled.
 service.setLifecycleListener(new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService, service));
 const controller = new BookingsController(service);

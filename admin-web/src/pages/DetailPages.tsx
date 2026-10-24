@@ -358,7 +358,7 @@ export function AccountDetailPage() {
                     <Link to={`/shops/${businessProfile.id}`} className="row" style={{ padding: '4px 0', borderBottom: 0 }}>
                       <Avatar
                         name={businessProfile.shopName}
-                        photo={businessProfile.shopPhotoUrls[0] ?? businessProfile.profilePhotoUrl}
+                        photo={businessProfile.profilePhotoUrl}
                         square
                         gradient="linear-gradient(135deg,#16a34a,#4ade80)"
                       />
@@ -586,7 +586,7 @@ export function ShopDetailPage() {
           return (
             <>
               <div className="hero" style={{ background: 'linear-gradient(135deg,#0055d3,#16a34a)' }}>
-                <Avatar name={shop.shopName} photo={shop.shopPhotoUrls[0] ?? shop.profilePhotoUrl} />
+                <Avatar name={shop.shopName} photo={shop.profilePhotoUrl} />
                 <div className="hero-text">
                   <h2>{shop.shopName}</h2>
                   <p>

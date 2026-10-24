@@ -30,6 +30,8 @@ export function useAcceptBookingOffer() {
   // Location must be on to take a job (as for every partner action) — asked for first.
   return useLocationGatedMutation({
     mutationFn: (bookingRequestId: string) => bookingOffersService.accept(bookingRequestId),
+    // No partner plan: one paid accept.
+    payKind: 'accept',
     onSettled: () => queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY }),
   });
 }

@@ -25,6 +25,8 @@ import { PortalHost } from '@/components/Portal';
 import { BookingTrackingModal } from '@/components/BookingTrackingModal';
 import { PromotedProfileHost } from '@/components/PromotedProfileHost';
 import { OrderTrackingModal } from '@/components/OrderTrackingModal';
+import { SubscribeModal } from '@/components/SubscribeModal';
+import { PayGateSheet } from '@/components/PayGateSheet';
 import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -169,6 +171,10 @@ export default function App() {
         {/* Quick Book's live tracking screen — opened from anywhere via bookingTrackerStore. */}
         <BookingTrackingModal />
         <OrderTrackingModal />
+        {/* Plans, opened by a locked Book / Order button or the Profile card. */}
+        <SubscribeModal />
+        {/* Pay once (no plan) before booking / ordering / a staff phone number. */}
+        <PayGateSheet />
         {/* A local business's ad before a key action (see showAdBefore). */}
         <AdActionHost />
         {/* A profile an ad promotes: Book Now / Order from this Shop / Contact. */}

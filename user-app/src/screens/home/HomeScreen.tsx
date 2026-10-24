@@ -1,4 +1,7 @@
 import React, { useMemo, useState } from 'react';
+
+// How many service tiles Home shows before "See all".
+const HOME_CATEGORY_TILES = 10;
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -276,7 +279,10 @@ export function HomeScreen() {
 
           {renderSectionHeader(t('home.browseServices'), () => navigation.navigate('Services', undefined))}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
-            {SKILL_CATEGORIES.map((skill) => (
+            {[...SKILL_CATEGORIES]
+              .sort((a, b) => (countsByCategory[b.key] ?? 0) - (countsByCategory[a.key] ?? 0))
+              .slice(0, HOME_CATEGORY_TILES)
+              .map((skill) => (
               <Pressable
                 key={skill.key}
                 style={[styles.categoryTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -293,6 +299,21 @@ export function HomeScreen() {
                 </Text>
               </Pressable>
             ))}
+            {/* Every other service is in the Services tab. */}
+            <Pressable
+              style={[styles.categoryTile, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}55` }]}
+              onPress={() => navigation.navigate('Services', undefined)}
+            >
+              <View style={[styles.categoryIcon, { backgroundColor: colors.primary }]}>
+                <FontAwesome6 name="grip" size={18} color="#FFFFFF" solid />
+              </View>
+              <Text style={[styles.categoryLabel, { color: colors.primary }]} numberOfLines={1}>
+                {t('home.seeAll')}
+              </Text>
+              <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
+                {t('home.allServicesCount', { count: SKILL_CATEGORIES.length })}
+              </Text>
+            </Pressable>
           </ScrollView>
 
           {(workers.data ?? []).length > 0 ? (

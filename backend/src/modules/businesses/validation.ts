@@ -58,7 +58,12 @@ export const nearbySearchQuerySchema = z.object({
   radiusKm: z.coerce.number().min(0.1).max(50).default(10),
   query: z.string().trim().max(100).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
-  shopCategory: z.enum(BUSINESS_SHOP_CATEGORIES as [string, ...string[]]).optional(),
+  // One shop category, or several separated by commas (any of them matches).
+  shopCategory: z
+    .string()
+    .trim()
+    .refine((value) => value.split(',').every((key) => (BUSINESS_SHOP_CATEGORIES as string[]).includes(key)), 'Unknown shop category')
+    .optional(),
   // Query strings are text: only the literal 'true' turns the delivery filter on.
   delivery: z
     .enum(['true', 'false'])

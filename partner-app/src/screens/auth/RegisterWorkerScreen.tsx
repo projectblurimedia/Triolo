@@ -19,16 +19,9 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { workersService } from '@/services/workersService';
 import { useAuthStore } from '@/state/authStore';
+import { CategoryPicker } from '@/components/CategoryPicker';
+import { SKILL_CATEGORIES } from '@/constants/categories';
 
-const SKILL_CATEGORIES = [
-  { key: 'electrician', icon: 'bolt' as const },
-  { key: 'plumber', icon: 'faucet' as const },
-  { key: 'painter', icon: 'paint-roller' as const },
-  { key: 'carpenter', icon: 'hammer' as const },
-  { key: 'mechanic', icon: 'wrench' as const },
-  { key: 'cleaner', icon: 'broom' as const },
-  { key: 'mason', icon: 'trowel' as const },
-];
 
 /**
  * One screen, one form — Full Name/Mobile Number (via `PhoneVerification`) sit alongside
@@ -211,82 +204,22 @@ export function RegisterWorkerScreen() {
           />
 
           <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.skillLabel')}</Text>
-          <View style={styles.chipRow}>
-            {orderedSkills.map((skill) => {
-              const isActive = skillCategories.includes(skill.key);
-              return (
-                <Pressable key={skill.key} onPress={() => toggleSkill(skill.key)}>
-                  {isActive ? (
-                    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                      <FontAwesome6 name={skill.icon} size={12} color="#FFFFFF" solid />
-                      <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-                    </LinearGradient>
-                  ) : (
-                    <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
-                      <FontAwesome6 name={skill.icon} size={12} color={colors.textMuted} solid />
-                      <Text style={[styles.chipLabel, { color: colors.text }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-            {otherSkillEntries.map((entry, index) => (
-              <Pressable key={`other-${entry}-${index}`} onPress={() => removeOtherEntry(index)}>
-                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]} numberOfLines={1}>
-                    {entry}
-                  </Text>
-                  <FontAwesome6 name="xmark" size={10} color="#FFFFFF" solid />
-                </LinearGradient>
-              </Pressable>
-            ))}
-            <Pressable onPress={() => setShowOtherInput(true)}>
-              <View
-                style={[styles.chip, styles.addNewChip, { borderColor: colors.primary, backgroundColor: `${colors.primary}16` }]}
-              >
-                <View style={[styles.addNewBadge, { backgroundColor: colors.primary }]}>
-                  <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
-                </View>
-                <Text style={[styles.chipLabel, { color: colors.primary, fontFamily: fonts.semiBold }]}>
-                  {t('common.addNew')}
-                </Text>
-              </View>
-            </Pressable>
-          </View>
-
-          {showOtherInput ? (
-            <>
-              <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.otherSkillLabel')}</Text>
-              <View style={styles.otherInputRow}>
-                <View style={styles.otherInputField}>
-                  <TextField
-                    containerStyle={styles.noMargin}
-                    value={otherInputValue}
-                    onChangeText={setOtherInputValue}
-                    maxLength={40}
-                    returnKeyType="done"
-                    onSubmitEditing={commitOtherEntry}
-                    autoFocus
-                  />
-                </View>
-                <Pressable
-                  style={{ opacity: otherInputValue.trim() ? 1 : 0.5 }}
-                  onPress={commitOtherEntry}
-                  disabled={!otherInputValue.trim()}
-                  accessibilityLabel={t('common.done')}
-                >
-                  <LinearGradient
-                    colors={headerGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.otherDoneGradient}
-                  >
-                    <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
-                  </LinearGradient>
-                </Pressable>
-              </View>
-            </>
-          ) : null}
+          {/* One searchable list, A–Z: pick several; your own words become a new one (or reuse one
+              another partner already added). */}
+          <CategoryPicker
+            title={t('workerProfile.skillLabel')}
+            placeholder={t('picker.chooseSkills')}
+            options={SKILL_CATEGORIES.map((entry) => ({ key: entry.key, label: t(`workerProfile.skills.${entry.key}`), icon: entry.icon }))}
+            selected={[...skillCategories.filter((key) => key !== 'other'), ...otherSkillEntries]}
+            onChange={(next) => {
+              const fixedKeys = new Set<string>(SKILL_CATEGORIES.map((entry) => entry.key));
+              setSkillCategories(next.filter((key) => fixedKeys.has(key)));
+              setOtherSkillEntries(next.filter((key) => !fixedKeys.has(key)));
+            }}
+            searchCustom={workersService.customSkills}
+            allowAdd
+            style={styles.picker}
+          />
 
           <TextField
             label={t('workerProfile.experienceLabel')}
@@ -315,6 +248,7 @@ export function RegisterWorkerScreen() {
 }
 
 const styles = StyleSheet.create({
+  picker: { marginBottom: 16 },
   body: { paddingBottom: 40 },
   label: { ...typography.caption, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },

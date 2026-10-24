@@ -4,7 +4,7 @@ import { StackStep, StepStack } from './StepStack';
 import { useMyJobs } from '@/hooks/useJobs';
 import { useShopOrders } from '@/hooks/useShopOrders';
 import { ACTIVE_JOB_STATUSES } from '@/services/jobsService';
-import { ACTIVE_SHOP_STATUSES, NEW_ORDER_STATUSES } from '@/services/shopOrdersService';
+import { ACTIVE_SHOP_STATUSES } from '@/services/shopOrdersService';
 import { openJob } from '@/state/jobFocusStore';
 import { openShopOrder } from '@/state/shopOrderFocusStore';
 
@@ -47,7 +47,8 @@ export function ContinueSteps({ isShop }: { isShop: boolean }) {
         onPress: () => openJob(job.id),
       })),
     ...(isShop ? (orders.data ?? []) : [])
-      .filter((order) => NEW_ORDER_STATUSES.includes(order.status) || ACTIVE_SHOP_STATUSES.includes(order.status))
+      // New ones are in "New for you" above; here only what is under way.
+      .filter((order) => ACTIVE_SHOP_STATUSES.includes(order.status))
       .map<Step>((order) => ({
         key: `order-${order.id}`,
         kind: 'order',

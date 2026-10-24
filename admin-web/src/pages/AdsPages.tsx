@@ -119,7 +119,7 @@ function endDateFor(start: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (value: boolean) => void; disabled?: boolean }) {
+export function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (value: boolean) => void; disabled?: boolean }) {
   return (
     <button
       type="button"

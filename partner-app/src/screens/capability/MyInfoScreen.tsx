@@ -14,6 +14,8 @@ import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { MainStackParamList } from '@/navigation/types';
 import { formatAddress } from '@/utils/formatAddress';
 import { SmartImage } from '@/components/SmartImage';
+import { SealedPhoto } from '@/components/TrustedSeal';
+import { useTrustedKinds } from '@/hooks/useSubscription';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'MyInfo'>;
 type MyInfoNavigation = Props['navigation'];
@@ -36,6 +38,7 @@ function WorkerInfo({ navigation }: { navigation: MyInfoNavigation }) {
   const { colors } = useThemeColors();
   const account = useAuthStore((state) => state.account);
   const { data: profile, isLoading } = useMyWorkerProfile();
+  const trustedKinds = useTrustedKinds();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -67,6 +70,7 @@ function WorkerInfo({ navigation }: { navigation: MyInfoNavigation }) {
           <HeroCard
             icon="screwdriver-wrench"
             photoUrl={profile.profilePhotoUrl}
+            trusted={trustedKinds.has('service')}
             name={account?.fullName ?? t('workerProfile.title')}
             tagline={t('mainTabs.Profile.workerTitle')}
           />
@@ -123,6 +127,7 @@ function BusinessInfo({ navigation }: { navigation: MyInfoNavigation }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const { data: profile, isLoading } = useMyBusinessProfile();
+  const trustedKinds = useTrustedKinds();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -154,6 +159,7 @@ function BusinessInfo({ navigation }: { navigation: MyInfoNavigation }) {
           <HeroCard
             icon="store"
             photoUrl={profile.profilePhotoUrl}
+            trusted={trustedKinds.has('business')}
             name={profile.shopName}
             tagline={t('mainTabs.Profile.businessTitle')}
           />
@@ -228,15 +234,19 @@ interface HeroCardProps {
   photoUrl?: string | null;
   name: string;
   tagline: string;
+  /** Active Trusted by Triolo badge: the photo shows the seal. */
+  trusted?: boolean;
 }
 
 /** Identity banner shared by both capability views — same gradient/avatar treatment as ProfileScreen's own hero, for visual consistency across "who is this" surfaces in the app. */
-function HeroCard({ icon, photoUrl, name, tagline }: HeroCardProps) {
+function HeroCard({ icon, photoUrl, name, tagline, trusted }: HeroCardProps) {
   return (
     <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroCard}>
       {photoUrl ? (
         <View style={styles.heroPhotoRing}>
-          <SmartImage source={{ uri: photoUrl }} style={styles.heroPhoto} />
+          <SealedPhoto size={86} trusted={!!trusted}>
+            <SmartImage source={{ uri: photoUrl }} style={styles.heroPhoto} />
+          </SealedPhoto>
         </View>
       ) : (
         <View style={styles.heroIcon}>

@@ -1,7 +1,4 @@
-export type BusinessShopCategory =
-  'grocery' | 'restaurant' | 'pharmacy' | 'electronics' | 'clothing' | 'hardware' | 'salon' | 'other';
-
-export const BUSINESS_SHOP_CATEGORIES: BusinessShopCategory[] = [
+const BUSINESS_SHOP_CATEGORIES_LIST = [
   'grocery',
   'restaurant',
   'pharmacy',
@@ -9,8 +6,50 @@ export const BUSINESS_SHOP_CATEGORIES: BusinessShopCategory[] = [
   'clothing',
   'hardware',
   'salon',
+  'supermarket',
+  'vegetables_fruits',
+  'dairy',
+  'bakery',
+  'sweets',
+  'meat_chicken',
+  'fish',
+  'tea_coffee',
+  'tiffin_center',
+  'juice_icecream',
+  'water_cans',
+  'mobile_shop',
+  'computer_shop',
+  'home_appliances',
+  'furniture',
+  'footwear',
+  'jewellery',
+  'cosmetics',
+  'gifts_toys',
+  'stationery_books',
+  'printing_xerox',
+  'photo_studio',
+  'optical',
+  'clinic_lab',
+  'beauty_parlour',
+  'gym',
+  'tailoring',
+  'laundry',
+  'paints',
+  'electricals',
+  'sanitary',
+  'building_materials',
+  'auto_parts',
+  'seeds_fertilizers',
+  'pet_shop',
+  'flowers',
+  'gas_agency',
+  'hotel_lodge',
   'other',
-];
+] as const;
+
+export type BusinessShopCategory = (typeof BUSINESS_SHOP_CATEGORIES_LIST)[number];
+
+export const BUSINESS_SHOP_CATEGORIES: BusinessShopCategory[] = [...BUSINESS_SHOP_CATEGORIES_LIST];
 
 export type ProfileVerificationStatus = 'pending_verification' | 'verified' | 'rejected';
 
@@ -80,6 +119,8 @@ export interface NearbySearchFilter {
   /** Only shops that offer door delivery. */
   deliveryOnly?: boolean;
   sort?: 'distance' | 'rating';
+  /** Subscribed partners' accounts: listed first. */
+  priorityAccountIds?: string[];
 }
 
 /** Public (non-admin) nearby-search result — a verified profile plus its computed distance from the searcher. */

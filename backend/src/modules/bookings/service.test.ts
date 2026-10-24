@@ -10,6 +10,7 @@ function createMockRepository(): MockRepository {
   return {
     createRequest: jest.fn(),
     createOffers: jest.fn(),
+    claimDueOffers: jest.fn().mockResolvedValue([]),
     exists: jest.fn(),
     findByIdForAccount: jest.fn(),
     findForCustomer: jest.fn(),
@@ -32,7 +33,7 @@ function createMockRepository(): MockRepository {
     createAssigned: jest.fn(),
     findRatedForWorker: jest.fn(),
     findStatuses: jest.fn(),
-    expireStaleBroadcasts: jest.fn(),
+    expireStaleBroadcasts: jest.fn().mockResolvedValue([]),
     findWorkerContact: jest.fn(),
     findAccountName: jest.fn(),
     declineDirect: jest.fn(),
@@ -128,16 +129,17 @@ describe('createQuickBooking', () => {
 
     expect(result).toEqual({ bookingRequestId: 'request-1', matchedWorkerCount: 2 });
     expect(repo.createRequest).toHaveBeenCalledWith(expect.objectContaining({ locationAddress: 'Ameerpet, Hyderabad' }));
+    // No subscriptions here: nobody waits.
     expect(repo.createOffers).toHaveBeenCalledWith('request-1', [
-      { workerId: 'worker-1', distanceMeters: 480 },
-      { workerId: 'worker-2', distanceMeters: 1200 },
+      { workerId: 'worker-1', distanceMeters: 480, delaySeconds: 0 },
+      { workerId: 'worker-2', distanceMeters: 1200, delaySeconds: 0 },
     ]);
     expect(notifications.sendRawPush).toHaveBeenCalledTimes(2);
     expect(notifications.sendRawPush).toHaveBeenCalledWith(
       'worker-account-1',
       expect.any(String),
       expect.stringContaining('Electrician'),
-      expect.objectContaining({ dataOnly: true, data: { kind: 'booking_offer', bookingRequestId: 'request-1' } }),
+      expect.objectContaining({ data: { kind: 'booking_offer', bookingRequestId: 'request-1' } }),
     );
   });
 
@@ -220,7 +222,7 @@ describe('acceptOffer', () => {
       'worker-account-2',
       expect.any(String),
       expect.any(String),
-      expect.objectContaining({ data: { kind: 'booking_taken', bookingRequestId: 'request-1' }, dataOnly: true }),
+      expect.objectContaining({ data: { kind: 'booking_taken', bookingRequestId: 'request-1' } }),
     );
   });
 });
@@ -433,7 +435,7 @@ describe('find jobs now', () => {
 
     const offers = await service.searchOpenRequests('worker-account-1', { latitude: 17, longitude: 82 });
 
-    expect(repo.addOffersForOpenRequests).toHaveBeenCalledWith('worker-1', 'worker-account-1', ['plumber'], 17, 82);
+    expect(repo.addOffersForOpenRequests).toHaveBeenCalledWith('worker-1', 'worker-account-1', ['plumber'], 17, 82, 0, null);
     expect(offers).toEqual([{ offerId: 'o-1' }]);
   });
 
@@ -443,7 +445,7 @@ describe('find jobs now', () => {
 
     await service.searchOpenRequests('worker-account-1');
 
-    expect(repo.addOffersForOpenRequests).toHaveBeenCalledWith('worker-1', 'worker-account-1', ['plumber'], 16.7, 81.1);
+    expect(repo.addOffersForOpenRequests).toHaveBeenCalledWith('worker-1', 'worker-account-1', ['plumber'], 16.7, 81.1, 0, null);
   });
 
   it('finds nothing for an unverified worker', async () => {
@@ -665,5 +667,78 @@ describe('admin cancel', () => {
     });
     expect(await service.adminCancelActiveForAccount('account-1', null)).toBe(2);
     expect(repo.adminCancel).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('subscriptions', () => {
+  const matches = [
+    { workerId: 'worker-1', accountId: 'worker-account-1', accountFullName: 'Rajesh', preferredLanguage: 'en', distanceMeters: 480 },
+    { workerId: 'worker-2', accountId: 'worker-account-2', accountFullName: 'Suresh', preferredLanguage: 'te', distanceMeters: 1200 },
+  ];
+  const dto = { skillCategories: ['electrician'], latitude: 17.385, longitude: 78.4867, radiusKm: 50, locationAddress: '' };
+
+  it('subscribed workers hear first; the others wait for the head start', async () => {
+    const status = {
+      useCustomerPass: jest.fn().mockResolvedValue(null),
+      attachPass: jest.fn(),
+      restorePasses: jest.fn(),
+      headStart: jest.fn().mockResolvedValue({ seconds: 60, subscriberIds: new Set(['worker-account-1']) }),
+    };
+    const subscribed = new BookingsService(repo as unknown as BookingsRepository, workers, notifications, status as never);
+    repo.createRequest.mockResolvedValue(buildRequest());
+    workers.findMatchingForBroadcast.mockResolvedValue(matches as never);
+
+    await subscribed.createQuickBooking('account-1', dto as never);
+
+    expect(repo.createOffers).toHaveBeenCalledWith('request-1', [
+      { workerId: 'worker-1', distanceMeters: 480, delaySeconds: 0 },
+      { workerId: 'worker-2', distanceMeters: 1200, delaySeconds: 60 },
+    ]);
+    expect(notifications.sendRawPush).toHaveBeenCalledTimes(1);
+    expect(notifications.sendRawPush).toHaveBeenCalledWith('worker-account-1', expect.any(String), expect.any(String), expect.any(Object));
+  });
+
+  it('a customer without a plan or a paid pass cannot Quick Book (nothing is created)', async () => {
+    const status = { useCustomerPass: jest.fn().mockRejectedValue(Object.assign(new Error('x'), { code: 'PAYMENT_REQUIRED' })) };
+    const locked = new BookingsService(repo as unknown as BookingsRepository, workers, notifications, status as never);
+    await expect(locked.createQuickBooking('account-1', dto as never)).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED' });
+    expect(repo.createRequest).not.toHaveBeenCalled();
+  });
+
+  it('a paid pass is tied to the booking, and given back when nobody can be asked', async () => {
+    const status = {
+      useCustomerPass: jest.fn().mockResolvedValue('pass-1'),
+      attachPass: jest.fn(),
+      restorePasses: jest.fn(),
+      headStart: jest.fn().mockResolvedValue(null),
+    };
+    const paying = new BookingsService(repo as unknown as BookingsRepository, workers, notifications, status as never);
+    repo.createRequest.mockResolvedValue(buildRequest());
+    workers.findMatchingForBroadcast.mockResolvedValue([]);
+    await paying.createQuickBooking('account-1', dto as never);
+    expect(status.attachPass).toHaveBeenCalledWith('pass-1', 'request-1');
+    expect(status.restorePasses).toHaveBeenCalledWith(['request-1']);
+  });
+
+  it('an expired Quick Book gives its pass back', async () => {
+    const status = { restorePasses: jest.fn() };
+    const withStatus = new BookingsService(repo as unknown as BookingsRepository, workers, notifications, status as never);
+    repo.expireStaleBroadcasts.mockResolvedValue(['old-1']);
+    repo.findForCustomer.mockResolvedValue([]);
+    await withStatus.listMyBookings('account-1');
+    expect(status.restorePasses).toHaveBeenCalledWith(['old-1']);
+  });
+
+  it('delayed offers are pushed once their time comes', async () => {
+    repo.claimDueOffers.mockResolvedValue([
+      { bookingRequestId: 'request-1', distanceMeters: 900, skillCategories: ['plumber'], accountId: 'worker-account-2', preferredLanguage: 'en' },
+    ]);
+    await service.releaseDueOffers();
+    expect(notifications.sendRawPush).toHaveBeenCalledWith(
+      'worker-account-2',
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ data: { kind: 'booking_offer', bookingRequestId: 'request-1' } }),
+    );
   });
 });

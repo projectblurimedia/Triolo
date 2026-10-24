@@ -239,6 +239,23 @@ The same migration added `business_profiles.rating_sum/rating_count` (shop ratin
 
 Partial index `(category) WHERE is_active`. No admin review: a post is live as soon as it's saved.
 
+### Pay once (migration `0047`)
+
+- `subscription_settings.customer_fees` / `partner_fees` (JSONB, ₹).
+- `pay_passes` — `account_id`, `kind` (`book`/`order`/`staff_contact`/`accept`/`job_post`), `target_id` (staff_contact: the job post), `amount`, `status` (`unpaid` → `paid` → `used`), `used_ref` (the booking / order / post that used it; cleared when given back), Razorpay link / payment ids, `paid_at`, `used_at`.
+
+### More categories (migration `0045`)
+
+- `worker_skill_category`, `business_shop_category` and `job_seeker_category` gained many values (added before `other`). The lists live in each module's `interfaces.ts` and are copied in `user-app` / `partner-app` `constants/categories.ts`, the job services, admin-web `utils/format.ts` and registration-web — keep them in sync.
+
+### Subscriptions and Trusted badges (Subscriptions module — migration `0043`)
+
+- `subscription_settings` — one row (`id = 1`): `customer_enabled`, `partner_enabled` (both start off), `customer_prices` / `partner_prices` (JSONB, months → ₹, plans 1/3/6/12), `head_start_seconds` (how long subscribed workers get Quick Book offers and new problems before others, default 60), `badge_enabled`, `badge_price`, `badge_min_rating` / `badge_min_ratings` (an active badge whose profile falls below this, with at least that many ratings, shows in the admin's review list).
+- `subscriptions` — `account_id`, `audience` (`customer`/`partner`), `months`, `amount`, `status` (`unpaid`/`active`/`cancelled`), Razorpay payment link id/url, `razorpay_payment_id` (unique), `paid_at`, `starts_at`/`ends_at` (a renewal starts when the current plan ends).
+- `profile_badges` — `account_id`, `kind` (`service`/`business`/`job_post`), `profile_id`, `amount`, `status` (`unpaid`/`active`/`removed`), payment link, payment id, `removed_at`, `removed_reason`; at most one active badge per profile.
+- Migration `0044`: `subscription_settings.subscriptions_enabled` — the main switch; customer / partner plans count only while it is on too.
+- `booking_offers.visible_after` / `pushed_at` (the head start), `notifications.actor_account_id` (who viewed a profile), notification type `badge_removed`, `ads.razorpay_link_id` (partner-app boosts are paid through a payment link).
+
 ### Ads (Ads module — migration `0029`)
 
 - `ad_settings` — one row (`id = 1`): `ads_enabled` (master switch, starts off), `launch_user`, `launch_partner`, `home_user`, `home_partner`.

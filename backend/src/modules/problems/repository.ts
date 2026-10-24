@@ -148,6 +148,8 @@ export class ProblemsRepository {
     longitude: number,
     radiusKm: number,
     limit: number,
+    // Without the head start, only problems at least this old.
+    minAgeSeconds = 0,
   ): Promise<NearbyProblem[]> {
     const result = await this.pool.query(
       `SELECT * FROM (
@@ -157,11 +159,12 @@ export class ProblemsRepository {
            AND p.account_id != $3
            AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL
            AND p.skill_categories && $4::worker_skill_category[]
+           AND p.created_at <= now() - make_interval(secs => $7)
        ) sub
        WHERE distance_meters <= $5
        ORDER BY distance_meters ASC, created_at DESC
        LIMIT $6`,
-      [latitude, longitude, excludeAccountId, skillCategories, radiusKm * 1000, limit],
+      [latitude, longitude, excludeAccountId, skillCategories, radiusKm * 1000, limit, minAgeSeconds],
     );
     return result.rows.map((row) => ({
       id: row.id,

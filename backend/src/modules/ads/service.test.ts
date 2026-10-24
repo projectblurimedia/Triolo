@@ -90,6 +90,7 @@ const AD: Ad = {
   promoteMobile: null,
   needsPayment: false,
   razorpayOrderId: null,
+  razorpayLinkId: null,
   razorpayPaymentId: null,
   paidAt: null,
   refundId: null,
@@ -658,5 +659,16 @@ describe('AdsService', () => {
       const params = { ...PARAMS, startDate: '2999-01-01', planDays: 7 } as Omit<SaveAdParams, 'paymentMethod'>;
       await expect(service.updateOwned('owner-1', 'ad-1', params, {})).rejects.toMatchObject({ code: 'AD_PAID_PLAN_LOCKED' });
     });
+  });
+});
+
+describe('ads and subscriptions', () => {
+  it('a subscriber sees no ads', async () => {
+    const { repository } = makeService();
+    const status = { isActive: jest.fn().mockResolvedValue(true) };
+    const service = new AdsService(repository as unknown as AdsRepository, undefined, status as never);
+    expect(await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null, { spot: 'quick_book', accountId: 'acc-1' })).toBeNull();
+    expect(status.isActive).toHaveBeenCalledWith('acc-1', 'customer');
+    expect(repository.pickAndCount).not.toHaveBeenCalled();
   });
 });

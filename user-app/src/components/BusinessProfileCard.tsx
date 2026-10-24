@@ -17,7 +17,7 @@ interface BusinessProfileCardProps {
 export function BusinessProfileCard({ profile }: BusinessProfileCardProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const thumbnail = profile.shopPhotoUrls[0] ?? profile.profilePhotoUrl;
+  const thumbnail = profile.profilePhotoUrl;
   const fixedCategories = profile.shopCategories.filter((key) => key !== 'other');
 
   return (

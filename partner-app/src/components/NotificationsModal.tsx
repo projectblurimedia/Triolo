@@ -18,6 +18,9 @@ import {
 } from '@/hooks/useNotifications';
 import { AppNotification, NotificationType } from '@/services/notificationsService';
 import { showToast } from '@/state/toastStore';
+import { openSubscribe } from '@/state/subscribeStore';
+import { useMySubscription } from '@/hooks/useSubscription';
+import { useNotificationFocusStore } from '@/state/notificationFocusStore';
 
 interface NotificationsModalProps {
   visible: boolean;
@@ -30,7 +33,7 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const TYPE_ICONS: Record<NotificationType, React.ComponentProps<typeof FontAwesome6>['name']> = {
+export const TYPE_ICONS: Record<NotificationType, React.ComponentProps<typeof FontAwesome6>['name']> = {
   profile_view: 'eye',
   problem_accepted: 'user-check',
   problem_work_done: 'clipboard-check',
@@ -49,9 +52,10 @@ const TYPE_ICONS: Record<NotificationType, React.ComponentProps<typeof FontAweso
   order_out_for_delivery: 'truck-fast',
   order_completed: 'circle-check',
   order_cancelled: 'ban',
+  badge_removed: 'shield-halved',
 };
 
-function formatRelativeTime(iso: string, justNowLabel: string): string {
+export function formatRelativeTime(iso: string, justNowLabel: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   if (diffMs < MINUTE_MS) return justNowLabel;
   if (diffMs < HOUR_MS) return `${Math.floor(diffMs / MINUTE_MS)}m`;
@@ -107,6 +111,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<AppNotification | null>(null);
+  const subscription = useMySubscription();
   const [confirmBulk, setConfirmBulk] = useState(false);
 
   const items = data?.items ?? [];
@@ -150,6 +155,18 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     setDetail(item);
     if (!item.isRead) markRead.mutate(item.id);
   };
+
+  // Opened from a tapped push: show that notification once the list has it.
+  const focusId = useNotificationFocusStore((state) => state.focusId);
+  useEffect(() => {
+    if (!visible || !focusId) return;
+    const item = items.find((entry) => entry.id === focusId);
+    if (item) {
+      openDetail(item);
+      useNotificationFocusStore.getState().clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, focusId, items]);
 
   const handleRowPress = (item: AppNotification) => {
     if (selectionMode) {
@@ -332,6 +349,11 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         </View>
         <View style={[styles.detailDivider, { backgroundColor: colors.border }]} />
         <Text style={[styles.detailMessage, { color: colors.text }]}>{item.body}</Text>
+        {item.type === 'profile_view' && !item.viewer && subscription.data?.enabled && !subscription.data.active ? (
+          <Pressable onPress={openSubscribe} hitSlop={6} style={styles.callWrap}>
+            <Text style={[styles.subscribeLink, { color: colors.primary }]}>{t('notifications.seeWhoViewed')}</Text>
+          </Pressable>
+        ) : null}
       </View>
       <Pressable
         style={[styles.detailDelete, { borderColor: `${brandColors.error}59`, backgroundColor: `${brandColors.error}0D` }]}
@@ -573,6 +595,8 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   detailDeleteText: { ...typography.body, fontFamily: fonts.semiBold },
+  callWrap: { alignSelf: 'stretch', marginTop: 18 },
+  subscribeLink: { ...typography.body, fontFamily: fonts.semiBold, textAlign: 'center' },
   selectionBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1 },
   deleteSelected: { borderRadius: 16, overflow: 'hidden' },
   deleteSelectedInner: { height: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

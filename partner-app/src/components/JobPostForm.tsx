@@ -18,6 +18,7 @@ import { useAuthStore } from '@/state/authStore';
 import { PlaceValue } from '@/utils/place';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
+import { payIfNeeded } from '@/state/payGateStore';
 
 interface JobPostFormProps {
   /** The existing post when editing; omitted for a new one. */
@@ -105,6 +106,8 @@ export function JobPostForm({
     if (!workType) return setError(t('jobPost.errorCategory'));
     if (!Number.isInteger(amount) || amount < 1) return setError(t('jobPost.errorPay'));
     if (!place) return setError(t('jobPost.errorLocation'));
+    // Publishing a new post without a partner plan: pay once (the admin's fee) — or subscribe.
+    if (!post && !(await payIfNeeded('job_post'))) return;
 
     setSaving(true);
     try {

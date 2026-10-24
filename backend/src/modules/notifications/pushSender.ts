@@ -88,6 +88,9 @@ export async function sendPushNotification(
   if (options.dataOnly) {
     data.title = title;
     data.body = body;
+  } else {
+    // Android shows this one itself: partner-app's background task must not show it again.
+    data.presented = 'os';
   }
 
   try {

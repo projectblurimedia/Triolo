@@ -19,16 +19,9 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { businessesService } from '@/services/businessesService';
 import { useAuthStore } from '@/state/authStore';
+import { CategoryPicker } from '@/components/CategoryPicker';
+import { SHOP_CATEGORIES } from '@/constants/categories';
 
-const SHOP_CATEGORIES = [
-  { key: 'grocery', icon: 'basket-shopping' as const },
-  { key: 'restaurant', icon: 'utensils' as const },
-  { key: 'pharmacy', icon: 'pills' as const },
-  { key: 'electronics', icon: 'tv' as const },
-  { key: 'clothing', icon: 'shirt' as const },
-  { key: 'hardware', icon: 'screwdriver-wrench' as const },
-  { key: 'salon', icon: 'scissors' as const },
-];
 
 /**
  * One screen, one form — mirrors `RegisterWorkerScreen`'s own restructuring (see its doc
@@ -211,90 +204,22 @@ export function RegisterBusinessScreen() {
           <TextField label={t('businessProfile.shopNameLabel')} value={shopName} onChangeText={setShopName} />
 
           <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.categoryLabel')}</Text>
-          <View style={styles.chipRow}>
-            {orderedCategories.map((category) => {
-              const isActive = shopCategories.includes(category.key);
-              return (
-                <Pressable key={category.key} onPress={() => toggleCategory(category.key)}>
-                  {isActive ? (
-                    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                      <FontAwesome6 name={category.icon} size={12} color="#FFFFFF" solid />
-                      <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>
-                        {t(`businessProfile.categories.${category.key}`)}
-                      </Text>
-                    </LinearGradient>
-                  ) : (
-                    <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
-                      <FontAwesome6 name={category.icon} size={12} color={colors.textMuted} solid />
-                      <Text style={[styles.chipLabel, { color: colors.text }]}>
-                        {t(`businessProfile.categories.${category.key}`)}
-                      </Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-            {otherCategoryEntries.map((entry, index) => (
-              <Pressable key={`other-${entry}-${index}`} onPress={() => removeOtherEntry(index)}>
-                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                  <Text style={[styles.chipLabel, { color: '#FFFFFF' }]} numberOfLines={1}>
-                    {entry}
-                  </Text>
-                  <FontAwesome6 name="xmark" size={10} color="#FFFFFF" solid />
-                </LinearGradient>
-              </Pressable>
-            ))}
-            <Pressable onPress={() => setShowOtherInput(true)}>
-              <View
-                style={[
-                  styles.chip,
-                  styles.addNewChip,
-                  { borderColor: headerGradient[0], backgroundColor: `${headerGradient[0]}16` },
-                ]}
-              >
-                <View style={[styles.addNewBadge, { backgroundColor: headerGradient[0] }]}>
-                  <FontAwesome6 name="plus" size={9} color="#FFFFFF" solid />
-                </View>
-                <Text style={[styles.chipLabel, { color: headerGradient[0], fontFamily: fonts.semiBold }]}>
-                  {t('common.addNew')}
-                </Text>
-              </View>
-            </Pressable>
-          </View>
-
-          {showOtherInput ? (
-            <>
-              <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.otherCategoryLabel')}</Text>
-              <View style={styles.otherInputRow}>
-                <View style={styles.otherInputField}>
-                  <TextField
-                    containerStyle={styles.noMargin}
-                    value={otherInputValue}
-                    onChangeText={setOtherInputValue}
-                    maxLength={40}
-                    returnKeyType="done"
-                    onSubmitEditing={commitOtherEntry}
-                    autoFocus
-                  />
-                </View>
-                <Pressable
-                  style={{ opacity: otherInputValue.trim() ? 1 : 0.5 }}
-                  onPress={commitOtherEntry}
-                  disabled={!otherInputValue.trim()}
-                  accessibilityLabel={t('common.done')}
-                >
-                  <LinearGradient
-                    colors={headerGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.otherDoneGradient}
-                  >
-                    <FontAwesome6 name="check" size={16} color="#FFFFFF" solid />
-                  </LinearGradient>
-                </Pressable>
-              </View>
-            </>
-          ) : null}
+          {/* One searchable list, A–Z: pick several; your own words become a new one (or reuse one
+              another partner already added). */}
+          <CategoryPicker
+            title={t('businessProfile.categoryLabel')}
+            placeholder={t('picker.chooseShopTypes')}
+            options={SHOP_CATEGORIES.map((entry) => ({ key: entry.key, label: t(`businessProfile.categories.${entry.key}`), icon: entry.icon }))}
+            selected={[...shopCategories.filter((key) => key !== 'other'), ...otherCategoryEntries]}
+            onChange={(next) => {
+              const fixedKeys = new Set<string>(SHOP_CATEGORIES.map((entry) => entry.key));
+              setShopCategories(next.filter((key) => fixedKeys.has(key)));
+              setOtherCategoryEntries(next.filter((key) => !fixedKeys.has(key)));
+            }}
+            searchCustom={businessesService.customCategories}
+            allowAdd
+            style={styles.picker}
+          />
 
           <LocationField label={t('location.shopPlaceLabel')} value={place} onChange={setPlace} />
 
@@ -354,6 +279,7 @@ export function RegisterBusinessScreen() {
 }
 
 const styles = StyleSheet.create({
+  picker: { marginBottom: 16 },
   body: { paddingBottom: 40 },
   label: { ...typography.caption, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },

@@ -12,6 +12,7 @@ import { WorkerProfileCard } from '@/components/WorkerProfileCard';
 import { BusinessProfileCard } from '@/components/BusinessProfileCard';
 import { ProfileStatsRow } from '@/components/ProfileStatsRow';
 import { ProfileActivity, ProfileOrders } from '@/components/ProfileActivity';
+import { SubscriptionCard } from '@/components/SubscriptionCard';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
@@ -105,6 +106,8 @@ export function ProfileScreen() {
               </View>
             </LinearGradient>
           ) : null}
+
+          {account ? <SubscriptionCard /> : null}
 
           {account ? (
             <View style={styles.detailsSection}>

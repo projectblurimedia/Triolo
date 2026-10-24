@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -7,11 +7,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { JOB_CATEGORIES, JobSeeker } from '@/services/jobSeekersService';
 import { formatRupees } from '@/services/ordersService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
-import { callPhone } from '@/utils/tripLinks';
+import { callStaff } from '@/utils/callStaff';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { COMPACT_AVATAR_SIZE, GlassProfileLayout } from './GlassHero';
 import { firstName } from '@/utils/firstName';
 import { SmartImage } from './SmartImage';
+import { SealedAvatar, TrustedBadge } from './TrustedBadge';
+import { PhotoViewer } from './PhotoViewer';
 
 const CALL_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const PHOTO_SIZE = 104;
@@ -35,6 +37,11 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
+  // The photo, opened on its own by tapping it in the header.
+  const [photoOpen, setPhotoOpen] = useState(false);
+  // The number, once paid for here (no plan).
+  const [unlockedNumber, setUnlockedNumber] = useState<string | null>(null);
+  useEffect(() => setUnlockedNumber(null), [person?.id]);
 
   const icon = person ? (JOB_CATEGORIES.find((entry) => entry.key === person.category)?.icon ?? 'user-tie') : 'user-tie';
 
@@ -60,7 +67,14 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
               onBack={onClose}
               backLabel={t('common.close')}
               avatar={
-                person.photoUrl ? (
+                <Pressable
+                  onPress={() => person.photoUrl && setPhotoOpen(true)}
+                  disabled={!person.photoUrl}
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={person.fullName}
+                >
+                <SealedAvatar size={COMPACT_AVATAR_SIZE} kind="job_post" id={person.id}>
+                {person.photoUrl ? (
                   <SmartImage source={{ uri: person.photoUrl }} style={styles.compactAvatar} />
                 ) : (
                   <LinearGradient
@@ -71,7 +85,9 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                   >
                     <Text style={styles.compactInitials}>{initialsOf(person.fullName)}</Text>
                   </LinearGradient>
-                )
+                )}
+                </SealedAvatar>
+                </Pressable>
               }
               title={firstName(person.fullName)}
               subtitle={jobSeekerTitle(person, t)}
@@ -80,6 +96,7 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
               {/* Pay, work and distance — the first thing a family wants to know. */}
               <View style={styles.bodyTop}>
                 <Text style={[styles.fullName, { color: colors.text }]}>{person.fullName}</Text>
+                <TrustedBadge kind="job_post" id={person.id} style={styles.trusted} />
                 <View style={[styles.payCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={styles.flex}>
                     <Text style={[styles.payLabel, { color: colors.textMuted }]}>{t('hireStaff.expectedPay')}</Text>
@@ -154,11 +171,11 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
               <View style={styles.flex}>
                 <Text style={[styles.phoneLabel, { color: colors.textMuted }]}>{t('hireStaff.phoneLabel')}</Text>
                 <Text style={[styles.phone, { color: colors.text }]} selectable>
-                  {person.mobileNumber}
+                  {unlockedNumber ?? person.mobileNumber ?? t('hireStaff.numberHidden')}
                 </Text>
               </View>
               <Pressable
-                onPress={() => callPhone(person.mobileNumber)}
+                onPress={() => callStaff({ id: person.id, mobileNumber: unlockedNumber ?? person.mobileNumber }, setUnlockedNumber)}
                 accessibilityLabel={`${t('hireStaff.call')} ${person.fullName}`}
               >
                 <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>
@@ -167,6 +184,11 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                 </LinearGradient>
               </Pressable>
             </View>
+            <PhotoViewer
+              photos={person.photoUrl ? [person.photoUrl] : []}
+              startIndex={photoOpen ? 0 : null}
+              onClose={() => setPhotoOpen(false)}
+            />
           </>
         ) : null}
       </View>
@@ -175,6 +197,7 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
 }
 
 const styles = StyleSheet.create({
+  trusted: { marginTop: -6, marginBottom: 12 },
   compactAvatar: {
     width: COMPACT_AVATAR_SIZE,
     height: COMPACT_AVATAR_SIZE,

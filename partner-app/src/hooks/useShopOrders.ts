@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocationGatedMutation } from './useLocationGatedMutation';
 import { ACTIVE_SHOP_STATUSES, NEW_ORDER_STATUSES, shopOrdersService } from '@/services/shopOrdersService';
 import { useAuthStore } from '@/state/authStore';
+import { PassKind } from '@/services/subscriptionsService';
 
 export const SHOP_ORDERS_QUERY_KEY = ['shop-orders', 'mine'];
 export const shopOrderQueryKey = (id: string | null) => ['shop-orders', 'detail', id];
@@ -33,11 +34,16 @@ export function useShopOrder(id: string | null) {
 }
 
 /** Any shop step (accept, save items, packed, ready, verify PIN, cancel) — refreshes the order and list after. */
-export function useShopOrderAction<TArgs extends { id: string }, TResult = unknown>(action: (args: TArgs) => Promise<TResult>) {
+export function useShopOrderAction<TArgs extends { id: string }, TResult = unknown>(
+  action: (args: TArgs) => Promise<TResult>,
+  // Accepting an order without a partner plan is paid for once.
+  payKind?: PassKind,
+) {
   const queryClient = useQueryClient();
   // Location must be on for every partner action, shop orders included (asked for first).
   return useLocationGatedMutation({
     mutationFn: (args: TArgs) => action(args),
+    payKind,
     onSettled: (_data, _error, args) =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: shopOrderQueryKey(args.id) }),

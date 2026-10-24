@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, useParams } from 'react-router-dom';
+import { SubscriptionsPage } from '@/pages/SubscriptionsPage';
 import { RequireAdmin } from '@/components/RequireAdmin';
 import { Layout } from '@/components/Layout';
 import { LoginPage } from '@/pages/LoginPage';
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
       { path: 'job-posts', element: <JobPostsPage /> },
       { path: 'job-posts/:id', element: <JobPostDetailPage /> },
       { path: 'ads', element: <AdsPage /> },
+      { path: 'subscriptions', element: <SubscriptionsPage /> },
       { path: 'ads/new', element: <AdNewPage /> },
       { path: 'ads/:id', element: <AdDetailPage /> },
       { path: 'ads/:id/edit', element: <AdEditPage /> },

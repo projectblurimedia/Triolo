@@ -250,7 +250,7 @@ describe('listNearbyForWorker', () => {
 
     await service.listNearbyForWorker('worker-account-1');
 
-    expect(repository.findNearbyOpen).toHaveBeenCalledWith('worker-account-1', ['plumber', 'painter'], 16.7, 81.1, 50, 50);
+    expect(repository.findNearbyOpen).toHaveBeenCalledWith('worker-account-1', ['plumber', 'painter'], 16.7, 81.1, 50, 50, 0);
   });
 
   it('returns nothing when the worker profile has no GPS location', async () => {

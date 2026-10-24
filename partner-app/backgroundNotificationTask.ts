@@ -61,7 +61,9 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
   // A fresh data-only push arrived — compose the actual notification ourselves.
   const remoteData = (payload && 'data' in payload ? payload.data : undefined) as Record<string, string> | undefined;
   const bookingRequestId = remoteData?.bookingRequestId;
-  if (!remoteData || !bookingRequestId) {
+  // Already shown by Android (the backend sends job offers as normal notifications now, so
+  // they arrive even when the phone won't wake a closed app for data-only messages).
+  if (!remoteData || !bookingRequestId || remoteData.presented === 'os') {
     return;
   }
 

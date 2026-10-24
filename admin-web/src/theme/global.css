@@ -3178,3 +3178,134 @@ a.row:hover {
   bottom: 0;
   border-radius: 0;
 }
+
+/* ---------- Subscriptions page ---------- */
+.sub-plan .ad-master-banner {
+  margin-bottom: 4px;
+}
+
+.sub-perks {
+  list-style: none;
+  margin: 12px 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.sub-perks svg {
+  color: #fbbf24;
+  margin-right: 6px;
+}
+
+.sub-prices {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.sub-prices .ad-prices {
+  width: 100%;
+}
+
+.sub-plan .ad-gap-box {
+  margin-top: 14px;
+}
+
+.sub-badge-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.sub-badge-settings .field {
+  margin-bottom: 0;
+}
+
+.sub-inline {
+  display: flex;
+  gap: 10px;
+}
+
+.sub-inline .ad-price-input {
+  flex: 1;
+}
+
+.sub-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.sub-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--input);
+}
+
+.sub-row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sub-row-text strong {
+  display: block;
+  font-size: 14px;
+}
+
+.sub-row-text small {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.sub-row-right {
+  flex-shrink: 0;
+}
+
+.grid-2 + .sub-plan {
+  margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+  .sub-row {
+    flex-wrap: wrap;
+  }
+
+  .sub-row-right {
+    width: 100%;
+  }
+
+  .sub-row-right .btn {
+    width: 100%;
+  }
+}
+
+/* Subscriptions: the main switch in gold, each app's plans under it. */
+.sub-master:not(.off) {
+  background: linear-gradient(135deg, #b45309, #f59e0b 55%, #fcd34d);
+}
+.sub-section-body {
+  padding: 4px 4px 2px;
+  transition: opacity 0.2s ease;
+}
+.sub-section-body.disabled {
+  opacity: 0.55;
+}
+.sub-main .ad-spots {
+  gap: 14px;
+}
+
+/* Pay-once fees: room between the heading and the price boxes. */
+.sub-fees .ad-prices {
+  margin-top: 14px;
+}
+.sub-fees .btn {
+  margin-top: 12px;
+}

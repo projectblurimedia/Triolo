@@ -21,7 +21,9 @@
     "updateCompleteMessage": "Restarting the app with the latest version...",
     "edit": "Edit",
     "back": "Back",
-    "search": "Search"
+    "search": "Search",
+    "showMore": "Show more ({{count}})",
+    "showLess": "Show less"
   },
   "verification": {
     "pending": "Pending Review",
@@ -155,7 +157,46 @@
       "mechanic": "Mechanic",
       "cleaner": "Cleaner",
       "mason": "Mason",
-      "other": "Other"
+      "other": "Other",
+      "ac_technician": "AC Technician",
+      "appliance_repair": "Appliance Repair",
+      "mobile_repair": "Mobile Repair",
+      "computer_repair": "Computer Repair",
+      "tv_repair": "TV Repair",
+      "ro_water_purifier": "RO / Water Purifier",
+      "cctv_technician": "CCTV Technician",
+      "solar_technician": "Solar Technician",
+      "welder": "Welder",
+      "fabricator": "Fabricator",
+      "tiles_worker": "Tiles Worker",
+      "false_ceiling": "False Ceiling / POP",
+      "waterproofing": "Waterproofing",
+      "glass_aluminium": "Glass & Aluminium",
+      "locksmith": "Locksmith",
+      "borewell": "Borewell / Motor",
+      "pest_control": "Pest Control",
+      "bike_mechanic": "Bike Mechanic",
+      "car_wash": "Car / Bike Wash",
+      "driver": "Driver",
+      "movers_packers": "Packers & Movers",
+      "gardener": "Gardener",
+      "cook": "Cook",
+      "caterer": "Caterer",
+      "tailor": "Tailor",
+      "beautician": "Beautician",
+      "barber": "Barber",
+      "mehendi_artist": "Mehendi Artist",
+      "photographer": "Photographer",
+      "event_decorator": "Event Decorator",
+      "priest": "Priest / Pandit",
+      "tutor": "Home Tutor",
+      "fitness_trainer": "Fitness / Yoga Trainer",
+      "nurse": "Nurse / Caretaker",
+      "physiotherapist": "Physiotherapist",
+      "interior_designer": "Interior Designer",
+      "architect": "Architect / Engineer",
+      "contractor": "Building Contractor",
+      "labour": "Labour / Helper"
     },
     "experienceLabel": "Years of Experience",
     "portfolioLabel": "Photos of Your Work (optional)",
@@ -185,7 +226,45 @@
       "clothing": "Clothing",
       "hardware": "Hardware",
       "salon": "Salon",
-      "other": "Other"
+      "other": "Other",
+      "supermarket": "Supermarket",
+      "vegetables_fruits": "Vegetables & Fruits",
+      "dairy": "Milk & Dairy",
+      "bakery": "Bakery",
+      "sweets": "Sweets & Snacks",
+      "meat_chicken": "Meat & Chicken",
+      "fish": "Fish",
+      "tea_coffee": "Tea & Coffee",
+      "tiffin_center": "Tiffin Centre",
+      "juice_icecream": "Juice & Ice Cream",
+      "water_cans": "Water Cans",
+      "mobile_shop": "Mobiles & Accessories",
+      "computer_shop": "Computers",
+      "home_appliances": "Home Appliances",
+      "furniture": "Furniture",
+      "footwear": "Footwear",
+      "jewellery": "Jewellery",
+      "cosmetics": "Cosmetics & Beauty",
+      "gifts_toys": "Gifts & Toys",
+      "stationery_books": "Stationery & Books",
+      "printing_xerox": "Printing & Xerox",
+      "photo_studio": "Photo Studio",
+      "optical": "Optical",
+      "clinic_lab": "Clinic & Lab",
+      "beauty_parlour": "Beauty Parlour",
+      "gym": "Gym",
+      "tailoring": "Tailoring",
+      "laundry": "Laundry & Dry Clean",
+      "paints": "Paints",
+      "electricals": "Electricals",
+      "sanitary": "Sanitary & Plumbing",
+      "building_materials": "Building Materials",
+      "auto_parts": "Auto Parts & Tyres",
+      "seeds_fertilizers": "Seeds & Fertilizers",
+      "pet_shop": "Pet Shop",
+      "flowers": "Flowers & Pooja Items",
+      "gas_agency": "Gas Agency",
+      "hotel_lodge": "Hotel & Lodge"
     },
     "photosLabel": "Shop Photos (optional)",
     "deliveryLabel": "Do you offer delivery?",
@@ -266,7 +345,8 @@
       "hireStaff": "Cooks, tutors, drivers",
       "orderShop": "Send your list to a nearby shop"
     },
-    "trackBooking": "Track"
+    "trackBooking": "Track",
+    "allServicesCount": "{{count}} services"
   },
   "homeMenu": {
     "title": "Triolo",
@@ -334,7 +414,8 @@
     "emptyTitle": "No Workers Nearby",
     "emptyMessage": "No verified workers were found near you yet. Pull down to refresh later.",
     "emptyCategoryMessage": "No {{category}} found near you yet.",
-    "searchPlaceholder": "Search workers by name or skill"
+    "searchPlaceholder": "Search workers by name or skill",
+    "filterTitle": "Filter by service"
   },
   "servicesMenu": {
     "title": "Services",
@@ -429,7 +510,8 @@
     "emptyTitle": "No shops found",
     "emptyMessage": "No verified shops near you yet.",
     "emptyDeliveryMessage": "No shops near you deliver right now. Turn off the Delivery filter to see all shops.",
-    "searchPlaceholder": "Search shops by name or category"
+    "searchPlaceholder": "Search shops by name or category",
+    "filterTitle": "Filter by shop type"
   },
   "bazaarMenu": {
     "title": "Bazaar",
@@ -551,7 +633,13 @@
     "BOOKING_OWN_PROFILE": "You can't book yourself.",
     "WORKER_NOT_FOUND": "This worker isn't available right now.",
     "BOOKING_NOT_LATE": "You can rate when cancelling only once the worker is over an hour late.",
-    "ORDER_NOT_LATE": "You can rate when cancelling only once the order has made no progress for over an hour."
+    "ORDER_NOT_LATE": "You can rate when cancelling only once the order has made no progress for over an hour.",
+    "SUBSCRIPTION_REQUIRED": "Subscribe to book workers and order from shops.",
+    "SUBSCRIPTIONS_OFF": "Subscriptions aren't available right now.",
+    "SUBSCRIPTION_NOT_FOUND": "We couldn't find that payment.",
+    "SUBSCRIPTION_ACTIVE": "Your plan is already active.",
+    "PAYMENT_REQUIRED": "Pay once or subscribe to continue.",
+    "PASS_NOT_FOUND": "We couldn't find that payment."
   },
   "problemForm": {
     "photosLabel": "Photos of the problem (up to 5)",
@@ -641,7 +729,7 @@
     "allCaughtUp": "All caught up"
   },
   "homeSearch": {
-    "placeholder": "Search workers, shops, services…",
+    "placeholder": "Search workers, shops, staff…",
     "scopeAll": "All",
     "scopeWorkers": "Workers",
     "scopeShops": "Shops",
@@ -654,13 +742,28 @@
     "noResultsTitle": "No matches nearby",
     "noResultsMessage": "Nothing near you matches \"{{query}}\". Try a different word.",
     "title": "Search",
-    "subtitle": "Workers and shops near you",
+    "subtitle": "Services, shops and staff near you",
     "workersTitle": "Search Services",
     "workersSubtitle": "Workers near you",
     "workersPlaceholder": "Name or skill, e.g. plumber",
     "shopsTitle": "Search Shops",
     "shopsSubtitle": "Shops near you",
-    "shopsPlaceholder": "Shop name or category, e.g. grocery"
+    "shopsPlaceholder": "Shop name or category, e.g. grocery",
+    "scopeStaff": "Staff",
+    "staff": "Staff",
+    "staffCount": "Staff ({{count}})",
+    "tryStaff": "Hire staff",
+    "tabServices": "Services",
+    "tabShops": "Shops",
+    "tabStaff": "Hire Staff",
+    "staffPlaceholder": "Kind of work or name, e.g. cook",
+    "browse": {
+      "workers": "All services ({{count}})",
+      "shops": "All shop types ({{count}})",
+      "staff": "All kinds of work ({{count}})"
+    },
+    "matchingItems": "Matching",
+    "nearbyResults": "Near you"
   },
   "liveMap": {
     "unavailable": "Map unavailable right now",
@@ -920,7 +1023,27 @@
       "gardener": "Gardener",
       "office_assistant": "Office assistant",
       "shop_assistant": "Shop assistant",
-      "other": "Other"
+      "other": "Other",
+      "maid": "Maid / House Help",
+      "delivery_boy": "Delivery Boy",
+      "receptionist": "Receptionist",
+      "accountant": "Accountant",
+      "computer_operator": "Computer Operator",
+      "data_entry": "Data Entry",
+      "sales_executive": "Sales Executive",
+      "telecaller": "Telecaller",
+      "cashier": "Cashier",
+      "waiter": "Waiter / Hotel Staff",
+      "nurse": "Nurse / Patient Care",
+      "tailor": "Tailor",
+      "beautician": "Beautician",
+      "music_dance_teacher": "Music / Dance Teacher",
+      "fitness_trainer": "Gym / Yoga Trainer",
+      "watchman": "Watchman",
+      "helper_labour": "Helper / Labour",
+      "warehouse_staff": "Warehouse / Packing Staff",
+      "factory_worker": "Factory Worker",
+      "farm_worker": "Farm Worker"
     },
     "period": {
       "daily": "Daily",
@@ -969,7 +1092,9 @@
     "how2": "See each person's pay, skills, experience and distance.",
     "how3": "Call them directly — no middleman, no fee.",
     "introNote": "Uses your location to show only people near you.",
-    "finding": "Finding people near you…"
+    "finding": "Finding people near you…",
+    "selectType": "Select the type of staff you need",
+    "numberHidden": "Number hidden · tap Call"
   },
   "continueSteps": {
     "title": "Continue Where You Left Off",
@@ -1145,10 +1270,11 @@
     "chooseWork": "What do you need done?",
     "note": "{{name}} gets your request personally and has 10 minutes to accept. Then you can track them like Quick Book.",
     "send": "Send Booking Request",
-    "waitingTitle": "Waiting for {{name}}",
-    "waitingMessage": "We asked {{name}} personally. They have 10 minutes to accept.",
+    "waitingTitle": "Booking request sent to {{name}}",
+    "waitingMessage": "Waiting for {{name}} to accept. They have 10 minutes.",
     "expiredMessage": "{{name}} didn't answer in time. Book Again asks every worker nearby.",
-    "declinedMessage": "{{name}} can't take this job. Book Again asks every worker nearby."
+    "declinedMessage": "{{name}} can't take this job. Book Again asks every worker nearby.",
+    "sentTitle": "Request sent to {{name}}"
   },
   "late": {
     "workerTitle": "{{name}} hasn't arrived yet",
@@ -1165,5 +1291,93 @@
     "cancelAndRate": "Cancel & Rate",
     "cancelledToast": "Cancelled — thanks for your rating",
     "orderReason": "no progress for over an hour"
+  },
+  "subscribe": {
+    "title": "Triolo Plus",
+    "subtitle": "Book workers and order from shops",
+    "heroTitle": "Subscribe to book and order",
+    "heroText": "Searching and seeing profiles is free. A plan lets you book workers and order from shops.",
+    "activeTitle": "You're subscribed",
+    "activeUntil": "Active until {{date}}",
+    "perkQuickBook": "Quick Book nearby workers",
+    "perkBookWorker": "Book the worker you choose",
+    "perkOrder": "Send your lists to shops",
+    "perkNoAds": "No ads",
+    "choosePlan": "Choose a plan",
+    "extend": "Add more time",
+    "months_one": "{{count}} month",
+    "months_other": "{{count}} months",
+    "perMonth": "₹{{amount}} / month",
+    "best": "Best value",
+    "pay": "Pay ₹{{amount}}",
+    "payExtend": "Add time · ₹{{amount}}",
+    "checkPaid": "I've paid — check",
+    "pending_one": "A payment of ₹{{amount}} for {{count}} month isn't finished yet.",
+    "pending_other": "A payment of ₹{{amount}} for {{count}} months isn't finished yet.",
+    "openPayment": "Open",
+    "note": "You pay securely on Razorpay. Come back to the app when you're done and your plan starts at once.",
+    "paidTitle": "Subscribed!",
+    "paidMessage": "You can book workers and order from shops now.",
+    "notPaidTitle": "Not paid yet",
+    "notPaidMessage": "We haven't received the payment. Finish it on the Razorpay page and try again.",
+    "off": "Subscriptions aren't available right now.",
+    "toBook": "Subscribe to book",
+    "toOrder": "Subscribe to order",
+    "cardTitle": "Get Triolo Plus",
+    "cardText": "Book workers and order from shops, with no ads.",
+    "cardActive": "Triolo Plus",
+    "cardBrand": "Triolo Plus",
+    "activeShort": "Active",
+    "manage": "Manage",
+    "get": "Get"
+  },
+  "trusted": {
+    "label": "Trusted by Triolo"
+  },
+  "picker": {
+    "selected": "Selected ({{count}})",
+    "all": "All",
+    "addedByPartners": "Added by partners",
+    "partnerMade": "Added by a partner",
+    "add": "Add “{{name}}”",
+    "remove": "Remove {{name}}",
+    "countSelected": "{{count}} selected",
+    "pickOne": "Pick one",
+    "pickMany": "Pick as many as you need",
+    "search": "Search…",
+    "noMatch": "Nothing matches",
+    "doneCount": "Done ({{count}})",
+    "chooseServices": "Choose services",
+    "chooseWork": "Choose the kind of work",
+    "chooseSkills": "Choose your skills",
+    "chooseShopTypes": "Choose your shop type",
+    "allCount": "All ({{count}})",
+    "clear": "Clear"
+  },
+  "payGate": {
+    "title": {
+      "book": "Book this worker",
+      "order": "Send your list",
+      "staff_contact": "See their phone number"
+    },
+    "message": {
+      "book": "Pay ₹{{amount}} once to book. With Triolo Plus every booking is free.",
+      "order": "Pay ₹{{amount}} once to send this order. With Triolo Plus every order is free.",
+      "staff_contact": "Pay ₹{{amount}} once to see and call this number — it stays unlocked. With Triolo Plus every number is free."
+    },
+    "pay": "Pay ₹{{amount}}",
+    "waiting": "Finish the payment on Razorpay, then come back — it carries on by itself.",
+    "subscribeInstead": "Subscribe instead — no fees",
+    "paidTitle": "Paid!",
+    "paidMessage": {
+      "book": "Your booking is going out.",
+      "order": "Your order is being sent.",
+      "staff_contact": "Their number is unlocked."
+    },
+    "paidEarlierTitle": "Using your earlier payment",
+    "paidEarlierMessage": {
+      "book": "You paid for a booking that didn't go ahead, so this one is free.",
+      "order": "You paid for an order that didn't go ahead, so this one is free."
+    }
   }
 }

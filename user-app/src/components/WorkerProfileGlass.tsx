@@ -69,7 +69,7 @@ interface WorkerProfileFactsProps {
   ratingAverage: number | null;
   ratingCount: number;
   experienceYears: number;
-  /** Shown above the tiles, e.g. a VerificationBadge. */
+  /** Shown at the top of the card, above the tiles (e.g. the name and the Trusted badge). */
   badge?: ReactNode;
 }
 
@@ -98,8 +98,16 @@ export function WorkerProfileFacts({ skills, ratingAverage, ratingCount, experie
 
   return (
     <View style={styles.facts}>
-      {badge ? <View style={styles.factsBadge}>{badge}</View> : null}
-      <View style={[styles.factsTiles, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {/* One card: who it is on top, then rating / rated jobs / experience. */}
+      <View style={[styles.factsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {badge ? (
+          <View
+            style={[styles.factsBadge, { backgroundColor: `${colors.primary}0A`, borderBottomColor: colors.border }]}
+          >
+            {badge}
+          </View>
+        ) : null}
+        <View style={styles.factsTiles}>
         {tiles.map((tile, index) => (
           <View
             key={tile.label}
@@ -119,6 +127,7 @@ export function WorkerProfileFacts({ skills, ratingAverage, ratingCount, experie
             </Text>
           </View>
         ))}
+        </View>
       </View>
       {skills.length > 0 ? (
         <View style={styles.factsSkills}>
@@ -251,8 +260,18 @@ const GLASS_BORDER = 'rgba(255,255,255,0.32)';
 
 const styles = StyleSheet.create({
   facts: { gap: 12, marginBottom: 6 },
-  factsBadge: { alignItems: 'flex-start' },
-  factsTiles: { flexDirection: 'row', borderRadius: 18, borderWidth: 1, paddingVertical: 14 },
+  factsCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#0B2A5B',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  factsBadge: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  factsTiles: { flexDirection: 'row', paddingVertical: 14 },
   factsTile: { flex: 1, alignItems: 'center', gap: 4, paddingHorizontal: 4 },
   factsIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   factsValue: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 21 },

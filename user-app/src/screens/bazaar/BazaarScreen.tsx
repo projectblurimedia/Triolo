@@ -24,6 +24,8 @@ import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { HomeSearchModal } from '@/components/HomeSearchModal';
+import { CategoryPicker } from '@/components/CategoryPicker';
+import { DeliveryToggle } from '@/components/DeliveryToggle';
 
 const SHOP_LIMIT = 50;
 const TOP_RATED_LIMIT = 10;
@@ -111,7 +113,12 @@ export function BazaarScreen() {
       onPress={() => openShop(shop)}
       style={[styles.wideCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
-      <Avatar photoUrl={shop.shopPhotoUrls[0] ?? shop.profilePhotoUrl} name={shop.shopName} size={56} />
+      <Avatar
+        photoUrl={shop.profilePhotoUrl}
+        name={shop.shopName}
+        size={56}
+        seal={{ kind: 'business', id: shop.id }}
+      />
       <View style={styles.wideInfo}>
         <Text style={[styles.wideName, { color: colors.text }]} numberOfLines={1}>
           {shop.shopName}
@@ -320,33 +327,24 @@ export function BazaarScreen() {
             </View>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            {renderChip(
-              'delivery',
-              t('sendList.deliveryFilter'),
-              deliveryOnly,
-              () => setDeliveryOnly((value) => !value),
-              'truck',
-            )}
-            {renderChip(
-              'all',
-              t('services.allCategories'),
-              category === null,
-              () => setCategory(null),
-              'border-all',
-              allShops.data?.length,
-            )}
-            {SHOP_CATEGORIES.map((entry) =>
-              renderChip(
-                entry.key,
-                t(`businessProfile.categories.${entry.key}`),
-                category === entry.key,
-                () => setCategory(entry.key),
-                entry.icon,
-                countsByCategory[entry.key] ?? 0,
-              ),
-            )}
-          </ScrollView>
+          <View style={styles.filterRow}>
+            <CategoryPicker
+              title={t('bazaar.filterTitle')}
+              placeholder={t('services.allCategories')}
+              allLabel={t('picker.allCount', { count: allShops.data?.length ?? 0 })}
+              options={SHOP_CATEGORIES.map((entry) => ({
+                key: entry.key,
+                label: t(`businessProfile.categories.${entry.key}`),
+                icon: entry.icon,
+              }))}
+              selected={category ? category.split(',') : []}
+              onChange={(keys) => setCategory(keys.length > 0 ? keys.join(',') : null)}
+              counts={countsByCategory}
+              fieldIcon="filter"
+              style={styles.flex1}
+            />
+            <DeliveryToggle on={deliveryOnly} onPress={() => setDeliveryOnly((value) => !value)} label={t('sendList.deliveryFilter')} />
+          </View>
 
           {renderBody()}
         </ScrollView>
@@ -365,6 +363,8 @@ export function BazaarScreen() {
 }
 
 const styles = StyleSheet.create({
+  filterRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 16 },
+  flex1: { flex: 1 },
   // Opens the full search screen, like Home's search bar.
   searchBar: {
     flexDirection: 'row',

@@ -15,6 +15,7 @@ import { ProblemPost } from '@/services/problemsService';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from './PullToRefresh';
+import { bookingStatusTitle } from '@/utils/bookingStatusText';
 
 interface MyBookingsModalProps {
   visible: boolean;
@@ -101,7 +102,7 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
       .map((key) => t(`workerProfile.skills.${key}`))
       .join(', ');
     const status = isBooking ? item.booking.status : item.problem.status;
-    const statusLabel = isBooking ? t(`tracking.status.${status}.title`) : t(`yourProblems.status.${status}`);
+    const statusLabel = isBooking ? bookingStatusTitle(item.booking, t) : t(`yourProblems.status.${status}`);
     const workerName = isBooking ? item.booking.worker?.fullName : item.problem.acceptedWorkerFullName;
     const rating = isBooking ? item.booking.workerRating : item.problem.workerRating;
     const tone = statusColor(status);

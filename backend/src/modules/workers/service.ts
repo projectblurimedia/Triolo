@@ -1,4 +1,5 @@
 import fs from 'fs';
+import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { NotificationsService } from '@/modules/notifications/service';
@@ -22,6 +23,8 @@ export class WorkersService {
   constructor(
     private readonly repository: WorkersRepository,
     private readonly notificationsService: NotificationsService,
+    // Subscribed partners come first in searches (optional: tests and admin don't need it).
+    private readonly subscriptionStatus?: SubscriptionStatusService,
   ) {}
 
   async createProfile(accountId: string, dto: CreateWorkerProfileDto, files: Express.Multer.File[]): Promise<WorkerProfile> {
@@ -147,7 +150,8 @@ export class WorkersService {
   }
 
   async searchNearby(accountId: string, filter: NearbySearchFilter): Promise<WorkerNearbyResult[]> {
-    return this.repository.findNearby(accountId, filter);
+    const priorityAccountIds = (await this.subscriptionStatus?.priorityPartnerIds()) ?? [];
+    return this.repository.findNearby(accountId, { ...filter, priorityAccountIds });
   }
 
   /** Called from modules/problems when a customer rates a finished job (never touches this table itself). */
@@ -167,8 +171,14 @@ export class WorkersService {
     latitude: number,
     longitude: number,
     radiusKm: number,
+    customSkills: string[] = [],
   ): Promise<WorkerBroadcastMatch[]> {
-    return this.repository.findMatchingForBroadcast(requesterAccountId, skillCategories, latitude, longitude, radiusKm);
+    return this.repository.findMatchingForBroadcast(requesterAccountId, skillCategories, latitude, longitude, radiusKm, customSkills);
+  }
+
+  /** Skills workers added themselves (under "other") that match a search — names only. */
+  searchCustomSkills(query: string): Promise<string[]> {
+    return this.repository.findCustomSkills(query);
   }
 
   /** Fired when a user opens this worker's detail card from Nearby Workers search. */

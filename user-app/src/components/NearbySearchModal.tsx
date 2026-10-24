@@ -12,6 +12,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { workersService, WorkerNearbyResult } from '@/services/workersService';
 import { businessesService, BusinessNearbyResult } from '@/services/businessesService';
 import { formatAddress } from '@/utils/formatAddress';
+import { Avatar } from './WorkerMiniCard';
 import { formatDistanceValue, isWorkerResult, NearbyResult, NearbySearchMode } from '@/utils/nearbyResult';
 
 export type { NearbySearchMode, NearbyResult };
@@ -275,9 +276,21 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
         onPress={() => handleSelectResult(item)}
       >
         <View style={styles.resultHeaderRow}>
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.resultAvatar}>
-            <FontAwesome6 name={isWorker ? 'screwdriver-wrench' : 'store'} size={18} color="#FFFFFF" solid />
-          </LinearGradient>
+          {/* The photo, with the Trusted by Triolo seal when bought. */}
+          <Avatar
+            photoUrl={
+              worker
+                ? (worker.profilePhotoUrl)
+                : ((business as BusinessNearbyResult).profilePhotoUrl)
+            }
+            name={title}
+            size={44}
+            seal={
+              worker
+                ? { kind: 'service', id: worker.id }
+                : { kind: 'business', id: item.id }
+            }
+          />
           <View style={styles.resultHeaderInfo}>
             <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={1}>
               {title}

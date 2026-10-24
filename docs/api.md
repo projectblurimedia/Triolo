@@ -562,6 +562,42 @@ People looking for regular work (a home cook, a tutor, a driver, a nanny…), po
 
 All need a login. Used when an ad promoting a profile is tapped.
 
+## Nearby filters
+
+`GET /workers/nearby` `skillCategory` and `GET /businesses/nearby` `shopCategory` take one key or several separated by commas; a profile matches when it has any of them.
+
+## Category name suggestions
+
+All require auth; `query` (1–40 characters) is matched anywhere in the name; at most 15 names, A–Z.
+
+- `GET /workers/custom-skills?query=` — skills verified workers typed under "other".
+- `GET /businesses/custom-categories?query=` — categories verified shops typed under "other".
+- `GET /job-seekers/custom-titles?query=` — kinds of work on live posts in the "other" category.
+
+`POST /bookings/quick` and `POST /bookings/direct` take `skillCategories` as fixed skill keys and/or such names (max 10, names cleaned of dots and colons, at most 5 kept); bookings return the names in place of `other`.
+
+## Subscriptions Module
+
+Paid plans for each app (customer: book and order, no ads; partner: jobs first, top of lists, see who viewed, no ads) and the per-profile "Trusted by Triolo" badge. Payment is a Razorpay payment link opened in the browser; the app calls the check endpoint when the person comes back. All routes require auth.
+
+| Method | Path | Body / query | Response |
+|---|---|---|---|
+| GET | `/subscriptions/me` | `?audience=customer\|partner` | `{ enabled, prices, active: {months, startsAt, endsAt} \| null, pending: {id, months, amount, paymentUrl} \| null }` |
+| POST | `/subscriptions/checkout` | `{ audience, months: 1\|3\|6\|12 }` | `{ id, amount, paymentUrl }` — 409 `SUBSCRIPTIONS_OFF` / `SUBSCRIPTION_ACTIVE` (a plan is already running) |
+| POST | `/subscriptions/:id/check` | — | `getMine` + `paid` — 404 `SUBSCRIPTION_NOT_FOUND` (not yours) |
+| GET | `/subscriptions/badges/me` | — | `{ enabled, price, profiles: [{kind, profileId, name, eligible, status: none\|pending\|active\|removed, badgeId, paymentUrl, removedReason}] }` |
+| POST | `/subscriptions/badges/checkout` | `{ kind: service\|business\|job_post }` | `{ id, amount, paymentUrl }` — 409 `BADGES_OFF` / `BADGE_ALREADY_ACTIVE`, 404 `BADGE_PROFILE_NOT_FOUND`, 400 `BADGE_PROFILE_NOT_ELIGIBLE` |
+| POST | `/subscriptions/badges/:id/check` | — | `badges/me` + `paid` |
+| GET | `/subscriptions/badges/trusted` | — | `{ service: id[], business: id[], job_post: id[] }` (cached 60 s) |
+
+**Pay once (no plan):** `POST /subscriptions/passes/checkout { kind: book|order|staff_contact|accept|job_post, targetId? }` → `{ id, paid, amount, paymentUrl }` (paid at once when nothing is owed; a started link is reused); `POST /subscriptions/passes/:id/check` → `{ paid }`. `GET /subscriptions/me` adds `fees` and `passes` (paid, unused, per kind). Without a plan or a pass: `POST /bookings/quick|direct`, `POST /orders`, accepting (`/bookings/:id/accept`, `/problems/:id/accept`, shop `accept`) and a new job post answer 403 `PAYMENT_REQUIRED` with `details { kind, amount }`; job-seeker search / public post return `mobileNumber: null, contactLocked: true` until that number is paid for. Admin: `GET /admin/subscriptions/passes?kind&q`; settings `customerFees { book, order, staffContact }`, `partnerFees { accept, jobPost }`.
+
+**Locks while customer subscriptions are on (superseded by pay once):** `POST /bookings/quick`, `POST /bookings/direct` and `POST /orders` answer 403 `SUBSCRIPTION_REQUIRED` without an active customer plan. Subscribers get no ad from `/ads/serve`. **Partner perks:** subscribed workers get Quick Book offers and new problems `headStartSeconds` before others; shops and job posts of subscribed partners sort first in nearby search; a subscribed partner's `profile_view` notifications carry `viewer: { name }` — never the viewer's number (null otherwise) and the push data carries `notificationId`.
+
+**Admin** (`/admin/subscriptions`, admin only): `GET /overview`, `PATCH /settings`, `GET /list?audience&state&q`, `GET /badges?status`, `GET /badges/review` (active badges under the minimum rating), `POST /badges/:id/remove { reason }` (the partner gets a `badge_removed` notification with the reason and must buy again).
+
+**Boost (partner app):** an ordinary self-booked ad (`POST /ads/self` with `actionType` = the profile kind and the partner's own number as `promoteMobile`), paid via `POST /ads/self/:id/pay-link` and checked with `POST /ads/self/:id/pay/check`; reviewed by the admin like any self-booked ad.
+
 ## Ads Module
 
 Ads from local businesses (shops, openings, offers), booked by the admin by hand after the business pays. Nothing is self-serve.

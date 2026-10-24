@@ -9,6 +9,26 @@ export const JOB_SEEKER_CATEGORIES = [
   'gardener',
   'office_assistant',
   'shop_assistant',
+  'maid',
+  'delivery_boy',
+  'receptionist',
+  'accountant',
+  'computer_operator',
+  'data_entry',
+  'sales_executive',
+  'telecaller',
+  'cashier',
+  'waiter',
+  'nurse',
+  'tailor',
+  'beautician',
+  'music_dance_teacher',
+  'fitness_trainer',
+  'watchman',
+  'helper_labour',
+  'warehouse_staff',
+  'factory_worker',
+  'farm_worker',
   'other',
 ] as const;
 export type JobSeekerCategory = (typeof JOB_SEEKER_CATEGORIES)[number];
@@ -44,8 +64,11 @@ export interface JobSeekerPost {
 /** A post as a customer sees it in search: with the poster's name, phone to call, and distance. */
 export interface JobSeekerSearchResult extends JobSeekerPost {
   fullName: string;
-  mobileNumber: string;
+  /** Null while the viewer hasn't paid to see it (no plan; see contactLocked). */
+  mobileNumber: string | null;
   distanceMeters: number;
+  /** The number is hidden until the viewer pays once (or subscribes). */
+  contactLocked?: boolean;
 }
 
 /** A post as the admin sees it: the poster's name, phone and account standing. */
@@ -88,4 +111,6 @@ export interface JobSeekerSearchParams {
   query?: string;
   sort: JobSeekerSort;
   limit: number;
+  /** Subscribed partners' accounts: listed first. */
+  priorityAccountIds?: string[];
 }

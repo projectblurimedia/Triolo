@@ -7,6 +7,7 @@ import { pushTokenService } from '@/services/pushTokenService';
 import { attemptAccept, attemptDecline, updateOfferNotification } from '@/utils/bookingOfferOutcome';
 import { useAuthStore } from '@/state/authStore';
 import { usePendingOfferStore } from '@/state/pendingOfferStore';
+import { useNotificationFocusStore } from '@/state/notificationFocusStore';
 import { openJob } from '@/state/jobFocusStore';
 import { openShopOrder } from '@/state/shopOrderFocusStore';
 import { navigateToBookings } from '@/navigation/navigationRef';
@@ -57,6 +58,9 @@ async function handleOfferAction(actionIdentifier: string, bookingRequestId: str
       showToast({ variant: 'success', title: labels.accepted, message: labels.acceptedMessage });
     } else if (outcome === 'already_taken') {
       showToast({ variant: 'info', title: labels.taken, message: labels.takenMessage });
+    } else if (outcome === 'payment') {
+      // No partner plan: the job opens in the app, where Accept takes the payment.
+      usePendingOfferStore.getState().setFocusedOffer(bookingRequestId, false);
     } else if (outcome === 'location_off') {
       showToast({ variant: 'error', title: i18n.t('location.disabledTitle'), message: i18n.t('location.acceptNeedsLocation') });
     } else {
@@ -104,8 +108,10 @@ function openOfferFromTap(response: Notifications.NotificationResponse, bookingR
  */
 function openUpdateFromTap(response: Notifications.NotificationResponse): boolean {
   if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return false;
-  const data = response.notification.request.content.data as { orderId?: string; bookingId?: string } | undefined;
-  if (!data?.orderId && !data?.bookingId) return false;
+  const data = response.notification.request.content.data as
+    | { orderId?: string; bookingId?: string; notificationId?: string }
+    | undefined;
+  if (!data?.orderId && !data?.bookingId && !data?.notificationId) return false;
   const key = `${response.notification.request.identifier}:${response.actionIdentifier}`;
   if (handledTaps.has(key)) return true;
   handledTaps.add(key);
@@ -114,6 +120,9 @@ function openUpdateFromTap(response: Notifications.NotificationResponse): boolea
     openShopOrder(data.orderId);
   } else if (data.bookingId) {
     openJob(data.bookingId);
+  } else if (data.notificationId) {
+    // Profile viewed: open it in the bell's list (who it was, Call Now).
+    useNotificationFocusStore.getState().open(data.notificationId);
   }
   return true;
 }

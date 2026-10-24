@@ -32,6 +32,11 @@ i18n.use(initReactI18next).init({
   lng: defaultLanguage,
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
+  // A category a partner typed themselves (not one of the fixed keys) shows as its own name.
+  parseMissingKeyHandler: (key: string) => {
+    const match = /^(?:workerProfile\.skills|businessProfile\.categories|hireStaff\.categories|jobPost\.categories)\.(.+)$/.exec(key);
+    return match ? match[1] : key;
+  },
 });
 
 export default i18n;

@@ -1,4 +1,5 @@
 import { AppError } from '@/common/errors/AppError';
+import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import {
   deletePhotosFromCloudinary,
   deleteVideosFromCloudinary,
@@ -118,6 +119,8 @@ export class AdsService {
     private readonly repository: AdsRepository,
     // Finds the profile a 'service' / 'business' / 'job_post' ad promotes.
     private readonly promotions?: PromotionResolver,
+    // Subscribers (customers and partners) see no ads.
+    private readonly subscriptionStatus?: SubscriptionStatusService,
   ) {}
 
   /**
@@ -213,6 +216,10 @@ export class AdsService {
     }
     const settings = await this.repository.getSettings();
     if (!placementOn(settings, app, placement, options.spot)) return null;
+    // A subscriber sees no ads.
+    if (options.accountId && this.subscriptionStatus) {
+      if (await this.subscriptionStatus.isActive(options.accountId, app === 'user' ? 'customer' : 'partner')) return null;
+    }
     // Not too often for the same person (the admin's minimum gap).
     if (options.accountId && settings.actionGapSeconds > 0) {
       if (await this.repository.sawActionAdWithin(options.accountId, app, settings.actionGapSeconds)) return null;
@@ -226,6 +233,11 @@ export class AdsService {
     const served = toPublic(ad);
     if (ad.promoted && this.promotions) {
       served.promotedCard = await this.promotions.card(ad.promoted.kind, ad.promoted.id).catch(() => null);
+      // The Trusted by Triolo seal shows only for a profile whose owner bought it.
+      if (served.promotedCard && this.subscriptionStatus) {
+        const trusted = await this.subscriptionStatus.trustedIds().catch(() => null);
+        served.promotedCard.trusted = !!trusted?.[ad.promoted.kind]?.includes(ad.promoted.id);
+      }
     }
     return served;
   }
@@ -343,8 +355,32 @@ export class AdsService {
   }
 
   /** "I've paid": asks Razorpay about the ad's order (e.g. the page was closed before checkout finished). */
+  /**
+   * The partner app's boost: a Razorpay payment link to open in the browser (where UPI apps
+   * work); `checkPayment` then picks the payment up.
+   */
+  async startPaymentLink(accountId: string, id: string): Promise<{ paymentUrl: string }> {
+    const ad = await this.getOwned(accountId, id);
+    if (ad.status !== 'unpaid') throw AppError.conflict('This ad does not need paying.', 'AD_NOT_PAYABLE');
+    const contact = await this.repository.ownerContact(accountId);
+    if (!contact) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
+    const link = await razorpayService.createPaymentLink({
+      amountPaise: ad.amount * 100,
+      description: `Triolo boost — bill ${ad.billNumber}`,
+      referenceId: `ad${ad.billNumber}-${Date.now()}`,
+      customer: { name: contact.name, contact: contact.mobile },
+      notes: { adId: ad.id },
+    });
+    await this.repository.setPaymentLink(ad.id, link.id);
+    return { paymentUrl: link.short_url };
+  }
+
   async checkPayment(accountId: string, id: string): Promise<Ad> {
     const ad = await this.getOwned(accountId, id);
+    if (ad.status === 'unpaid' && ad.razorpayLinkId) {
+      const paymentId = await razorpayService.paidLinkPayment(ad.razorpayLinkId, ad.amount * 100);
+      if (paymentId) return (await this.repository.markPaidByLink(ad.id, ad.razorpayLinkId, paymentId)) ?? (await this.getOwned(accountId, id));
+    }
     if (ad.status !== 'unpaid' || !ad.razorpayOrderId) return ad;
     const payments = await razorpayService.orderPayments(ad.razorpayOrderId);
     const done = payments.find((payment) => payment.status === 'captured') ?? payments.find((payment) => payment.status === 'authorized');

@@ -78,7 +78,7 @@ const GLASS_DARK = {
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
   Home: 'house',
   Bookings: 'calendar-check',
-  Earnings: 'wallet',
+  Grow: 'rocket',
   Profile: 'user',
 };
 
@@ -86,7 +86,7 @@ const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> =
 const ACTIVE_GRADIENTS: Record<string, readonly [string, string]> = {
   Home: headerGradient,
   Bookings: headerGradient,
-  Earnings: headerGradient,
+  Grow: headerGradient,
   Profile: headerGradient,
 };
 

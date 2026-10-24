@@ -31,6 +31,8 @@ export interface AdPromotedCard {
   payAmount: number | null;
   payPeriod: 'daily' | 'monthly' | null;
   placeName: string | null;
+  /** The profile has an active "Trusted by Triolo" badge. */
+  trusted?: boolean;
 }
 
 export interface Ad {

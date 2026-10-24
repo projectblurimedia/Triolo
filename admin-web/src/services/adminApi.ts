@@ -248,6 +248,8 @@ export interface Stats {
   bookings: { active: number; searching: number; completed: number; cancelled: number; today: number };
   orders: { new: number; active: number; completed: number; cancelled: number; today: number };
   problems: { open: number; inProgress: number; completed: number; closed: number };
+  /** Trusted badges with low ratings (from the subscriptions overview). */
+  badgesToReview?: number;
 }
 
 /** Builds a query string, skipping empty values. */

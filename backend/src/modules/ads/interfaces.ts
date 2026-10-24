@@ -84,6 +84,8 @@ export interface AdPromotedCard {
   payAmount: number | null;
   payPeriod: 'daily' | 'monthly' | null;
   placeName: string | null;
+  /** The profile has an active "Trusted by Triolo" badge. */
+  trusted?: boolean;
 }
 
 /** Where "Directions" takes people. */
@@ -187,6 +189,8 @@ export interface Ad extends PublicAd {
   /** Booked on the Triolo Ads website after online payment began: must be paid before review. */
   needsPayment: boolean;
   razorpayOrderId: string | null;
+  /** A boost bought in the partner app is paid through a payment link (opened in the browser). */
+  razorpayLinkId: string | null;
   razorpayPaymentId: string | null;
   paidAt: string | null;
   /** The Razorpay refund of a rejected / withdrawn online payment. */

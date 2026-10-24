@@ -227,7 +227,7 @@ export function ShopsPage() {
           >
             <Avatar
               name={shop.shopName}
-              photo={shop.shopPhotoUrls[0]}
+              photo={shop.profilePhotoUrl}
               square
               gradient="linear-gradient(135deg,#16a34a,#4ade80)"
             />

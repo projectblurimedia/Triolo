@@ -20,6 +20,7 @@ import { ProblemsService } from '@/modules/problems/service';
 import { NotificationsRepository } from '@/modules/notifications/repository';
 import { NotificationsService } from '@/modules/notifications/service';
 import { adsAdminRouter } from '@/modules/ads/routes';
+import { subscriptionsAdminRouter } from '@/modules/subscriptions/routes';
 import { AdminController } from './controller';
 import { AdminService } from './service';
 import { jobPostActiveSchema, moderateAccountSchema, reasonSchema, setVerificationStatusSchema } from './validation';
@@ -83,3 +84,4 @@ adminRouter.post('/job-posts/:id/remove', validateBody(reasonSchema), controller
 
 // Ads booked by local businesses — the ads module owns these routes and its tables.
 adminRouter.use('/ads', adsAdminRouter);
+adminRouter.use('/subscriptions', subscriptionsAdminRouter);

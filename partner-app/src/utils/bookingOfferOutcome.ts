@@ -5,7 +5,7 @@ import i18n from '@/localization/i18n';
 import { BOOKING_OFFER_CHANNEL } from '@/constants/bookingNotifications';
 import { isLocationOn } from './requireLocation';
 
-export type OfferOutcome = 'accepted' | 'declined' | 'already_taken' | 'location_off' | 'error';
+export type OfferOutcome = 'accepted' | 'declined' | 'already_taken' | 'location_off' | 'payment' | 'error';
 
 /**
  * Plain (non-React) accept/decline attempts, callable from anywhere — including
@@ -23,6 +23,7 @@ export async function attemptAccept(bookingRequestId: string): Promise<OfferOutc
     await bookingOffersService.accept(bookingRequestId);
     return 'accepted';
   } catch (err) {
+    if (err instanceof ApiError && err.code === 'PAYMENT_REQUIRED') return 'payment';
     return err instanceof ApiError && err.code === 'BOOKING_ALREADY_TAKEN' ? 'already_taken' : 'error';
   }
 }
@@ -63,7 +64,9 @@ export async function updateOfferNotification(bookingRequestId: string, outcome:
         ? { title: i18n.t('bookings.takenToastTitle'), body: i18n.t('bookings.takenToastMessage') }
         : outcome === 'location_off'
           ? { title: i18n.t('location.disabledTitle'), body: i18n.t('location.acceptNeedsLocation') }
-          : { title: i18n.t('bookings.declinedToastTitle') };
+          : outcome === 'payment'
+            ? { title: i18n.t('payGate.notificationTitle'), body: i18n.t('payGate.notificationBody') }
+            : { title: i18n.t('bookings.declinedToastTitle') };
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: bookingRequestId,

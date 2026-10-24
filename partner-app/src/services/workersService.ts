@@ -43,6 +43,8 @@ export interface WorkerProfile {
 
 export const workersService = {
   getMyProfile: () => apiClient.get<WorkerProfile | null>('/workers/me/profile', true),
+  /** Skills other workers added themselves (names) matching a search — reused instead of retyped. */
+  customSkills: (query: string) => apiClient.get<string[]>(`/workers/custom-skills?query=${encodeURIComponent(query)}`, true),
 
   createProfile: (params: CreateWorkerProfileParams) => {
     const formData = new FormData();

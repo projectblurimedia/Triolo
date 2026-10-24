@@ -1192,3 +1192,135 @@ body::before {
     padding: 18px 16px 22px;
   }
 }
+
+
+/* Category picker (searchable multi-select). */
+.picker {
+  position: relative;
+  margin-bottom: 16px;
+}
+.picker__field {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-white);
+  color: var(--color-text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  text-align: left;
+}
+.picker__field--set {
+  color: var(--color-text);
+  border-color: var(--color-primary);
+}
+.picker__summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.picker__caret {
+  color: var(--color-text-muted);
+}
+.picker__panel {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: 54px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(11, 42, 91, 0.16);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.picker__search {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 16px;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+.picker__list {
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.picker__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.picker__row:hover {
+  background: var(--color-surface);
+}
+.picker__row--on {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+}
+.picker__row--add {
+  border: 1.5px dashed var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.picker__check {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 2px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--color-white);
+}
+.picker__row--on .picker__check {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.picker__row--add .picker__check {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.picker__empty {
+  padding: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+.picker__done {
+  width: 100%;
+}
+.picker__chips {
+  margin: 10px 0 0;
+}
+.picker__remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+  font-size: 11px;
+}

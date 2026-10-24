@@ -14,6 +14,7 @@ import { ContinueSteps } from '@/components/ContinueSteps';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { useAdGate } from '@/components/Ads';
 import { LocationNeededCard } from '@/components/LocationNeededCard';
+import { BackgroundAlertsCard } from '@/components/BackgroundAlertsCard';
 import { FindJobsButton } from '@/components/FindJobsButton';
 import { navigateToBookings } from '@/navigation/navigationRef';
 import { useQueryClient } from '@tanstack/react-query';
@@ -32,6 +33,7 @@ import { ApiError } from '@/services/apiClient';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistance } from '@/utils/formatDistance';
 import { PullToRefresh } from '@/components/PullToRefresh';
+import { NewForYou } from '@/components/NewForYou';
 import { SmartImage } from '@/components/SmartImage';
 
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
@@ -390,7 +392,11 @@ export function HomeScreen() {
 
           {/* Location off: say so first — nothing works without it. */}
           <LocationNeededCard />
+          {/* Job requests while the app is closed: the phone has to allow it. */}
+          <BackgroundAlertsCard />
 
+          {/* New requests and alerts first, then what is in progress. */}
+          <NewForYou isWorker={isVerifiedWorker} isShop={isVerifiedShop} />
           <ContinueSteps isShop={isVerifiedShop} />
 
           {profilesLoading ? (

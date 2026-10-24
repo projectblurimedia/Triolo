@@ -18,7 +18,8 @@ export type NotificationType =
   | 'order_ready'
   | 'order_out_for_delivery'
   | 'order_completed'
-  | 'order_cancelled';
+  | 'order_cancelled'
+  | 'badge_removed';
 
 export interface AppNotification {
   id: string;
@@ -28,6 +29,8 @@ export interface AppNotification {
   body: string;
   isRead: boolean;
   createdAt: string;
+  /** profile_view, for a subscribed partner: who it was (their name only). Null otherwise. */
+  viewer?: { name: string } | null;
 }
 
 export interface NotificationListResult {

@@ -17,7 +17,8 @@ export type NotificationType =
   | 'order_out_for_delivery'
   | 'order_completed'
   | 'order_cancelled'
-  | 'admin_notice';
+  | 'admin_notice'
+  | 'badge_removed';
 
 export const MAX_BULK_DELETE = 100;
 
@@ -29,6 +30,12 @@ export interface AppNotification {
   body: string;
   isRead: boolean;
   createdAt: Date;
+  /**
+   * profile_view: who viewed — given only to subscribed partners (their app shows the name and
+   * a Call button); null otherwise.
+   */
+  /** profile_view, for a subscribed partner: the viewer's name only (never their number). */
+  viewer?: { name: string } | null;
 }
 
 export interface NotificationListResult {
@@ -69,4 +76,5 @@ export const AUDIENCE_BY_TYPE: Record<NotificationType, PushAudience> = {
   order_completed: 'user',
   order_cancelled: 'any',
   admin_notice: 'any',
+  badge_removed: 'partner',
 };

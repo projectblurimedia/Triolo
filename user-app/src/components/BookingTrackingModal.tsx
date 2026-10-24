@@ -33,6 +33,8 @@ import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BlurScope } from './Glass';
 import { askForLocation } from '@/utils/ensureLocationOn';
+import { payIfNeeded } from '@/state/payGateStore';
+import { bookingStatusTitle } from '@/utils/bookingStatusText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -150,6 +152,7 @@ export function BookingTrackingModal() {
   const handleBookAgain = async () => {
     if (!booking || rebooking) return;
     if (!(await askForLocation())) return;
+    if (!(await payIfNeeded('book'))) return;
     setRebooking(true);
     try {
       const here = await ensureLocation();
@@ -197,7 +200,7 @@ export function BookingTrackingModal() {
           <FontAwesome6 name={STATUS_ICONS[b.status]} size={16} color="#FFFFFF" solid />
         </View>
         <View style={styles.bannerText}>
-          <Text style={[styles.bannerTitle, { color: colors.text }]}>{t(`tracking.status.${b.status}.title`)}</Text>
+          <Text style={[styles.bannerTitle, { color: colors.text }]}>{bookingStatusTitle(b, t)}</Text>
           <Text style={[styles.bannerMessage, { color: colors.textMuted }]}>
             {b.status === 'cancelled' && b.cancelledBy === 'admin'
               ? t('tracking.adminCancelled')
@@ -443,7 +446,7 @@ export function BookingTrackingModal() {
     );
   };
 
-  const title = status ? t(`tracking.status.${status}.title`) : t('tracking.title');
+  const title = booking ? bookingStatusTitle(booking, t) : status ? t(`tracking.status.${status}.title`) : t('tracking.title');
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>

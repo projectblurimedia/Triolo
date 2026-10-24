@@ -42,6 +42,8 @@ export function useAcceptProblem() {
   const invalidate = useInvalidateProblems();
   return useLocationGatedMutation({
     mutationFn: (problemId: string) => problemsService.accept(problemId),
+    // No partner plan: one paid accept.
+    payKind: 'accept',
     // Settled, not success — a lost race (409) also means the list is stale.
     onSettled: invalidate,
   });

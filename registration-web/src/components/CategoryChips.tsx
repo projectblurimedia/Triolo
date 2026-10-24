@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export interface CategoryOption {
   key: string;
@@ -9,100 +9,140 @@ interface CategoryChipsProps {
   options: CategoryOption[];
   selected: string[];
   onChange: (next: string[]) => void;
+  /** Categories typed by the visitor themselves (sent as "other" + description). */
   otherEntries: string[];
   onOtherEntriesChange: (next: string[]) => void;
+  placeholder?: string;
 }
 
-/** Same multi-select chip + "+ Add New" custom-tag pattern as the mobile apps' WorkerProfileModal/BusinessProfileModal. */
-export function CategoryChips({ options, selected, onChange, otherEntries, onOtherEntriesChange }: CategoryChipsProps) {
-  const [showOtherInput, setShowOtherInput] = useState(false);
-  const [otherValue, setOtherValue] = useState('');
+/**
+ * The same searchable multi-select as the apps' CategoryPicker: one field; click it and a panel
+ * opens with a search box and the whole list A–Z (picked ones on top). Pick several, or add your
+ * own words when nothing matches. Picks show as removable chips under the field.
+ */
+export function CategoryChips({
+  options,
+  selected,
+  onChange,
+  otherEntries,
+  onOtherEntriesChange,
+  placeholder = 'Choose from the list',
+}: CategoryChipsProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  const toggle = (key: string) => {
-    onChange(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
+  // Clicking anywhere else closes the panel.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    setTimeout(() => searchRef.current?.focus(), 0);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const sorted = useMemo(() => [...options].sort((a, b) => a.label.localeCompare(b.label)), [options]);
+  const text = query.trim().toLowerCase();
+  const matches = sorted.filter((option) => !text || option.label.toLowerCase().includes(text));
+  const listed = [...matches.filter((o) => selected.includes(o.key)), ...matches.filter((o) => !selected.includes(o.key))];
+  const typed = query.trim();
+  const exists =
+    options.some((o) => o.label.toLowerCase() === typed.toLowerCase()) ||
+    otherEntries.some((entry) => entry.toLowerCase() === typed.toLowerCase());
+
+  const toggle = (key: string) => onChange(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
+  const addTyped = () => {
+    const name = typed.replace(/[.:]/g, '').trim();
+    if (name.length < 2 || exists) return;
+    onOtherEntriesChange([...otherEntries, name]);
+    setQuery('');
   };
 
-  const ordered = [...options].sort((a, b) => Number(selected.includes(b.key)) - Number(selected.includes(a.key)));
-
-  const commitOther = () => {
-    const trimmed = otherValue.trim();
-    if (trimmed) {
-      const matched = options.find((o) => o.label.toLowerCase() === trimmed.toLowerCase());
-      if (matched) {
-        if (!selected.includes(matched.key)) onChange([...selected, matched.key]);
-      } else {
-        const existingIndex = otherEntries.findIndex((e) => e.toLowerCase() === trimmed.toLowerCase());
-        if (existingIndex !== -1) {
-          const existing = otherEntries[existingIndex];
-          onOtherEntriesChange([existing, ...otherEntries.filter((_, i) => i !== existingIndex)]);
-        } else {
-          onOtherEntriesChange([...otherEntries, trimmed]);
-        }
-      }
-    }
-    setOtherValue('');
-    setShowOtherInput(false);
-  };
-
-  const removeOther = (index: number) => {
-    onOtherEntriesChange(otherEntries.filter((_, i) => i !== index));
-  };
+  const picked = [...options.filter((o) => selected.includes(o.key)).map((o) => ({ key: o.key, label: o.label, custom: false })),
+    ...otherEntries.map((entry) => ({ key: entry, label: entry, custom: true }))];
+  const summary = picked.length === 0 ? placeholder : picked.length === 1 ? picked[0].label : `${picked.length} selected`;
 
   return (
-    <div>
-      <div className="chip-row">
-        {ordered.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            className={`chip ${selected.includes(option.key) ? 'chip--active' : ''}`}
-            onClick={() => toggle(option.key)}
-          >
-            {option.label}
-          </button>
-        ))}
-        {otherEntries.map((entry, index) => (
-          <button key={`${entry}-${index}`} type="button" className="chip chip--active" onClick={() => removeOther(index)}>
-            {entry} ✕
-          </button>
-        ))}
-        <button type="button" className="chip" onClick={() => setShowOtherInput(true)}>
-          + Add New
-        </button>
-      </div>
+    <div className="picker" ref={wrapRef}>
+      <button
+        type="button"
+        className={`picker__field${picked.length ? ' picker__field--set' : ''}`}
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <span className="picker__summary">{summary}</span>
+        <span className="picker__caret">{open ? '▴' : '▾'}</span>
+      </button>
 
-      {showOtherInput ? (
-        <div className="field">
-          <label>What's your category?</label>
-          {/* Label sits above the row (not inside a per-input flex item beside the button) so
-              the input and the "done" button — genuine siblings with no hidden label offset
-              between them — center on each other exactly via alignItems:'center', rather than
-              the previous alignItems:'flex-end' approximation. */}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <input
-              style={{ flex: 1, width: 'auto', minWidth: 0 }}
-              value={otherValue}
-              onChange={(e) => setOtherValue(e.target.value)}
-              onKeyDown={(e) => {
-                // This chip picker now lives inside the page's own <form> (for its
-                // Enter-to-submit behavior) — without preventDefault, Enter here would
-                // both commit this tag *and* submit that outer form prematurely.
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commitOther();
-                }
-              }}
-              autoFocus
-            />
-            <button
-              type="button"
-              className="button"
-              style={{ width: 44, height: 44, padding: 0, flexShrink: 0 }}
-              onClick={commitOther}
-            >
-              ✓
-            </button>
+      {open ? (
+        <div className="picker__panel">
+          <input
+            ref={searchRef}
+            className="picker__search"
+            value={query}
+            placeholder="Search…"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // The picker sits inside the page's <form>: Enter adds the typed category instead of submitting.
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                if (listed.length === 1) toggle(listed[0].key);
+                else addTyped();
+              }
+              if (e.key === 'Escape') setOpen(false);
+            }}
+          />
+          <div className="picker__list">
+            {listed.map((option) => {
+              const on = selected.includes(option.key);
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`picker__row${on ? ' picker__row--on' : ''}`}
+                  onClick={() => toggle(option.key)}
+                >
+                  <span className="picker__check">{on ? '✓' : ''}</span>
+                  {option.label}
+                </button>
+              );
+            })}
+            {listed.length === 0 && !typed ? <div className="picker__empty">Nothing found</div> : null}
+            {typed.length >= 2 && !exists ? (
+              <button type="button" className="picker__row picker__row--add" onClick={addTyped}>
+                <span className="picker__check">+</span>
+                Add “{typed}”
+              </button>
+            ) : null}
           </div>
+          <button type="button" className="button picker__done" onClick={() => setOpen(false)}>
+            {picked.length ? `Done (${picked.length})` : 'Done'}
+          </button>
+        </div>
+      ) : null}
+
+      {picked.length > 0 ? (
+        <div className="chip-row picker__chips">
+          {picked.map((entry) => (
+            <span key={`${entry.custom ? 'c' : 'k'}-${entry.key}`} className="chip chip--active">
+              {entry.label}
+              <button
+                type="button"
+                className="picker__remove"
+                aria-label={`Remove ${entry.label}`}
+                onClick={() =>
+                  entry.custom
+                    ? onOtherEntriesChange(otherEntries.filter((value) => value !== entry.key))
+                    : onChange(selected.filter((key) => key !== entry.key))
+                }
+              >
+                ✕
+              </button>
+            </span>
+          ))}
         </div>
       ) : null}
     </div>

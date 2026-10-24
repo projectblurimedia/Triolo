@@ -18,7 +18,9 @@
     "updatingAppMessage": "Please don't close the app while updating...",
     "updateCompleteTitle": "Update Complete!",
     "updateCompleteMessage": "Restarting the app with the latest version...",
-    "back": "Back"
+    "back": "Back",
+    "showMore": "Show more ({{count}})",
+    "showLess": "Show less"
   },
   "verification": {
     "pending": "Pending Review",
@@ -131,7 +133,9 @@
     "gestureHint": "Swipe left to delete · Long-press to select",
     "unreadCount_one": "{{count}} unread",
     "unreadCount_other": "{{count}} unread",
-    "allCaughtUp": "All caught up"
+    "allCaughtUp": "All caught up",
+    "callViewer": "Call {{name}}",
+    "seeWhoViewed": "Subscribe to see who viewed you"
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -151,11 +155,6 @@
       "title": "Bookings",
       "subtitle": "Your job and order requests"
     },
-    "Earnings": {
-      "title": "Earnings",
-      "subtitle": "Track your payments and payouts",
-      "comingSoon": "Your earnings dashboard is coming soon."
-    },
     "Profile": {
       "title": "Profile",
       "subtitle": "Your account and capabilities",
@@ -170,6 +169,10 @@
       "detailPhone": "Phone number",
       "detailEmail": "Email",
       "ownerLine": "Owner: {{name}}"
+    },
+    "Grow": {
+      "title": "Grow",
+      "subtitle": "Get more work on Triolo"
     }
   },
   "bookings": {
@@ -274,7 +277,46 @@
       "mechanic": "Mechanic",
       "cleaner": "Cleaner",
       "mason": "Mason",
-      "other": "Other"
+      "other": "Other",
+      "ac_technician": "AC Technician",
+      "appliance_repair": "Appliance Repair",
+      "mobile_repair": "Mobile Repair",
+      "computer_repair": "Computer Repair",
+      "tv_repair": "TV Repair",
+      "ro_water_purifier": "RO / Water Purifier",
+      "cctv_technician": "CCTV Technician",
+      "solar_technician": "Solar Technician",
+      "welder": "Welder",
+      "fabricator": "Fabricator",
+      "tiles_worker": "Tiles Worker",
+      "false_ceiling": "False Ceiling / POP",
+      "waterproofing": "Waterproofing",
+      "glass_aluminium": "Glass & Aluminium",
+      "locksmith": "Locksmith",
+      "borewell": "Borewell / Motor",
+      "pest_control": "Pest Control",
+      "bike_mechanic": "Bike Mechanic",
+      "car_wash": "Car / Bike Wash",
+      "driver": "Driver",
+      "movers_packers": "Packers & Movers",
+      "gardener": "Gardener",
+      "cook": "Cook",
+      "caterer": "Caterer",
+      "tailor": "Tailor",
+      "beautician": "Beautician",
+      "barber": "Barber",
+      "mehendi_artist": "Mehendi Artist",
+      "photographer": "Photographer",
+      "event_decorator": "Event Decorator",
+      "priest": "Priest / Pandit",
+      "tutor": "Home Tutor",
+      "fitness_trainer": "Fitness / Yoga Trainer",
+      "nurse": "Nurse / Caretaker",
+      "physiotherapist": "Physiotherapist",
+      "interior_designer": "Interior Designer",
+      "architect": "Architect / Engineer",
+      "contractor": "Building Contractor",
+      "labour": "Labour / Helper"
     },
     "experienceLabel": "Years of Experience",
     "portfolioLabel": "Photos of Your Work (optional)",
@@ -305,7 +347,45 @@
       "clothing": "Clothing",
       "hardware": "Hardware",
       "salon": "Salon",
-      "other": "Other"
+      "other": "Other",
+      "supermarket": "Supermarket",
+      "vegetables_fruits": "Vegetables & Fruits",
+      "dairy": "Milk & Dairy",
+      "bakery": "Bakery",
+      "sweets": "Sweets & Snacks",
+      "meat_chicken": "Meat & Chicken",
+      "fish": "Fish",
+      "tea_coffee": "Tea & Coffee",
+      "tiffin_center": "Tiffin Centre",
+      "juice_icecream": "Juice & Ice Cream",
+      "water_cans": "Water Cans",
+      "mobile_shop": "Mobiles & Accessories",
+      "computer_shop": "Computers",
+      "home_appliances": "Home Appliances",
+      "furniture": "Furniture",
+      "footwear": "Footwear",
+      "jewellery": "Jewellery",
+      "cosmetics": "Cosmetics & Beauty",
+      "gifts_toys": "Gifts & Toys",
+      "stationery_books": "Stationery & Books",
+      "printing_xerox": "Printing & Xerox",
+      "photo_studio": "Photo Studio",
+      "optical": "Optical",
+      "clinic_lab": "Clinic & Lab",
+      "beauty_parlour": "Beauty Parlour",
+      "gym": "Gym",
+      "tailoring": "Tailoring",
+      "laundry": "Laundry & Dry Clean",
+      "paints": "Paints",
+      "electricals": "Electricals",
+      "sanitary": "Sanitary & Plumbing",
+      "building_materials": "Building Materials",
+      "auto_parts": "Auto Parts & Tyres",
+      "seeds_fertilizers": "Seeds & Fertilizers",
+      "pet_shop": "Pet Shop",
+      "flowers": "Flowers & Pooja Items",
+      "gas_agency": "Gas Agency",
+      "hotel_lodge": "Hotel & Lodge"
     },
     "photosLabel": "Shop Photos (optional)",
     "deliveryLabel": "Do you offer delivery?",
@@ -391,7 +471,19 @@
     "suspendedTitle": "Account Suspended",
     "bannedTitle": "Account Banned",
     "validationFields": "Please check: {{fields}}.",
-    "LOCATION_REQUIRED": "Turn on location to do this."
+    "LOCATION_REQUIRED": "Turn on location to do this.",
+    "SUBSCRIPTIONS_OFF": "Subscriptions aren't available right now.",
+    "SUBSCRIPTION_NOT_FOUND": "We couldn't find that payment.",
+    "BADGES_OFF": "Badges aren't available right now.",
+    "BADGE_PROFILE_NOT_FOUND": "Add this profile first.",
+    "BADGE_PROFILE_NOT_ELIGIBLE": "This profile can get the badge once it's verified (or live).",
+    "BADGE_ALREADY_ACTIVE": "This profile already has the badge.",
+    "AD_SELF_LIMIT": "You have too many boosts waiting. Pay or wait for them to be checked first.",
+    "AD_PROMOTE_PROFILE_NOT_FOUND": "This profile can be boosted once it's verified (or live).",
+    "AD_NOT_PAYABLE": "This boost doesn't need paying.",
+    "SUBSCRIPTION_ACTIVE": "Your plan is already active.",
+    "PAYMENT_REQUIRED": "Pay once or subscribe to continue.",
+    "PASS_NOT_FOUND": "We couldn't find that payment."
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -694,7 +786,27 @@
       "gardener": "Gardener",
       "office_assistant": "Office assistant",
       "shop_assistant": "Shop assistant",
-      "other": "Other"
+      "other": "Other",
+      "maid": "Maid / House Help",
+      "delivery_boy": "Delivery Boy",
+      "receptionist": "Receptionist",
+      "accountant": "Accountant",
+      "computer_operator": "Computer Operator",
+      "data_entry": "Data Entry",
+      "sales_executive": "Sales Executive",
+      "telecaller": "Telecaller",
+      "cashier": "Cashier",
+      "waiter": "Waiter / Hotel Staff",
+      "nurse": "Nurse / Patient Care",
+      "tailor": "Tailor",
+      "beautician": "Beautician",
+      "music_dance_teacher": "Music / Dance Teacher",
+      "fitness_trainer": "Gym / Yoga Trainer",
+      "watchman": "Watchman",
+      "helper_labour": "Helper / Labour",
+      "warehouse_staff": "Warehouse / Packing Staff",
+      "factory_worker": "Factory Worker",
+      "farm_worker": "Farm Worker"
     },
     "period": {
       "daily": "Daily",
@@ -895,5 +1007,178 @@
     "newOnTriolo": "New on Triolo",
     "findInCustomerApp": "Book them in the Triolo app",
     "callNow": "Call Now"
+  },
+  "subscribe": {
+    "title": "Triolo Partner Plus",
+    "subtitle": "Get more work from Triolo",
+    "heroTitle": "Be first. Be seen.",
+    "heroText": "Hear about jobs before others, show at the top of customers' lists and see who viewed your profile.",
+    "activeTitle": "You're subscribed",
+    "activeUntil": "Active until {{date}}",
+    "perkFirst": "Get Quick Book jobs and problems first",
+    "perkTop": "Your shop and job post at the top of lists",
+    "perkViewers": "See the names of people who viewed your profile",
+    "perkNoAds": "No ads",
+    "choosePlan": "Choose a plan",
+    "extend": "Add more time",
+    "months_one": "{{count}} month",
+    "months_other": "{{count}} months",
+    "perMonth": "₹{{amount}} / month",
+    "best": "Best value",
+    "pay": "Pay ₹{{amount}}",
+    "payExtend": "Add time · ₹{{amount}}",
+    "checkPaid": "I've paid — check",
+    "pending_one": "A payment of ₹{{amount}} for {{count}} month isn't finished yet.",
+    "pending_other": "A payment of ₹{{amount}} for {{count}} months isn't finished yet.",
+    "openPayment": "Open",
+    "note": "You pay securely on Razorpay. Come back to the app when you're done and your plan starts at once.",
+    "paidTitle": "Subscribed!",
+    "paidMessage": "You'll now hear about jobs first.",
+    "notPaidTitle": "Not paid yet",
+    "notPaidMessage": "We haven't received the payment. Finish it on the Razorpay page and try again.",
+    "off": "Subscriptions aren't available right now.",
+    "cardTitle": "Get Partner Plus",
+    "cardText": "Jobs first, top of lists, see who viewed you.",
+    "cardActive": "Partner Plus",
+    "cardBrand": "Partner Plus",
+    "activeShort": "Active",
+    "manage": "Manage",
+    "get": "Get"
+  },
+  "growth": {
+    "title": "Grow your profiles",
+    "boost": "Boost",
+    "kind": {
+      "service": "Your services",
+      "business": "Your shop",
+      "job_post": "Your job post"
+    },
+    "boostFrom": "Show it to customers nearby · from ₹{{amount}}",
+    "boostCaption": "Show it to customers nearby",
+    "boostCta": "Boost now"
+  },
+  "badge": {
+    "trusted": "Trusted by Triolo",
+    "buy": "Get Trusted badge · ₹{{amount}}",
+    "buyAgain": "Buy the badge again · ₹{{amount}}",
+    "finishPayment": "Finish the badge payment",
+    "removed": "Your Trusted badge was removed: {{reason}}",
+    "paidTitle": "Badge added!",
+    "paidMessage": "Customers now see \"Trusted by Triolo\" on this profile.",
+    "notEligible": {
+      "service": "The badge is for verified profiles. Wait for verification.",
+      "business": "The badge is for verified shops. Wait for verification.",
+      "job_post": "Turn your job post on (Live) to get the badge."
+    },
+    "tileTitle": "Trusted badge",
+    "activeCaption": "Customers see it on this profile",
+    "price": "₹{{amount}} · customers trust you more",
+    "getShort": "Get badge",
+    "buyAgainShort": "Buy again"
+  },
+  "boost": {
+    "title": "Boost",
+    "heroTitle": "Show your profile to customers",
+    "heroText": "Customers nearby see your profile as an ad, with a button to book you, order from you or call you.",
+    "choose": "How long?",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "note": "After you pay, the Triolo team checks it and it starts running. If it's not accepted, your money is refunded.",
+    "pay": "Pay ₹{{amount}}",
+    "yours": "Your boosts",
+    "views_one": "{{count}} view",
+    "views_other": "{{count}} views",
+    "payNow": "Pay",
+    "paidTitle": "Paid!",
+    "paidMessage": "Your boost starts once the Triolo team has checked it.",
+    "status": {
+      "unpaid": "Not paid",
+      "in_review": "Being checked",
+      "rejected": "Not accepted",
+      "scheduled": "Starts soon",
+      "running": "Running",
+      "ended": "Ended",
+      "deleted": "Removed"
+    }
+  },
+  "home": {
+    "allServicesCount": "{{count}} services"
+  },
+  "picker": {
+    "selected": "Selected ({{count}})",
+    "all": "All",
+    "addedByPartners": "Added by partners",
+    "partnerMade": "Added by a partner",
+    "add": "Add “{{name}}”",
+    "remove": "Remove {{name}}",
+    "countSelected": "{{count}} selected",
+    "pickOne": "Pick one",
+    "pickMany": "Pick as many as you need",
+    "search": "Search…",
+    "noMatch": "Nothing matches",
+    "doneCount": "Done ({{count}})",
+    "chooseServices": "Choose services",
+    "chooseWork": "Choose the kind of work",
+    "chooseSkills": "Choose your skills",
+    "chooseShopTypes": "Choose your shop type",
+    "allCount": "All ({{count}})",
+    "clear": "Clear"
+  },
+  "payGate": {
+    "title": {
+      "accept": "Accept this",
+      "job_post": "Publish your job post"
+    },
+    "message": {
+      "accept": "Pay ₹{{amount}} once to accept this job or order. With Partner Plus every accept is free.",
+      "job_post": "Pay ₹{{amount}} once to publish your job post. With Partner Plus it's free."
+    },
+    "pay": "Pay ₹{{amount}}",
+    "waiting": "Finish the payment on Razorpay, then come back — it carries on by itself.",
+    "subscribeInstead": "Subscribe instead — no fees",
+    "paidTitle": "Paid!",
+    "paidMessage": {
+      "accept": "Accepting now.",
+      "job_post": "Publishing your post."
+    },
+    "notificationTitle": "Pay to accept",
+    "notificationBody": "Open Triolo Partner to accept this job.",
+    "paidEarlierTitle": "Using your earlier payment",
+    "paidEarlierMessage": {
+      "accept": "You paid for one that didn't go ahead, so this one is free.",
+      "job_post": "You already paid for a job post, so this one is free."
+    }
+  },
+  "newForYou": {
+    "title": "New for you",
+    "jobRequest": "Job request",
+    "bookedYou": "Booked you",
+    "jobHint": "{{distance}} away · tap to see and accept",
+    "newOrder": "New order",
+    "orderHint": "A customer sent a list · tap to answer",
+    "view": "View",
+    "open": "Open"
+  },
+  "grow": {
+    "intro": "Partner Plus gets you jobs first and puts you at the top of lists. A Trusted badge and a Boost help customers pick you.",
+    "emptyTitle": "Nothing to grow yet",
+    "emptyMessage": "Once your profile is verified, its Trusted badge and Boost show up here."
+  },
+  "incoming": {
+    "kicker": "NEW REQUESTS",
+    "headline_one": "{{count}} new request",
+    "headline_other": "{{count}} new requests",
+    "caption": "Answer them here, or later from Bookings",
+    "later": "Later"
+  },
+  "backgroundAlerts": {
+    "title": "Get job requests even when the app is closed",
+    "offTitle": "Notifications are off",
+    "message": "Some phones stop Triolo Partner when it's swiped away or battery saving is on, so requests only arrive when you open the app. In Settings:",
+    "stepAutostart": "Turn on Auto-start (or \"Allow background activity\").",
+    "stepBattery": "Battery → No restrictions (not \"Optimised\").",
+    "stepRecents": "Don't swipe the app away from recent apps — or lock it there.",
+    "stepNotifications": "Notifications → turn them on, so new jobs and orders can reach you.",
+    "done": "Done"
   }
 }

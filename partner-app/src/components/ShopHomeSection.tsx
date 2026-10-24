@@ -159,8 +159,8 @@ export function ShopHomeSection({ profile }: { profile: BusinessProfile }) {
     <View>
       <Pressable onPress={() => navigation.navigate('MyInfo', { capability: 'business' })}>
         <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-          {(profile.shopPhotoUrls[0] ?? profile.profilePhotoUrl) ? (
-            <SmartImage source={{ uri: profile.shopPhotoUrls[0] ?? profile.profilePhotoUrl }} style={styles.heroPhoto} />
+          {(profile.profilePhotoUrl) ? (
+            <SmartImage source={{ uri: profile.profilePhotoUrl }} style={styles.heroPhoto} />
           ) : (
             <View style={[styles.heroPhoto, styles.heroPlaceholder]}>
               <FontAwesome6 name="store" size={24} color="#FFFFFF" solid />

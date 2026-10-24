@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -8,9 +8,10 @@ import { SettingsMenuModal } from '@/components/SettingsMenuModal';
 import { NotificationsModal } from '@/components/NotificationsModal';
 import { HomeScreen } from '@/screens/main/HomeScreen';
 import { BookingsScreen } from '@/screens/main/BookingsScreen';
-import { EarningsScreen } from '@/screens/main/EarningsScreen';
+import { GrowScreen } from '@/screens/main/GrowScreen';
 import { ProfileScreen } from '@/screens/main/ProfileScreen';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationFocusStore } from '@/state/notificationFocusStore';
 import { MainTabParamList } from './types';
 import { ScreenBlurTarget } from './ScreenBlurTarget';
 
@@ -19,7 +20,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const TAB_ICONS: Record<keyof MainTabParamList, keyof typeof FontAwesome6.glyphMap> = {
   Home: 'house',
   Bookings: 'calendar-check',
-  Earnings: 'wallet',
+  Grow: 'rocket',
   Profile: 'user',
 };
 
@@ -46,6 +47,11 @@ export function MainTabNavigator() {
   const { t } = useTranslation();
   const [menuVisible, setMenuVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  // A tapped "profile viewed" push opens the list on that notification.
+  const focusId = useNotificationFocusStore((state) => state.focusId);
+  useEffect(() => {
+    if (focusId) setNotificationsVisible(true);
+  }, [focusId]);
   const { data: notifications } = useNotifications();
 
   return (
@@ -78,7 +84,7 @@ export function MainTabNavigator() {
       >
         <Tab.Screen name="Home" component={HomeScreen} />
         <Tab.Screen name="Bookings" component={BookingsScreen} />
-        <Tab.Screen name="Earnings" component={EarningsScreen} />
+        <Tab.Screen name="Grow" component={GrowScreen} />
         <Tab.Screen name="Profile" component={ProfileScreen} />
       </Tab.Navigator>
 

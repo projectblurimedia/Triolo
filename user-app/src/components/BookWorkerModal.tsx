@@ -5,6 +5,8 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from './Button';
+import { usePayHint, withFee } from '@/hooks/useSubscription';
+import { payIfNeeded } from '@/state/payGateStore';
 import { GlassBackdrop, GlassCard } from './Glass';
 import { ToastHost } from './ToastHost';
 import { useAdGate } from './Ads';
@@ -35,6 +37,7 @@ interface BookWorkerModalProps {
  */
 export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalProps) {
   const { t } = useTranslation();
+  const bookFee = usePayHint('book');
   const { colors } = useThemeColors();
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
@@ -66,6 +69,8 @@ export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalPr
       // Location first (the worker comes here), then the ad while the button spins.
       if (!(await askForLocation())) return;
       if (!(await waitForAd())) return;
+      // No plan: pay once at this last step — or subscribe.
+      if (!(await payIfNeeded('book'))) return;
     } finally {
       preparing.current = false;
     }
@@ -137,7 +142,12 @@ export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalPr
             <Text style={[styles.noteText, { color: colors.text }]}>{t('directBook.note', { name })}</Text>
           </View>
 
-          <Button label={t('directBook.send')} onPress={send} loading={sending || adLoading} disabled={selected.length === 0} />
+          <Button
+            label={withFee(t('directBook.send'), bookFee)}
+            onPress={send}
+            loading={sending || adLoading}
+            disabled={selected.length === 0}
+          />
           <Pressable onPress={onClose} disabled={sending} style={styles.cancel} hitSlop={6}>
             <Text style={[styles.cancelText, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
           </Pressable>

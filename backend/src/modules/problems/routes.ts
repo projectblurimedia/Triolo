@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
+import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
 import { validateBody } from '@/common/middleware/validate';
@@ -19,7 +21,8 @@ const notificationsService = new NotificationsService(new NotificationsRepositor
 const workersService = new WorkersService(new WorkersRepository(pool), notificationsService);
 // Accepting a problem starts a trip in the bookings module; that trip reports back here.
 const bookingsService = new BookingsService(new BookingsRepository(pool), workersService, notificationsService);
-const service = new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService, bookingsService);
+const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
+const service = new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService, bookingsService, subscriptionStatus);
 bookingsService.setLifecycleListener(service);
 const controller = new ProblemsController(service);
 

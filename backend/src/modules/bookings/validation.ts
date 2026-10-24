@@ -1,12 +1,14 @@
 import { z } from 'zod';
-import { WORKER_SKILL_CATEGORIES } from '@/modules/workers/interfaces';
 
 // JSON bodies (no multipart here), so plain z number types — no z.coerce needed. Default
 // radiusKm is 50 (the backend's own max, same ceiling nearbySearchQuerySchema enforces) per
 // explicit instruction to broadcast the full 50km range for testing; a real production
 // default would likely be much smaller.
+// A fixed skill key, or the name of a skill a worker added themselves (split in skills.ts).
+const skillOrName = z.string().trim().min(2).max(40);
+
 export const createQuickBookingSchema = z.object({
-  skillCategories: z.array(z.enum(WORKER_SKILL_CATEGORIES as [string, ...string[]])).min(1, 'Select at least one skill'),
+  skillCategories: z.array(skillOrName).min(1, 'Select at least one skill').max(10),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   radiusKm: z.number().min(0.1).max(50).default(50),
@@ -16,7 +18,7 @@ export const createQuickBookingSchema = z.object({
 /** Booking one particular worker from their profile. */
 export const createDirectBookingSchema = z.object({
   workerId: z.string().uuid(),
-  skillCategories: z.array(z.enum(WORKER_SKILL_CATEGORIES as [string, ...string[]])).min(1, 'Select at least one skill'),
+  skillCategories: z.array(skillOrName).min(1, 'Select at least one skill').max(10),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   locationAddress: z.string().trim().max(300).optional(),

@@ -2,6 +2,8 @@ import { useCallback, useRef } from 'react';
 import { MutateOptions, useMutation, UseMutationOptions } from '@tanstack/react-query';
 import { ensureLocationOn } from '@/utils/ensureLocationOn';
 import { requireLocationNow } from '@/utils/requireLocation';
+import { payIfNeeded } from '@/state/payGateStore';
+import { PassKind } from '@/services/subscriptionsService';
 
 /**
  * A mutation for a partner action that needs location on (accepting a job, trip steps, shop
@@ -12,11 +14,13 @@ import { requireLocationNow } from '@/utils/requireLocation';
 export function useLocationGatedMutation<TData, TVariables, TContext = unknown>(
   options: UseMutationOptions<TData, Error, TVariables, TContext> & {
     mutationFn: (variables: TVariables) => Promise<TData>;
+    /** Without a partner plan this action is paid for once (the admin's fee) — asked after location. */
+    payKind?: PassKind;
   },
 ) {
-  const { mutationFn } = options;
+  const { mutationFn, payKind, ...mutationOptions } = options;
   const mutation = useMutation<TData, Error, TVariables, TContext>({
-    ...options,
+    ...mutationOptions,
     // A quick check with no dialog: the dialog was already shown by `mutate` below.
     mutationFn: async (variables) => {
       await requireLocationNow();
@@ -30,10 +34,12 @@ export function useLocationGatedMutation<TData, TVariables, TContext = unknown>(
     (variables: TVariables, mutateOptions?: MutateOptions<TData, Error, TVariables, TContext>) => {
       if (asking.current) return;
       asking.current = true;
-      ensureLocationOn().then(() => {
-        asking.current = false;
-        run(variables, mutateOptions);
-      });
+      ensureLocationOn()
+        .then(async () => (payKind ? payIfNeeded(payKind) : true))
+        .then((go) => {
+          asking.current = false;
+          if (go) run(variables, mutateOptions);
+        });
     },
     [run],
   );

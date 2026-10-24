@@ -19,7 +19,12 @@ export function ShopMiniCard({ shop, onPress }: { shop: BusinessNearbyResult; on
 
   return (
     <Pressable onPress={onPress} style={[miniCardStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Avatar photoUrl={shop.shopPhotoUrls[0] ?? shop.profilePhotoUrl} name={shop.shopName} size={56} />
+      <Avatar
+        photoUrl={shop.profilePhotoUrl}
+        name={shop.shopName}
+        size={56}
+        seal={{ kind: 'business', id: shop.id }}
+      />
       <Text style={[miniCardStyles.name, { color: colors.text }]} numberOfLines={1}>
         {shop.shopName}
       </Text>

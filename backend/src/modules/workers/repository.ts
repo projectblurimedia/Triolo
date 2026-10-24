@@ -262,8 +262,8 @@ export class WorkersRepository {
        ) sub
        WHERE sub.distance_meters <= $4
          AND ($5::text IS NULL OR sub.account_full_name ILIKE $5 OR sub.other_skill_description ILIKE $5 OR sub.location_name ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.skill_categories, ',') ILIKE $5)
-         AND ($7::worker_skill_category IS NULL OR $7::worker_skill_category = ANY(sub.skill_categories))
-       ORDER BY ${orderBy}
+         AND ($7::worker_skill_category[] IS NULL OR sub.skill_categories && $7::worker_skill_category[])
+       ORDER BY (sub.account_id = ANY($8::uuid[])) DESC, ${orderBy}
        LIMIT $6`,
       [
         filter.latitude,
@@ -272,7 +272,8 @@ export class WorkersRepository {
         filter.radiusKm * 1000,
         like,
         filter.limit,
-        filter.skillCategory ?? null,
+        filter.skillCategory ? filter.skillCategory.split(',') : null,
+        filter.priorityAccountIds ?? [],
       ],
     );
     return result.rows.map((row) => ({
@@ -286,12 +287,29 @@ export class WorkersRepository {
   // array *containment*: a worker only matches if their skills are a superset of every
   // skill the requester asked for, not merely an overlap (a plumber-only worker doesn't
   // match an "electrician AND plumber" request). Distance math mirrors findNearby above.
+  /** Distinct skill names verified workers typed under "other", matching the search. */
+  async findCustomSkills(query: string): Promise<string[]> {
+    const result = await this.pool.query(
+      `SELECT DISTINCT ON (lower(name)) name FROM (
+         SELECT trim(unnest(string_to_array(other_skill_description, ','))) AS name
+         FROM worker_profiles
+         WHERE verification_status = 'verified' AND other_skill_description IS NOT NULL
+       ) s
+       WHERE name <> '' AND name ILIKE $1
+       ORDER BY lower(name)
+       LIMIT 15`,
+      [`%${query}%`],
+    );
+    return result.rows.map((row) => row.name);
+  }
+
   async findMatchingForBroadcast(
     requesterAccountId: string,
     skillCategories: string[],
     latitude: number,
     longitude: number,
     radiusKm: number,
+    customSkills: string[] = [],
   ): Promise<WorkerBroadcastMatch[]> {
     const result = await this.pool.query(
       `SELECT * FROM (
@@ -305,10 +323,11 @@ export class WorkersRepository {
            AND w.latitude IS NOT NULL AND w.longitude IS NOT NULL
            AND w.account_id != $3
            AND w.skill_categories @> $4::worker_skill_category[]
+           AND NOT EXISTS (SELECT 1 FROM unnest($6::text[]) c WHERE COALESCE(w.other_skill_description, '') NOT ILIKE '%' || c || '%')
        ) sub
        WHERE sub.distance_meters <= $5
        ORDER BY sub.distance_meters ASC`,
-      [latitude, longitude, requesterAccountId, skillCategories, radiusKm * 1000],
+      [latitude, longitude, requesterAccountId, skillCategories, radiusKm * 1000, customSkills],
     );
     return result.rows.map((row) => ({
       workerId: row.worker_id,

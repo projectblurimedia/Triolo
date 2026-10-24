@@ -1,4 +1,6 @@
 import { Request, Response, Router } from 'express';
+import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
+import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
 import { validateBody } from '@/common/middleware/validate';
@@ -10,7 +12,8 @@ import { JobSeekersRepository } from './repository';
 import { JobSeekersService } from './service';
 import { saveJobSeekerPostSchema, searchQuerySchema, setActiveSchema } from './validation';
 
-const service = new JobSeekersService(new JobSeekersRepository(pool));
+const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
+const service = new JobSeekersService(new JobSeekersRepository(pool), subscriptionStatus);
 
 function accountIdOf(req: Request): string {
   if (!req.account) throw AppError.unauthorized();
@@ -33,11 +36,21 @@ jobSeekersRouter.get(
   }),
 );
 
+// Kinds of work people typed themselves, for the Hire Staff picker's search.
+jobSeekersRouter.get(
+  '/custom-titles',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const query = String(req.query.query ?? '').trim().slice(0, 40);
+    return ok(res, query.length < 1 ? [] : await service.searchCustomTitles(query));
+  }),
+);
+
 // One live post — e.g. an ad's "Contact".
 jobSeekersRouter.get(
   '/public/:id',
   authenticate,
-  asyncHandler(async (req: Request, res: Response) => ok(res, await service.getPublic(req.params.id))),
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.getPublic(req.params.id, accountIdOf(req)))),
 );
 
 // Poster side: their own post.

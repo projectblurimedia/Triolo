@@ -1,4 +1,5 @@
 import fs from 'fs';
+import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { NotificationsService } from '@/modules/notifications/service';
@@ -21,6 +22,8 @@ export class BusinessesService {
   constructor(
     private readonly repository: BusinessesRepository,
     private readonly notificationsService: NotificationsService,
+    // Subscribed partners' shops come first in searches (optional: tests and admin don't need it).
+    private readonly subscriptionStatus?: SubscriptionStatusService,
   ) {}
 
   async createProfile(accountId: string, dto: CreateBusinessProfileDto, files: Express.Multer.File[]): Promise<BusinessProfile> {
@@ -159,7 +162,8 @@ export class BusinessesService {
   }
 
   async searchNearby(accountId: string, filter: NearbySearchFilter): Promise<BusinessNearbyResult[]> {
-    return this.repository.findNearby(accountId, filter);
+    const priorityAccountIds = (await this.subscriptionStatus?.priorityPartnerIds()) ?? [];
+    return this.repository.findNearby(accountId, { ...filter, priorityAccountIds });
   }
 
   /** Fired when a user opens this business's detail card from Nearby Shops search. */
@@ -208,5 +212,10 @@ export class BusinessesService {
     ]);
     await this.repository.remove(accountId);
     return true;
+  }
+
+  /** Categories shops typed under "other" that match a search — names only. */
+  searchCustomCategories(query: string): Promise<string[]> {
+    return this.repository.findCustomCategories(query);
   }
 }

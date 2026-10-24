@@ -18,6 +18,8 @@ import { MainStackParamList, MainTabParamList } from '@/navigation/types';
 import { JobPostCard } from '@/components/JobPostCard';
 import { SmartImage } from '@/components/SmartImage';
 import { useMyJobPost } from '@/hooks/useJobPost';
+import { SealedPhoto } from '@/components/TrustedSeal';
+import { useTrustedKinds } from '@/hooks/useSubscription';
 
 type Props = CompositeScreenProps<BottomTabScreenProps<MainTabParamList, 'Profile'>, NativeStackScreenProps<MainStackParamList>>;
 
@@ -42,6 +44,8 @@ export function ProfileScreen({ navigation }: Props) {
   const jobPost = useMyJobPost();
   const shop = businessProfile.data;
   const shopReviews = useMyShopReviews(!!shop);
+  // Profiles with an active Trusted by Triolo badge.
+  const trustedKinds = useTrustedKinds();
 
   return (
     <ScreenContainer edges={['left', 'right']}>
@@ -111,7 +115,8 @@ export function ProfileScreen({ navigation }: Props) {
           icon="screwdriver-wrench"
           title={t('mainTabs.Profile.workerTitle')}
           profile={workerProfile.data}
-          photoUrl={worker?.profilePhotoUrl ?? worker?.portfolioPhotoUrls[0]}
+          photoUrl={worker?.profilePhotoUrl}
+          trusted={trustedKinds.has('service')}
           name={account?.fullName}
           quickFact={
             worker
@@ -132,7 +137,8 @@ export function ProfileScreen({ navigation }: Props) {
           icon="store"
           title={t('mainTabs.Profile.businessTitle')}
           profile={businessProfile.data}
-          photoUrl={shop?.profilePhotoUrl ?? shop?.shopPhotoUrls[0]}
+          photoUrl={shop?.profilePhotoUrl}
+          trusted={trustedKinds.has('business')}
           name={shop?.shopName}
           quickFact={shop && account ? t('mainTabs.Profile.ownerLine', { name: account.fullName }) : undefined}
           addLabel={t('mainTabs.Profile.addBusiness')}
@@ -142,6 +148,7 @@ export function ProfileScreen({ navigation }: Props) {
         />
 
         <JobPostCard post={jobPost.data} name={account?.fullName} onPress={() => navigation.navigate('JobPost')} />
+
 
         {worker ? <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} /> : null}
         {shop ? (
@@ -170,6 +177,8 @@ interface CapabilityRowProps {
   profile: { verificationStatus: string } | null | undefined;
   /** This profile's own photo (worker face / shop logo); the icon shows when there is none. */
   photoUrl?: string | null;
+  /** The profile has an active Trusted by Triolo badge (its photo shows the seal). */
+  trusted?: boolean;
   /** Who or what this profile is: the worker's name, or the shop's name. */
   name?: string;
   quickFact?: string;
@@ -179,11 +188,15 @@ interface CapabilityRowProps {
   colors: ReturnType<typeof useThemeColors>['colors'];
 }
 
-function CapabilityRow({ icon, title, profile, photoUrl, name, quickFact, addLabel, onView, onAdd, colors }: CapabilityRowProps) {
+function CapabilityRow({ icon, title, profile, photoUrl, name, quickFact, addLabel, onView, onAdd, colors, trusted }: CapabilityRowProps) {
   return (
     <Pressable style={[styles.card, { backgroundColor: colors.surface }]} onPress={profile ? onView : onAdd}>
       {profile && photoUrl ? (
-        <SmartImage source={{ uri: photoUrl }} style={styles.cardPhoto} />
+        <View style={styles.cardPhotoWrap}>
+          <SealedPhoto size={52} trusted={!!trusted}>
+            <SmartImage source={{ uri: photoUrl }} style={styles.cardPhoto} />
+          </SealedPhoto>
+        </View>
       ) : (
         <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cardIcon}>
           <FontAwesome6 name={icon} size={18} color="#FFFFFF" solid />
@@ -278,7 +291,8 @@ const styles = StyleSheet.create({
     ...CARD_SHADOW,
   },
   cardIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  cardPhoto: { width: 52, height: 52, borderRadius: 26, marginRight: 14 },
+  cardPhotoWrap: { marginRight: 14 },
+  cardPhoto: { width: 52, height: 52, borderRadius: 26 },
   cardCaption: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, letterSpacing: 0.3 },
   cardText: { flex: 1, marginRight: 10 },
   cardTitle: { ...typography.subheading, fontFamily: fonts.semiBold },

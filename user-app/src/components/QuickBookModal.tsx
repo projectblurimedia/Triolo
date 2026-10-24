@@ -10,6 +10,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RadarPulse } from './RadarPulse';
 import { ToastHost } from './ToastHost';
 import { Button } from './Button';
+import { CategoryPicker } from './CategoryPicker';
+import { workersService } from '@/services/workersService';
+import { usePayHint, withFee } from '@/hooks/useSubscription';
+import { payIfNeeded } from '@/state/payGateStore';
 import { SKILL_CATEGORIES } from '@/constants/categories';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { bookingsService, CustomerBooking } from '@/services/bookingsService';
@@ -63,6 +67,7 @@ export async function addressFor(latitude: number, longitude: number): Promise<s
  */
 export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
   const { t } = useTranslation();
+  const bookFee = usePayHint('book');
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
@@ -78,10 +83,6 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
     setSubmitting(false);
   }, [visible]);
 
-  const toggleSkill = (key: string) => {
-    setSelectedSkills((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
-  };
-
   const handleClose = () => {
     onClose();
   };
@@ -95,6 +96,8 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
       if (!(await askForLocation())) return;
       // The button shows its spinner while the ad loads.
       if (!(await waitForAd())) return;
+      // No plan: pay once (the admin's fee) at this last step — or subscribe.
+      if (!(await payIfNeeded('book'))) return;
     } finally {
       preparing.current = false;
     }
@@ -189,38 +192,28 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
       );
     }
 
-    const orderedSkills = [...SKILL_CATEGORIES].sort(
-      (a, b) => Number(selectedSkills.includes(b.key)) - Number(selectedSkills.includes(a.key)),
-    );
+    const skillOptions = SKILL_CATEGORIES.map((skill) => ({
+      key: skill.key,
+      label: t(`workerProfile.skills.${skill.key}`),
+      icon: skill.icon,
+    }));
 
     return (
       <>
         <ScrollView contentContainerStyle={styles.selectBody} keyboardShouldPersistTaps="handled">
           <Text style={[styles.skillsLabel, { color: colors.text }]}>{t('quickBook.skillsLabel')}</Text>
-          <View style={styles.chipRow}>
-            {orderedSkills.map((skill) => {
-              const isActive = selectedSkills.includes(skill.key);
-              return (
-                <Pressable key={skill.key} onPress={() => toggleSkill(skill.key)}>
-                  {isActive ? (
-                    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                      <FontAwesome6 name={skill.icon} size={13} color="#FFFFFF" solid />
-                      <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-                    </LinearGradient>
-                  ) : (
-                    <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
-                      <FontAwesome6 name={skill.icon} size={13} color={colors.textMuted} solid />
-                      <Text style={[styles.chipLabel, { color: colors.text }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
+          <CategoryPicker
+            title={t('quickBook.skillsLabel')}
+            placeholder={t('picker.chooseServices')}
+            options={skillOptions}
+            selected={selectedSkills}
+            onChange={setSelectedSkills}
+            searchCustom={workersService.customSkills}
+          />
         </ScrollView>
         <View style={[styles.bookButtonWrap, { borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
           <Button
-            label={t('quickBook.bookNearby')}
+            label={withFee(t('quickBook.bookNearby'), bookFee)}
             onPress={handleBookNearby}
             loading={submitting || adLoading}
             disabled={selectedSkills.length === 0}

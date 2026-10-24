@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from './Button';
+import { CategoryPicker } from './CategoryPicker';
 import { ImagePickerField, PickedImage } from './ImagePickerField';
 import { LocationField } from './LocationField';
 import { PlaceValue } from '@/utils/place';
@@ -79,10 +80,6 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
     quotation !== '' && Number.isInteger(quotationAmount) && quotationAmount > 0 && quotationAmount <= MAX_QUOTATION;
   const locationValid = location !== null;
   const canSubmit = selectedSkills.length > 0 && quotationValid && locationValid;
-
-  const toggleSkill = (key: string) => {
-    setSelectedSkills((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
-  };
 
   const uploadNewPhotos = async (postId: string, newPhotos: PickedImage[]) => {
     for (let i = 0; i < newPhotos.length; i += 1) {
@@ -160,9 +157,11 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
     }
   };
 
-  const orderedSkills = [...SKILL_CATEGORIES].sort(
-    (a, b) => Number(selectedSkills.includes(b.key)) - Number(selectedSkills.includes(a.key)),
-  );
+  const skillOptions = SKILL_CATEGORIES.map((skill) => ({
+    key: skill.key,
+    label: t(`workerProfile.skills.${skill.key}`),
+    icon: skill.icon,
+  }));
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -204,26 +203,13 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
           <LocationField label={t('problemForm.locationHint')} value={location} onChange={setLocation} />
 
           <Text style={[styles.sectionLabel, styles.sectionSpacing, { color: colors.text }]}>{t('problemForm.workerLabel')}</Text>
-          <View style={styles.chipRow}>
-            {orderedSkills.map((skill) => {
-              const isActive = selectedSkills.includes(skill.key);
-              return (
-                <Pressable key={skill.key} onPress={() => toggleSkill(skill.key)}>
-                  {isActive ? (
-                    <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.chip}>
-                      <FontAwesome6 name={skill.icon} size={13} color="#FFFFFF" solid />
-                      <Text style={[styles.chipLabel, { color: '#FFFFFF' }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-                    </LinearGradient>
-                  ) : (
-                    <View style={[styles.chip, styles.chipInactive, { borderColor: colors.border }]}>
-                      <FontAwesome6 name={skill.icon} size={13} color={colors.textMuted} solid />
-                      <Text style={[styles.chipLabel, { color: colors.text }]}>{t(`workerProfile.skills.${skill.key}`)}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
+          <CategoryPicker
+            title={t('problemForm.workerLabel')}
+            placeholder={t('picker.chooseServices')}
+            options={skillOptions}
+            selected={selectedSkills}
+            onChange={setSelectedSkills}
+          />
 
           <Text style={[styles.sectionLabel, styles.sectionSpacing, { color: colors.text }]}>
             {t('problemForm.quotationLabel')}

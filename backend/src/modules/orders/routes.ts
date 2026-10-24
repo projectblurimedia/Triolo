@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
+import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
 import { validateBody } from '@/common/middleware/validate';
@@ -15,7 +17,10 @@ import { createOrderSchema, customerCancelSchema, rateOrderSchema, saveItemsSche
 // Own instances over the shared pool — same wiring style as bookings/routes.ts.
 const notificationsService = new NotificationsService(new NotificationsRepository(pool));
 const businessesService = new BusinessesService(new BusinessesRepository(pool), notificationsService);
-const controller = new OrdersController(new OrdersService(new OrdersRepository(pool), businessesService, notificationsService));
+const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
+const controller = new OrdersController(
+  new OrdersService(new OrdersRepository(pool), businessesService, notificationsService, subscriptionStatus),
+);
 
 export const ordersRouter = Router();
 

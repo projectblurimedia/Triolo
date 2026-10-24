@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { RatingStars } from './RatingStars';
+import { SealedAvatar } from './TrustedBadge';
 import { WorkerNearbyResult } from '@/services/workersService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -20,8 +21,23 @@ export function initialsOf(name: string): string {
     .join('');
 }
 
-/** Round photo, or brand-gradient initials when there's no photo. */
-export function Avatar({ photoUrl, name, size }: { photoUrl?: string; name: string; size: number }) {
+export interface AvatarSeal {
+  kind: 'service' | 'business' | 'job_post';
+  id: string;
+}
+
+/**
+ * Round photo, or brand-gradient initials when there's no photo — with a seal on its
+ * top-right edge when it's Trusted by Triolo.
+ */
+export function Avatar({ photoUrl, name, size, seal }: { photoUrl?: string | null; name: string; size: number; seal?: AvatarSeal }) {
+  if (seal) {
+    return (
+      <SealedAvatar size={size} kind={seal.kind} id={seal.id}>
+        <Avatar photoUrl={photoUrl} name={name} size={size} />
+      </SealedAvatar>
+    );
+  }
   if (photoUrl) {
     return <SmartImage source={{ uri: photoUrl }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   }
@@ -48,7 +64,12 @@ export function WorkerMiniCard({ worker, onPress }: { worker: WorkerNearbyResult
 
   return (
     <Pressable onPress={onPress} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Avatar photoUrl={worker.profilePhotoUrl ?? worker.portfolioPhotoUrls[0]} name={worker.accountFullName} size={56} />
+      <Avatar
+        photoUrl={worker.profilePhotoUrl}
+        name={worker.accountFullName}
+        size={56}
+        seal={{ kind: 'service', id: worker.id }}
+      />
       <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
         {worker.accountFullName}
       </Text>

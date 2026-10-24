@@ -1,4 +1,5 @@
 import fs from 'fs';
+import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import { WorkersService } from '@/modules/workers/service';
@@ -44,6 +45,8 @@ export class ProblemsService implements BookingLifecycleListener {
     private readonly workersService: WorkersService,
     private readonly notificationsService: NotificationsService,
     private readonly bookingsService: BookingsService,
+    // Subscribed workers see new problems first (the head start).
+    private readonly subscriptionStatus?: SubscriptionStatusService,
   ) {}
 
   // --- Customer side ---
@@ -143,6 +146,8 @@ export class ProblemsService implements BookingLifecycleListener {
     if (worker.latitude == null || worker.longitude == null) {
       return [];
     }
+    const headStart = await this.subscriptionStatus?.headStart();
+    const minAgeSeconds = headStart && !headStart.subscriberIds.has(accountId) ? headStart.seconds : 0;
     return this.repository.findNearbyOpen(
       accountId,
       worker.skillCategories,
@@ -150,6 +155,7 @@ export class ProblemsService implements BookingLifecycleListener {
       worker.longitude,
       NEARBY_RADIUS_KM,
       DEFAULT_LIST_LIMIT,
+      minAgeSeconds,
     );
   }
 
@@ -168,8 +174,10 @@ export class ProblemsService implements BookingLifecycleListener {
    */
   async acceptProblem(accountId: string, postId: string): Promise<ProblemPost> {
     const worker = await this.getVerifiedWorker(accountId);
+    const passId = (await this.subscriptionStatus?.usePartnerPass(accountId, 'accept')) ?? null;
     const result = await this.repository.accept(postId, worker.id, accountId);
     if (!result) {
+      await this.subscriptionStatus?.restorePasses([], [passId]);
       if (!(await this.repository.exists(postId))) {
         throw AppError.notFound('Problem not found.', 'PROBLEM_POST_NOT_FOUND');
       }
@@ -194,8 +202,10 @@ export class ProblemsService implements BookingLifecycleListener {
       await this.repository.setBookingRequest(post.id, bookingRequestId);
     } catch (err) {
       await this.repository.reopen(post.id);
+      await this.subscriptionStatus?.restorePasses([], [passId]);
       throw err;
     }
+    await this.subscriptionStatus?.attachPass(passId, `accept-${post.id}`);
 
     await this.push(result, problemPushTemplates.accepted(result.notifyLanguage), 'problem_accepted', bookingRequestId);
     return { ...post, bookingRequestId };

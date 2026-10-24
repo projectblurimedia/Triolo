@@ -1,4 +1,6 @@
 import { Request, Response, Router } from 'express';
+import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
+import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { ZodTypeAny, z } from 'zod';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
@@ -40,7 +42,7 @@ const promotions = new ServicePromotionResolver(
   new BusinessesService(new BusinessesRepository(pool), notifications),
   new JobSeekersService(new JobSeekersRepository(pool)),
 );
-const service = new AdsService(new AdsRepository(pool), promotions);
+const service = new AdsService(new AdsRepository(pool), promotions, new SubscriptionStatusService(new SubscriptionsRepository(pool)));
 
 /** The image / video sent along with an ad's details, if any. */
 function mediaOf(body: { imageUrl?: string | null; videoUrl?: string | null }) {
@@ -151,6 +153,13 @@ adsRouter.post(
   asyncHandler(async (req: Request, res: Response) =>
     ok(res, await service.confirmPayment(requireAccountId(req), req.params.id, req.body), 'Payment received'),
   ),
+);
+
+// The partner app's boost: pay through a link opened in the browser.
+adsRouter.post(
+  '/self/:id/pay-link',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.startPaymentLink(requireAccountId(req), req.params.id))),
 );
 
 adsRouter.post(

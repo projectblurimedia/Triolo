@@ -4,6 +4,7 @@ import { useAuthStore } from '@/state/authStore';
 import i18n from '@/localization/i18n';
 import { accountStandingMessage, STANDING_CODES } from '@/localization/accountStanding';
 import { showToast } from '@/state/toastStore';
+import { openSubscribe } from '@/state/subscribeStore';
 
 export interface ApiEnvelope<T> {
   success: boolean;
@@ -124,6 +125,8 @@ function signOutIfBanned(error: ApiError): ApiError {
       });
     }
   }
+  // An old build's lock, or a plan that just ended: offer the plans.
+  if (error.code === 'SUBSCRIPTION_REQUIRED') openSubscribe();
   return error;
 }
 

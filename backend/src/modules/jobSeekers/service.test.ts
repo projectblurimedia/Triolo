@@ -115,6 +115,6 @@ describe('JobSeekersService', () => {
     repository.search.mockResolvedValue([]);
     const params = { latitude: 16.7, longitude: 81.1, radiusKm: 25, sort: 'distance' as const, limit: 30 };
     await service.search('acc-2', params);
-    expect(repository.search).toHaveBeenCalledWith('acc-2', params);
+    expect(repository.search).toHaveBeenCalledWith('acc-2', { ...params, priorityAccountIds: [] });
   });
 });
