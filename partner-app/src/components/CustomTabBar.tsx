@@ -6,6 +6,8 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { headerGradient, useThemeColors } from '@/theme';
 import { ANDROID_REAL_BLUR, useBlurTargetStore } from '@/state/blurTargetStore';
+import { useAttentionCounts } from '@/hooks/useAttentionCounts';
+import { CountBadge } from './CountBadge';
 
 // Floats on every side by the same amount — `MARGIN_H` insets the bar from the left/right
 // screen edges, and `barBottom` (below) is at least `MARGIN_H` too, so the gap reads
@@ -78,7 +80,7 @@ const GLASS_DARK = {
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
   Home: 'house',
   Bookings: 'calendar-check',
-  Grow: 'rocket',
+  Grow: 'crown',
   Profile: 'user',
 };
 
@@ -109,6 +111,11 @@ const ACTIVE_GRADIENTS: Record<string, readonly [string, string]> = {
 export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   const { colors, isDark } = useThemeColors();
   const progressAnims = useRef(state.routes.map((_, index) => new Animated.Value(index === state.index ? 1 : 0))).current;
+  // Requests and work under way (jobs and shop orders) as a red count on the Bookings icon.
+  const attention = useAttentionCounts();
+  // Activity is a record, not an alert: no count on its icon (Home shows what's waiting).
+  const counts: Record<string, number> = {};
+  void attention;
   // A single shared bounce value for whichever tab is becoming active — reset low and
   // sprung back past 1 on every change, so the selected tab's backdrop circle and dot
   // visibly "pop" a little larger before settling, not just fade/scale linearly to their
@@ -249,6 +256,7 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
                         <FontAwesome6 name={ICONS[route.name]} size={20} color={gradient[0]} solid />
                       </Animated.View>
                     </View>
+                    <CountBadge count={counts[route.name] ?? 0} style={styles.countBadge} />
                   </Animated.View>
 
                   {/* Absolutely positioned against `tabContent`'s own (untransformed)
@@ -318,6 +326,7 @@ const styles = StyleSheet.create({
   // own layout size is driven entirely by `iconArea` (its one normal-flow child), which is
   // what keeps every tab's icon truly centered in the bar regardless of the dot below it.
   tabContent: { alignItems: 'center', justifyContent: 'center' },
+  countBadge: { position: 'absolute', top: 3, right: -3, zIndex: 2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4 },
   iconArea: { width: ICON_BG_SIZE, height: ICON_BG_SIZE, alignItems: 'center', justifyContent: 'center' },
   iconBg: {
     position: 'absolute',

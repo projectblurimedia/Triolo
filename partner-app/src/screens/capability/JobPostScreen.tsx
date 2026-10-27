@@ -9,7 +9,7 @@ import { JobPostForm } from '@/components/JobPostForm';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
-import { useDeleteJobPost, useMyJobPost, useSetJobPostActive } from '@/hooks/useJobPost';
+import { useDeleteJobPost, useMyJobPosts, useSetJobPostActive } from '@/hooks/useJobPost';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { MainStackParamList } from '@/navigation/types';
@@ -25,10 +25,13 @@ const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
  * offers the Show / Hide switch (a hidden post keeps its details but drops out of search) and
  * Delete.
  */
-export function JobPostScreen({ navigation }: Props) {
+export function JobPostScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const { data: post, isLoading } = useMyJobPost();
+  const posts = useMyJobPosts();
+  const isLoading = posts.isLoading;
+  // The post being edited; none = a new post (a partner may keep several).
+  const post = route.params?.postId ? (posts.data ?? []).find((entry) => entry.id === route.params?.postId) ?? null : null;
   const setActive = useSetJobPostActive();
   const deletePost = useDeleteJobPost();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -41,7 +44,8 @@ export function JobPostScreen({ navigation }: Props) {
 
   const toggleActive = (value: boolean) => {
     setLive(value);
-    setActive.mutate(value, {
+    if (!post) return;
+    setActive.mutate({ id: post.id, isActive: value }, {
       onSuccess: () => showToast({ variant: 'info', title: t(value ? 'jobPost.shownToast' : 'jobPost.hiddenToast') }),
       onError: (err) => {
         setLive(!value);
@@ -51,7 +55,8 @@ export function JobPostScreen({ navigation }: Props) {
   };
 
   const handleDelete = () => {
-    deletePost.mutate(undefined, {
+    if (!post) return;
+    deletePost.mutate(post.id, {
       onSuccess: () => {
         setConfirmDelete(false);
         showToast({ variant: 'info', title: t('jobPost.deletedToast') });

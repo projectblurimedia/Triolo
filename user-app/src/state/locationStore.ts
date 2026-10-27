@@ -1,6 +1,7 @@
 import { Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { create } from 'zustand';
+import { chosenAddressCoords, useAddressStore } from './addressStore';
 
 export type DeviceLocationStatus = 'idle' | 'loading' | 'denied' | 'disabled' | 'error' | 'ready';
 
@@ -49,6 +50,14 @@ export const useLocationStore = create<LocationState>((set, get) => ({
       const hadFix = get().status === 'ready';
       if (!hadFix) set({ status: 'loading' });
       try {
+        // A saved address chosen on Home: nearby lists, bookings and orders use it (no GPS needed).
+        // (Let `inFlight` be set first: without an await here, finally would clear it too early.)
+        await Promise.resolve();
+        const chosen = chosenAddressCoords();
+        if (chosen) {
+          set({ status: 'ready', latitude: chosen.latitude, longitude: chosen.longitude, canAskAgain: true });
+          return;
+        }
         let permission = await Location.getForegroundPermissionsAsync();
         if (!permission.granted) {
           if (!permission.canAskAgain) {
@@ -109,3 +118,11 @@ export async function ensureLocation(): Promise<{ latitude: number; longitude: n
   const { status, latitude, longitude } = useLocationStore.getState();
   return status === 'ready' && latitude != null && longitude != null ? { latitude, longitude } : null;
 }
+
+// Saved addresses load from the phone after start-up: read the position again once they have.
+useAddressStore.persist.onFinishHydration(() => {
+  useLocationStore
+    .getState()
+    .refresh()
+    .catch(() => undefined);
+});

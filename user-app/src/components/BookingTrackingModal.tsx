@@ -272,39 +272,84 @@ export function BookingTrackingModal() {
       </View>
     ) : null;
 
-  const renderSteps = (b: CustomerBooking) => (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('tracking.progress')}</Text>
-      {STEPS.map((step, index) => {
-        const at = b[step.at] as string | null;
-        const done = !!at;
-        const last = index === STEPS.length - 1;
-        return (
-          <View key={step.key} style={styles.stepRow}>
-            <View style={styles.stepRail}>
-              <View
-                style={[
-                  styles.stepDot,
-                  done
-                    ? { backgroundColor: brandColors.success, borderColor: brandColors.success }
-                    : { borderColor: colors.border },
-                ]}
-              >
-                {done ? <FontAwesome6 name="check" size={9} color="#FFFFFF" solid /> : null}
+  /**
+   * The booking's steps, the same list while waiting and after: request sent, accepted (by
+   * the worker you chose, or whoever takes a Quick Book), on the way … finished. Each is done
+   * once its time exists; the first one not done yet is "now".
+   */
+  const buildSteps = (b: CustomerBooking, retrying = false) => {
+    const chosen = !retrying && b.directWorker ? b.directWorker.fullName : null;
+    const acceptedBy = b.worker?.fullName ?? chosen;
+    return [
+      { key: 'sent', label: t('waiting.stepSent'), at: retrying ? null : b.createdAt },
+      {
+        key: 'accepted',
+        label:
+          !retrying && b.acceptedAt && acceptedBy
+            ? t('tracking.stepAcceptedBy', { name: acceptedBy })
+            : chosen
+              ? t('waiting.stepAcceptName', { name: chosen })
+              : t('waiting.stepAcceptAny'),
+        at: retrying ? null : b.acceptedAt,
+      },
+      ...STEPS.slice(1).map((step) => ({
+        key: step.key,
+        label: t(`tracking.step.${step.key}`),
+        at: retrying ? null : ((b[step.at] as string | null) ?? null),
+      })),
+    ];
+  };
+
+  const renderSteps = (b: CustomerBooking, retrying = false) => {
+    const steps = buildSteps(b, retrying);
+    const ended = !retrying && (b.status === 'completed' || b.status === 'cancelled' || b.status === 'expired');
+    const currentIndex = ended ? -1 : steps.findIndex((step) => !step.at);
+    return (
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('tracking.progress')}</Text>
+        {steps.map((step, index) => {
+          const done = !!step.at;
+          const current = index === currentIndex;
+          const last = index === steps.length - 1;
+          return (
+            <View key={step.key} style={styles.stepRow}>
+              <View style={styles.stepRail}>
+                <View
+                  style={[
+                    styles.stepDot,
+                    done
+                      ? { backgroundColor: brandColors.success, borderColor: brandColors.success }
+                      : current
+                        ? { borderColor: colors.primary, backgroundColor: `${colors.primary}1F` }
+                        : { borderColor: colors.border },
+                  ]}
+                >
+                  {done ? <FontAwesome6 name="check" size={9} color="#FFFFFF" solid /> : null}
+                </View>
+                {!last ? <View style={[styles.stepLine, { backgroundColor: done ? brandColors.success : colors.border }]} /> : null}
               </View>
-              {!last ? <View style={[styles.stepLine, { backgroundColor: done ? brandColors.success : colors.border }]} /> : null}
+              <View style={styles.stepText}>
+                <Text
+                  style={[
+                    styles.stepTitle,
+                    { color: done || current ? colors.text : colors.textMuted },
+                    current ? { color: colors.primary } : null,
+                  ]}
+                >
+                  {step.label}
+                </Text>
+                {step.at ? (
+                  <Text style={[styles.stepTime, { color: colors.textMuted }]}>{formatTime(step.at)}</Text>
+                ) : current ? (
+                  <Text style={[styles.stepTime, { color: colors.primary }]}>{t('waiting.now')}</Text>
+                ) : null}
+              </View>
             </View>
-            <View style={styles.stepText}>
-              <Text style={[styles.stepTitle, { color: done ? colors.text : colors.textMuted }]}>
-                {t(`tracking.step.${step.key}`)}
-              </Text>
-              {at ? <Text style={[styles.stepTime, { color: colors.textMuted }]}>{formatTime(at)}</Text> : null}
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
+          );
+        })}
+      </View>
+    );
+  };
 
   const renderLocation = (b: CustomerBooking) => (
     <>
@@ -369,16 +414,6 @@ export function BookingTrackingModal() {
           : 'screwdriver-wrench';
       // Booked personally: waiting for that one worker, not searching.
       const directName = booking.directWorker && !rebooking ? booking.directWorker.fullName : null;
-      const waitingSteps = [
-        { key: 'sent', label: t('waiting.stepSent'), at: booking.createdAt },
-        {
-          key: 'accept',
-          label: directName ? t('waiting.stepAcceptName', { name: directName }) : t('waiting.stepAcceptAny'),
-          at: null,
-          current: true,
-        },
-        ...STEPS.slice(1).map((step) => ({ key: step.key, label: t(`tracking.step.${step.key}`), at: null })),
-      ];
       return (
         <ScrollView contentContainerStyle={[styles.waitingBody, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
           <View style={styles.waitingHero}>
@@ -397,50 +432,8 @@ export function BookingTrackingModal() {
             <WaitCountdown createdAt={booking.createdAt} kind={directName ? 'directMinutes' : 'quickBookMinutes'} />
           )}
 
-          {/* The steps; below them, that there is no need to wait here. */}
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('tracking.progress')}</Text>
-            {waitingSteps.map((step, index) => {
-              const done = !!step.at;
-              const current = 'current' in step && step.current;
-              const last = index === waitingSteps.length - 1;
-              return (
-                <View key={step.key} style={styles.stepRow}>
-                  <View style={styles.stepRail}>
-                    <View
-                      style={[
-                        styles.stepDot,
-                        done
-                          ? { backgroundColor: brandColors.success, borderColor: brandColors.success }
-                          : current
-                            ? { borderColor: colors.primary, backgroundColor: `${colors.primary}1F` }
-                            : { borderColor: colors.border },
-                      ]}
-                    >
-                      {done ? <FontAwesome6 name="check" size={9} color="#FFFFFF" solid /> : null}
-                    </View>
-                    {!last ? <View style={[styles.stepLine, { backgroundColor: done ? brandColors.success : colors.border }]} /> : null}
-                  </View>
-                  <View style={styles.stepText}>
-                    <Text
-                      style={[
-                        styles.stepTitle,
-                        { color: done || current ? colors.text : colors.textMuted },
-                        current ? { color: colors.primary } : null,
-                      ]}
-                    >
-                      {step.label}
-                    </Text>
-                    {step.at ? (
-                      <Text style={[styles.stepTime, { color: colors.textMuted }]}>{formatTime(step.at)}</Text>
-                    ) : current ? (
-                      <Text style={[styles.stepTime, { color: colors.primary }]}>{t('waiting.now')}</Text>
-                    ) : null}
-                  </View>
-                </View>
-              );
-            })}
-          </View>
+          {/* The steps (the same list as after acceptance); below them, that there is no need to wait here. */}
+          {renderSteps(booking, rebooking)}
 
           <View style={[styles.notifyCard, { backgroundColor: `${colors.primary}0F`, borderColor: `${colors.primary}2E` }]}>
             <View style={[styles.notifyIcon, { backgroundColor: `${colors.primary}1F` }]}>

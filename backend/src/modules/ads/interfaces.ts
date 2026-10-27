@@ -111,7 +111,7 @@ export interface AdActionColumns {
 export interface PromotionResolver {
   accountIdByMobile(mobileNumber: string): Promise<string | null>;
   /** The account's verified worker / shop, or its live job post: its id and display name. */
-  find(kind: AdPromotedKind, accountId: string): Promise<{ id: string; name: string } | null>;
+  find(kind: AdPromotedKind, accountId: string, preferredId?: string | null): Promise<{ id: string; name: string } | null>;
   /** The promoted profile as a card, or null when it's no longer available. */
   card(kind: AdPromotedKind, id: string): Promise<AdPromotedCard | null>;
 }
@@ -227,6 +227,8 @@ export interface SaveAdParams {
   actionPlace?: string | null;
   /** Admin form: the phone number of the account whose profile the ad promotes. */
   promoteMobile?: string | null;
+  /** Boosting one of several job posts: which one. */
+  promotedPostId?: string | null;
   planDays: AdPlanDays;
   paymentMethod: AdPaymentState;
   /** YYYY-MM-DD (India date). */

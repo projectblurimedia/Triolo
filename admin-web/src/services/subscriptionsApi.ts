@@ -3,6 +3,8 @@ import { apiClient } from './apiClient';
 export type SubscriptionAudience = 'customer' | 'partner';
 export type SubscriptionPrices = Record<'1' | '3' | '6' | '12', number>;
 export type BadgeKind = 'service' | 'business' | 'job_post';
+/** Partner plans are bought per side: services, a shop or job posts. */
+export type PartnerPlan = 'service' | 'shop' | 'job_post';
 
 export interface SubscriptionSettings {
   /** The main switch: customer and partner plans show only while it is on. */
@@ -11,6 +13,8 @@ export interface SubscriptionSettings {
   partnerEnabled: boolean;
   customerPrices: SubscriptionPrices;
   partnerPrices: SubscriptionPrices;
+  /** Prices of each partner plan (partnerPrices is only for older app builds' all-in-one plan). */
+  partnerPlanPrices: Record<PartnerPlan, SubscriptionPrices>;
   /** Subscribed workers hear about Quick Book offers and new problems this many seconds first. */
   headStartSeconds: number;
   badgeEnabled: boolean;
@@ -54,6 +58,8 @@ export interface AdminSubscription {
   id: string;
   accountId: string;
   audience: SubscriptionAudience;
+  /** 'all': a customer plan, or an older partner plan covering every side. */
+  plan?: 'all' | PartnerPlan;
   months: number;
   amount: number;
   status: 'unpaid' | 'active' | 'cancelled';

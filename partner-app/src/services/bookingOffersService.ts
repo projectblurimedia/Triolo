@@ -13,8 +13,20 @@ export interface PendingOffer {
   createdAt: string;
 }
 
+/** Job requests that reached the worker and what became of them. */
+export interface OfferStats {
+  received: number;
+  accepted: number;
+  declined: number;
+  missed: number;
+}
+
 export const bookingOffersService = {
   listMine: () => apiClient.get<PendingOffer[]>('/bookings/offers/mine', true),
+  stats: (from?: string, to?: string) => {
+    const query = [from ? `from=${encodeURIComponent(from)}` : '', to ? `to=${encodeURIComponent(to)}` : ''].filter(Boolean).join('&');
+    return apiClient.get<OfferStats>(`/bookings/offers/stats${query ? `?${query}` : ''}`, true);
+  },
   /** "Find jobs now" — picks up every open request nearby, then returns the open offers. */
   search: (here?: { latitude: number; longitude: number }) =>
     apiClient.post<PendingOffer[]>('/bookings/offers/search', here ?? {}, true),

@@ -28,9 +28,11 @@ export type MainStackParamList = {
   // profile object rather than just an id, since every entry point already has it in hand.
   WorkerRegistration: { profile?: WorkerProfile } | undefined;
   BusinessRegistration: { profile?: BusinessProfile } | undefined;
-  MyInfo: { capability: CapabilityType };
+  /** `postId`: which job post (a partner may keep several). */
+  MyInfo: { capability: CapabilityType | 'job'; postId?: string };
   // Create or edit the "looking for work" post (no admin review, so no verification state).
-  JobPost: undefined;
+  /** Edit that post; without one, make a new post. */
+  JobPost: { postId?: string } | undefined;
 };
 
 /**
@@ -43,7 +45,15 @@ export type MainTabParamList = {
   Home: undefined;
   // `mode` opens a dual (worker + shop) partner's Bookings on that side; `linkedAt` makes a
   // repeat navigation with the same mode still apply after the user switched sides by hand.
-  Bookings: { mode?: 'jobs' | 'orders'; tab?: 'requests' | 'active' | 'history'; linkedAt?: number } | undefined;
+  Bookings:
+    | {
+        mode?: 'jobs' | 'orders';
+        tab?: 'requests' | 'active' | 'history';
+        /** Shop Orders' list to open on (Home's New orders / In progress cards). */
+        orderTab?: 'new' | 'active' | 'history';
+        linkedAt?: number;
+      }
+    | undefined;
   Grow: undefined;
   Profile: undefined;
 };

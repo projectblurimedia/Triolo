@@ -13,6 +13,10 @@ export function bookingStatusTitle(booking: BookingLike, t: TFunction): string {
   if (booking.status === 'broadcasting' && booking.directWorker) {
     return t('directBook.sentTitle', { name: booking.directWorker.fullName });
   }
+  // Booked personally: nobody was "found" — the chosen worker said yes.
+  if (booking.status === 'accepted' && booking.directWorker) {
+    return t('directBook.acceptedTitle', { name: booking.directWorker.fullName });
+  }
   return t(`tracking.status.${booking.status}.title`);
 }
 

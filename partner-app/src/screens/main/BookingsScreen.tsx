@@ -9,8 +9,8 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
-import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
-import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from '@/hooks/useBookingOffers';
+import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer, useOfferStats } from '@/hooks/useBookingOffers';
 import { useMyJobs } from '@/hooks/useJobs';
 import { useAssignedProblems } from '@/hooks/useProblems';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
@@ -28,13 +28,25 @@ import { formatDistance } from '@/utils/formatDistance';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { FindJobsButton } from '@/components/FindJobsButton';
 import { LocationNeededCard } from '@/components/LocationNeededCard';
+import { useAttentionCounts } from '@/hooks/useAttentionCounts';
+import { useMyJobPost } from '@/hooks/useJobPost';
+import { ActivityFilter } from '@/components/ActivityFilter';
+import { JobPostActivity } from '@/components/JobPostActivity';
+import { ALL_TIME, DateRange, inRange, rangeLabel } from '@/components/DateRangeSheet';
+import { ActivitySummary } from '@/components/ActivitySummary';
+import { formatRupees } from '@/services/shopOrdersService';
 
-type Tab = 'requests' | 'active' | 'history';
+type Side = 'services' | 'shop' | 'job';
+type JobFilter = 'all' | 'requests' | 'active' | 'done' | 'cancelled';
+type ShopFilter = 'all' | 'new' | 'active' | 'done' | 'cancelled';
+type Row = { kind: 'offer'; key: string; offer: PendingOffer } | { kind: 'entry'; key: string; entry: HistoryEntry };
+const SIDE_ICONS = { services: 'screwdriver-wrench', shop: 'store', job: 'briefcase' } as const;
 type HistoryEntry =
   | { kind: 'job'; id: string; createdAt: string; active: boolean; job: WorkerJob }
   | { kind: 'problem'; id: string; createdAt: string; active: boolean; problem: AssignedProblem };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// Post a Problem jobs have their own colour and icon, so they're never mistaken for a Quick Book.
 const PURPLE = '#7C3AED';
 const STAR_COLOR = '#FBBF24';
 
@@ -57,7 +69,11 @@ export function BookingsScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
-  const [tab, setTab] = useState<Tab>('requests');
+  // One list per side, narrowed by a filter (no separate tabs).
+  const [jobFilter, setJobFilter] = useState<JobFilter>('all');
+  const [shopFilter, setShopFilter] = useState<ShopFilter>('all');
+  // From – to dates (both sides share them).
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
   const [refreshing, setRefreshing] = useState(false);
   const { data: offers, isLoading: offersLoading, refetch: refetchOffers } = useBookingOffers();
   const jobs = useMyJobs();
@@ -71,14 +87,19 @@ export function BookingsScreen() {
   // A partner with both capabilities switches between their worker jobs and their shop orders.
   // Opened from a shop order (Home's shop card, an order notification) it starts on orders.
   const route = useRoute<RouteProp<MainTabParamList, 'Bookings'>>();
-  const [mode, setMode] = useState<'jobs' | 'orders'>(route.params?.mode ?? 'jobs');
+  const [pickedSide, setPickedSide] = useState<Side | null>(
+    route.params?.mode === 'orders' ? 'shop' : route.params?.mode === 'jobs' ? 'services' : null,
+  );
   useEffect(() => {
-    if (route.params?.mode) setMode(route.params.mode);
-    if (route.params?.tab) setTab(route.params.tab);
-  }, [route.params?.mode, route.params?.tab, route.params?.linkedAt]);
+    if (route.params?.mode) setPickedSide(route.params.mode === 'orders' ? 'shop' : 'services');
+    const tab = route.params?.tab;
+    if (tab) setJobFilter(tab === 'history' ? 'done' : tab);
+    const orderTab = route.params?.orderTab;
+    if (orderTab) setShopFilter(orderTab === 'history' ? 'done' : orderTab);
+  }, [route.params?.mode, route.params?.tab, route.params?.orderTab, route.params?.linkedAt]);
+  const jobPost = useMyJobPost();
   const shopOrders = useShopOrders(isShop);
-  const newOrderCount = (shopOrders.data ?? []).filter((order) => order.status === 'placed').length;
-  const showOrders = isShop && (!isWorker || mode === 'orders');
+  const attention = useAttentionCounts();
 
   const entries = useMemo<HistoryEntry[]>(() => {
     const fromJobs: HistoryEntry[] = (jobs.data ?? []).map((job) => ({
@@ -151,7 +172,7 @@ export function BookingsScreen() {
     const declining = declineMutation.isPending && declineMutation.variables === item.bookingRequestId;
     const busy = accepting || declining;
     return (
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.card, styles.thickBorder, { backgroundColor: `${brandColors.success}0D`, borderColor: `${brandColors.success}80` }]}>
         <View style={styles.offerTop}>
           <View style={[styles.offerAvatar, { backgroundColor: `${colors.primary}1A` }]}>
             <FontAwesome6 name="user" size={16} color={colors.primary} solid />
@@ -206,7 +227,7 @@ export function BookingsScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.acceptButton,
-              { backgroundColor: colors.primary, opacity: pressed || accepting ? 0.8 : 1 },
+              { backgroundColor: brandColors.success, opacity: pressed || accepting ? 0.8 : 1 },
             ]}
             disabled={busy}
             onPress={() => handleAccept(item)}
@@ -232,7 +253,7 @@ export function BookingsScreen() {
     return colors.primary;
   };
 
-  const renderEntry = ({ item }: { item: HistoryEntry }) => {
+  const renderEntry = (item: HistoryEntry) => {
     const isJob = item.kind === 'job';
     const skills = (isJob ? item.job.skillCategories : item.problem.skillCategories)
       .map((key) => t(`workerProfile.skills.${key}`))
@@ -252,9 +273,12 @@ export function BookingsScreen() {
         style={[
           styles.card,
           styles.entryCard,
+          // Under way: red (waiting on you); done: a grey, quieter card. A problem job has its own
+          // purple icon.
           item.active
-            ? { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` }
-            : { backgroundColor: colors.surface, borderColor: colors.border },
+            ? { backgroundColor: `${brandColors.error}0A`, borderColor: `${brandColors.error}80` }
+            : { backgroundColor: `${colors.textMuted}0F`, borderColor: colors.border },
+          styles.thickBorder,
         ]}
         onPress={() => (isJob ? openJob(item.job.id) : navigation.navigate('Home'))}
       >
@@ -305,121 +329,183 @@ export function BookingsScreen() {
     </View>
   );
 
-  const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: 'requests', label: t('bookings.tabRequests'), count: offers?.length ?? 0 },
-    { key: 'active', label: t('bookings.tabActive'), count: activeEntries.length },
-    { key: 'history', label: t('bookings.tabHistory'), count: 0 },
+  // The partner's sides — only the ones they have; a switch only when there's more than one.
+  const sides: Side[] = [
+    ...(isWorker ? (['services'] as const) : []),
+    ...(isShop ? (['shop'] as const) : []),
+    ...(jobPost.data ? (['job'] as const) : []),
+  ];
+  const side: Side = pickedSide && sides.includes(pickedSide) ? pickedSide : (sides[0] ?? 'job');
+
+  // Services: requests first, then work under way, then finished and cancelled, newest first.
+  const jobStatus = (entry: HistoryEntry) => (entry.kind === 'job' ? entry.job.status : entry.problem.status);
+  const isCancelled = (entry: HistoryEntry) => jobStatus(entry) === 'cancelled';
+  const offerRows: Row[] = (offers ?? [])
+    .filter((offer) => inRange(offer.createdAt, range))
+    .map((offer) => ({ kind: 'offer', key: `o-${offer.offerId}`, offer }));
+  const entryRows = (list: HistoryEntry[]): Row[] =>
+    list.filter((entry) => inRange(entry.createdAt, range)).map((entry) => ({ kind: 'entry', key: `${entry.kind}-${entry.id}`, entry }));
+  const doneEntries = historyEntries.filter((entry) => !isCancelled(entry));
+  const cancelledEntries = historyEntries.filter(isCancelled);
+  const jobRows: Record<JobFilter, Row[]> = {
+    all: [...offerRows, ...entryRows(activeEntries), ...entryRows(historyEntries)],
+    requests: offerRows,
+    active: entryRows(activeEntries),
+    done: entryRows(doneEntries),
+    cancelled: entryRows(cancelledEntries),
+  };
+  const jobOptions = [
+    { key: 'all' as const, label: t('activity.filterAll'), icon: 'layer-group' as const, count: jobRows.all.length },
+    { key: 'requests' as const, label: t('activity.filterRequests'), icon: 'bell' as const, count: jobRows.requests.length },
+    { key: 'active' as const, label: t('activity.filterActive'), icon: 'person-digging' as const, count: jobRows.active.length },
+    { key: 'done' as const, label: t('activity.filterDone'), icon: 'circle-check' as const, count: jobRows.done.length },
+    { key: 'cancelled' as const, label: t('activity.filterCancelled'), icon: 'ban' as const, count: jobRows.cancelled.length },
+  ];
+  const shopAll = (shopOrders.data ?? []).filter((order) => inRange(order.createdAt, range));
+  const shopCounts = {
+    all: shopAll.length,
+    new: shopAll.filter((order) => order.status === 'placed').length,
+    active: shopAll.filter((order) => ['accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery'].includes(order.status)).length,
+    done: shopAll.filter((order) => order.status === 'completed').length,
+    cancelled: shopAll.filter((order) => ['cancelled', 'declined', 'expired'].includes(order.status)).length,
+  };
+  const shopOptions = [
+    { key: 'all' as const, label: t('activity.filterAll'), icon: 'layer-group' as const, count: shopCounts.all },
+    { key: 'new' as const, label: t('activity.filterNew'), icon: 'bell' as const, count: shopCounts.new },
+    { key: 'active' as const, label: t('activity.filterActive'), icon: 'basket-shopping' as const, count: shopCounts.active },
+    { key: 'done' as const, label: t('activity.filterDone'), icon: 'circle-check' as const, count: shopCounts.done },
+    { key: 'cancelled' as const, label: t('activity.filterCancelled'), icon: 'ban' as const, count: shopCounts.cancelled },
   ];
 
-  const loading = tab === 'requests' ? offersLoading : jobs.isLoading;
+  const loading = offersLoading || jobs.isLoading;
+  const periodText = rangeLabel(range, t) ?? t('activity.allTime');
 
-  const modeSwitch =
-    isShop && isWorker ? (
+  // Services: how many jobs were finished, how many requests came and how many were taken —
+  // no money here (prices aren't confirmed by anyone, so a total could be made up).
+  const offerStats = useOfferStats(range.from, range.to, isWorker);
+  const servicesSummary = (
+    <ActivitySummary
+      icon="circle-check"
+      label={t('activity.jobsDoneLabel', { period: periodText })}
+      value={String(jobRows.done.length)}
+      gradient={headerGradient}
+      stats={[
+        { icon: 'bell', value: offerStats.data?.received ?? 0, label: t('activity.offersReceived') },
+        { icon: 'handshake', value: offerStats.data?.accepted ?? 0, label: t('activity.offersAccepted') },
+        { icon: 'person-digging', value: jobRows.active.length, label: t('activity.filterActive') },
+      ]}
+    />
+  );
+  // Shop: the bills of orders completed in these dates.
+  const shopCompleted = (shopOrders.data ?? []).filter((order) => order.status === 'completed' && inRange(order.completedAt, range));
+  const shopSummary = (
+    <ActivitySummary
+      icon="indian-rupee-sign"
+      label={t('activity.earned', { period: periodText })}
+      value={formatRupees(shopCompleted.reduce((sum, order) => sum + (order.totalAmount ?? 0), 0))}
+      gradient={headerGradient}
+      stats={[
+        { icon: 'circle-check', value: shopCounts.done, label: t('activity.filterDone') },
+        { icon: 'basket-shopping', value: shopCounts.active, label: t('activity.filterActive') },
+        { icon: 'bell', value: shopCounts.new, label: t('activity.filterNew') },
+      ]}
+    />
+  );
+
+  const sideSwitch =
+    sides.length > 1 ? (
       <View style={[styles.modeSwitch, { borderColor: colors.border }]}>
-        {(['jobs', 'orders'] as const).map((value) => (
-          <Pressable
-            key={value}
-            onPress={() => setMode(value)}
-            style={[styles.modeOption, mode === value ? { backgroundColor: colors.primary } : null]}
-          >
-            <FontAwesome6
-              name={value === 'jobs' ? 'screwdriver-wrench' : 'store'}
-              size={12}
-              color={mode === value ? '#FFFFFF' : colors.textMuted}
-              solid
-            />
-            <Text style={[styles.modeText, { color: mode === value ? '#FFFFFF' : colors.textMuted }]}>
-              {t(value === 'jobs' ? 'bookings.serviceJobs' : 'bookings.shopOrders')}
-            </Text>
-            {value === 'orders' && newOrderCount > 0 ? (
-              <View style={[styles.modeBadge, { backgroundColor: mode === value ? '#FFFFFF' : brandColors.error }]}>
-                <Text style={[styles.modeBadgeText, { color: mode === value ? brandColors.error : '#FFFFFF' }]}>
-                  {newOrderCount > 9 ? '9+' : newOrderCount}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-        ))}
-      </View>
-    ) : null;
-
-  if (showOrders) {
-    return (
-      <ScreenContainer edges={['left', 'right']}>
-        {modeSwitch}
-        <ShopOrdersList />
-      </ScreenContainer>
-    );
-  }
-
-  return (
-    <ScreenContainer edges={['left', 'right']}>
-      {modeSwitch}
-      <View style={[styles.segment, { backgroundColor: `${colors.primary}10` }]}>
-        {tabs.map((option) => {
-          const active = tab === option.key;
+        {sides.map((value) => {
+          const active = side === value;
           return (
             <Pressable
-              key={option.key}
-              onPress={() => setTab(option.key)}
-              style={[styles.segmentItem, active ? { backgroundColor: colors.surface } : null]}
+              key={value}
+              onPress={() => setPickedSide(value)}
+              style={[styles.modeOption, active ? { backgroundColor: colors.primary } : null]}
             >
-              <Text style={[styles.segmentText, { color: active ? colors.primary : colors.textMuted }]}>{option.label}</Text>
-              {option.count > 0 ? (
-                <View
-                  style={[styles.countBadge, { backgroundColor: option.key === 'requests' ? brandColors.error : colors.primary }]}
-                >
-                  <Text style={styles.countText}>{option.count > 9 ? '9+' : option.count}</Text>
-                </View>
-              ) : null}
+              <FontAwesome6 name={SIDE_ICONS[value]} size={12} color={active ? '#FFFFFF' : colors.textMuted} solid />
+              <Text style={[styles.modeText, { color: active ? '#FFFFFF' : colors.textMuted }]} numberOfLines={1}>
+                {t(`homeSides.${value === 'services' ? 'services' : value === 'shop' ? 'shop' : 'jobPost'}`)}
+              </Text>
+
             </Pressable>
           );
         })}
       </View>
+    ) : null;
 
-      <LocationNeededCard />
+  if (side === 'shop') {
+    return (
+      <ScreenContainer edges={['left', 'right']}>
+        {sideSwitch}
+        {/* The summary and the filter scroll away with the orders, leaving the list room. */}
+        <ShopOrdersList
+          filter={shopFilter}
+          range={range}
+          header={
+            <>
+              {shopSummary}
+              <ActivityFilter value={shopFilter} options={shopOptions} onChange={setShopFilter} range={range} onRangeChange={setRange} />
+            </>
+          }
+        />
+      </ScreenContainer>
+    );
+  }
+
+  if (side === 'job') {
+    return (
+      <ScreenContainer edges={['left', 'right']}>
+        {sideSwitch}
+        <JobPostActivity />
+      </ScreenContainer>
+    );
+  }
+
+  const rows = jobRows[jobFilter];
+  return (
+    <ScreenContainer edges={['left', 'right']}>
+      {sideSwitch}
 
       {loading ? (
         <View style={styles.centerWrap}>
           <LoadingIndicator color={colors.primary} />
         </View>
-      ) : tab === 'requests' ? (
-        <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
+      ) : (
+        // Each filter gets its own list, placed fresh (never opening on the refresh gap).
+        <PullToRefresh key={`${jobFilter}-${range.from?.getTime() ?? 0}-${range.to?.getTime() ?? 0}`} refreshing={refreshing} onRefresh={onRefresh}>
           <FlatList
             showsVerticalScrollIndicator={false}
             showsHorizontalScrollIndicator={false}
-            data={offers ?? []}
-            keyExtractor={(item) => item.offerId}
+            data={rows}
+            keyExtractor={(row) => row.key}
             contentContainerStyle={styles.listContent}
-            renderItem={renderOffer}
-            ListEmptyComponent={renderEmpty('bell', t('bookings.emptyTitle'), t('bookings.emptyMessage'))}
-          />
-        </PullToRefresh>
-      ) : null}
-      {!loading && tab === 'requests' && isWorker ? <FindJobsButton variant="fab" /> : null}
-      {loading || tab === 'requests' ? null : (
-        // Each tab gets its own list, placed fresh (never opening on the refresh gap).
-        <PullToRefresh key={tab} refreshing={refreshing} onRefresh={onRefresh}>
-          <FlatList
-            showsVerticalScrollIndicator={false}
-            showsHorizontalScrollIndicator={false}
-            data={tab === 'active' ? activeEntries : historyEntries}
-            keyExtractor={(item) => `${item.kind}-${item.id}`}
-            contentContainerStyle={styles.listContent}
-            renderItem={renderEntry}
+            // The summary and the filter scroll away with the list, leaving it room.
+            ListHeaderComponent={
+              <>
+                {servicesSummary}
+                <ActivityFilter value={jobFilter} options={jobOptions} onChange={setJobFilter} range={range} onRangeChange={setRange} />
+                <LocationNeededCard />
+              </>
+            }
+            renderItem={({ item: row }) => (row.kind === 'offer' ? renderOffer({ item: row.offer }) : renderEntry(row.entry))}
             ListEmptyComponent={
-              tab === 'active'
-                ? renderEmpty('person-digging', t('bookings.emptyActiveTitle'), t('bookings.emptyActiveMessage'))
-                : renderEmpty('clock-rotate-left', t('bookings.emptyHistoryTitle'), t('bookings.emptyHistoryMessage'))
+              jobFilter === 'requests'
+                ? renderEmpty('bell', t('bookings.emptyTitle'), t('bookings.emptyMessage'))
+                : jobFilter === 'active'
+                  ? renderEmpty('person-digging', t('bookings.emptyActiveTitle'), t('bookings.emptyActiveMessage'))
+                  : renderEmpty('clock-rotate-left', t('activity.emptyTitle'), t('activity.emptyMessage'))
             }
           />
         </PullToRefresh>
       )}
+      {!loading && (jobFilter === 'all' || jobFilter === 'requests') && isWorker ? <FindJobsButton variant="fab" /> : null}
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  thickBorder: { borderWidth: 2 },
   directTag: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -442,8 +528,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   modeText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
-  modeBadge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
-  modeBadgeText: { fontSize: 10, fontFamily: fonts.semiBold },
+  modeDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
   segment: { flexDirection: 'row', borderRadius: 14, padding: 4, marginBottom: 10 },
   segmentItem: {
     flex: 1,

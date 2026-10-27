@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -15,9 +15,13 @@ import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { MainStackParamList, MainTabParamList } from '@/navigation/types';
-import { JobPostCard } from '@/components/JobPostCard';
+import { categoryIcon, JobPostCard, jobTitle } from '@/components/JobPostCard';
+import { JobPostsSheet } from '@/components/JobPostsSheet';
 import { SmartImage } from '@/components/SmartImage';
-import { useMyJobPost } from '@/hooks/useJobPost';
+import { useMyJobPosts } from '@/hooks/useJobPost';
+
+// As many as the server allows (jobSeekers MAX_JOB_POSTS).
+const MAX_JOB_POSTS = 5;
 import { SealedPhoto } from '@/components/TrustedSeal';
 import { useTrustedKinds } from '@/hooks/useSubscription';
 
@@ -41,7 +45,10 @@ export function ProfileScreen({ navigation }: Props) {
   const businessProfile = useMyBusinessProfile();
   const worker = workerProfile.data;
   const reviews = useMyReviews(!!worker);
-  const jobPost = useMyJobPost();
+  const jobPosts = useMyJobPosts();
+  const [postsOpen, setPostsOpen] = useState(false);
+  const posts = jobPosts.data ?? [];
+  const livePosts = posts.filter((post) => post.isActive).length;
   const shop = businessProfile.data;
   const shopReviews = useMyShopReviews(!!shop);
   // Profiles with an active Trusted by Triolo badge.
@@ -123,9 +130,7 @@ export function ProfileScreen({ navigation }: Props) {
               ? [
                   ...worker.skillCategories.filter((key) => key !== 'other').map((key) => t(`workerProfile.skills.${key}`)),
                   ...(worker.otherSkillDescription ? [worker.otherSkillDescription] : []),
-                ].join(', ') +
-                ' · ' +
-                t('mainTabs.Profile.workerQuickFact', { count: worker.experienceYears })
+                ].join(', ')
               : undefined
           }
           addLabel={t('mainTabs.Profile.addWorker')}
@@ -147,7 +152,81 @@ export function ProfileScreen({ navigation }: Props) {
           colors={colors}
         />
 
-        <JobPostCard post={jobPost.data} name={account?.fullName} onPress={() => navigation.navigate('JobPost')} />
+        {posts.length === 1 ? (
+          <JobPostCard
+            post={posts[0]}
+            name={account?.fullName}
+            compact
+            onPress={() => navigation.navigate('MyInfo', { capability: 'job', postId: posts[0].id })}
+          />
+        ) : null}
+        {posts.length > 1 ? (
+          <Pressable
+            onPress={() => setPostsOpen(true)}
+            style={({ pressed }) => [styles.postsCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.9 : 1 }]}
+          >
+            <View style={styles.postsIcons}>
+              {posts.slice(0, 3).map((post, index) => (
+                <LinearGradient
+                  key={post.id}
+                  colors={headerGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.postsIcon, { borderColor: colors.surface, marginLeft: index === 0 ? 0 : -12 }]}
+                >
+                  <FontAwesome6 name={categoryIcon(post.category) as never} size={13} color="#FFFFFF" solid />
+                </LinearGradient>
+              ))}
+            </View>
+            <View style={styles.flex}>
+              <Text style={[styles.addPostTitle, { color: colors.text }]} numberOfLines={1}>
+                {t('jobPost.postsTitle')}
+              </Text>
+              <Text style={[styles.addPostText, { color: colors.textMuted }]} numberOfLines={1}>
+                {posts.map((post) => jobTitle(post, t)).join(' · ')}
+              </Text>
+              <Text style={[styles.postsCount, { color: colors.primary }]}>
+                {t('jobPost.postsCount', { count: posts.length, live: livePosts })}
+              </Text>
+            </View>
+            <FontAwesome6 name="chevron-right" size={13} color={colors.textMuted} solid />
+          </Pressable>
+        ) : null}
+        <JobPostsSheet
+          visible={postsOpen}
+          posts={posts}
+          name={account?.fullName}
+          canAdd={posts.length < MAX_JOB_POSTS}
+          onClose={() => setPostsOpen(false)}
+          onOpen={(post) => {
+            setPostsOpen(false);
+            navigation.navigate('MyInfo', { capability: 'job', postId: post.id });
+          }}
+          onAdd={() => {
+            setPostsOpen(false);
+            navigation.navigate('JobPost', {});
+          }}
+        />
+        {/* The first post, or a second one; from two on, Add another lives in the sheet. */}
+        {posts.length < 2 ? (
+          <Pressable
+            onPress={() => navigation.navigate('JobPost', {})}
+            style={({ pressed }) => [styles.addPost, { borderColor: `${colors.primary}40`, backgroundColor: `${colors.primary}0A`, opacity: pressed ? 0.85 : 1 }]}
+          >
+            <View style={[styles.addPostIcon, { backgroundColor: colors.primary }]}>
+              <FontAwesome6 name="plus" size={13} color="#FFFFFF" solid />
+            </View>
+            <View style={styles.flex}>
+              <Text style={[styles.addPostTitle, { color: colors.text }]}>
+                {t(posts.length > 0 ? 'jobPost.addAnother' : 'jobPost.lookingTitle')}
+              </Text>
+              <Text style={[styles.addPostText, { color: colors.textMuted }]} numberOfLines={1}>
+                {t('jobPost.addAnotherHint')}
+              </Text>
+            </View>
+            <FontAwesome6 name="chevron-right" size={13} color={colors.textMuted} solid />
+          </Pressable>
+        ) : null}
 
 
         {worker ? <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} /> : null}
@@ -193,7 +272,7 @@ function CapabilityRow({ icon, title, profile, photoUrl, name, quickFact, addLab
     <Pressable style={[styles.card, { backgroundColor: colors.surface }]} onPress={profile ? onView : onAdd}>
       {profile && photoUrl ? (
         <View style={styles.cardPhotoWrap}>
-          <SealedPhoto size={52} trusted={!!trusted}>
+          <SealedPhoto size={42} trusted={!!trusted}>
             <SmartImage source={{ uri: photoUrl }} style={styles.cardPhoto} />
           </SealedPhoto>
         </View>
@@ -214,7 +293,6 @@ function CapabilityRow({ icon, title, profile, photoUrl, name, quickFact, addLab
                 {quickFact}
               </Text>
             ) : null}
-            <VerificationBadge status={profile.verificationStatus} />
           </>
         ) : (
           <>
@@ -223,7 +301,13 @@ function CapabilityRow({ icon, title, profile, photoUrl, name, quickFact, addLab
           </>
         )}
       </View>
-      <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
+      {/* Verified is the normal state, so it isn't shown; only "pending" / "rejected" are. */}
+      {profile && profile.verificationStatus !== 'verified' ? (
+        <View style={styles.statusWrap}>
+          <VerificationBadge status={profile.verificationStatus} />
+        </View>
+      ) : null}
+      <FontAwesome6 name="chevron-right" size={13} color={colors.textMuted} solid />
     </Pressable>
   );
 }
@@ -285,17 +369,28 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 10,
     ...CARD_SHADOW,
   },
-  cardIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  cardPhotoWrap: { marginRight: 14 },
-  cardPhoto: { width: 52, height: 52, borderRadius: 26 },
-  cardCaption: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, letterSpacing: 0.3 },
-  cardText: { flex: 1, marginRight: 10 },
-  cardTitle: { ...typography.subheading, fontFamily: fonts.semiBold },
-  cardQuickFact: { ...typography.caption, marginTop: 3, marginBottom: 3 },
+  cardIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  cardPhotoWrap: { marginRight: 12 },
+  cardPhoto: { width: 42, height: 42, borderRadius: 21 },
+  cardCaption: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10.5, letterSpacing: 0.3 },
+  cardText: { flex: 1, marginRight: 8 },
+  cardTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15 },
+  cardQuickFact: { ...typography.caption, fontSize: 11.5, marginTop: 1 },
+  statusWrap: { marginRight: 8 },
+  flex: { flex: 1 },
+  postsCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12, marginBottom: 10 },
+  postsIcons: { flexDirection: 'row' },
+  postsIcon: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  postsCount: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11.5, marginTop: 1 },
+  addPost: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', paddingVertical: 10, paddingHorizontal: 12, marginBottom: 10 },
+  addPostIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  addPostTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14.5 },
+  addPostText: { ...typography.caption, fontSize: 11.5 },
   cardSubtitle: { ...typography.caption, marginTop: 3 },
 });

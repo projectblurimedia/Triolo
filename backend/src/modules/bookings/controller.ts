@@ -48,6 +48,17 @@ export class BookingsController {
 
   // --- Worker side ---
 
+  getMyOfferStats = asyncHandler(async (req: Request, res: Response) => {
+    const when = (value: unknown) => {
+      if (typeof value !== 'string' || !value) return undefined;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) throw AppError.badRequest('Invalid date', 'VALIDATION_ERROR');
+      return date;
+    };
+    const result = await this.service.getMyOfferStats(requireAccountId(req), when(req.query.from), when(req.query.to));
+    return ok(res, result);
+  });
+
   getMyOffers = asyncHandler(async (req: Request, res: Response) => {
     const result = await this.service.getMyOffers(requireAccountId(req));
     return ok(res, result);

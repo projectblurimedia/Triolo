@@ -138,6 +138,16 @@ export interface DueOffer {
   preferredLanguage: string;
 }
 
+/** How many job requests reached a worker and what became of them (Activity's Services card). */
+export interface OfferStats {
+  /** Requests shown to the worker (Quick Book, booked personally, and accepted problem jobs). */
+  received: number;
+  accepted: number;
+  declined: number;
+  /** Taken by someone else or ended before this worker answered. */
+  missed: number;
+}
+
 /** A worker's own view of one still-open offer — feeds partner-app's Bookings tab list. */
 export interface PendingOffer {
   offerId: string;

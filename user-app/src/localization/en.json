@@ -23,7 +23,8 @@
     "back": "Back",
     "search": "Search",
     "showMore": "Show more ({{count}})",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "clear": "Clear"
   },
   "verification": {
     "pending": "Pending Review",
@@ -127,7 +128,9 @@
     "findingPlace": "Finding place name…",
     "confirmPlace": "Confirm Location",
     "workerPlaceLabel": "Where do you work from?",
-    "shopPlaceLabel": "Shop location"
+    "shopPlaceLabel": "Shop location",
+    "searchPlaceholder": "Search a village, town or area",
+    "searchNone": "No places found — try another name"
   },
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",
@@ -907,7 +910,8 @@
     "workerCancelledProblem": "{{name}} had to cancel. Your problem is open again for other workers nearby.",
     "cancelHint": "You can cancel until you share your PIN.",
     "adminCancelled": "Triolo support cancelled this booking.",
-    "reason": "Reason: {{reason}}"
+    "reason": "Reason: {{reason}}",
+    "stepAcceptedBy": "{{name}} accepted"
   },
   "workerReviews": {
     "title": "Ratings & Reviews",
@@ -1053,7 +1057,10 @@
     "pickStarsTitle": "Tap the stars to rate",
     "reviewPlaceholder": "Anything to share? (optional)",
     "cancelHint": "You can cancel until the shop accepts your list.",
-    "adminCancelled": "Triolo support cancelled this order."
+    "adminCancelled": "Triolo support cancelled this order.",
+    "stepAcceptedBy": "{{shop}} accepted",
+    "stepAcceptName": "{{shop}} accepts",
+    "stepAcceptAny": "A shop accepts"
   },
   "myOrders": {
     "title": "My Orders",
@@ -1345,7 +1352,8 @@
     "expiredMessage": "{{name}} didn't answer in time. Book Again asks every worker nearby.",
     "declinedMessage": "{{name}} can't take this job. Book Again asks every worker nearby.",
     "sentTitle": "Request sent to {{name}}",
-    "alreadyWaitingMessage": "{{name}} already has your request for this — here it is."
+    "alreadyWaitingMessage": "{{name}} already has your request for this — here it is.",
+    "acceptedTitle": "{{name}} Accepted"
   },
   "late": {
     "workerTitle": "{{name}} hasn't arrived yet",
@@ -1533,5 +1541,26 @@
     "deliveryPerKm": "Per km",
     "pickupOnly": "No delivery — collect your order from the shop",
     "deliveryChargeLine": "₹{{perKm}} per km · Min ₹{{min}}"
+  },
+  "homeLocation": {
+    "current": "Current location",
+    "finding": "Finding where you are…",
+    "unknown": "Location not set",
+    "change": "Change address",
+    "title": "Your address",
+    "subtitle": "Pick where you are, or a saved address",
+    "savedTitle": "Saved addresses",
+    "add": "Add an address on the map",
+    "saveTitle": "Save this address",
+    "saveAs": "Save as",
+    "kinds": {
+      "home": "Home",
+      "work": "Work",
+      "other": "Other"
+    },
+    "namePlaceholder": "Name it (e.g. Shop, Farm)",
+    "moveOnMap": "Move it on the map",
+    "save": "Save address",
+    "changeShort": "Change"
   }
 }

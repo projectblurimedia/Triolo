@@ -16,13 +16,8 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDay } from '@/utils/formatDate';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { PLAN_ICON, PLAN_PERKS } from '@/screens/main/GrowScreen';
 
-const PERKS = [
-  { icon: 'bolt', key: 'perkFirst' },
-  { icon: 'arrow-up-wide-short', key: 'perkTop' },
-  { icon: 'eye', key: 'perkViewers' },
-  { icon: 'ban', key: 'perkNoAds' },
-] as const;
 
 /**
  * The partner's subscription screen (root-mounted; opened by openSubscribe()): jobs first,
@@ -37,6 +32,8 @@ export function SubscribeModal() {
   const queryClient = useQueryClient();
   const visible = useSubscribeStore((state) => state.visible);
   const close = useSubscribeStore((state) => state.close);
+  // Services, shop or job posts — each plan has its own perks and prices.
+  const plan = useSubscribeStore((state) => state.plan);
   const { data, isLoading, refetch } = useMySubscription();
   const [months, setMonths] = useState<number>(3);
   const [busy, setBusy] = useState<'pay' | 'check' | null>(null);
@@ -76,7 +73,7 @@ export function SubscribeModal() {
   const pay = async () => {
     setBusy('pay');
     try {
-      const result = await subscriptionsService.checkout(months);
+      const result = await subscriptionsService.checkout(months, plan);
       waitingId.current = result.id;
       queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
       await Linking.openURL(result.paymentUrl);
@@ -93,10 +90,11 @@ export function SubscribeModal() {
     await Linking.openURL(data.pending.paymentUrl).catch(() => {});
   };
 
-  const prices = data?.prices;
+  const planState = data?.plans?.[plan];
+  const prices = planState?.prices ?? data?.prices;
   const price = prices ? prices[String(months) as '1' | '3' | '6' | '12'] : 0;
-  const pending = data?.pending ?? null;
-  const active = data?.active ?? null;
+  const pending = planState ? planState.pending : (data?.pending ?? null);
+  const active = planState ? planState.active : (data?.active ?? null);
 
   const renderBody = () => {
     if (isLoading || !data) {
@@ -117,21 +115,21 @@ export function SubscribeModal() {
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <GoldCard style={styles.hero}>
           <View style={styles.crown}>
-            <FontAwesome6 name="crown" size={24} color="#8A5300" solid />
+            <FontAwesome6 name={PLAN_ICON[plan]} size={22} color="#8A5300" solid />
           </View>
-          <Text style={styles.heroTitle}>{active ? t('subscribe.activeTitle') : t('subscribe.heroTitle')}</Text>
+          <Text style={styles.heroTitle}>{t(`plans.names.${plan}`)}</Text>
           <Text style={styles.heroText}>
-            {active ? t('subscribe.activeUntil', { date: formatDay(active.endsAt) }) : t('subscribe.heroText')}
+            {active ? t('subscribe.activeUntil', { date: formatDay(active.endsAt) }) : t(`plans.hero.${plan}`)}
           </Text>
         </GoldCard>
 
         <View style={[styles.perks, { backgroundColor: colors.surface, borderColor: `${GOLD_BORDER}80` }]}>
-          {PERKS.map((perk) => (
+          {PLAN_PERKS[plan].map((perk) => (
             <View key={perk.key} style={styles.perkRow}>
               <View style={[styles.perkIcon, { backgroundColor: `${GOLD_DEEP}22` }]}>
                 <FontAwesome6 name={perk.icon} size={14} color={GOLD_DEEP} solid />
               </View>
-              <Text style={[styles.perkText, { color: colors.text }]}>{t(`subscribe.${perk.key}`)}</Text>
+              <Text style={[styles.perkText, { color: colors.text }]}>{t(perk.key)}</Text>
               <FontAwesome6 name="circle-check" size={16} color={GOLD_DEEP} solid />
             </View>
           ))}

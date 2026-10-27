@@ -8,8 +8,9 @@ import { openShopOrder } from '@/state/shopOrderFocusStore';
 import { ACTIVE_SHOP_STATUSES, formatRupees, NEW_ORDER_STATUSES, ShopOrder, ShopOrderStatus } from '@/services/shopOrdersService';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from './PullToRefresh';
+import { ALL_TIME, DateRange, inRange } from './DateRangeSheet';
 
-type Tab = 'new' | 'active' | 'history';
+export type ShopFilter = 'all' | 'new' | 'active' | 'done' | 'cancelled';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Manual, not toLocale* — Hermes on Android doesn't reliably ship full Intl data.
@@ -24,22 +25,38 @@ function formatDate(iso: string): string {
  * opening the order screen (ShopOrderModal). Used by the Bookings tab and, for a shop-only
  * partner, Home. `bottomPadding` clears the floating tab bar.
  */
-export function ShopOrdersList({ bottomPadding = 120 }: { bottomPadding?: number }) {
+export function ShopOrdersList({
+  bottomPadding = 120,
+  filter = 'all',
+  range = ALL_TIME,
+  header,
+}: {
+  /** Shown at the top of the list, scrolling with it (Activity's summary and filter). */
+  header?: React.ReactNode;
+  bottomPadding?: number;
+  filter?: ShopFilter;
+  range?: DateRange;
+}) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const [tab, setTab] = useState<Tab>('new');
   const [refreshing, setRefreshing] = useState(false);
   const orders = useShopOrders(true);
 
-  const all = orders.data ?? [];
-  const lists: Record<Tab, ShopOrder[]> = {
-    new: all.filter((order) => NEW_ORDER_STATUSES.includes(order.status)),
-    active: all.filter((order) => ACTIVE_SHOP_STATUSES.includes(order.status)),
-    history: all.filter((order) => !NEW_ORDER_STATUSES.includes(order.status) && !ACTIVE_SHOP_STATUSES.includes(order.status)),
+  const all = (orders.data ?? []).filter((order) => inRange(order.createdAt, range));
+  const newOrders = all.filter((order) => NEW_ORDER_STATUSES.includes(order.status));
+  const activeOrders = all.filter((order) => ACTIVE_SHOP_STATUSES.includes(order.status));
+  const ended = all.filter((order) => !NEW_ORDER_STATUSES.includes(order.status) && !ACTIVE_SHOP_STATUSES.includes(order.status));
+  // New first, then under way, then finished / ended — one list, narrowed by the filter.
+  const lists: Record<ShopFilter, ShopOrder[]> = {
+    all: [...newOrders, ...activeOrders, ...ended],
+    new: newOrders,
+    active: activeOrders,
+    done: ended.filter((order) => order.status === 'completed'),
+    cancelled: ended.filter((order) => order.status !== 'completed'),
   };
 
   const tone = (status: ShopOrderStatus) => {
-    if (status === 'placed') return brandColors.error;
+    if (status === 'placed') return brandColors.success;
     if (status === 'completed') return brandColors.success;
     if (status === 'cancelled' || status === 'declined') return brandColors.error;
     if (status === 'expired') return brandColors.warning;
@@ -62,11 +79,13 @@ export function ShopOrdersList({ bottomPadding = 120 }: { bottomPadding?: number
         key={order.id}
         style={[
           styles.card,
+          { borderWidth: 2 },
+          // New: brand blue; under way: red (waiting on you); done: a grey, quieter card.
           order.status === 'placed'
-            ? { backgroundColor: colors.surface, borderColor: color }
+            ? { backgroundColor: `${brandColors.success}0D`, borderColor: `${brandColors.success}80` }
             : ACTIVE_SHOP_STATUSES.includes(order.status)
-              ? { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` }
-              : { backgroundColor: colors.surface, borderColor: colors.border },
+              ? { backgroundColor: `${brandColors.error}0A`, borderColor: `${brandColors.error}66` }
+              : { backgroundColor: `${colors.textMuted}0F`, borderColor: colors.border },
         ]}
         onPress={() => openShopOrder(order.id)}
       >
@@ -99,50 +118,33 @@ export function ShopOrdersList({ bottomPadding = 120 }: { bottomPadding?: number
 
   return (
     <View style={styles.flex}>
-      <View style={[styles.segment, { backgroundColor: `${colors.primary}10` }]}>
-        {(['new', 'active', 'history'] as Tab[]).map((key) => {
-          const active = tab === key;
-          const count = key === 'history' ? 0 : lists[key].length;
-          return (
-            <Pressable
-              key={key}
-              onPress={() => setTab(key)}
-              style={[styles.segmentItem, active ? { backgroundColor: colors.surface } : null]}
-            >
-              <Text style={[styles.segmentText, { color: active ? colors.primary : colors.textMuted }]}>
-                {t(`shopOrders.tab.${key}`)}
-              </Text>
-              {count > 0 ? (
-                <View style={[styles.badge, { backgroundColor: key === 'new' ? brandColors.error : colors.primary }]}>
-                  <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
-
       {orders.isLoading ? (
-        <View style={styles.state}>
-          <LoadingIndicator color={colors.primary} />
-        </View>
+        <>
+          {header}
+          <View style={styles.state}>
+            <LoadingIndicator color={colors.primary} />
+          </View>
+        </>
       ) : (
         <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[styles.list, { paddingBottom: bottomPadding }]}
           >
-            {lists[tab].length > 0 ? (
-              lists[tab].map(renderOrder)
+            {header}
+            {lists[filter].length > 0 ? (
+              lists[filter].map(renderOrder)
             ) : (
               <View style={styles.state}>
                 <FontAwesome6
-                  name={tab === 'new' ? 'bell' : tab === 'active' ? 'basket-shopping' : 'clock-rotate-left'}
+                  name={filter === 'new' ? 'bell' : filter === 'active' ? 'basket-shopping' : 'clock-rotate-left'}
                   size={22}
                   color={colors.textMuted}
                   solid
                 />
-                <Text style={[styles.stateTitle, { color: colors.text }]}>{t(`shopOrders.empty.${tab}`)}</Text>
+                <Text style={[styles.stateTitle, { color: colors.text }]}>
+                  {filter === 'new' || filter === 'active' ? t(`shopOrders.empty.${filter}`) : t('activity.emptyTitle')}
+                </Text>
                 <Text style={[styles.meta, styles.center, { color: colors.textMuted }]}>{t('shopOrders.emptyMessage')}</Text>
               </View>
             )}

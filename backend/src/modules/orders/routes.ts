@@ -32,6 +32,7 @@ ordersRouter.param('id', (_req, _res, next, id: string) => {
 
 // Shop side — registered before `/:id` so `shop` isn't captured as an order id.
 ordersRouter.get('/shop/mine', authenticate, controller.listShop);
+ordersRouter.post('/shop/quick/search', authenticate, controller.searchQuick);
 ordersRouter.get('/shop/:id', authenticate, controller.getShop);
 
 // Customer side.

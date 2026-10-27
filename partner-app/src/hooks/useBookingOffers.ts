@@ -25,6 +25,20 @@ export function useBookingOffers() {
   });
 }
 
+/** Requests received / accepted in a date range (whole days), for Activity's Services card. */
+export function useOfferStats(from: Date | null, to: Date | null, enabled = true) {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const day = (date: Date, add: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + add).toISOString();
+  const fromIso = from ? day(from, 0) : undefined;
+  const toIso = to ? day(to, 1) : undefined;
+  return useQuery({
+    queryKey: [...BOOKING_OFFERS_QUERY_KEY, 'stats', fromIso ?? '', toIso ?? ''],
+    queryFn: () => bookingOffersService.stats(fromIso, toIso),
+    enabled: !!accessToken && enabled,
+    refetchInterval: 30000,
+  });
+}
+
 export function useAcceptBookingOffer() {
   const queryClient = useQueryClient();
   // Location must be on to take a job (as for every partner action) — asked for first.
@@ -32,6 +46,7 @@ export function useAcceptBookingOffer() {
     mutationFn: (bookingRequestId: string) => bookingOffersService.accept(bookingRequestId),
     // No partner plan: one paid accept.
     payKind: 'accept',
+    payPlan: 'service',
     onSettled: () => queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY }),
   });
 }

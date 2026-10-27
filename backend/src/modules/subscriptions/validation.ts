@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BADGE_KINDS, PASS_KINDS, SUBSCRIPTION_AUDIENCES, SUBSCRIPTION_MONTHS } from './interfaces';
+import { BADGE_KINDS, PARTNER_PLANS, PASS_KINDS, SUBSCRIPTION_AUDIENCES, SUBSCRIPTION_MONTHS } from './interfaces';
 
 const months = z
   .number()
@@ -8,9 +8,9 @@ const months = z
 
 export const audienceQuerySchema = z.object({ audience: z.enum(SUBSCRIPTION_AUDIENCES) });
 
-export const checkoutSchema = z.object({ audience: z.enum(SUBSCRIPTION_AUDIENCES), months });
+export const checkoutSchema = z.object({ audience: z.enum(SUBSCRIPTION_AUDIENCES), months, plan: z.enum(PARTNER_PLANS).optional() });
 
-export const badgeCheckoutSchema = z.object({ kind: z.enum(BADGE_KINDS) });
+export const badgeCheckoutSchema = z.object({ kind: z.enum(BADGE_KINDS), profileId: z.string().uuid().optional() });
 
 const price = z.number().int().min(0).max(100000);
 const prices = z.object({ '1': price, '3': price, '6': price, '12': price });
@@ -22,6 +22,7 @@ export const subscriptionSettingsSchema = z
     partnerEnabled: z.boolean(),
     customerPrices: prices,
     partnerPrices: prices,
+    partnerPlanPrices: z.object({ service: prices, shop: prices, job_post: prices }),
     headStartSeconds: z.number().int().min(0).max(600),
     badgeEnabled: z.boolean(),
     badgePrice: price,
@@ -36,6 +37,8 @@ export const passCheckoutSchema = z.object({
   kind: z.enum(PASS_KINDS),
   // staff_contact: the job post whose phone number it unlocks.
   targetId: z.string().uuid().optional(),
+  // accept: which side's plan would make it free (services for jobs, shop for orders).
+  plan: z.enum(PARTNER_PLANS).optional(),
 });
 
 export const passListQuerySchema = z.object({

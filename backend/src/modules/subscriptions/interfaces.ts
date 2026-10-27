@@ -7,6 +7,12 @@ export type SubscriptionMonths = (typeof SUBSCRIPTION_MONTHS)[number];
 /** ₹ per plan, keyed by months. */
 export type SubscriptionPrices = Record<'1' | '3' | '6' | '12', number>;
 
+/** Partner plans are bought per profile: services (a worker), a shop, or job posts. */
+export const PARTNER_PLANS = ['service', 'shop', 'job_post'] as const;
+export type PartnerPlan = (typeof PARTNER_PLANS)[number];
+/** 'all': a customer plan, or an older partner plan that covers every profile. */
+export type SubscriptionPlan = 'all' | PartnerPlan;
+
 export const BADGE_KINDS = ['service', 'business', 'job_post'] as const;
 /** Which profile a "Trusted by Triolo" badge is for: a worker's services, a shop or a job post. */
 export type BadgeKind = (typeof BADGE_KINDS)[number];
@@ -18,6 +24,8 @@ export interface SubscriptionSettings {
   partnerEnabled: boolean;
   customerPrices: SubscriptionPrices;
   partnerPrices: SubscriptionPrices;
+  /** Prices of each partner plan (services, shop, job posts). */
+  partnerPlanPrices: Record<PartnerPlan, SubscriptionPrices>;
   /** Subscribed workers get Quick Book offers and new problems this many seconds before others. */
   headStartSeconds: number;
   badgeEnabled: boolean;
@@ -77,6 +85,7 @@ export interface Subscription {
   id: string;
   accountId: string;
   audience: SubscriptionAudience;
+  plan: SubscriptionPlan;
   months: SubscriptionMonths;
   amount: number;
   status: 'unpaid' | 'active' | 'cancelled';
@@ -101,6 +110,14 @@ export interface MySubscription {
   fees: Record<string, number>;
   /** Paid uses not used yet, per kind. */
   passes: Record<string, number>;
+  /** Partner app: each plan on its own (services, shop, job posts). */
+  plans?: Record<PartnerPlan, PlanState>;
+}
+
+export interface PlanState {
+  prices: SubscriptionPrices;
+  active: { months: number; startsAt: string; endsAt: string } | null;
+  pending: { id: string; months: number; amount: number; paymentUrl: string } | null;
 }
 
 export interface ProfileBadge {

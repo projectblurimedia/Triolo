@@ -44,6 +44,7 @@ export function useShopOrderAction<TArgs extends { id: string }, TResult = unkno
   return useLocationGatedMutation({
     mutationFn: (args: TArgs) => action(args),
     payKind,
+    payPlan: 'shop',
     onSettled: (_data, _error, args) =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: shopOrderQueryKey(args.id) }),

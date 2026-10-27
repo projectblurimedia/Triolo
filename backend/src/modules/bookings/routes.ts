@@ -44,6 +44,7 @@ bookingsRouter.post('/quick', authenticate, validateBody(createQuickBookingSchem
 bookingsRouter.post('/direct', authenticate, validateBody(createDirectBookingSchema), controller.createDirectBooking);
 bookingsRouter.get('/mine', authenticate, controller.listMine);
 bookingsRouter.get('/offers/mine', authenticate, controller.getMyOffers);
+bookingsRouter.get('/offers/stats', authenticate, controller.getMyOfferStats);
 bookingsRouter.post('/offers/search', authenticate, validateBody(searchOffersSchema), controller.searchOffers);
 bookingsRouter.get('/jobs/mine', authenticate, controller.listMyJobs);
 bookingsRouter.get('/jobs/:id', authenticate, controller.getMyJob);

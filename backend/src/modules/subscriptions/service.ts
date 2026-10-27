@@ -23,6 +23,9 @@ import {
   TrustedIds,
   CUSTOMER_PASS_KINDS,
   PassKind,
+  PARTNER_PLANS,
+  PartnerPlan,
+  PlanState,
 } from './interfaces';
 
 const TRUSTED_TTL_MS = 60 * 1000;
@@ -66,6 +69,9 @@ const PASS_LABEL: Record<PassKind, string> = {
   job_post: 'Triolo Partner — publish a job post',
 };
 
+/** Which partner plan a payment is for (shown on the Razorpay page). */
+const PLAN_LABEL: Record<PartnerPlan, string> = { service: '(services)', shop: '(shop)', job_post: '(job posts)' };
+
 export class SubscriptionsService {
   private trustedCache: { at: number; value: TrustedIds } | null = null;
 
@@ -76,6 +82,20 @@ export class SubscriptionsService {
   ) {}
 
   // --- Apps: subscriptions ---
+
+  /** One partner plan's prices, running plan and open payment. */
+  private async planState(accountId: string, plan: PartnerPlan, settings: SubscriptionSettings): Promise<PlanState> {
+    const [active, lastEnd, pending] = await Promise.all([
+      this.repository.findActive(accountId, 'partner', plan),
+      this.repository.findLastEnd(accountId, 'partner', plan),
+      this.repository.findPending(accountId, 'partner', plan),
+    ]);
+    return {
+      prices: settings.partnerPlanPrices[plan],
+      active: active ? { months: active.months, startsAt: active.startsAt as string, endsAt: lastEnd ?? (active.endsAt as string) } : null,
+      pending: pending?.paymentUrl ? { id: pending.id, months: pending.months, amount: pending.amount, paymentUrl: pending.paymentUrl } : null,
+    };
+  }
 
   async getMine(accountId: string, audience: SubscriptionAudience): Promise<MySubscription> {
     const settings = await this.repository.getSettings();
@@ -97,6 +117,13 @@ export class SubscriptionsService {
           ? { book: settings.customerFees.book, order: settings.customerFees.order, staff_contact: settings.customerFees.staffContact }
           : { accept: settings.partnerFees.accept, job_post: settings.partnerFees.jobPost },
       passes: await this.repository.countPaidPasses(accountId),
+      ...(audience === 'partner'
+        ? {
+            plans: Object.fromEntries(
+              await Promise.all(PARTNER_PLANS.map(async (plan) => [plan, await this.planState(accountId, plan, settings)] as const)),
+            ) as Record<PartnerPlan, PlanState>,
+          }
+        : {}),
     };
   }
 
@@ -104,11 +131,13 @@ export class SubscriptionsService {
    * Starts paying for one use (or a job seeker's phone number). Free (plan, or plans off) or
    * already paid: { paid: true } straight away. Otherwise a payment link — a started one is reused.
    */
-  async passCheckout(accountId: string, kind: PassKind, targetId: string | null) {
+  async passCheckout(accountId: string, kind: PassKind, targetId: string | null, plan?: PartnerPlan) {
     const settings = await this.repository.getSettings();
     const audience = CUSTOMER_PASS_KINDS.includes(kind) ? 'customer' : 'partner';
     const plansOn = audience === 'customer' ? customerPlansOn(settings) : partnerPlansOn(settings);
-    if (!plansOn || (await this.status.isActive(accountId, audience))) return { id: null, paid: true, amount: 0, paymentUrl: null };
+    // A job post is paid for even on a plan; accepting is free on that side's plan.
+    const covered = kind !== 'job_post' && (await this.status.isActive(accountId, audience, audience === 'partner' ? plan : undefined));
+    if (!plansOn || covered) return { id: null, paid: true, amount: 0, paymentUrl: null };
     if (kind === 'staff_contact') {
       if (!targetId) throw AppError.badRequest('Which job post?', 'VALIDATION_ERROR');
       if ((await this.repository.unlockedStaffPosts(accountId)).includes(targetId)) {
@@ -162,25 +191,32 @@ export class SubscriptionsService {
   }
 
   /** Starts paying for a plan: a payment link to open (the plan starts once it's paid). */
-  async checkout(accountId: string, audience: SubscriptionAudience, months: SubscriptionMonths) {
+  /**
+   * Starts paying for a plan: a payment link to open (the plan starts once it's paid). Partners
+   * choose which plan (services, shop or job posts); without one (older app builds) it covers all.
+   */
+  async checkout(accountId: string, audience: SubscriptionAudience, months: SubscriptionMonths, plan?: PartnerPlan) {
     const settings = await this.repository.getSettings();
     if (!(audience === 'customer' ? customerPlansOn(settings) : partnerPlansOn(settings))) {
       throw AppError.conflict('Subscriptions are not available right now.', 'SUBSCRIPTIONS_OFF');
     }
-    if (await this.repository.findActive(accountId, audience)) {
+    const partnerPlan = audience === 'partner' ? plan : undefined;
+    if (await this.repository.findActive(accountId, audience, partnerPlan)) {
       throw AppError.conflict('Your plan is already active.', 'SUBSCRIPTION_ACTIVE');
     }
-    const prices = audience === 'customer' ? settings.customerPrices : settings.partnerPrices;
+    const prices =
+      audience === 'customer' ? settings.customerPrices : partnerPlan ? settings.partnerPlanPrices[partnerPlan] : settings.partnerPrices;
     const amount = prices[String(months) as keyof typeof prices];
     const contact = await this.repository.accountContact(accountId);
     if (!contact) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
-    const subscription = await this.repository.createSubscription(accountId, audience, months, amount);
+    const subscription = await this.repository.createSubscription(accountId, audience, months, amount, partnerPlan ?? 'all');
+    const planName = partnerPlan ? ` ${PLAN_LABEL[partnerPlan]}` : '';
     const link = await razorpayService.createPaymentLink({
       amountPaise: amount * 100,
-      description: `Triolo ${audience === 'customer' ? '' : 'Partner '}subscription — ${months} month${months === 1 ? '' : 's'}`,
+      description: `Triolo ${audience === 'customer' ? '' : 'Partner '}subscription${planName} — ${months} month${months === 1 ? '' : 's'}`,
       referenceId: `sub-${subscription.id}`,
       customer: { name: contact.name, contact: contact.mobile },
-      notes: { subscriptionId: subscription.id, audience },
+      notes: { subscriptionId: subscription.id, audience, plan: partnerPlan ?? 'all' },
     });
     await this.repository.setSubscriptionLink(subscription.id, link.id, link.short_url);
     return { id: subscription.id, amount, paymentUrl: link.short_url };
@@ -207,10 +243,10 @@ export class SubscriptionsService {
   /** The partner's profiles (worker / shop / job post) with each one's badge. */
   async getMyBadges(accountId: string): Promise<MyBadges> {
     const settings = await this.repository.getSettings();
-    const [worker, shop, post, badges] = await Promise.all([
+    const [worker, shop, posts, badges] = await Promise.all([
       this.deps.workers.getMyProfile(accountId),
       this.deps.businesses.getMyProfile(accountId),
-      this.deps.jobSeekers.getMine(accountId),
+      this.deps.jobSeekers.listMine(accountId),
       this.repository.findLatestBadges(accountId),
     ]);
     const profiles: { kind: BadgeKind; id: string; name: string; eligible: boolean }[] = [];
@@ -219,7 +255,7 @@ export class SubscriptionsService {
       profiles.push({ kind: 'service', id: worker.id, name: named?.accountFullName ?? 'My services', eligible: worker.verificationStatus === 'verified' });
     }
     if (shop) profiles.push({ kind: 'business', id: shop.id, name: shop.shopName, eligible: shop.verificationStatus === 'verified' });
-    if (post) profiles.push({ kind: 'job_post', id: post.id, name: post.title, eligible: post.isActive });
+    for (const post of posts) profiles.push({ kind: 'job_post', id: post.id, name: post.title, eligible: post.isActive });
     return {
       enabled: settings.badgeEnabled,
       price: settings.badgePrice,
@@ -241,10 +277,12 @@ export class SubscriptionsService {
   }
 
   /** Starts buying the badge for one of the partner's own profiles. */
-  async badgeCheckout(accountId: string, kind: BadgeKind) {
+  async badgeCheckout(accountId: string, kind: BadgeKind, profileId?: string) {
     const settings = await this.repository.getSettings();
     if (!settings.badgeEnabled) throw AppError.conflict('Badges are not available right now.', 'BADGES_OFF');
-    const mine = (await this.getMyBadges(accountId)).profiles.find((profile) => profile.kind === kind);
+    const mine = (await this.getMyBadges(accountId)).profiles.find(
+      (profile) => profile.kind === kind && (!profileId || profile.profileId === profileId),
+    );
     if (!mine) throw AppError.notFound(`You don't have a ${BADGE_LABEL[kind]} yet.`, 'BADGE_PROFILE_NOT_FOUND');
     if (!mine.eligible) {
       throw AppError.conflict(

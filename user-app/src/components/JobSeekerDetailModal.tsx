@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { JOB_CATEGORIES, JobSeeker } from '@/services/jobSeekersService';
+import { JOB_CATEGORIES, JobSeeker, jobSeekersService } from '@/services/jobSeekersService';
 import { formatRupees } from '@/services/ordersService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { callStaff } from '@/utils/callStaff';
@@ -43,6 +43,10 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
   // The number, once paid for here (no plan).
   const [unlockedNumber, setUnlockedNumber] = useState<string | null>(null);
   useEffect(() => setUnlockedNumber(null), [person?.id]);
+  // Opening a post counts as a visit the poster sees (never blocks or shows an error).
+  useEffect(() => {
+    if (person?.id) jobSeekersService.recordView(person.id).catch(() => {});
+  }, [person?.id]);
 
   const number = unlockedNumber ?? person?.mobileNumber ?? null;
   // What seeing the number costs right now (null: free / already covered).

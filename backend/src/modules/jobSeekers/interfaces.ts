@@ -42,6 +42,10 @@ export type JobSeekerAvailability = (typeof JOB_SEEKER_AVAILABILITIES)[number];
 /** A person's "I'm looking for work" post — what they do, expected pay, skills, where they are. */
 export interface JobSeekerPost {
   id: string;
+  /** Times customers opened it (never counting the poster). */
+  viewCount: number;
+  /** Visits the poster hasn't looked at yet (only on the poster's own posts). */
+  newViews?: number;
   accountId: string;
   category: JobSeekerCategory;
   title: string;
@@ -113,4 +117,23 @@ export interface JobSeekerSearchParams {
   limit: number;
   /** Subscribed partners' accounts: listed first. */
   priorityAccountIds?: string[];
+}
+
+/** Someone who opened one of the partner's job posts. */
+export interface JobPostViewer {
+  viewerKey: string;
+  /** Hidden (null) without the job post plan. */
+  name: string | null;
+  mobile: string | null;
+  lastViewedAt: string;
+  times: number;
+  isNew: boolean;
+}
+
+export interface JobPostViewers {
+  /** Who viewed is hidden: the partner isn't on the job post plan. */
+  locked: boolean;
+  total: number;
+  newCount: number;
+  viewers: JobPostViewer[];
 }

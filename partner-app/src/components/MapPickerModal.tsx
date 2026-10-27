@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
 import { LoadingIndicator } from './LoadingIndicator';
+import { MapSearchBar } from './MapSearchBar';
 import { ToastHost } from './ToastHost';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PlaceValue, placeFromCoords } from '@/utils/place';
@@ -234,6 +235,15 @@ export function MapPickerModal({ visible, initial, onClose, onPick }: MapPickerM
               <View style={styles.pinShadow} />
             </View>
           )}
+
+          {mapState === 'ready' ? (
+            <MapSearchBar
+              near={center}
+              onPick={(latitude, longitude) =>
+                webViewRef.current?.injectJavaScript(`window.__flyTo && window.__flyTo(${latitude}, ${longitude}); true;`)
+              }
+            />
+          ) : null}
 
           {mapState === 'ready' ? (
             <Pressable

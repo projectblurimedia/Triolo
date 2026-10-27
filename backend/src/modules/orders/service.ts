@@ -209,6 +209,28 @@ export class OrdersService {
     return this.repository.listForShop(shop.id, LIST_LIMIT);
   }
 
+  /**
+   * "Find Orders Now" (partner app): pulls in every open Quick Order nearby this shop could take,
+   * then returns the shop's orders as usual — those Quick Orders among the new ones. A shop
+   * with no location on file just gets its list.
+   */
+  async searchOpenQuickOrders(ownerAccountId: string): Promise<ShopSideOrder[]> {
+    const shop = await this.requireShop(ownerAccountId);
+    await this.repository.expireStale();
+    if (shop.verificationStatus === 'verified' && shop.latitude != null && shop.longitude != null) {
+      await this.repository.offerOpenQuickOrders({
+        businessId: shop.id,
+        ownerAccountId,
+        latitude: shop.latitude,
+        longitude: shop.longitude,
+        shopCategories: shop.shopCategories,
+        deliveryAvailable: shop.deliveryAvailable,
+        radiusKm: QUICK_ORDER_RADIUS_KM,
+      });
+    }
+    return this.repository.listForShop(shop.id, LIST_LIMIT);
+  }
+
   async getShopOrder(ownerAccountId: string, orderId: string): Promise<ShopSideOrder> {
     const shop = await this.requireShop(ownerAccountId);
     await this.repository.expireStale();
@@ -221,7 +243,7 @@ export class OrdersService {
 
   async acceptOrder(ownerAccountId: string, orderId: string): Promise<void> {
     const shop = await this.requireShop(ownerAccountId);
-    const passId = (await this.subscriptionStatus?.usePartnerPass(ownerAccountId, 'accept')) ?? null;
+    const passId = (await this.subscriptionStatus?.usePartnerPass(ownerAccountId, 'accept', 'shop')) ?? null;
     // A Quick Order offered to this shop: the first accept takes it (delivery charge from here).
     const offerDistance = await this.repository.findQuickOffer(orderId, shop.id);
     const result =

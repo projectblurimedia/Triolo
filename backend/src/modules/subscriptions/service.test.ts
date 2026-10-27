@@ -18,6 +18,11 @@ const SETTINGS: SubscriptionSettings = {
   partnerEnabled: true,
   customerPrices: { '1': 49, '3': 129, '6': 239, '12': 449 },
   partnerPrices: { '1': 99, '3': 269, '6': 499, '12': 899 },
+  partnerPlanPrices: {
+    service: { '1': 99, '3': 269, '6': 499, '12': 899 },
+    shop: { '1': 99, '3': 269, '6': 499, '12': 899 },
+    job_post: { '1': 49, '3': 129, '6': 239, '12': 449 },
+  },
   headStartSeconds: 60,
   badgeEnabled: true,
   badgePrice: 199,
@@ -73,7 +78,7 @@ function makeService(repo = makeRepo()) {
       getMyProfile: jest.fn().mockResolvedValue({ id: 'shop-1', shopName: 'Sri Sai', verificationStatus: 'pending_verification' }),
       getVerifiedProfiles: jest.fn().mockResolvedValue([]),
     },
-    jobSeekers: { getMine: jest.fn().mockResolvedValue(null) },
+    jobSeekers: { getMine: jest.fn().mockResolvedValue(null), listMine: jest.fn().mockResolvedValue([]) },
     notifications: { notify: jest.fn().mockResolvedValue(undefined) },
   };
   const status = new SubscriptionStatusService(repo as unknown as SubscriptionsRepository);
@@ -104,7 +109,7 @@ describe('SubscriptionStatusService', () => {
     repo.getSettings.mockResolvedValue({ ...SETTINGS, partnerEnabled: false });
     status.forget();
     expect(await status.headStart()).toBeNull();
-    expect(await status.priorityPartnerIds()).toEqual([]);
+    expect(await status.priorityPartnerIds('service')).toEqual([]);
   });
 });
 
@@ -114,12 +119,27 @@ describe('SubscriptionsService', () => {
   it('starts a payment link at the admin price for the chosen plan', async () => {
     const { service, repo } = makeService();
     const result = await service.checkout('cust-1', 'customer', 3);
-    expect(repo.createSubscription).toHaveBeenCalledWith('cust-1', 'customer', 3, 129);
+    expect(repo.createSubscription).toHaveBeenCalledWith('cust-1', 'customer', 3, 129, 'all');
     expect(razorpay.createPaymentLink).toHaveBeenCalledWith(
       expect.objectContaining({ amountPaise: 12900, referenceId: 'sub-sub-1', customer: { name: 'Ravi', contact: '9700000001' } }),
     );
     expect(repo.setSubscriptionLink).toHaveBeenCalledWith('sub-1', 'plink_1', 'https://rzp.io/l/abc');
     expect(result).toEqual({ id: 'sub-1', amount: 129, paymentUrl: 'https://rzp.io/l/abc' });
+  });
+
+  it('charges a partner plan at its own price and checks only that plan', async () => {
+    const { service, repo } = makeService();
+    await service.checkout('p-1', 'partner', 3, 'job_post');
+    expect(repo.findActive).toHaveBeenCalledWith('p-1', 'partner', 'job_post');
+    expect(repo.createSubscription).toHaveBeenCalledWith('p-1', 'partner', 3, 129, 'job_post');
+  });
+
+  it('makes accepting free only on the plan for that side', async () => {
+    const { status, repo } = makeService();
+    repo.findActive.mockImplementation(async (_id: string, _audience: string, plan?: string) => (plan === 'shop' ? { id: 'sub-shop' } : null));
+    repo.consumePass.mockResolvedValue('pass-9');
+    await expect(status.usePartnerPass('p-1', 'accept', 'shop')).resolves.toBeNull();
+    await expect(status.usePartnerPass('p-1', 'accept', 'service')).resolves.toBe('pass-9');
   });
 
   it('refuses a plan while subscriptions are off', async () => {

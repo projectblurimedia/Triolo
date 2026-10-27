@@ -8,12 +8,18 @@ import { logUploadedFiles, upload } from '@/common/middleware/upload';
 import { asyncHandler } from '@/common/utils/asyncHandler';
 import { ok } from '@/common/utils/response';
 import { AppError } from '@/common/errors/AppError';
+import { NotificationsRepository } from '@/modules/notifications/repository';
+import { NotificationsService } from '@/modules/notifications/service';
 import { JobSeekersRepository } from './repository';
 import { JobSeekersService } from './service';
 import { saveJobSeekerPostSchema, searchQuerySchema, setActiveSchema } from './validation';
 
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
-const service = new JobSeekersService(new JobSeekersRepository(pool), subscriptionStatus);
+const service = new JobSeekersService(
+  new JobSeekersRepository(pool),
+  subscriptionStatus,
+  new NotificationsService(new NotificationsRepository(pool)),
+);
 
 function accountIdOf(req: Request): string {
   if (!req.account) throw AppError.unauthorized();
@@ -53,7 +59,90 @@ jobSeekersRouter.get(
   asyncHandler(async (req: Request, res: Response) => ok(res, await service.getPublic(req.params.id, accountIdOf(req)))),
 );
 
-// Poster side: their own post.
+// A customer opened a post: one more visit for the poster to see.
+jobSeekersRouter.post(
+  '/:id/view',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    await service.recordView(req.params.id, accountIdOf(req));
+    return ok(res, null);
+  }),
+);
+
+// Who opened one of my posts (people hidden without the job post plan), and marking them seen.
+jobSeekersRouter.get(
+  '/me/posts/:id/viewers',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.listViewers(accountIdOf(req), req.params.id))),
+);
+
+jobSeekersRouter.post(
+  '/me/posts/:id/viewers/seen',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    await service.markViewsSeen(accountIdOf(req), req.params.id);
+    return ok(res, null);
+  }),
+);
+
+// Poster side: their posts (several), each by id.
+jobSeekersRouter.get(
+  '/me/posts',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.listMine(accountIdOf(req)))),
+);
+
+jobSeekersRouter.post(
+  '/me/posts',
+  authenticate,
+  validateBody(saveJobSeekerPostSchema),
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.createMine(accountIdOf(req), req.body), 'Job post saved')),
+);
+
+jobSeekersRouter.put(
+  '/me/posts/:id',
+  authenticate,
+  validateBody(saveJobSeekerPostSchema),
+  asyncHandler(async (req: Request, res: Response) =>
+    ok(res, await service.updateMine(accountIdOf(req), req.params.id, req.body), 'Job post saved'),
+  ),
+);
+
+jobSeekersRouter.patch(
+  '/me/posts/:id/active',
+  authenticate,
+  validateBody(setActiveSchema),
+  asyncHandler(async (req: Request, res: Response) =>
+    ok(res, await service.setActive(accountIdOf(req), req.body.isActive, req.params.id), 'Job post updated'),
+  ),
+);
+
+jobSeekersRouter.put(
+  '/me/posts/:id/photo',
+  authenticate,
+  upload.single('photo'),
+  logUploadedFiles,
+  asyncHandler(async (req: Request, res: Response) =>
+    ok(res, await service.setPhoto(accountIdOf(req), req.file, req.params.id), 'Photo saved'),
+  ),
+);
+
+jobSeekersRouter.delete(
+  '/me/posts/:id/photo',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.removePhoto(accountIdOf(req), req.params.id), 'Photo removed')),
+);
+
+jobSeekersRouter.delete(
+  '/me/posts/:id',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    await service.deleteMine(accountIdOf(req), req.params.id);
+    return ok(res, null, 'Job post deleted');
+  }),
+);
+
+// Older app builds: their single post (the first one).
 jobSeekersRouter.get(
   '/me',
   authenticate,

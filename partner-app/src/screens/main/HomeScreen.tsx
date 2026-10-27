@@ -8,7 +8,6 @@ import { Button } from '@/components/Button';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { ProblemDetailModal } from '@/components/ProblemDetailModal';
-import { ShopHomeSection } from '@/components/ShopHomeSection';
 import { JobPostHomeSection } from '@/components/JobPostHomeSection';
 import { useMyJobPost } from '@/hooks/useJobPost';
 import { ContinueSteps } from '@/components/ContinueSteps';
@@ -20,9 +19,15 @@ import { FindJobsButton } from '@/components/FindJobsButton';
 import { navigateToBookings } from '@/navigation/navigationRef';
 import { useQueryClient } from '@tanstack/react-query';
 import { openJob } from '@/state/jobFocusStore';
-import { jobQueryKey } from '@/hooks/useJobs';
+import { jobQueryKey, useMyJobs } from '@/hooks/useJobs';
+import { openShopOrder } from '@/state/shopOrderFocusStore';
+import { ACTIVE_JOB_STATUSES } from '@/services/jobsService';
+import { StackStep, StepStack } from '@/components/StepStack';
+import { HomeLocationBar } from '@/components/HomeLocationBar';
+import { ACTIVE_SHOP_STATUSES, formatRupees } from '@/services/shopOrdersService';
 import { jobsService } from '@/services/jobsService';
-import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
+import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '@/state/authStore';
 import { showToast } from '@/state/toastStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
@@ -35,10 +40,12 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistance } from '@/utils/formatDistance';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { NewForYou } from '@/components/NewForYou';
+import { FindOrdersButton } from '@/components/FindOrdersButton';
+import { useAttentionCounts } from '@/hooks/useAttentionCounts';
 import { SmartImage } from '@/components/SmartImage';
 
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
-const FINISHED_PREVIEW_LIMIT = 5;
+const RECENT_LIMIT = 5;
 // Lets the job screen finish fading in on top before the detail screen closes underneath it.
 const MODAL_HANDOFF_MS = 350;
 
@@ -53,7 +60,13 @@ const MODAL_HANDOFF_MS = 350;
  */
 type HomeSide = 'shop' | 'worker' | 'job';
 const SIDE_ICONS = { shop: 'store', worker: 'screwdriver-wrench', job: 'user-tie' } as const;
-const SIDE_LABELS = { shop: 'shopHome.myShop', worker: 'shopHome.myServices', job: 'jobPost.homeTab' } as const;
+const SIDE_LABELS = { shop: 'homeSides.shop', worker: 'homeSides.services', job: 'homeSides.jobPost' } as const;
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function formatShortDate(iso: string): string {
+  const date = new Date(iso);
+  return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}
 
 export function HomeScreen() {
   const { t } = useTranslation();
@@ -88,6 +101,10 @@ export function HomeScreen() {
   const defaultSide: HomeSide =
     isVerifiedShop && (newOrderCount > 0 || !isVerifiedWorker) ? 'shop' : isVerifiedWorker ? 'worker' : 'job';
   const side: HomeSide = pickedSide && sides.includes(pickedSide) ? pickedSide : defaultSide;
+  // A red dot on a side with something new or under way.
+  const attention = useAttentionCounts();
+  const sideWaiting = (value: HomeSide) =>
+    value === 'shop' ? attention.orders > 0 : value === 'worker' ? attention.jobs > 0 : attention.jobPostViews > 0;
   const nearby = useNearbyProblems(isVerifiedWorker);
   const assigned = useAssignedProblems(isVerifiedWorker);
   const acceptProblem = useAcceptProblem();
@@ -98,8 +115,11 @@ export function HomeScreen() {
   const queryClient = useQueryClient();
 
   const skillLabel = (keys: string[]) => keys.map((key) => t(`workerProfile.skills.${key}`)).join(', ');
-  const activeJobs = (assigned.data ?? []).filter((job) => job.status !== 'completed');
-  const finishedJobs = (assigned.data ?? []).filter((job) => job.status === 'completed').slice(0, FINISHED_PREVIEW_LIMIT);
+  const activeJobs = (assigned.data ?? []).filter((job) => job.status !== 'completed' && !job.bookingRequestId);
+  // The last five jobs and orders (any step), newest first.
+  const myJobs = useMyJobs();
+  const recentJobs = [...(myJobs.data ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, RECENT_LIMIT);
+  const recentOrders = [...(shopOrders.data ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, RECENT_LIMIT);
 
   const handleAccept = (problem: NearbyProblem) => {
     setAcceptingId(problem.id);
@@ -295,17 +315,70 @@ export function HomeScreen() {
     </Pressable>
   );
 
-  const renderFinishedJob = (job: AssignedProblem) => (
-    <View key={job.id} style={[styles.finishedRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <FontAwesome6 name="circle-check" size={18} color={brandColors.success} solid />
-      <View style={styles.finishedInfo}>
-        <Text style={[styles.finishedTitle, { color: colors.text }]} numberOfLines={1}>
-          {skillLabel(job.skillCategories)} · ₹{job.quotationAmount.toLocaleString('en-IN')}
-        </Text>
-        <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
-          {job.customerFullName}
-        </Text>
-      </View>
+  const stepTone = (status: string, active: boolean) =>
+    active ? brandColors.error : status === 'completed' ? brandColors.success : colors.textMuted;
+
+  // The last few jobs and orders, stacked like notifications — the newest in front.
+  const recentJobSteps: StackStep[] = recentJobs.map((job) => ({
+    key: job.id,
+    icon: job.problemPostId ? 'clipboard-list' : 'bolt',
+    name: job.customerFullName,
+    stepTitle: skillLabel(job.skillCategories),
+    hint: formatShortDate(job.createdAt),
+    action: t('home.open'),
+    tag: { label: t(`job.status.${job.status}.title`), color: stepTone(job.status, ACTIVE_JOB_STATUSES.includes(job.status)) },
+    onPress: () => openJob(job.id),
+  }));
+  const recentOrderSteps: StackStep[] = recentOrders.map((order) => ({
+    key: order.id,
+    icon: order.fulfillment === 'delivery' ? 'truck' : 'basket-shopping',
+    name: order.customerFullName,
+    stepTitle: [t('shopOrders.itemsCount', { count: order.items.length }), order.totalAmount != null ? formatRupees(order.totalAmount) : null]
+      .filter(Boolean)
+      .join(' · '),
+    hint: formatShortDate(order.createdAt),
+    action: t('home.open'),
+    tag: {
+      label: t(`shopOrders.status.${order.status}.title`),
+      color: order.status === 'placed' ? brandColors.success : stepTone(order.status, ACTIVE_SHOP_STATUSES.includes(order.status)),
+    },
+    onPress: () => openShopOrder(order.id),
+  }));
+
+  // "All bookings" / "All shop orders": a bright card leading to Activity.
+  const renderAllButton = (icon: React.ComponentProps<typeof FontAwesome6>['name'], title: string, hint: string, onPress: () => void) => (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.allWrap, { transform: [{ scale: pressed ? 0.985 : 1 }] }]}>
+      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.allCard}>
+        <View style={styles.allIcon}>
+          <FontAwesome6 name={icon} size={15} color="#FFFFFF" solid />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.allTitle}>{title}</Text>
+          <Text style={styles.allHint} numberOfLines={1}>
+            {hint}
+          </Text>
+        </View>
+        <View style={styles.allGo}>
+          <FontAwesome6 name="arrow-right" size={12} color={headerGradient[0]} solid />
+        </View>
+      </LinearGradient>
+    </Pressable>
+  );
+
+  const renderSectionTitle = (icon: React.ComponentProps<typeof FontAwesome6>['name'], title: string, count?: number, tone?: string) => (
+    <View style={styles.sectionRow}>
+      <LinearGradient colors={tone ? [tone, `${tone}B3`] : headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sectionIcon}>
+        <FontAwesome6 name={icon} size={12} color="#FFFFFF" solid />
+      </LinearGradient>
+      <Text style={[styles.sectionRowTitle, { color: colors.text }]} numberOfLines={1}>
+        {title}
+      </Text>
+      {count !== undefined ? (
+        <View style={[styles.sectionCount, { backgroundColor: `${tone ?? colors.primary}18` }]}>
+          <Text style={[styles.sectionCountText, { color: tone ?? colors.primary }]}>{count}</Text>
+        </View>
+      ) : null}
+      <View style={[styles.sectionRule, { backgroundColor: `${colors.primary}1F` }]} />
     </View>
   );
 
@@ -347,26 +420,27 @@ export function HomeScreen() {
 
     return (
       <>
+        {renderSectionTitle('magnifying-glass-location', t('findJobs.sectionTitle'))}
         <FindJobsButton variant="card" onFound={() => navigateToBookings('jobs', 'requests')} />
 
         {activeJobs.length > 0 ? (
           <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('problems.myJobsTitle')}</Text>
+            {renderSectionTitle('person-digging', t('problems.myJobsTitle'), activeJobs.length)}
             {activeJobs.map(renderActiveJob)}
           </>
         ) : null}
 
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('problems.nearbyTitle')}</Text>
+        {renderSectionTitle('clipboard-list', t('problems.nearbyTitle'), (nearby.data ?? []).length)}
         {workerProfile.data?.latitude == null
           ? renderEmpty('location-crosshairs', t('problems.noLocationTitle'), t('problems.noLocationMessage'))
           : (nearby.data ?? []).length === 0
             ? renderEmpty('clipboard-list', t('problems.noneNearbyTitle'), t('problems.noneNearbyMessage'))
             : (nearby.data ?? []).map(renderNearbyProblem)}
 
-        {finishedJobs.length > 0 ? (
+        {recentJobs.length > 0 ? (
           <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('problems.finishedTitle')}</Text>
-            {finishedJobs.map(renderFinishedJob)}
+            <StepStack title={t('home.recentJobs')} steps={recentJobSteps} minimized live={false} hideMore accent={colors.primary} style={styles.recentStack} />
+            {renderAllButton('calendar-check', t('problems.allBookings'), t('home.allBookingsHint'), () => navigateToBookings('jobs'))}
           </>
         ) : null}
       </>
@@ -392,28 +466,8 @@ export function HomeScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.body}
         >
-          {account ? (
-            <Text style={[styles.greeting, { color: colors.text }]}>
-              {t('mainTabs.Home.greeting', { name: account.fullName })}
-            </Text>
-          ) : null}
-
-          {/* Location off: say so first — nothing works without it. */}
-          <LocationNeededCard />
-          {/* Job requests while the app is closed: the phone has to allow it. */}
-          <BackgroundAlertsCard />
-
-          {/* New requests and alerts first, then what is in progress. */}
-          <NewForYou isWorker={isVerifiedWorker} isShop={isVerifiedShop} />
-          <ContinueSteps isShop={isVerifiedShop} />
-
-          {profilesLoading ? (
-            <View style={styles.loading}>
-              <LoadingIndicator size={36} dotSize={5} color={colors.primary} />
-            </View>
-          ) : null}
-
-          {!profilesLoading && sides.length > 1 ? (
+          {/* Which side you're looking at comes first, above the greeting. */}
+          {!profilesLoading ? (
             <View style={[styles.sideSwitch, { borderColor: colors.border, backgroundColor: colors.surface }]}>
               {sides.map((value) => {
                 const active = side === value;
@@ -432,12 +486,8 @@ export function HomeScreen() {
                     >
                       {t(SIDE_LABELS[value])}
                     </Text>
-                    {value === 'shop' && newOrderCount > 0 ? (
-                      <View style={[styles.sideBadge, { backgroundColor: active ? '#FFFFFF' : brandColors.error }]}>
-                        <Text style={[styles.sideBadgeText, { color: active ? brandColors.error : '#FFFFFF' }]}>
-                          {newOrderCount > 9 ? '9+' : newOrderCount}
-                        </Text>
-                      </View>
+                    {sideWaiting(value) ? (
+                      <View style={[styles.sideDot, { backgroundColor: brandColors.error, borderColor: active ? '#FFFFFF' : colors.surface }]} />
                     ) : null}
                   </Pressable>
                 );
@@ -445,12 +495,49 @@ export function HomeScreen() {
             </View>
           ) : null}
 
+          {account ? (
+            <Text style={[styles.greeting, styles.greetingTight, { color: colors.text }]}>
+              {t('mainTabs.Home.greeting', { name: account.fullName })}
+            </Text>
+          ) : null}
+          <HomeLocationBar />
+
+          {/* Location off: say so first — nothing works without it. */}
+          <LocationNeededCard />
+          {/* Job requests while the app is closed: the phone has to allow it. */}
+          <BackgroundAlertsCard />
+
+
+          {profilesLoading ? (
+            <View style={styles.loading}>
+              <LoadingIndicator size={36} dotSize={5} color={colors.primary} />
+            </View>
+          ) : null}
+
+
           {profilesLoading ? null : side === 'job' ? (
             <JobPostHomeSection />
           ) : side === 'shop' && isVerifiedShop && businessProfile.data ? (
-            <ShopHomeSection profile={businessProfile.data} />
+            <>
+              <NewForYou isWorker={false} isShop />
+              <ContinueSteps isShop only="orders" />
+              {renderSectionTitle('magnifying-glass-location', t('findOrders.sectionTitle'))}
+              <FindOrdersButton />
+              {recentOrders.length > 0 ? (
+                <>
+                  <StepStack title={t('home.recentOrders')} steps={recentOrderSteps} minimized live={false} hideMore accent={colors.primary} style={styles.recentStack} />
+                </>
+              ) : (
+                renderEmpty('bell', t('shopHome.noOrdersTitle'), t('shopHome.noOrdersMessage'))
+              )}
+              {renderAllButton('receipt', t('shopHome.allOrders'), t('home.allOrdersHint'), () => navigateToBookings('orders'))}
+            </>
           ) : isVerifiedWorker ? (
-            renderWorkerBody()
+            <>
+              <NewForYou isWorker isShop={false} />
+              <ContinueSteps isShop={false} only="jobs" />
+              {renderWorkerBody()}
+            </>
           ) : (
             renderEmpty('screwdriver-wrench', t('problems.workersOnlyTitle'), t('problems.workersOnlyMessage'))
           )}
@@ -483,7 +570,7 @@ const styles = StyleSheet.create({
   // Extra bottom padding clears the floating CustomTabBar.
   body: { paddingBottom: 120 },
   greeting: { ...typography.heading, fontFamily: fonts.semiBold, fontSize: 19, marginBottom: 10 },
-  sideSwitch: { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 3, marginBottom: 14, gap: 4 },
+  sideSwitch: { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 3, marginBottom: 18, gap: 4 },
   sideOption: {
     flex: 1,
     flexDirection: 'row',
@@ -494,6 +581,18 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   sideText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
+  sideDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
+  allOrders: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    height: 46,
+    marginTop: 14,
+  },
+  allOrdersText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
   sideBadge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   sideBadgeText: { fontSize: 10, fontFamily: fonts.semiBold },
   // Same spacing for every section title in this app: 22 above, 12 below.
@@ -530,17 +629,49 @@ const styles = StyleSheet.create({
   customerPhone: { ...typography.caption },
   callButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   waitingText: { ...typography.body, fontFamily: fonts.medium, textAlign: 'center', paddingVertical: 8 },
-  finishedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 12,
+  flex: { flex: 1 },
+  greetingTight: { marginBottom: 10 },
+  allWrap: { borderRadius: 18, overflow: 'hidden', marginTop: 4, marginBottom: 6 },
+  allCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
+  allIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     borderWidth: 1,
-    padding: 12,
-    marginBottom: 10,
+    borderColor: 'rgba(255,255,255,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  finishedInfo: { flex: 1 },
-  finishedTitle: { ...typography.body, fontFamily: fonts.medium, fontSize: 13 },
+  allTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, color: '#FFFFFF', lineHeight: 20 },
+  allHint: { ...typography.caption, fontSize: 12, color: 'rgba(255,255,255,0.86)' },
+  allGo: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  recentStack: { marginTop: 18, marginBottom: 8 },
+  recentRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1.5, padding: 10, marginBottom: 8 },
+  recentIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  recentTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recentTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14, flexShrink: 1 },
+  recentPill: { borderRadius: 9, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '55%' },
+  recentPillText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10 },
+  recentMeta: { ...typography.caption, fontSize: 11.5, marginTop: 1 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22, marginBottom: 12 },
+  sectionIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  sectionRowTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16, flexShrink: 1 },
+  sectionCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center' },
+  sectionCountText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 14 },
+  sectionRule: { flex: 1, height: 1, minWidth: 8 },
+  finishedRowList: { gap: 10, paddingRight: 4 },
+  finishedCard: { width: 200, borderRadius: 18, borderWidth: 1, padding: 12, gap: 4 },
+  finishedTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  finishedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 22, borderRadius: 11, paddingHorizontal: 8 },
+  finishedBadgeText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10.5, lineHeight: 14 },
+  finishedDate: { ...typography.caption, fontSize: 11 },
+  finishedTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  finishedAmount: { fontFamily: fonts.semiBold, fontSize: 20, lineHeight: 26 },
+  finishedFoot: { flexDirection: 'row', alignItems: 'center', gap: 6, borderTopWidth: 1, paddingTop: 8, marginTop: 4 },
+  finishedName: { ...typography.caption, fontSize: 12, flex: 1 },
+  finishedStars: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  finishedRating: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
   emptyCard: { borderRadius: 16, borderWidth: 1, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', gap: 8 },
   emptyTitle: { ...typography.body, fontFamily: fonts.semiBold, textAlign: 'center' },
   emptyMessage: { ...typography.caption, textAlign: 'center', lineHeight: 18 },

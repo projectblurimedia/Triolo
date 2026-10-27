@@ -14,7 +14,7 @@ import { WorkType, WorkTypePicker, workTypeLabel } from './WorkTypePicker';
 import { PickedImage } from './ImagePickerField';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { AVAILABILITIES, Availability, JobPost, jobSeekerService, PayPeriod } from '@/services/jobSeekerService';
-import { JOB_POST_QUERY_KEY, useSaveJobPost } from '@/hooks/useJobPost';
+import { JOB_POST_QUERY_KEY, upsertCachedPost, useSaveJobPost } from '@/hooks/useJobPost';
 import { useAuthStore } from '@/state/authStore';
 import { PlaceValue } from '@/utils/place';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
@@ -114,6 +114,8 @@ export function JobPostForm({
     try {
       if (showNameField) await saveAccountName(fullName);
       let saved = await save.mutateAsync({
+        id: post?.id,
+        params: {
         category: workType.category,
         // The work itself is the title: the person's own words for "other", else the category name.
         title: workTypeLabel(workType, t).trim(),
@@ -127,11 +129,13 @@ export function JobPostForm({
         longitude: place.longitude,
         // Only the place name is shown to customers.
         locationAddress: placeName(place.locationName) || place.locationName,
+        },
       });
       try {
-        if (newPhoto) saved = await jobSeekerService.uploadPhoto(newPhoto);
-        else if (photoRemoved && post?.photoUrl) saved = await jobSeekerService.removePhoto();
-        queryClient.setQueryData(JOB_POST_QUERY_KEY, saved);
+        if (newPhoto) saved = await jobSeekerService.uploadPhoto(saved.id, newPhoto);
+        else if (photoRemoved && post?.photoUrl) saved = await jobSeekerService.removePhoto(saved.id);
+        const withPhoto = saved;
+        queryClient.setQueryData<JobPost[]>(JOB_POST_QUERY_KEY, (posts) => upsertCachedPost(posts, withPhoto));
       } catch {
         showToast({ variant: 'error', title: t('jobPost.photoFailed') });
       }

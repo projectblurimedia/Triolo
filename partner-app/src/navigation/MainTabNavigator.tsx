@@ -20,7 +20,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const TAB_ICONS: Record<keyof MainTabParamList, keyof typeof FontAwesome6.glyphMap> = {
   Home: 'house',
   Bookings: 'calendar-check',
-  Grow: 'rocket',
+  Grow: 'crown',
   Profile: 'user',
 };
 

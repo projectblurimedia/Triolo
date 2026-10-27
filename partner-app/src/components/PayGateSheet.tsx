@@ -83,7 +83,7 @@ export function PayGateSheet() {
     if (!request) return;
     setStep('starting');
     try {
-      const result = await subscriptionsService.passCheckout(request.kind, request.targetId);
+      const result = await subscriptionsService.passCheckout(request.kind, request.targetId, request.plan);
       if (result.paid) {
         done(true);
         return;
@@ -147,8 +147,10 @@ export function PayGateSheet() {
 
           <Pressable
             onPress={() => {
+              // The plan for this side: job posts, or services / shop for accepting.
+              const plan = request.kind === 'job_post' ? 'job_post' : request.plan;
               done(false);
-              openSubscribe();
+              openSubscribe(plan);
             }}
             disabled={busy}
             hitSlop={6}

@@ -48,6 +48,10 @@ export class OrdersController {
     return ok(res, await this.service.listShopOrders(requireAccountId(req)));
   });
 
+  searchQuick = asyncHandler(async (req: Request, res: Response) => {
+    return ok(res, await this.service.searchOpenQuickOrders(requireAccountId(req)));
+  });
+
   getShop = asyncHandler(async (req: Request, res: Response) => {
     return ok(res, await this.service.getShopOrder(requireAccountId(req), req.params.id));
   });

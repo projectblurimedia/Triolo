@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.35)',
   },
-  cardWrap: { marginBottom: 18 },
+  cardWrap: { marginBottom: 6 },
   card: { borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, overflow: 'hidden' },
   watermark: { position: 'absolute', right: -8, bottom: -14 },
   cardIcon: {

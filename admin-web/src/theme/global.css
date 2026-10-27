@@ -3309,3 +3309,7 @@ a.row:hover {
 .sub-fees .btn {
   margin-top: 12px;
 }
+
+/* One partner plan's prices (Services Plus / Shop Plus / Job Post Plus). */
+.sub-plan-prices { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.sub-plan-prices > strong { font-size: 13px; }

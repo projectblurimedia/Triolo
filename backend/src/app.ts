@@ -24,7 +24,7 @@ import { pool } from '@/config/database';
 
 // Subscribed partners see who viewed their profile (notifications asks, without depending on subscriptions).
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
-setProfileViewerReveal((accountId) => subscriptionStatus.revealsProfileViewers(accountId));
+setProfileViewerReveal((accountId, plan) => subscriptionStatus.revealsProfileViewers(accountId, plan));
 
 export function createApp(): Express {
   const app = express();

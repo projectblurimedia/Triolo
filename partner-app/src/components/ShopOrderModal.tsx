@@ -269,14 +269,20 @@ export function ShopOrderModal() {
         <View style={styles.flex}>
           <Text style={[styles.cardLabelInline, { color: colors.textMuted }]}>{t('shopOrders.customer')}</Text>
           <Text style={[styles.name, { color: colors.text }]}>{o.customerFullName}</Text>
-          <Text style={[styles.meta, { color: colors.textMuted }]}>{o.customerMobileNumber}</Text>
+          {o.customerMobileNumber ? (
+            <Text style={[styles.meta, { color: colors.textMuted }]}>{o.customerMobileNumber}</Text>
+          ) : (
+            <Text style={[styles.meta, { color: colors.textMuted }]}>{t('shopOrders.numberAfterAccept')}</Text>
+          )}
         </View>
-        <Pressable
-          style={[styles.roundButton, { backgroundColor: brandColors.success }]}
-          onPress={() => callPhone(o.customerMobileNumber)}
-        >
-          <FontAwesome6 name="phone" size={15} color="#FFFFFF" solid />
-        </Pressable>
+        {o.customerMobileNumber ? (
+          <Pressable
+            style={[styles.roundButton, { backgroundColor: brandColors.success }]}
+            onPress={() => callPhone(o.customerMobileNumber as string)}
+          >
+            <FontAwesome6 name="phone" size={15} color="#FFFFFF" solid />
+          </Pressable>
+        ) : null}
       </View>
       <View style={[styles.infoRow, { borderTopColor: colors.border }]}>
         <FontAwesome6 name={o.fulfillment === 'delivery' ? 'truck' : 'store'} size={13} color={colors.primary} solid />

@@ -47,6 +47,14 @@ const STATUS_ICONS: Record<OrderStatus, IconName> = {
 const ENDED_BADLY: OrderStatus[] = ['cancelled', 'declined', 'expired'];
 const SUCCESS_GRADIENT = ['#16A34A', '#22C55E'] as const;
 
+// Built by hand — Hermes on Android doesn't reliably ship Intl time formatting.
+function formatClock(iso: string): string {
+  const date = new Date(iso);
+  const hours = date.getHours();
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${hour12}:${String(date.getMinutes()).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`;
+}
+
 function itemLabel(item: OrderItem): string {
   return [item.quantity, item.unit].filter(Boolean).join(' ');
 }
@@ -293,36 +301,80 @@ export function OrderTrackingModal() {
     );
   };
 
+  /**
+   * The order's steps, the same list from the moment it's sent: sent, accepted by the shop
+   * (named when it's a particular shop), packed, ready / out for delivery, completed, rated.
+   * Each shows its time; the first one not done yet is "now".
+   */
   const renderSteps = (o: CustomerOrder) => {
     if (ENDED_BADLY.includes(o.status)) return null;
-    const steps: { key: string; done: boolean }[] = [
-      { key: 'placed', done: true },
-      { key: 'accepted', done: !!o.acceptedAt },
-      { key: 'packed', done: !!o.packedAt },
-      { key: o.fulfillment === 'delivery' ? 'out_for_delivery' : 'ready_for_pickup', done: !!o.readyAt },
-      { key: 'completed', done: !!o.completedAt },
-      { key: 'rated', done: !!o.shopRating },
+    const claimed = !!o.businessId;
+    const steps: { key: string; label: string; at: string | null; done: boolean }[] = [
+      { key: 'placed', label: t('orders.step.placed'), at: o.createdAt, done: true },
+      {
+        key: 'accepted',
+        label: o.acceptedAt && claimed
+          ? t('orders.stepAcceptedBy', { shop: o.shop.name })
+          : claimed
+            ? t('orders.stepAcceptName', { shop: o.shop.name })
+            : t('orders.stepAcceptAny'),
+        at: o.acceptedAt,
+        done: !!o.acceptedAt,
+      },
+      { key: 'packed', label: t('orders.step.packed'), at: o.packedAt, done: !!o.packedAt },
+      {
+        key: 'ready',
+        label: t(`orders.step.${o.fulfillment === 'delivery' ? 'out_for_delivery' : 'ready_for_pickup'}`),
+        at: o.readyAt,
+        done: !!o.readyAt,
+      },
+      { key: 'completed', label: t('orders.step.completed'), at: o.completedAt, done: !!o.completedAt },
+      { key: 'rated', label: t('orders.step.rated'), at: null, done: !!o.shopRating },
     ];
+    const currentIndex = steps.findIndex((step) => !step.done);
     return (
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('orders.progress')}</Text>
-        {steps.map((step, index) => (
-          <View key={step.key} style={styles.stepRow}>
-            <View style={styles.stepRail}>
-              <View style={[styles.stepDot, { backgroundColor: step.done ? brandColors.success : colors.border }]}>
-                {step.done ? <FontAwesome6 name="check" size={9} color="#FFFFFF" solid /> : null}
-              </View>
-              {index < steps.length - 1 ? (
+        {steps.map((step, index) => {
+          const current = index === currentIndex;
+          return (
+            <View key={step.key} style={styles.stepRow}>
+              <View style={styles.stepRail}>
                 <View
-                  style={[styles.stepLine, { backgroundColor: steps[index + 1].done ? brandColors.success : colors.border }]}
-                />
-              ) : null}
+                  style={[
+                    styles.stepDot,
+                    step.done
+                      ? { backgroundColor: brandColors.success }
+                      : current
+                        ? { backgroundColor: `${colors.primary}1F`, borderWidth: 2, borderColor: colors.primary }
+                        : { backgroundColor: colors.border },
+                  ]}
+                >
+                  {step.done ? <FontAwesome6 name="check" size={9} color="#FFFFFF" solid /> : null}
+                </View>
+                {index < steps.length - 1 ? (
+                  <View style={[styles.stepLine, { backgroundColor: steps[index + 1].done ? brandColors.success : colors.border }]} />
+                ) : null}
+              </View>
+              <View style={styles.stepBody}>
+                <Text
+                  style={[
+                    styles.stepText,
+                    { color: step.done || current ? colors.text : colors.textMuted },
+                    current ? { color: colors.primary } : null,
+                  ]}
+                >
+                  {step.label}
+                </Text>
+                {step.at ? (
+                  <Text style={[styles.stepTime, { color: colors.textMuted }]}>{formatClock(step.at)}</Text>
+                ) : current ? (
+                  <Text style={[styles.stepTime, { color: colors.primary }]}>{t('waiting.now')}</Text>
+                ) : null}
+              </View>
             </View>
-            <Text style={[styles.stepText, { color: step.done ? colors.text : colors.textMuted }]}>
-              {t(`orders.step.${step.key}`)}
-            </Text>
-          </View>
-        ))}
+          );
+        })}
       </View>
     );
   };
@@ -434,9 +486,9 @@ export function OrderTrackingModal() {
           ) : null}
           {renderPin(order)}
           {renderRating(order)}
+          {renderSteps(order)}
           {renderItems(order)}
           {order.businessId ? renderShop(order) : null}
-          {renderSteps(order)}
           {CUSTOMER_CANCELLABLE.includes(order.status) ? (
             <CancelButton label={t('orders.cancel')} hint={t('orders.cancelHint')} onPress={() => setConfirmCancel(true)} />
           ) : null}
@@ -576,7 +628,9 @@ const styles = StyleSheet.create({
   stepRail: { alignItems: 'center', width: 20 },
   stepDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   stepLine: { width: 2, height: 22 },
-  stepText: { ...typography.body, fontSize: 14, lineHeight: 20 },
+  stepText: { ...typography.body, fontSize: 14, lineHeight: 20, flex: 1 },
+  stepBody: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  stepTime: { ...typography.caption, fontSize: 11, lineHeight: 20 },
   starsRow: { flexDirection: 'row', gap: 4 },
   review: { ...typography.body, fontStyle: 'italic', marginTop: 8 },
   actionWrap: { alignSelf: 'stretch' },

@@ -3,6 +3,7 @@ import { AppNotification, NotificationListResult, NotificationType, PushApp } fr
 
 function mapNotification(row: QueryResultRow): AppNotification & { actorAccountId?: string | null; actorName?: string | null; actorMobile?: string | null } {
   return {
+    ref: row.ref_kind ? { kind: row.ref_kind, id: row.ref_id ?? null } : null,
     actorAccountId: row.actor_account_id ?? null,
     actorName: row.actor_name ?? null,
     actorMobile: row.actor_mobile ?? null,
@@ -25,10 +26,13 @@ export class NotificationsRepository {
     title: string;
     body: string;
     actorAccountId?: string | null;
+    refKind?: string | null;
+    refId?: string | null;
   }): Promise<AppNotification> {
     const result = await this.pool.query(
-      `INSERT INTO notifications (account_id, type, title, body, actor_account_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [params.accountId, params.type, params.title, params.body, params.actorAccountId ?? null],
+      `INSERT INTO notifications (account_id, type, title, body, actor_account_id, ref_kind, ref_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [params.accountId, params.type, params.title, params.body, params.actorAccountId ?? null, params.refKind ?? null, params.refId ?? null],
     );
     return mapNotification(result.rows[0]);
   }
@@ -37,7 +41,7 @@ export class NotificationsRepository {
     const [rows, unread] = await Promise.all([
       // The actor's (viewer's) name is read for display; the service decides who sees it.
       this.pool.query(
-        `SELECT n.*, a.full_name AS actor_name
+        `SELECT n.*, a.full_name AS actor_name, a.mobile_number AS actor_mobile
          FROM notifications n LEFT JOIN accounts a ON a.id = n.actor_account_id
          WHERE n.account_id = $1 ORDER BY n.created_at DESC LIMIT $2`,
         [accountId, limit],
@@ -51,6 +55,21 @@ export class NotificationsRepository {
   async accountName(accountId: string): Promise<string | null> {
     const result = await this.pool.query(`SELECT full_name FROM accounts WHERE id = $1`, [accountId]);
     return result.rows[0]?.full_name ?? null;
+  }
+
+  /** A viewer's name and number (for a job post plan subscriber's push). */
+  async accountContact(accountId: string): Promise<{ name: string; mobile: string } | null> {
+    const result = await this.pool.query(`SELECT full_name, mobile_number FROM accounts WHERE id = $1`, [accountId]);
+    const row = result.rows[0];
+    return row ? { name: row.full_name, mobile: row.mobile_number } : null;
+  }
+
+  /** Marks read every notification about one thing (e.g. a job post's views, once opened). */
+  async markReadByRef(accountId: string, refKind: string, refId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE notifications SET is_read = true WHERE account_id = $1 AND ref_kind = $2 AND ref_id = $3 AND is_read = false`,
+      [accountId, refKind, refId],
+    );
   }
 
   async markRead(accountId: string, id: string): Promise<void> {

@@ -4,6 +4,7 @@ import {
   AdminJobSeekerListFilter,
   AdminJobSeekerPost,
   JobSeekerPost,
+  JobPostViewer,
   JobSeekerSearchParams,
   JobSeekerSearchResult,
   SaveJobSeekerPostParams,
@@ -15,10 +16,15 @@ const DISTANCE_SQL = `(6371000 * acos(LEAST(1.0, GREATEST(-1.0,
   cos(radians($1)) * cos(radians(p.latitude)) * cos(radians(p.longitude) - radians($2)) + sin(radians($1)) * sin(radians(p.latitude))
 ))))`;
 
+// Visits to post p the poster hasn't opened yet.
+const NEW_VIEWS_SQL = `(SELECT COUNT(*) FROM job_post_views v WHERE v.post_id = p.id AND v.seen_at IS NULL)`;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapPost(row: any): JobSeekerPost {
   return {
     id: row.id,
+    viewCount: Number(row.view_count ?? 0),
+    ...(row.new_views !== undefined ? { newViews: Number(row.new_views ?? 0) } : {}),
     accountId: row.account_id,
     category: row.category,
     title: row.title,
@@ -41,71 +47,179 @@ function mapPost(row: any): JobSeekerPost {
 export class JobSeekersRepository {
   constructor(private readonly pool: Pool) {}
 
+  /** The account's first post (its oldest), or null. */
   async findByAccount(accountId: string): Promise<JobSeekerPost | null> {
-    const result = await this.pool.query(`SELECT * FROM job_seeker_posts WHERE account_id = $1`, [accountId]);
+    const result = await this.pool.query(
+      `SELECT * FROM job_seeker_posts WHERE account_id = $1 ORDER BY created_at ASC LIMIT 1`,
+      [accountId],
+    );
     return result.rows[0] ? mapPost(result.rows[0]) : null;
   }
 
-  /** One post per account: creates it, or replaces its details (keeping it shown/hidden as it was). */
-  async upsert(accountId: string, params: SaveJobSeekerPostParams): Promise<JobSeekerPost> {
+  /** All of the account's posts, oldest first. */
+  async listByAccount(accountId: string): Promise<JobSeekerPost[]> {
+    const result = await this.pool.query(
+      `SELECT p.*, ${NEW_VIEWS_SQL} AS new_views FROM job_seeker_posts p WHERE p.account_id = $1 ORDER BY p.created_at ASC`,
+      [accountId],
+    );
+    return result.rows.map(mapPost);
+  }
+
+  /** One of the account's own posts, or null. */
+  async findOwned(accountId: string, id: string): Promise<JobSeekerPost | null> {
+    const result = await this.pool.query(
+      `SELECT p.*, ${NEW_VIEWS_SQL} AS new_views FROM job_seeker_posts p WHERE p.id = $1 AND p.account_id = $2`,
+      [id, accountId],
+    );
+    return result.rows[0] ? mapPost(result.rows[0]) : null;
+  }
+
+  async countByAccount(accountId: string): Promise<number> {
+    const result = await this.pool.query(`SELECT COUNT(*)::int AS n FROM job_seeker_posts WHERE account_id = $1`, [accountId]);
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  private values(params: SaveJobSeekerPostParams) {
+    return [
+      params.category,
+      params.title,
+      params.payAmount,
+      params.payPeriod,
+      params.availability,
+      params.experienceYears,
+      params.skills,
+      params.description ?? null,
+      params.latitude,
+      params.longitude,
+      params.locationAddress,
+    ];
+  }
+
+  /** A new post (shown at once). */
+  async create(accountId: string, params: SaveJobSeekerPostParams): Promise<JobSeekerPost> {
     const result = await this.pool.query(
       `INSERT INTO job_seeker_posts
          (account_id, category, title, pay_amount, pay_period, availability, experience_years, skills,
           description, latitude, longitude, location_address)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-       ON CONFLICT (account_id) DO UPDATE SET
-         category = EXCLUDED.category, title = EXCLUDED.title, pay_amount = EXCLUDED.pay_amount,
-         pay_period = EXCLUDED.pay_period, availability = EXCLUDED.availability,
-         experience_years = EXCLUDED.experience_years, skills = EXCLUDED.skills,
-         description = EXCLUDED.description, latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude,
-         location_address = EXCLUDED.location_address, updated_at = now()
        RETURNING *`,
-      [
-        accountId,
-        params.category,
-        params.title,
-        params.payAmount,
-        params.payPeriod,
-        params.availability,
-        params.experienceYears,
-        params.skills,
-        params.description ?? null,
-        params.latitude,
-        params.longitude,
-        params.locationAddress,
-      ],
+      [accountId, ...this.values(params)],
     );
     return mapPost(result.rows[0]);
   }
 
-  async setActive(accountId: string, isActive: boolean): Promise<JobSeekerPost | null> {
+  /** Replaces one own post's details (keeping it shown / hidden as it was); null if not theirs. */
+  async update(accountId: string, id: string, params: SaveJobSeekerPostParams): Promise<JobSeekerPost | null> {
     const result = await this.pool.query(
-      `UPDATE job_seeker_posts SET is_active = $2, updated_at = now() WHERE account_id = $1 RETURNING *`,
-      [accountId, isActive],
+      `UPDATE job_seeker_posts SET
+         category = $3, title = $4, pay_amount = $5, pay_period = $6, availability = $7,
+         experience_years = $8, skills = $9, description = $10, latitude = $11, longitude = $12,
+         location_address = $13, updated_at = now()
+       WHERE id = $1 AND account_id = $2
+       RETURNING *`,
+      [id, accountId, ...this.values(params)],
     );
     return result.rows[0] ? mapPost(result.rows[0]) : null;
   }
 
-  /** Sets (or clears) the photo; returns the post and the photo it replaced, or null with no post. */
+  async setActive(accountId: string, id: string, isActive: boolean): Promise<JobSeekerPost | null> {
+    const result = await this.pool.query(
+      `UPDATE job_seeker_posts SET is_active = $3, updated_at = now() WHERE id = $1 AND account_id = $2 RETURNING *`,
+      [id, accountId, isActive],
+    );
+    return result.rows[0] ? mapPost(result.rows[0]) : null;
+  }
+
+  /** Sets (or clears) one post's photo; returns the post and the photo it replaced, or null. */
   async setPhoto(
     accountId: string,
+    id: string,
     photoUrl: string | null,
   ): Promise<{ post: JobSeekerPost; previousUrl: string | null } | null> {
     const result = await this.pool.query(
-      `UPDATE job_seeker_posts p SET photo_url = $2, updated_at = now()
-       FROM (SELECT photo_url AS previous_url FROM job_seeker_posts WHERE account_id = $1 FOR UPDATE) old
-       WHERE p.account_id = $1
+      `UPDATE job_seeker_posts p SET photo_url = $3, updated_at = now()
+       FROM (SELECT photo_url AS previous_url FROM job_seeker_posts WHERE id = $1 AND account_id = $2 FOR UPDATE) old
+       WHERE p.id = $1 AND p.account_id = $2
        RETURNING p.*, old.previous_url`,
-      [accountId, photoUrl],
+      [id, accountId, photoUrl],
     );
     if (!result.rows[0]) return null;
     return { post: mapPost(result.rows[0]), previousUrl: result.rows[0].previous_url ?? null };
   }
 
-  /** Deletes the post; returns its photo URL so the caller can remove it from storage. */
-  async delete(accountId: string): Promise<{ photoUrl: string | null } | null> {
-    const result = await this.pool.query(`DELETE FROM job_seeker_posts WHERE account_id = $1 RETURNING photo_url`, [accountId]);
+  /** Deletes one own post; returns its photo URL so the caller can remove it from storage. */
+  async delete(accountId: string, id: string): Promise<{ photoUrl: string | null } | null> {
+    const result = await this.pool.query(
+      `DELETE FROM job_seeker_posts WHERE id = $1 AND account_id = $2 RETURNING photo_url`,
+      [id, accountId],
+    );
     return result.rows[0] ? { photoUrl: result.rows[0].photo_url ?? null } : null;
+  }
+
+  /**
+   * A customer opened a live post (not their own): one more visit, remembered with who it was.
+   * Returns the post's owner and title, and whether this viewer hadn't opened it in the last day
+   * (so the poster is told once a day per person, not on every open). Null when nothing counted.
+   */
+  async recordView(
+    id: string,
+    viewerAccountId: string,
+  ): Promise<{ ownerAccountId: string; title: string; firstToday: boolean } | null> {
+    const result = await this.pool.query(
+      `WITH post AS (
+         UPDATE job_seeker_posts SET view_count = view_count + 1
+         WHERE id = $1 AND account_id <> $2 AND is_active
+         RETURNING id, account_id, title
+       ), recent AS (
+         SELECT 1 FROM job_post_views WHERE post_id = $1 AND viewer_account_id = $2 AND created_at > now() - interval '1 day' LIMIT 1
+       ), added AS (
+         INSERT INTO job_post_views (post_id, viewer_account_id) SELECT id, $2 FROM post RETURNING id
+       )
+       SELECT post.account_id, post.title, NOT EXISTS (SELECT 1 FROM recent) AS first_today, (SELECT count(*) FROM added) AS added
+       FROM post`,
+      [id, viewerAccountId],
+    );
+    const row = result.rows[0];
+    return row ? { ownerAccountId: row.account_id, title: row.title, firstToday: row.first_today } : null;
+  }
+
+  /** Who opened one of the account's posts — one row per person, latest first. */
+  async listViewers(ownerAccountId: string, postId: string, limit = 100): Promise<JobPostViewer[] | null> {
+    const owned = await this.pool.query(`SELECT 1 FROM job_seeker_posts WHERE id = $1 AND account_id = $2`, [postId, ownerAccountId]);
+    if (!owned.rowCount) return null;
+    const result = await this.pool.query(
+      `SELECT v.viewer_account_id, max(v.created_at) AS last_viewed_at, count(*)::int AS times,
+              bool_or(v.seen_at IS NULL) AS is_new, a.full_name, a.mobile_number
+       FROM job_post_views v JOIN accounts a ON a.id = v.viewer_account_id
+       WHERE v.post_id = $1
+       GROUP BY v.viewer_account_id, a.full_name, a.mobile_number
+       ORDER BY max(v.created_at) DESC LIMIT $2`,
+      [postId, limit],
+    );
+    return result.rows.map((row) => ({
+      viewerKey: row.viewer_account_id,
+      name: row.full_name,
+      mobile: row.mobile_number,
+      lastViewedAt: new Date(row.last_viewed_at).toISOString(),
+      times: Number(row.times),
+      isNew: row.is_new,
+    }));
+  }
+
+  /** The poster opened the post's views: none of them are new any more. */
+  async markViewsSeen(ownerAccountId: string, postId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE job_post_views v SET seen_at = now()
+       FROM job_seeker_posts p
+       WHERE v.post_id = p.id AND p.id = $1 AND p.account_id = $2 AND v.seen_at IS NULL`,
+      [postId, ownerAccountId],
+    );
+  }
+
+  /** Deletes every post of an account (the admin removing its profiles); returns their photos. */
+  async deleteAllForAccount(accountId: string): Promise<(string | null)[]> {
+    const result = await this.pool.query(`DELETE FROM job_seeker_posts WHERE account_id = $1 RETURNING photo_url`, [accountId]);
+    return result.rows.map((row) => row.photo_url ?? null);
   }
 
   /**

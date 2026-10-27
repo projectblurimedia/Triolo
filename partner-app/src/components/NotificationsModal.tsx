@@ -21,6 +21,8 @@ import { showToast } from '@/state/toastStore';
 import { openSubscribe } from '@/state/subscribeStore';
 import { useMySubscription } from '@/hooks/useSubscription';
 import { useNotificationFocusStore } from '@/state/notificationFocusStore';
+import { JobPostViewersSheet } from './JobPostViewersSheet';
+import { Linking } from 'react-native';
 
 interface NotificationsModalProps {
   visible: boolean;
@@ -53,6 +55,7 @@ export const TYPE_ICONS: Record<NotificationType, React.ComponentProps<typeof Fo
   order_completed: 'circle-check',
   order_cancelled: 'ban',
   badge_removed: 'shield-halved',
+  job_post_view: 'eye',
 };
 
 export function formatRelativeTime(iso: string, justNowLabel: string): string {
@@ -111,6 +114,8 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<AppNotification | null>(null);
+  // A job post's views, opened from a "viewed your job post" notification.
+  const [viewsPostId, setViewsPostId] = useState<string | null>(null);
   const subscription = useMySubscription();
   const [confirmBulk, setConfirmBulk] = useState(false);
 
@@ -349,10 +354,53 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         </View>
         <View style={[styles.detailDivider, { backgroundColor: colors.border }]} />
         <Text style={[styles.detailMessage, { color: colors.text }]}>{item.body}</Text>
-        {item.type === 'profile_view' && !item.viewer && subscription.data?.enabled && !subscription.data.active ? (
-          <Pressable onPress={openSubscribe} hitSlop={6} style={styles.callWrap}>
+        {item.type === 'profile_view' && !item.viewer && subscription.data?.enabled ? (
+          <Pressable
+            onPress={() => openSubscribe(item.ref?.kind === 'shop' ? 'shop' : 'service')}
+            hitSlop={6}
+            style={styles.callWrap}
+          >
             <Text style={[styles.subscribeLink, { color: colors.primary }]}>{t('notifications.seeWhoViewed')}</Text>
           </Pressable>
+        ) : null}
+        {item.type === 'job_post_view' ? (
+          <View style={styles.jobView}>
+            {item.viewer ? (
+              <View style={[styles.viewerRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                <FontAwesome6 name="user" size={14} color={colors.primary} solid />
+                <View style={styles.flexOne}>
+                  <Text style={[styles.viewerName, { color: colors.text }]}>{item.viewer.name}</Text>
+                  {item.viewer.mobile ? <Text style={[styles.viewerMobile, { color: colors.textMuted }]}>{item.viewer.mobile}</Text> : null}
+                </View>
+                {item.viewer.mobile ? (
+                  <Pressable
+                    onPress={() => Linking.openURL(`tel:${item.viewer?.mobile}`).catch(() => undefined)}
+                    style={[styles.viewerCall, { backgroundColor: brandColors.success }]}
+                    accessibilityLabel={t('jobViews.call')}
+                  >
+                    <FontAwesome6 name="phone" size={13} color="#FFFFFF" solid />
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : subscription.data?.enabled ? (
+              <View style={[styles.lockedBox, { borderColor: '#C08A1266', backgroundColor: '#F5B3011A' }]}>
+                <FontAwesome6 name="crown" size={14} color="#C08A12" solid />
+                <Text style={[styles.lockedText, { color: colors.text }]}>{t('jobViews.lockedText')}</Text>
+                <Pressable onPress={() => openSubscribe('job_post')} hitSlop={6}>
+                  <Text style={[styles.subscribeLink, { color: '#C08A12' }]}>{t('jobViews.getPlan')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            {item.ref?.id ? (
+              <Pressable
+                onPress={() => setViewsPostId(item.ref?.id ?? null)}
+                style={[styles.allViews, { borderColor: colors.primary }]}
+              >
+                <FontAwesome6 name="eye" size={13} color={colors.primary} solid />
+                <Text style={[styles.allViewsText, { color: colors.primary }]}>{t('jobViews.seeAll')}</Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
       </View>
       <Pressable
@@ -486,6 +534,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
           </View>
         ) : null}
 
+        <JobPostViewersSheet postId={viewsPostId} onClose={() => setViewsPostId(null)} />
         <ToastHost />
       </View>
 
@@ -510,6 +559,16 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
 }
 
 const styles = StyleSheet.create({
+  flexOne: { flex: 1 },
+  jobView: { alignSelf: 'stretch', gap: 10, marginTop: 14 },
+  viewerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 10 },
+  viewerName: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  viewerMobile: { ...typography.caption, fontSize: 12 },
+  viewerCall: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  lockedBox: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, borderRadius: 14, borderWidth: 1, padding: 10 },
+  lockedText: { ...typography.caption, fontSize: 12.5, lineHeight: 17, flex: 1, minWidth: 160 },
+  allViews: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 42, borderRadius: 13, borderWidth: 1.5 },
+  allViewsText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 13.5 },
   container: { flex: 1 },
   header: { paddingBottom: 20, paddingHorizontal: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center' },

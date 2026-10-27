@@ -14,7 +14,12 @@ import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
 import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
-import { useMyJobPost } from '@/hooks/useJobPost';
+import { useMyJobPosts } from '@/hooks/useJobPost';
+import { JobPostsSheet } from './JobPostsSheet';
+import { useAuthStore } from '@/state/authStore';
+
+// As many as the server allows (jobSeekers MAX_JOB_POSTS).
+const MAX_JOB_POSTS = 5;
 import { navigationRef } from '@/navigation/navigationRef';
 import { MainStackParamList } from '@/navigation/types';
 
@@ -44,9 +49,12 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [postsOpen, setPostsOpen] = useState(false);
   const worker = useMyWorkerProfile().data;
   const shop = useMyBusinessProfile().data;
-  const jobPost = useMyJobPost().data;
+  const jobPosts = useMyJobPosts().data ?? [];
+  const account = useAuthStore((state) => state.account);
+  const jobPost = jobPosts[0] ?? null;
 
   // Closes the drawer, then opens the form on top of the tabs.
   const open = <K extends 'WorkerRegistration' | 'BusinessRegistration' | 'JobPost'>(
@@ -69,6 +77,22 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
 
   return (
     <>
+      <JobPostsSheet
+        visible={postsOpen}
+        posts={jobPosts}
+        name={account?.fullName}
+        canAdd={jobPosts.length < MAX_JOB_POSTS}
+        hint={t('jobPost.pickToEdit')}
+        onClose={() => setPostsOpen(false)}
+        onOpen={(post) => {
+          setPostsOpen(false);
+          if (navigationRef.isReady()) navigationRef.navigate('JobPost', { postId: post.id });
+        }}
+        onAdd={() => {
+          setPostsOpen(false);
+          if (navigationRef.isReady()) navigationRef.navigate('JobPost', {});
+        }}
+      />
       <SideMenuDrawer
         visible={visible}
         onClose={onClose}
@@ -104,10 +128,18 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
           title={t(jobPost ? 'settingsMenu.editJobPost' : 'settingsMenu.addJobPost')}
           subtitle={
             jobPost
-              ? `${t(jobPost.isActive ? 'settingsMenu.jobPostLive' : 'settingsMenu.jobPostHidden')} · ${t('settingsMenu.tapToEdit')}`
+              ? jobPosts.length > 1
+                ? t('settingsMenu.jobPostsCount', { count: jobPosts.length })
+                : `${t(jobPost.isActive ? 'settingsMenu.jobPostLive' : 'settingsMenu.jobPostHidden')} · ${t('settingsMenu.tapToEdit')}`
               : t('settingsMenu.addJobPostHint')
           }
-          onPress={() => open('JobPost')}
+          onPress={() => {
+            // None: make the first. One: edit it. Several: pick which one (a sheet over the app).
+            if (!jobPost) return open('JobPost', {});
+            if (jobPosts.length === 1) return open('JobPost', { postId: jobPost.id });
+            onClose();
+            setTimeout(() => setPostsOpen(true), 260);
+          }}
         />
 
         <Text style={[styles.sectionTitle, styles.sectionGap, { color: colors.textMuted }]}>{t('settingsMenu.section')}</Text>

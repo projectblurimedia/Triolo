@@ -102,6 +102,7 @@ beforeEach(() => {
     findQuickOffer: jest.fn().mockResolvedValue(null),
     claimQuick: jest.fn(),
     declineQuickOffer: jest.fn().mockResolvedValue(false),
+    offerOpenQuickOrders: jest.fn().mockResolvedValue(0),
     expireStale: jest.fn().mockResolvedValue([]),
     exists: jest.fn(),
     findForCustomer: jest.fn(),
@@ -350,6 +351,30 @@ describe('shop steps', () => {
       expect.any(String),
       expect.anything(),
     );
+  });
+
+  it('Find Orders Now offers open Quick Orders by the shop\'s own place, kinds and delivery, then lists', async () => {
+    businesses.getMyProfile.mockResolvedValue(buildShop());
+    repo.listForShop.mockResolvedValue([]);
+    await service.searchOpenQuickOrders('owner-1');
+    expect(repo.offerOpenQuickOrders).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessId: 'shop-1',
+        ownerAccountId: 'owner-1',
+        latitude: 16.7,
+        longitude: 81.1,
+        shopCategories: ['grocery'],
+        deliveryAvailable: true,
+      }),
+    );
+    expect(repo.listForShop).toHaveBeenCalledWith('shop-1', expect.any(Number));
+  });
+
+  it('Find Orders Now only lists for a shop that is not verified yet', async () => {
+    businesses.getMyProfile.mockResolvedValue(buildShop({ verificationStatus: 'pending_verification' }));
+    repo.listForShop.mockResolvedValue([]);
+    await service.searchOpenQuickOrders('owner-1');
+    expect(repo.offerOpenQuickOrders).not.toHaveBeenCalled();
   });
 
   it('needs a business profile for every shop step', async () => {

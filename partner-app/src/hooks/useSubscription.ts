@@ -30,6 +30,12 @@ export function useMyBoosts(enabled: boolean) {
 }
 
 /** Which of my profiles (service / business / job_post) have an active Trusted by Triolo badge. */
+/** Ids of my profiles (worker, shop, each job post) with an active Trusted badge. */
+export function useTrustedProfileIds(): Set<string> {
+  const { data } = useMyBadges();
+  return new Set((data?.profiles ?? []).filter((entry) => entry.status === 'active').map((entry) => entry.profileId));
+}
+
 export function useTrustedKinds(): Set<string> {
   const { data } = useMyBadges();
   return new Set((data?.profiles ?? []).filter((entry) => entry.status === 'active').map((entry) => entry.kind));

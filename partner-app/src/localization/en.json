@@ -20,7 +20,8 @@
     "updateCompleteMessage": "Restarting the app with the latest version...",
     "back": "Back",
     "showMore": "Show more ({{count}})",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "clear": "Clear"
   },
   "verification": {
     "pending": "Pending Review",
@@ -90,7 +91,22 @@
   "myInfo": {
     "title": "My Info",
     "workerSubtitle": "Your worker profile",
-    "shopSubtitle": "Your shop profile"
+    "shopSubtitle": "Your shop profile",
+    "kickerWorker": "Your worker profile",
+    "kickerShop": "Your shop profile",
+    "workIDo": "Work I do",
+    "whatISell": "What my shop sells",
+    "ratings": "Ratings",
+    "delivery": "Delivery",
+    "deliversYes": "Yes",
+    "deliversNo": "No",
+    "deliveryTitle": "Home delivery",
+    "deliveryChargeLine": "₹{{perKm}} per km · Min ₹{{min}}",
+    "pickupOnly": "No delivery — customers collect from your shop",
+    "workPhotos": "Work photos",
+    "shopPhotos": "Shop photos",
+    "kickerJob": "Your job post",
+    "workAndSkills": "Work and skills"
   },
   "settingsMenu": {
     "title": "Settings",
@@ -108,7 +124,9 @@
     "addJobPostHint": "Looking for regular work? Post it here",
     "jobPostLive": "Live",
     "jobPostHidden": "Hidden",
-    "tapToEdit": "Tap to edit"
+    "tapToEdit": "Tap to edit",
+    "jobPostsCount_one": "{{count}} job post · tap to see",
+    "jobPostsCount_other": "{{count}} job posts · tap to see"
   },
   "notifications": {
     "title": "Notifications",
@@ -152,8 +170,8 @@
       "greeting": "Hi, {{name}}"
     },
     "Bookings": {
-      "title": "Bookings",
-      "subtitle": "Your job and order requests"
+      "title": "Activity",
+      "subtitle": "Requests, work under way and history"
     },
     "Profile": {
       "title": "Profile",
@@ -171,8 +189,8 @@
       "ownerLine": "Owner: {{name}}"
     },
     "Grow": {
-      "title": "Grow",
-      "subtitle": "Get more work on Triolo"
+      "title": "Plans",
+      "subtitle": "Partner Plus, Trusted badge and Boost"
     }
   },
   "bookings": {
@@ -255,7 +273,9 @@
     "openSettings": "Open Settings",
     "acceptNeedsLocation": "Turn on location, then open the app to accept this job.",
     "requiredTitle": "Turn On Location",
-    "requiredMessage": "Location must be on to do this."
+    "requiredMessage": "Location must be on to do this.",
+    "searchPlaceholder": "Search a village, town or area",
+    "searchNone": "No places found — try another name"
   },
   "imagePicker": {
     "permissionDeniedTitle": "Photo Access Needed",
@@ -515,7 +535,9 @@
     "noLocationMessage": "Add your current location to your Worker profile (Profile → edit) to see problems near you.",
     "workersOnlyTitle": "For Workers",
     "workersOnlyMessage": "Problems posted by customers near you show up here once your Worker profile is verified.",
-    "loadFailedTitle": "Couldn't Load Jobs"
+    "loadFailedTitle": "Couldn't Load Jobs",
+    "finishedTag": "Done",
+    "allBookings": "All Bookings"
   },
   "liveMap": {
     "unavailable": "Map unavailable right now",
@@ -766,7 +788,8 @@
     "lateReason": "no progress for over an hour",
     "quickKicker": "QUICK ORDER · FIRST TO ACCEPT",
     "quickTitle": "Quick Order — be the first",
-    "quickMessage": "This list went to several shops nearby. Accept it first and it is yours."
+    "quickMessage": "This list went to several shops nearby. Accept it first and it is yours.",
+    "numberAfterAccept": "Number shown after you accept"
   },
   "shopHome": {
     "myShop": "My Shop",
@@ -889,7 +912,19 @@
     "photoFailed": "Post saved, but the photo could not be uploaded. Try again.",
     "payPlaceholder": "Enter amount in ₹",
     "headerSubtitle": "Your work, pay and location",
-    "cardCaption": "Job post"
+    "cardCaption": "Job post",
+    "howCustomersSee": "How customers see it",
+    "viewProfile": "View",
+    "addAnother": "Add another job post",
+    "addAnotherHint": "Another kind of work you can do — each post is paid for on its own",
+    "postsTitle": "Your job posts",
+    "postsSheetHint": "Tap one to open its profile",
+    "postNumber": "Post {{n}}",
+    "postsCount_one": "{{count}} post · {{live}} live",
+    "postsCount_other": "{{count}} posts · {{live}} live",
+    "expectedPay": "Expected pay",
+    "pickToEdit": "Tap one to edit it",
+    "viewFull": "Full profile"
   },
   "continueSteps": {
     "title": "Continue Where You Left Off",
@@ -909,7 +944,8 @@
     "foundTitle_other": "{{count}} job requests open",
     "foundMessage": "Accept one before another worker does.",
     "noneTitle": "No job requests right now",
-    "noneMessage": "Problems near you are on Home. We will notify you as soon as a new request comes in."
+    "noneMessage": "Problems near you are on Home. We will notify you as soon as a new request comes in.",
+    "sectionTitle": "Find work near you"
   },
   "profilePhoto": {
     "add": "Add photo",
@@ -1025,7 +1061,7 @@
     "activeTitle": "You're subscribed",
     "activeUntil": "Active until {{date}}",
     "perkFirst": "Get Quick Book jobs and problems first",
-    "perkTop": "Your shop and job post at the top of lists",
+    "perkTop": "Your services, shop and job posts at the top of lists",
     "perkViewers": "See the names of people who viewed your profile",
     "perkNoAds": "No ads",
     "choosePlan": "Choose a plan",
@@ -1064,7 +1100,26 @@
     },
     "boostFrom": "Show it to customers nearby · from ₹{{amount}}",
     "boostCaption": "Show it to customers nearby",
-    "boostCta": "Boost now"
+    "boostCta": "Boost now",
+    "trustDesc": "A green Trusted by Triolo mark on this profile, so customers choose you with confidence.",
+    "boostDesc": "Show this profile to customers near you as an ad, for the days you choose.",
+    "badgeOff": "Badges are not available right now.",
+    "profileNumber": "{{kind}} {{n}}",
+    "trustPoints": {
+      "a": "Green badge",
+      "b": "More trust",
+      "c": "More calls",
+      "c_service": "More bookings",
+      "c_business": "More orders",
+      "c_job_post": "More calls"
+    },
+    "boostPoints": {
+      "a": "Shown as an ad",
+      "b": "To people near you",
+      "c": "Promote your profile"
+    },
+    "alreadyTrustedTitle": "Already Trusted",
+    "alreadyTrustedMessage": "This profile already has the Trusted by Triolo badge."
   },
   "badge": {
     "trusted": "Trusted by Triolo",
@@ -1111,7 +1166,12 @@
     }
   },
   "home": {
-    "allServicesCount": "{{count}} services"
+    "allServicesCount": "{{count}} services",
+    "recentJobs": "Recent jobs",
+    "recentOrders": "Recent orders",
+    "open": "Open",
+    "allBookingsHint": "Every job, with filters and dates",
+    "allOrdersHint": "Every order, with filters and dates"
   },
   "picker": {
     "selected": "Selected ({{count}})",
@@ -1190,5 +1250,188 @@
     "stepRecents": "Don't swipe the app away from recent apps — or lock it there.",
     "stepNotifications": "Notifications → turn them on, so new jobs and orders can reach you.",
     "done": "Done"
+  },
+  "findOrders": {
+    "button": "Find Orders Now",
+    "searching": "Searching nearby…",
+    "hint": "See every Quick Order near your shop that you can take — even one whose notification never came.",
+    "foundTitle_one": "{{count}} Quick Order waiting",
+    "foundTitle_other": "{{count}} Quick Orders waiting",
+    "foundMessage": "They are in New orders — accept one before another shop does.",
+    "noneTitle": "No Quick Orders right now",
+    "noneMessage": "We will notify you as soon as a customer near you sends one.",
+    "sectionTitle": "Find orders near you"
+  },
+  "homeSides": {
+    "shop": "Shop",
+    "services": "Services",
+    "jobPost": "Job Post"
+  },
+  "plans": {
+    "payOnceTitle": "Or pay once, only when you need it",
+    "fee": {
+      "accept": "Accept a job or order",
+      "job_post": "Publish your job post"
+    },
+    "profilesTitle": "Your profiles",
+    "badgeNotYet": "After verification",
+    "badgeFinish": "Finish payment",
+    "badgePrice": "Get · ₹{{amount}}",
+    "boostFrom": "From ₹{{amount}}",
+    "whatYouGet": "What you get",
+    "boosting": "Boosting",
+    "boostDetailsTitle": "Your boost",
+    "boostViews": "Views",
+    "boostClicks": "Taps",
+    "boostRate": "Tap rate",
+    "boostDates": "Dates",
+    "boostPlan": "Plan",
+    "sections": {
+      "service": "My Services",
+      "shop": "My Shop",
+      "job_post": "Job Posts"
+    },
+    "names": {
+      "service": "Services Plus",
+      "shop": "Shop Plus",
+      "job_post": "Job Post Plus"
+    },
+    "short": {
+      "service": "Jobs first, no accept fee, more customers",
+      "shop": "No accept fee, top of shop searches",
+      "job_post": "See who viewed your posts and call them"
+    },
+    "hero": {
+      "service": "For your services: get jobs before others and accept them free.",
+      "shop": "For your shop: accept orders free and show first to customers.",
+      "job_post": "For your job posts: see everyone who viewed them, with their number."
+    },
+    "perks": {
+      "noAds": "No ads in the app",
+      "service": {
+        "first": "Quick Book jobs and new problems reach you first",
+        "freeAccept": "Accept jobs with no fee",
+        "top": "Your services show first to customers",
+        "viewers": "See who viewed your services profile"
+      },
+      "shop": {
+        "freeAccept": "Accept orders with no fee",
+        "top": "Your shop shows first in searches",
+        "viewers": "See who viewed your shop"
+      },
+      "job_post": {
+        "viewers": "See who viewed your job posts, with their phone number",
+        "top": "Your job posts show first in Hire Staff"
+      }
+    },
+    "extra_one": "{{count}} benefit · from ₹{{amount}}/month",
+    "extra_other": "{{count}} benefits · from ₹{{amount}}/month",
+    "daysLeft_one": "Active · {{count}} day left",
+    "daysLeft_other": "Active · {{count}} days left",
+    "noPlanFee": {
+      "service": "No plan? You pay ₹{{amount}} each time you accept a job.",
+      "shop": "No plan? You pay ₹{{amount}} each time you accept an order.",
+      "job_post": "Each new job post costs ₹{{amount}}, with or without this plan."
+    },
+    "growTitle": "Badge and boost",
+    "yourPlan": "Your plan",
+    "upgrade": "Upgrade to",
+    "active": "Active"
+  },
+  "activity": {
+    "filter": "Filter",
+    "filterTitle": "Show",
+    "filterAll": "All activity",
+    "filterRequests": "Requests",
+    "filterNew": "New orders",
+    "filterActive": "In progress",
+    "filterDone": "Completed",
+    "filterCancelled": "Cancelled",
+    "emptyTitle": "Nothing here yet",
+    "emptyMessage": "Your jobs and orders show up here as they come in.",
+    "jobPosted": "Job post published",
+    "jobUpdated": "Last updated",
+    "jobCallsNote": "Customers find your post under Hire Staff and call you on your number — calls happen on your phone, not in the app.",
+    "earned": "Earned · {{period}}",
+    "ordersCount_one": "{{count}} order",
+    "ordersCount_other": "{{count}} orders",
+    "allTime": "all time",
+    "visitsLabel": "People who opened your job posts",
+    "posts": "Posts",
+    "visits_one": "{{count}} visit",
+    "visits_other": "{{count}} visits",
+    "jobsDoneLabel": "Jobs you finished · {{period}}",
+    "offersReceived": "Requests",
+    "offersAccepted": "Accepted",
+    "visitsShort": "Visits",
+    "posted": "Posted",
+    "updated": "Updated",
+    "postedOn": "Posted {{date}}",
+    "updatedOn": "updated {{date}}"
+  },
+  "dateRange": {
+    "title": "Choose dates",
+    "all": "All time",
+    "today": "Today",
+    "week": "Last 7 days",
+    "month30": "Last 30 days",
+    "thisMonth": "This month",
+    "since": "Since {{date}}",
+    "until": "Until {{date}}",
+    "pickEnd": "tap the end date",
+    "apply": "Apply",
+    "clear": "Clear dates",
+    "quick": "Quick pick",
+    "custom": "Or choose your own dates",
+    "from": "From",
+    "to": "To",
+    "anyDay": "Any day",
+    "pickStart": "Now tap the start date",
+    "pickEndDay": "Now tap the end date",
+    "reset": "Reset",
+    "showRange": "Show {{range}}",
+    "showAll": "Show all time"
+  },
+  "jobViews": {
+    "title": "Who viewed",
+    "total_one": "{{count}} visit",
+    "total_other": "{{count}} visits",
+    "none": "Nobody has opened this post yet.",
+    "someone": "Someone",
+    "lockedTitle": "Who viewed your post?",
+    "lockedText": "Get Job Post Plus to see who viewed your job post and their number.",
+    "getPlan": "Get Job Post Plus",
+    "times_one": "{{count}} time",
+    "times_other": "{{count}} times",
+    "new": "New",
+    "newCount_one": "{{count}} new",
+    "newCount_other": "{{count}} new",
+    "call": "Call",
+    "seeWho": "See who",
+    "seeWhoLong": "Tap to see who opened this post",
+    "seeAll": "See all views of this post",
+    "visits_one": "{{count}} visit",
+    "visits_other": "{{count}} visits"
+  },
+  "homeLocation": {
+    "current": "Current location",
+    "finding": "Finding where you are…",
+    "unknown": "Location not set",
+    "change": "Change address",
+    "title": "Your address",
+    "subtitle": "Pick where you are, or a saved address",
+    "savedTitle": "Saved addresses",
+    "add": "Add an address on the map",
+    "saveTitle": "Save this address",
+    "saveAs": "Save as",
+    "kinds": {
+      "home": "Home",
+      "work": "Work",
+      "other": "Other"
+    },
+    "namePlaceholder": "Name it (e.g. Shop, Farm)",
+    "moveOnMap": "Move it on the map",
+    "save": "Save address",
+    "changeShort": "Change"
   }
 }

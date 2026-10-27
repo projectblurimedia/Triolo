@@ -110,7 +110,12 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
               <CapabilityCard key={card.key} card={card} colors={colors} />
             ))}
             {/* Looking for regular work (a home cook, a tutor…) — live without admin review. */}
-            <JobPostCard post={jobPost.data} onPress={() => navigation.navigate('JobPost')} />
+            <JobPostCard
+              post={jobPost.data}
+              onPress={() =>
+                jobPost.data ? navigation.navigate('MyInfo', { capability: 'job', postId: jobPost.data.id }) : navigation.navigate('JobPost', {})
+              }
+            />
           </ScrollView>
         </PullToRefresh>
       )}

@@ -652,3 +652,38 @@ The apps' `contactPhone` (the Call button) is the business phone, `advertiserPho
 **Localization note**: `message` fields and validation error text on any endpoint are for logs/debugging, not for display — the client resolves `error.code` to a localized string itself. See `docs/localization.md`.
 
 Further modules (Users, Booking, Orders) documented here as they're implemented — never left to drift from the actual routes. Admin currently covers only listing/verifying Worker/Business profiles; the rest of its planned scope (user/worker/business management, complaints, warnings, suspension, announcements, audit logs — see `.cloud/project-context.md`) is still pending. Notifications currently covers only the `profile_view` event described above; push (FCM) delivery and other event types are still pending.
+
+
+### POST /api/v1/orders/shop/quick/search
+
+Shop owner, authenticated. Find Orders Now: offers the shop every open Quick Order within 50 km of the shop's own location that it can take (`shop_categories` overlap the shop's, delivery orders only if `deliveryAvailable`, not the shop owner's own orders); one it declined earlier is offered again. Offer rows are created once per order and shop. Only a verified shop with a location gets new offers. Returns the shop's order list (same shape as `GET /orders/shop/mine`).
+
+
+### Job posts — several per partner
+
+All authenticated, the caller's own posts (up to 5, `JOB_POST_LIMIT`).
+
+- `GET /api/v1/job-seekers/me/posts` — every post, oldest first.
+- `POST /api/v1/job-seekers/me/posts` — a new post (same body as `PUT /me`). Takes one paid `job_post` pass while partner plans are on, with or without a plan (`PAYMENT_REQUIRED` otherwise).
+- `PUT /api/v1/job-seekers/me/posts/:id` — edit one post (keeps Live / Hidden).
+- `PATCH /api/v1/job-seekers/me/posts/:id/active` — `{ isActive }`.
+- `PUT /api/v1/job-seekers/me/posts/:id/photo` (multipart `photo`), `DELETE .../photo`.
+- `DELETE /api/v1/job-seekers/me/posts/:id`.
+
+The older `GET/PUT/DELETE /me`, `PATCH /me/active` and `/me/photo` act on the first post. `POST /subscriptions/badges/checkout` takes an optional `profileId` (which post). A self-booked ad promoting a job post takes an optional `promotedPostId`.
+
+- `POST /api/v1/job-seekers/:id/view` — authenticated; counts one visit on a live post that isn't the caller's own. Every job post now carries `viewCount`.
+
+- `GET /api/v1/bookings/offers/stats?from=<ISO>&to=<ISO>` — authenticated worker; both optional (to is exclusive). Returns `{ received, accepted, declined, missed }` over the offers the worker was shown (`missed` = taken by another worker or ended unanswered). No worker profile → all zero.
+
+### Partner plans per profile and job post views
+
+- `POST /api/v1/subscriptions/checkout` — body adds optional `plan` (`service` / `shop` / `job_post`) for partners; without it an all-in-one plan at `partnerPrices` (older builds). `SUBSCRIPTION_ACTIVE` when that plan (or an all-in-one plan) is running.
+- `GET /api/v1/subscriptions/me?audience=partner` — adds `plans: { service|shop|job_post: { prices, active, pending } }`; top-level `active` = any partner plan.
+- `POST /api/v1/subscriptions/passes/checkout` — optional `plan`: accepting is free on that side's plan.
+- Settings: `partnerPlanPrices: { service, shop, job_post }` (each `{ '1','3','6','12' }`).
+- `GET /api/v1/job-seekers/me/posts/:id/viewers` — `{ locked, total, newCount, viewers: [{ viewerKey, name, mobile, lastViewedAt, times, isNew }] }`; `name`/`mobile` are null while `locked` (no Job Post Plus). 404 `JOB_POST_NOT_FOUND` if not the caller's post.
+- `POST /api/v1/job-seekers/me/posts/:id/viewers/seen` — marks the post's views seen and its `job_post_view` notifications read.
+- `GET /api/v1/job-seekers/me/posts` — each post adds `newViews`.
+- Notifications: type `job_post_view`; items carry `ref` (`{ kind, id }`) and, for `job_post_view`, `locked` and (on Job Post Plus) `viewer: { name, mobile }`.
+- Shop side orders: `customerMobileNumber` is null until the shop accepts.

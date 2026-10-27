@@ -2,6 +2,7 @@ import { Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import i18n from '@/localization/i18n';
 import { useLocationStore } from '@/state/locationStore';
+import { chosenAddressCoords } from '@/state/addressStore';
 import { showToast } from '@/state/toastStore';
 
 /*
@@ -20,6 +21,8 @@ let asking: Promise<boolean> | null = null;
  * position fix). A second tap while the dialog is up waits for the same answer.
  */
 export function ensureLocationOn(): Promise<boolean> {
+  // A saved address is chosen: everything works from it, without the phone's location.
+  if (chosenAddressCoords()) return Promise.resolve(true);
   if (asking) return asking;
   asking = (async () => {
     try {

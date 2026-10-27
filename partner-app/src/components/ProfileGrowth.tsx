@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { BoostModal } from './BoostModal';
-import { GoldCard, GOLD_INK, GOLD_INK_SOFT } from './GoldCard';
 import { LoadingIndicator } from './LoadingIndicator';
-import { BADGES_QUERY_KEY, useBoostInfo, useMyBadges, useMySubscription } from '@/hooks/useSubscription';
+import { BADGES_QUERY_KEY, useMyBadges, useMyBoosts } from '@/hooks/useSubscription';
+import { GlassBackdrop } from './Glass';
+import { GOLD_INK, GOLD_INK_SOFT } from './GoldCard';
+import { formatDay } from '@/utils/formatDate';
 import { usePaymentReturn } from '@/hooks/usePaymentReturn';
-import { BadgeKind, MyProfileBadge, subscriptionsService } from '@/services/subscriptionsService';
-import { openSubscribe } from '@/state/subscribeStore';
+import { BadgeKind, Boost, BoostInfo, MyProfileBadge, subscriptionsService } from '@/services/subscriptionsService';
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
-import { formatDay } from '@/utils/formatDate';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 const TRUST_GRADIENT = ['#047857', '#10B981'] as const;
@@ -24,27 +24,53 @@ const KIND_ICON: Record<BadgeKind, React.ComponentProps<typeof FontAwesome6>['na
 };
 
 /**
- * Profile's "Grow your profiles": the gold Partner Plus card (when the admin has plans on),
- * then a card per profile — services, shop, job post — each with two big tiles: its own
- * "Trusted by Triolo" badge (bought separately) and Boost (shown to customers as an ad).
+ * The Plans tab's "Your profiles": one slim card per profile — services, shop, job post — with
+ * its "Trusted by Triolo" badge (bought separately; shows Active / price / why not yet) and
+ * Boost (shown to customers as an ad) side by side as two buttons.
  */
-export function ProfileGrowth() {
+export function ProfileGrowth({
+  boostInfo,
+  kinds,
+  profileIds,
+  hideHeading = false,
+  gold = false,
+  split = false,
+}: {
+  /** Drawn inside the gold plan card: gold-toned, no white panels. */
+  gold?: boolean;
+  /** The Plans tab: the badge and the boost each in a card of their own. */
+  split?: boolean;
+  boostInfo: BoostInfo | null;
+  /** Only these kinds of profile (the Plans tab shows each kind in its own section). */
+  kinds?: BadgeKind[];
+  /** Only these profiles (Plans: the one job post picked). */
+  profileIds?: string[];
+  hideHeading?: boolean;
+}) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const queryClient = useQueryClient();
-  const subscription = useMySubscription();
   const badges = useMyBadges();
-  const profiles = badges.data?.profiles ?? [];
-  const boostInfo = useBoostInfo(profiles.length > 0);
-  const [boosting, setBoosting] = useState<{ kind: BadgeKind; name: string } | null>(null);
-  const [busy, setBusy] = useState<BadgeKind | null>(null);
+  const profiles = (badges.data?.profiles ?? []).filter(
+    (profile) => (!kinds || kinds.includes(profile.kind)) && (!profileIds || profileIds.includes(profile.profileId)),
+  );
+  const [boosting, setBoosting] = useState<{ kind: BadgeKind; name: string; profileId: string } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  // The boost whose numbers are open.
+  const [details, setDetails] = useState<Boost | null>(null);
+  const boosts = useMyBoosts(true);
   // The badge whose payment is being checked by hand (its button spins).
   const [checking, setChecking] = useState<string | null>(null);
   const { watch } = usePaymentReturn();
 
-  const sub = subscription.data;
-  if (!sub?.enabled && profiles.length === 0) return null;
-  const boostFrom = boostInfo.data ? Math.min(...Object.values(boostInfo.data.prices)) : null;
+  if (profiles.length === 0) return null;
+  const boostFrom = boostInfo ? Math.min(...Object.values(boostInfo.prices)) : null;
+  const badgesOn = !!badges.data?.enabled;
+  // On the gold card everything is gold-ink on a soft brown tint, in light and dark mode alike.
+  const ink = gold ? GOLD_INK : colors.text;
+  const inkSoft = gold ? GOLD_INK_SOFT : colors.textMuted;
+  const tint = 'rgba(61, 37, 0, 0.08)';
+  const rim = 'rgba(61, 37, 0, 0.2)';
 
   const checkBadge = async (badgeId: string, quiet: boolean) => {
     if (!quiet) setChecking(badgeId);
@@ -64,12 +90,12 @@ export function ProfileGrowth() {
   };
 
   const buyBadge = async (profile: MyProfileBadge) => {
-    setBusy(profile.kind);
+    setBusy(profile.profileId);
     try {
       const pending = profile.status === 'pending' && profile.badgeId && profile.paymentUrl;
       const { id, paymentUrl } = pending
         ? { id: profile.badgeId!, paymentUrl: profile.paymentUrl! }
-        : await subscriptionsService.badgeCheckout(profile.kind);
+        : await subscriptionsService.badgeCheckout(profile.kind, profile.profileId);
       queryClient.invalidateQueries({ queryKey: BADGES_QUERY_KEY });
       watch(() => checkBadge(id, true));
       await Linking.openURL(paymentUrl);
@@ -80,155 +106,249 @@ export function ProfileGrowth() {
     }
   };
 
-  const badgeTile = (profile: MyProfileBadge) => {
-    const badgesOn = !!badges.data?.enabled;
+  const badgeButton = (profile: MyProfileBadge) => {
     const active = profile.status === 'active';
     if (!badgesOn && !active) return null;
     const canBuy = profile.eligible && !active;
-    const caption = active
-      ? t('badge.activeCaption')
+    const label = active
+      ? t('badge.trusted')
       : !profile.eligible
-        ? t(`badge.notEligible.${profile.kind}`)
+        ? t('plans.badgeNotYet')
         : profile.status === 'pending'
-          ? t('badge.finishPayment')
-          : t('badge.price', { amount: badges.data?.price ?? 0 });
+          ? t('plans.badgeFinish')
+          : t('plans.badgePrice', { amount: badges.data?.price ?? 0 });
     return (
       <Pressable
-        onPress={() => canBuy && buyBadge(profile)}
-        disabled={!canBuy || busy !== null}
+        onPress={() => {
+          if (canBuy) {
+            buyBadge(profile);
+            return;
+          }
+          // Nothing to buy: say why rather than doing nothing.
+          showToast(
+            active
+              ? { variant: 'success', title: t('growth.alreadyTrustedTitle'), message: t('growth.alreadyTrustedMessage') }
+              : { variant: 'info', title: t('plans.badgeNotYet'), message: t(`badge.notEligible.${profile.kind}`) },
+          );
+        }}
+        disabled={busy !== null}
         accessibilityRole="button"
+        accessibilityHint={!profile.eligible ? t(`badge.notEligible.${profile.kind}`) : undefined}
         style={({ pressed }) => [
-          styles.tile,
+          split ? styles.actionRow : styles.action,
           {
-            backgroundColor: active ? `${brandColors.success}14` : colors.background,
-            borderColor: active ? `${brandColors.success}66` : colors.border,
+            backgroundColor: gold ? tint : active ? `${brandColors.success}14` : `${brandColors.success}0A`,
+            borderColor: gold ? rim : `${brandColors.success}${canBuy || active ? '66' : '2E'}`,
             opacity: pressed ? 0.85 : 1,
           },
         ]}
       >
-        <LinearGradient colors={TRUST_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.tileIcon}>
-          {busy === profile.kind ? (
-            <LoadingIndicator size={18} />
+        <LinearGradient colors={TRUST_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionIcon}>
+          {busy === profile.profileId ? (
+            <LoadingIndicator size={14} />
           ) : (
-            <FontAwesome6 name={active ? 'circle-check' : 'shield-halved'} size={18} color="#FFFFFF" solid />
+            <FontAwesome6 name={active ? 'circle-check' : 'shield-halved'} size={15} color="#FFFFFF" solid />
           )}
         </LinearGradient>
-        <Text style={[styles.tileTitle, { color: colors.text }]} numberOfLines={1}>
-          {active ? t('badge.trusted') : t('badge.tileTitle')}
-        </Text>
-        <Text style={[styles.tileCaption, { color: active ? brandColors.success : colors.textMuted }]} numberOfLines={3}>
-          {caption}
-        </Text>
-        {canBuy ? (
-          <View style={[styles.tileCta, { backgroundColor: brandColors.success }]}>
-            <Text style={styles.tileCtaText}>{profile.status === 'removed' ? t('badge.buyAgainShort') : t('badge.getShort')}</Text>
-          </View>
-        ) : null}
+        <View style={styles.flex}>
+          <Text style={[styles.actionTitle, { color: ink }]} numberOfLines={1}>
+            {t('badge.tileTitle')}
+          </Text>
+          <Text style={[styles.actionText, { color: gold ? '#166534' : brandColors.success }]} numberOfLines={1}>
+            {label}
+          </Text>
+        </View>
       </Pressable>
     );
   };
 
-  const boostTile = (profile: MyProfileBadge) => (
+  /** The profile's boost that is on or on its way (paid, being checked, running). */
+  const currentBoost = (profile: MyProfileBadge) =>
+    (boosts.data ?? []).find(
+      (boost) =>
+        boost.actionType === profile.kind &&
+        ['in_review', 'scheduled', 'running'].includes(boost.status) &&
+        (!boost.promoted || boost.promoted.id === profile.profileId),
+    ) ?? null;
+
+  const boostButton = (profile: MyProfileBadge) => {
+    const current = currentBoost(profile);
+    if (current) {
+      return (
+        <Pressable
+          onPress={() => setDetails(current)}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            split ? styles.actionRow : styles.action,
+            { backgroundColor: gold ? tint : `${colors.primary}14`, borderColor: gold ? rim : colors.primary, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionIcon}>
+            <FontAwesome6 name="rocket" size={15} color="#FFFFFF" solid />
+          </LinearGradient>
+          <View style={styles.flex}>
+            <Text style={[styles.actionTitle, { color: ink }]} numberOfLines={1}>
+              {t('plans.boosting')}
+            </Text>
+            <Text style={[styles.actionText, { color: gold ? '#0B3A8A' : colors.primary }]} numberOfLines={1}>
+              {current.status === 'running' ? t('boost.views', { count: current.impressions }) : t(`boost.status.${current.status}`)}
+            </Text>
+          </View>
+        </Pressable>
+      );
+    }
+    return (
     <Pressable
-      onPress={() => setBoosting({ kind: profile.kind, name: profile.name })}
+      onPress={() => setBoosting({ kind: profile.kind, name: profile.name, profileId: profile.profileId })}
       disabled={!profile.eligible}
       accessibilityRole="button"
       style={({ pressed }) => [
-        styles.tile,
-        { backgroundColor: colors.background, borderColor: colors.border, opacity: !profile.eligible ? 0.5 : pressed ? 0.85 : 1 },
+        split ? styles.actionRow : styles.action,
+        {
+          backgroundColor: gold ? tint : `${colors.primary}0A`,
+          borderColor: gold ? rim : `${colors.primary}${profile.eligible ? '66' : '2E'}`,
+          opacity: !profile.eligible ? 0.55 : pressed ? 0.85 : 1,
+        },
       ]}
     >
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.tileIcon}>
-        <FontAwesome6 name="rocket" size={18} color="#FFFFFF" solid />
+      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionIcon}>
+        <FontAwesome6 name="rocket" size={15} color="#FFFFFF" solid />
       </LinearGradient>
-      <Text style={[styles.tileTitle, { color: colors.text }]} numberOfLines={1}>
-        {t('growth.boost')}
-      </Text>
-      <Text style={[styles.tileCaption, { color: colors.textMuted }]} numberOfLines={3}>
-        {boostFrom !== null ? t('growth.boostFrom', { amount: boostFrom }) : t('growth.boostCaption')}
-      </Text>
-      {profile.eligible ? (
-        <View style={[styles.tileCta, { backgroundColor: colors.primary }]}>
-          <Text style={styles.tileCtaText}>{t('growth.boostCta')}</Text>
-        </View>
-      ) : null}
+      <View style={styles.flex}>
+        <Text style={[styles.actionTitle, { color: ink }]} numberOfLines={1}>
+          {t('growth.boost')}
+        </Text>
+        <Text style={[styles.actionText, { color: gold ? '#0B3A8A' : colors.primary }]} numberOfLines={1}>
+          {boostFrom !== null ? t('plans.boostFrom', { amount: boostFrom }) : t('growth.boostCta')}
+        </Text>
+      </View>
     </Pressable>
+    );
+  };
+
+  // The Plans tab: the badge card (green) and the boost card (blue), each saying what it does.
+  const renderSplit = (profile: MyProfileBadge, index: number) => (
+    <React.Fragment key={profile.profileId}>
+      <View style={[styles.splitCard, { backgroundColor: colors.surface, borderColor: `${brandColors.success}66` }]}>
+        <LinearGradient colors={TRUST_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.band}>
+          <FontAwesome6 name="shield-halved" size={70} color="rgba(255,255,255,0.13)" solid style={styles.bandMark} />
+          <View style={styles.bandIcon}>
+            <FontAwesome6 name="shield-halved" size={17} color="#FFFFFF" solid />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.bandTitle}>{t('badge.tileTitle')}</Text>
+            <Text style={styles.bandFor} numberOfLines={1}>
+              {profile.name}
+            </Text>
+          </View>
+        </LinearGradient>
+        <Text style={[styles.splitText, { color: colors.textMuted }]}>{t('growth.trustDesc')}</Text>
+        <View style={styles.points}>
+          {(['a', 'b', 'c'] as const).map((point) => (
+            <View key={point} style={[styles.point, { backgroundColor: `${brandColors.success}14`, borderColor: `${brandColors.success}33` }]}>
+              <FontAwesome6 name="check" size={9} color={brandColors.success} solid />
+              <Text style={[styles.pointText, { color: colors.text }]} numberOfLines={1}>
+                {t(`growth.trustPoints.${point === 'c' ? `c_${profile.kind}` : point}`)}
+              </Text>
+            </View>
+          ))}
+        </View>
+        {profile.status === 'removed' && profile.removedReason ? (
+          <View style={[styles.notice, { backgroundColor: `${brandColors.error}12`, borderColor: `${brandColors.error}40` }]}>
+            <FontAwesome6 name="triangle-exclamation" size={12} color={brandColors.error} solid />
+            <Text style={[styles.noticeText, { color: colors.text }]}>{t('badge.removed', { reason: profile.removedReason })}</Text>
+          </View>
+        ) : null}
+        {badgeButton(profile) ?? (
+          <Text style={[styles.splitText, { color: colors.textMuted }]}>{t('growth.badgeOff')}</Text>
+        )}
+        {profile.status === 'pending' && profile.badgeId ? (
+          <Pressable onPress={() => checkBadge(profile.badgeId!, false)} disabled={checking !== null} hitSlop={6} style={styles.checkLink}>
+            {checking === profile.badgeId ? (
+              <LoadingIndicator size={16} color={colors.primary} />
+            ) : (
+              <Text style={[styles.link, { color: colors.primary }]}>{t('subscribe.checkPaid')}</Text>
+            )}
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={[styles.splitCard, { backgroundColor: colors.surface, borderColor: `${colors.primary}66` }]}>
+        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.band}>
+          <FontAwesome6 name="rocket" size={70} color="rgba(255,255,255,0.13)" solid style={styles.bandMark} />
+          <View style={styles.bandIcon}>
+            <FontAwesome6 name="rocket" size={17} color="#FFFFFF" solid />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.bandTitle}>{t('growth.boost')}</Text>
+            <Text style={styles.bandFor} numberOfLines={1}>
+              {profile.name}
+            </Text>
+          </View>
+        </LinearGradient>
+        <Text style={[styles.splitText, { color: colors.textMuted }]}>{t('growth.boostDesc')}</Text>
+        <View style={styles.points}>
+          {(['a', 'b', 'c'] as const).map((point) => (
+            <View key={point} style={[styles.point, { backgroundColor: `${colors.primary}14`, borderColor: `${colors.primary}33` }]}>
+              <FontAwesome6 name="check" size={9} color={colors.primary} solid />
+              <Text style={[styles.pointText, { color: colors.text }]} numberOfLines={1}>
+                {t(`growth.boostPoints.${point}`)}
+              </Text>
+            </View>
+          ))}
+        </View>
+        {boostButton(profile)}
+      </View>
+    </React.Fragment>
   );
 
   return (
     <>
-      <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('growth.title')}</Text>
+      {split ? null : hideHeading ? (
+        <View style={styles.headGap} />
+      ) : (
+        <View style={styles.headRow}>
+          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headIcon}>
+            <FontAwesome6 name="id-card" size={12} color="#FFFFFF" solid />
+          </LinearGradient>
+          <Text style={[styles.headTitle, { color: colors.text }]}>{t('plans.profilesTitle')}</Text>
+          <View style={[styles.headRule, { backgroundColor: `${colors.primary}1F` }]} />
+        </View>
+      )}
 
-      {sub?.enabled ? (
-        <Pressable onPress={openSubscribe} accessibilityRole="button" style={({ pressed }) => [styles.plusWrap, { opacity: pressed ? 0.9 : 1 }]}>
-          <GoldCard style={styles.plusCard}>
-            <View style={styles.plusRow}>
-              <View style={styles.crown}>
-                <FontAwesome6 name="crown" size={18} color="#8A5300" solid />
-              </View>
-              <View style={styles.flex}>
-                <View style={styles.plusTitleRow}>
-                  <Text style={styles.plusTitle}>{t('subscribe.cardBrand')}</Text>
-                  {sub.active ? (
-                    <View style={styles.activePill}>
-                      <FontAwesome6 name="check" size={9} color="#FFFFFF" solid />
-                      <Text style={styles.activeText}>{t('subscribe.activeShort')}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={styles.plusText} numberOfLines={2}>
-                  {sub.active ? t('subscribe.activeUntil', { date: formatDay(sub.active.endsAt) }) : t('subscribe.cardText')}
-                </Text>
-              </View>
-              <View style={styles.plusCta}>
-                <Text style={styles.plusCtaText}>{sub.active ? t('subscribe.manage') : t('subscribe.get')}</Text>
-              </View>
-            </View>
-          </GoldCard>
-        </Pressable>
-      ) : null}
-
-      {profiles.map((profile) => (
-        <View key={profile.kind} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cardHead}>
-            <View style={styles.kindIcon}>
-              <FontAwesome6 name={KIND_ICON[profile.kind]} size={15} color="#FFFFFF" solid />
-            </View>
+      {profiles.map((profile, index) => split ? renderSplit(profile, index) : (
+        <View
+          key={profile.profileId}
+          style={[styles.card, gold ? { backgroundColor: tint, borderColor: rim } : { backgroundColor: colors.surface, borderColor: `${colors.primary}2E` }]}
+        >
+          <View style={styles.cardHead}>
+            <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.kindIcon}>
+              <FontAwesome6 name={KIND_ICON[profile.kind]} size={14} color="#FFFFFF" solid />
+            </LinearGradient>
             <View style={styles.flex}>
-              <Text style={styles.cardTitle} numberOfLines={1}>
+              <Text style={[styles.cardTitle, { color: ink }]} numberOfLines={1}>
                 {profile.name}
               </Text>
-              <Text style={styles.cardKind}>{t(`growth.kind.${profile.kind}`)}</Text>
+              <Text style={[styles.cardKind, { color: inkSoft }]}>{t(`growth.kind.${profile.kind}`)}</Text>
             </View>
-            {profile.status === 'active' ? (
-              <View style={styles.trustedChip}>
-                <FontAwesome6 name="circle-check" size={11} color="#FFFFFF" solid />
-                <Text style={styles.trustedChipText}>{t('badge.trusted')}</Text>
-              </View>
-            ) : null}
-          </LinearGradient>
+          </View>
 
           {profile.status === 'removed' && profile.removedReason ? (
             <View style={[styles.notice, { backgroundColor: `${brandColors.error}12`, borderColor: `${brandColors.error}40` }]}>
-              <FontAwesome6 name="triangle-exclamation" size={13} color={brandColors.error} solid />
+              <FontAwesome6 name="triangle-exclamation" size={12} color={brandColors.error} solid />
               <Text style={[styles.noticeText, { color: colors.text }]}>{t('badge.removed', { reason: profile.removedReason })}</Text>
             </View>
           ) : null}
 
-          <View style={styles.tiles}>
-            {badgeTile(profile)}
-            {boostTile(profile)}
+          <View style={styles.actions}>
+            {badgeButton(profile)}
+            {boostButton(profile)}
           </View>
 
           {profile.status === 'pending' && profile.badgeId ? (
-            <Pressable
-              onPress={() => checkBadge(profile.badgeId!, false)}
-              disabled={checking !== null}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.checkButton, { borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
-            >
+            <Pressable onPress={() => checkBadge(profile.badgeId!, false)} disabled={checking !== null} hitSlop={6} style={styles.checkLink}>
               {checking === profile.badgeId ? (
-                <LoadingIndicator size={18} color={colors.primary} />
+                <LoadingIndicator size={16} color={colors.primary} />
               ) : (
                 <Text style={[styles.link, { color: colors.primary }]}>{t('subscribe.checkPaid')}</Text>
               )}
@@ -238,110 +358,125 @@ export function ProfileGrowth() {
       ))}
 
       <BoostModal profile={boosting} onClose={() => setBoosting(null)} />
+
+      {/* A boost's numbers: views, taps, the tap rate, its days and status — as on the ads site. */}
+      <Modal visible={details !== null} transparent animationType="fade" onRequestClose={() => setDetails(null)} statusBarTranslucent>
+        <GlassBackdrop onPress={() => setDetails(null)} style={styles.detailsOverlay}>
+          {details ? (
+            <View style={[styles.detailsSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.detailsHead}>
+                <FontAwesome6 name="rocket" size={16} color="#FFFFFF" solid />
+                <View style={styles.flex}>
+                  <Text style={styles.detailsTitle}>{t('plans.boostDetailsTitle')}</Text>
+                  <Text style={styles.detailsSub} numberOfLines={1}>
+                    {details.promoted?.name ?? ''} · {t(`boost.status.${details.status}`)}
+                  </Text>
+                </View>
+              </LinearGradient>
+              <View style={styles.detailsStats}>
+                {[
+                  { icon: 'eye' as const, value: String(details.impressions), label: t('plans.boostViews') },
+                  { icon: 'hand-pointer' as const, value: String(details.clicks), label: t('plans.boostClicks') },
+                  {
+                    icon: 'percent' as const,
+                    value: details.impressions > 0 ? `${((details.clicks / details.impressions) * 100).toFixed(1)}%` : '–',
+                    label: t('plans.boostRate'),
+                  },
+                ].map((stat) => (
+                  <View key={stat.label} style={[styles.detailsStat, { backgroundColor: colors.background, borderColor: `${colors.primary}1F` }]}>
+                    <FontAwesome6 name={stat.icon} size={13} color={colors.primary} solid />
+                    <Text style={[styles.detailsValue, { color: colors.text }]}>{stat.value}</Text>
+                    <Text style={[styles.detailsLabel, { color: colors.textMuted }]}>{stat.label}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={[styles.detailsRow, { borderTopColor: colors.border }]}>
+                <Text style={[styles.detailsKey, { color: colors.textMuted }]}>{t('plans.boostDates')}</Text>
+                <Text style={[styles.detailsVal, { color: colors.text }]}>
+                  {formatDay(details.startDate)} – {formatDay(details.endDate)}
+                </Text>
+              </View>
+              <View style={[styles.detailsRow, { borderTopColor: colors.border }]}>
+                <Text style={[styles.detailsKey, { color: colors.textMuted }]}>{t('plans.boostPlan')}</Text>
+                <Text style={[styles.detailsVal, { color: colors.text }]}>
+                  {t('boost.days', { count: details.planDays })} · ₹{details.amount}
+                </Text>
+              </View>
+              <Pressable onPress={() => setDetails(null)} style={[styles.detailsClose, { borderColor: colors.primary }]}>
+                <Text style={[styles.detailsCloseText, { color: colors.primary }]}>{t('common.close')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </GlassBackdrop>
+      </Modal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  headGap: { height: 10 },
   flex: { flex: 1 },
-  sectionLabel: {
-    ...typography.caption,
-    fontFamily: fonts.semiBold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: 22,
-    marginBottom: 12,
-  },
-  plusWrap: { marginBottom: 14 },
-  plusCard: { padding: 16 },
-  plusRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  crown: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+  headRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 10 },
+  headIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  headTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16 },
+  headRule: { flex: 1, height: 1 },
+  card: { borderWidth: 1.5, borderRadius: 20, padding: 12, gap: 12, marginBottom: 10 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  kindIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14.5 },
+  cardKind: { ...typography.caption, fontSize: 11.5 },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, padding: 8 },
+  noticeText: { ...typography.caption, flex: 1, lineHeight: 16 },
+  actions: { flexDirection: 'row', gap: 10 },
+  splitCard: { borderWidth: 1.5, borderRadius: 22, padding: 14, gap: 11, marginBottom: 12, overflow: 'hidden' },
+  band: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: -14, marginTop: -14, paddingHorizontal: 14, paddingVertical: 14, overflow: 'hidden' },
+  bandMark: { position: 'absolute', right: -6, bottom: -18 },
+  bandIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: 'rgba(255,255,255,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  plusTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  plusTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: GOLD_INK, lineHeight: 22 },
-  plusText: { ...typography.caption, color: GOLD_INK_SOFT, marginTop: 2, lineHeight: 16 },
-  activePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#15803D',
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  activeText: { ...typography.caption, fontSize: 10, color: '#FFFFFF', fontFamily: fonts.semiBold },
-  plusCta: { backgroundColor: GOLD_INK, borderRadius: 14, paddingHorizontal: 12, height: 30, justifyContent: 'center' },
-  plusCtaText: { ...typography.caption, color: '#FFE29A', fontFamily: fonts.semiBold },
-  card: {
-    borderWidth: 1,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 14,
-    shadowColor: '#0B2A5B',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  kindIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardTitle: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  cardKind: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', marginTop: 1 },
-  trustedChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#059669',
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  trustedChipText: { ...typography.caption, fontSize: 11, color: '#FFFFFF', fontFamily: fonts.semiBold },
-  notice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-  },
-  noticeText: { ...typography.caption, flex: 1, lineHeight: 17 },
-  tiles: { flexDirection: 'row', gap: 10, padding: 12 },
-  tile: { flex: 1, borderWidth: 1, borderRadius: 16, padding: 12, alignItems: 'flex-start', gap: 6 },
-  tileIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  tileTitle: { ...typography.body, fontFamily: fonts.semiBold },
-  tileCaption: { ...typography.caption, lineHeight: 16, flexGrow: 1 },
-  tileCta: { marginTop: 4, borderRadius: 12, paddingHorizontal: 12, height: 30, justifyContent: 'center', alignSelf: 'stretch', alignItems: 'center' },
-  tileCtaText: { ...typography.caption, color: '#FFFFFF', fontFamily: fonts.semiBold },
-  checkButton: {
-    height: 40,
-    marginHorizontal: 12,
-    marginBottom: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  bandTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16.5, color: '#FFFFFF', lineHeight: 22 },
+  bandFor: { ...typography.caption, fontSize: 12, color: 'rgba(255,255,255,0.88)' },
+  points: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  point: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 26, borderRadius: 13, borderWidth: 1, paddingHorizontal: 9 },
+  pointText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
+  splitMark: { position: 'absolute', right: -10, top: -8 },
+  splitLabel: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, marginBottom: 8 },
+  splitNumber: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  splitNumberText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 14, color: '#FFFFFF' },
+  splitLabelText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14, flex: 1 },
+  splitHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  splitIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  splitTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16.5 },
+  splitFor: { ...typography.caption, fontSize: 12 },
+  splitText: { ...typography.caption, fontSize: 12.5, lineHeight: 18 },
+  // The action inside a split card: one wide row.
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 12, minHeight: 54 },
+  // Two tiles side by side: a big icon on top, the name and its state under it.
+  action: { flex: 1, gap: 10, borderWidth: 1.5, borderRadius: 16, padding: 12, minHeight: 98 },
+  actionIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  actionTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 13.5, lineHeight: 18 },
+  actionText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11.5, lineHeight: 15, marginTop: 1 },
+  checkLink: { alignSelf: 'center', paddingVertical: 2 },
   link: { ...typography.caption, fontFamily: fonts.semiBold },
+  detailsOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
+  detailsSheet: { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+  detailsHead: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  detailsTitle: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  detailsSub: { ...typography.caption, color: 'rgba(255,255,255,0.85)' },
+  detailsStats: { flexDirection: 'row', gap: 8, padding: 12 },
+  detailsStat: { flex: 1, alignItems: 'center', gap: 3, borderRadius: 14, borderWidth: 1, paddingVertical: 10 },
+  detailsValue: { fontFamily: fonts.semiBold, fontSize: 17, lineHeight: 22 },
+  detailsLabel: { ...typography.caption, fontSize: 11 },
+  detailsRow: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 10 },
+  detailsKey: { ...typography.caption, fontSize: 12.5 },
+  detailsVal: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12.5 },
+  detailsClose: { margin: 12, height: 42, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  detailsCloseText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
 });

@@ -44,6 +44,7 @@ export function useAcceptProblem() {
     mutationFn: (problemId: string) => problemsService.accept(problemId),
     // No partner plan: one paid accept.
     payKind: 'accept',
+    payPlan: 'service',
     // Settled, not success — a lost race (409) also means the list is stale.
     onSettled: invalidate,
   });

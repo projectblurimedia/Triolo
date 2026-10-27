@@ -89,4 +89,6 @@ export const jobSeekersService = {
   customTitles: (query: string) => apiClient.get<string[]>(`/job-seekers/custom-titles?query=${encodeURIComponent(query)}`, true),
   /** One live post (e.g. from an ad's Contact). */
   getPublic: (id: string) => apiClient.get<JobSeeker>(`/job-seekers/public/${id}`, true),
+  /** A customer opened this post: one more visit for the poster (fire and forget). */
+  recordView: (id: string) => apiClient.post<null>(`/job-seekers/${id}/view`, undefined, true),
 };

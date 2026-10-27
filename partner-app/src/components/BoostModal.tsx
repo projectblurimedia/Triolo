@@ -22,7 +22,7 @@ const BOOST_GRADIENT = headerGradient;
 
 interface BoostModalProps {
   /** The profile being boosted; null = closed. */
-  profile: { kind: BadgeKind; name: string } | null;
+  profile: { kind: BadgeKind; name: string; profileId?: string } | null;
   onClose: () => void;
 }
 
@@ -49,7 +49,12 @@ export function BoostModal({ profile, onClose }: BoostModalProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  const mine = (boosts.data ?? []).filter((boost) => boost.actionType === profile?.kind && boost.status !== 'deleted');
+  const mine = (boosts.data ?? []).filter(
+    (boost) =>
+      boost.actionType === profile?.kind &&
+      boost.status !== 'deleted' &&
+      (!profile?.profileId || !boost.promoted || boost.promoted.id === profile.profileId),
+  );
   const prices = info.data?.prices;
   const price = prices?.[String(days) as '1' | '3' | '7' | '30'] ?? 0;
 
@@ -76,7 +81,7 @@ export function BoostModal({ profile, onClose }: BoostModalProps) {
     if (!profile || !mobileNumber) return;
     setBusy('new');
     try {
-      const result = await subscriptionsService.startBoost(profile.kind, days, mobileNumber);
+      const result = await subscriptionsService.startBoost(profile.kind, days, mobileNumber, profile.profileId);
       queryClient.invalidateQueries({ queryKey: BOOSTS_QUERY_KEY });
       await openPayment(result.id, result.paymentUrl);
     } catch (error) {

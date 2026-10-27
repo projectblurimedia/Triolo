@@ -162,7 +162,7 @@ export class BusinessesService {
   }
 
   async searchNearby(accountId: string, filter: NearbySearchFilter): Promise<BusinessNearbyResult[]> {
-    const priorityAccountIds = (await this.subscriptionStatus?.priorityPartnerIds()) ?? [];
+    const priorityAccountIds = (await this.subscriptionStatus?.priorityPartnerIds('shop')) ?? [];
     return this.repository.findNearby(accountId, { ...filter, priorityAccountIds });
   }
 
@@ -172,7 +172,7 @@ export class BusinessesService {
     if (!profile) {
       throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
     }
-    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId);
+    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId, 'shop');
   }
 
   // --- Admin-facing (called only from modules/admin's service — see WorkersService's own

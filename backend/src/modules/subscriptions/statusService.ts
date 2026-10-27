@@ -1,6 +1,6 @@
 import { AppError } from '@/common/errors/AppError';
 import { SubscriptionsRepository } from './repository';
-import { customerPlansOn, partnerPlansOn, SubscriptionAudience, SubscriptionSettings, TrustedIds } from './interfaces';
+import { customerPlansOn, PartnerPlan, partnerPlansOn, SubscriptionAudience, SubscriptionSettings, TrustedIds } from './interfaces';
 
 // Short per-instance caches: these are asked on hot paths (every ad, search and booking).
 const SETTINGS_TTL_MS = 20 * 1000;
@@ -14,7 +14,7 @@ const ACTIVE_TTL_MS = 20 * 1000;
  */
 export class SubscriptionStatusService {
   private settingsCache: { at: number; value: SubscriptionSettings } | null = null;
-  private partnerIdsCache: { at: number; value: Set<string> } | null = null;
+  private partnerIdsCache = new Map<PartnerPlan, { at: number; value: Set<string> }>();
   private activeCache = new Map<string, { at: number; value: boolean }>();
 
   constructor(private readonly repository: SubscriptionsRepository) {}
@@ -26,11 +26,12 @@ export class SubscriptionStatusService {
     return value;
   }
 
-  async isActive(accountId: string, audience: SubscriptionAudience): Promise<boolean> {
-    const key = `${audience}:${accountId}`;
+  /** With a partner plan: subscribed to that plan (or an older plan covering everything). */
+  async isActive(accountId: string, audience: SubscriptionAudience, plan?: PartnerPlan): Promise<boolean> {
+    const key = `${audience}:${plan ?? '*'}:${accountId}`;
     const cached = this.activeCache.get(key);
     if (cached && Date.now() - cached.at < ACTIVE_TTL_MS) return cached.value;
-    const value = (await this.repository.findActive(accountId, audience)) !== null;
+    const value = (await this.repository.findActive(accountId, audience, plan)) !== null;
     this.activeCache.set(key, { at: Date.now(), value });
     return value;
   }
@@ -38,10 +39,9 @@ export class SubscriptionStatusService {
   /** Clears what this instance remembers (after a purchase or a settings change). */
   forget(accountId?: string): void {
     this.settingsCache = null;
-    this.partnerIdsCache = null;
+    this.partnerIdsCache.clear();
     if (accountId) {
-      this.activeCache.delete(`customer:${accountId}`);
-      this.activeCache.delete(`partner:${accountId}`);
+      for (const key of [...this.activeCache.keys()]) if (key.endsWith(`:${accountId}`)) this.activeCache.delete(key);
     } else {
       this.activeCache.clear();
     }
@@ -58,14 +58,18 @@ export class SubscriptionStatusService {
     throw new AppError(403, 'SUBSCRIPTION_REQUIRED', 'Subscribe to book workers and order from shops.');
   }
 
-  /** Subscribed partners (while partner subscriptions are on): they come first in searches. */
-  async priorityPartnerIds(): Promise<string[]> {
+  /**
+   * Partners subscribed to this plan (while partner subscriptions are on): their services /
+   * shop / job posts come first in customers' searches.
+   */
+  async priorityPartnerIds(plan: PartnerPlan): Promise<string[]> {
     const settings = await this.settings();
     if (!partnerPlansOn(settings)) return [];
-    if (!this.partnerIdsCache || Date.now() - this.partnerIdsCache.at > ACTIVE_TTL_MS) {
-      this.partnerIdsCache = { at: Date.now(), value: new Set(await this.repository.activeAccountIds('partner')) };
-    }
-    return [...this.partnerIdsCache.value];
+    const cached = this.partnerIdsCache.get(plan);
+    if (cached && Date.now() - cached.at <= ACTIVE_TTL_MS) return [...cached.value];
+    const value = new Set(await this.repository.activeAccountIds('partner', plan));
+    this.partnerIdsCache.set(plan, { at: Date.now(), value });
+    return [...value];
   }
 
   /**
@@ -75,13 +79,13 @@ export class SubscriptionStatusService {
   async headStart(): Promise<{ seconds: number; subscriberIds: Set<string> } | null> {
     const settings = await this.settings();
     if (!partnerPlansOn(settings) || settings.headStartSeconds <= 0) return null;
-    return { seconds: settings.headStartSeconds, subscriberIds: new Set(await this.priorityPartnerIds()) };
+    return { seconds: settings.headStartSeconds, subscriberIds: new Set(await this.priorityPartnerIds('service')) };
   }
 
-  /** Subscribed partners see who viewed their profile (with a Call button). */
-  async revealsProfileViewers(accountId: string): Promise<boolean> {
+  /** Partners on the plan for that profile see who viewed it. */
+  async revealsProfileViewers(accountId: string, plan?: PartnerPlan): Promise<boolean> {
     if (!partnerPlansOn(await this.settings())) return false;
-    return this.isActive(accountId, 'partner');
+    return this.isActive(accountId, 'partner', plan);
   }
 
   /**
@@ -100,11 +104,15 @@ export class SubscriptionStatusService {
     });
   }
 
-  /** Accepting work or publishing a job post without a plan (partner plans on) uses one paid pass. */
-  async usePartnerPass(accountId: string, kind: 'accept' | 'job_post'): Promise<string | null> {
+  /**
+   * Accepting work without a plan, or publishing any job post (each post is paid for, even with a
+   * plan), while partner plans are on, uses one paid pass.
+   */
+  async usePartnerPass(accountId: string, kind: 'accept' | 'job_post', plan?: PartnerPlan): Promise<string | null> {
     const settings = await this.settings();
     if (!partnerPlansOn(settings)) return null;
-    if (await this.isActive(accountId, 'partner')) return null;
+    // Accepting is free on the plan for that side (services for jobs, shop for orders).
+    if (kind !== 'job_post' && (await this.isActive(accountId, 'partner', plan))) return null;
     const id = await this.repository.consumePass(accountId, kind, null);
     if (id) return id;
     throw new AppError(403, 'PAYMENT_REQUIRED', 'Pay once or subscribe to continue.', {

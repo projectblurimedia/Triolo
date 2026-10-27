@@ -18,7 +18,8 @@ export type NotificationType =
   | 'order_completed'
   | 'order_cancelled'
   | 'admin_notice'
-  | 'badge_removed';
+  | 'badge_removed'
+  | 'job_post_view';
 
 export const MAX_BULK_DELETE = 100;
 
@@ -34,8 +35,15 @@ export interface AppNotification {
    * profile_view: who viewed — given only to subscribed partners (their app shows the name and
    * a Call button); null otherwise.
    */
-  /** profile_view, for a subscribed partner: the viewer's name only (never their number). */
-  viewer?: { name: string } | null;
+  /**
+   * profile_view (on that profile's plan): the viewer's name only. job_post_view (on the job post
+   * plan): name and number, since the poster is looking for work and wants to call back.
+   */
+  viewer?: { name: string; mobile?: string | null } | null;
+  /** What it is about: a profile kind, or a job post with its id. */
+  ref?: { kind: string; id: string | null } | null;
+  /** job_post_view without the job post plan: who it was is hidden (the app offers the plan). */
+  locked?: boolean;
 }
 
 export interface NotificationListResult {
@@ -77,4 +85,5 @@ export const AUDIENCE_BY_TYPE: Record<NotificationType, PushAudience> = {
   order_cancelled: 'any',
   admin_notice: 'any',
   badge_removed: 'partner',
+  job_post_view: 'partner',
 };

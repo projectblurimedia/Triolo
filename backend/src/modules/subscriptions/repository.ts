@@ -8,6 +8,9 @@ import {
   SubscriptionAudience,
   SubscriptionMonths,
   SubscriptionSettings,
+  PartnerPlan,
+  PARTNER_PLANS,
+  SubscriptionPlan,
   TrustedIds,
   AdminPassRow,
   PassKind,
@@ -29,6 +32,9 @@ function mapSettings(row: QueryResultRow): SubscriptionSettings {
     partnerEnabled: row.partner_enabled,
     customerPrices: prices(row.customer_prices),
     partnerPrices: prices(row.partner_prices),
+    partnerPlanPrices: Object.fromEntries(
+      PARTNER_PLANS.map((plan) => [plan, prices(row.partner_plan_prices?.[plan] ?? row.partner_prices)]),
+    ) as Record<PartnerPlan, ReturnType<typeof prices>>,
     headStartSeconds: Number(row.head_start_seconds),
     badgeEnabled: row.badge_enabled,
     badgePrice: Number(row.badge_price),
@@ -52,6 +58,7 @@ function mapSubscription(row: QueryResultRow): Subscription {
     id: row.id,
     accountId: row.account_id,
     audience: row.audience,
+    plan: (row.plan ?? 'all') as SubscriptionPlan,
     months: Number(row.months) as SubscriptionMonths,
     amount: Number(row.amount),
     status: row.status,
@@ -135,6 +142,7 @@ export class SubscriptionsRepository {
     for (const [key, column] of [
       ['customerPrices', 'customer_prices'],
       ['partnerPrices', 'partner_prices'],
+      ['partnerPlanPrices', 'partner_plan_prices'],
       ['customerFees', 'customer_fees'],
       ['partnerFees', 'partner_fees'],
     ] as const) {
@@ -162,41 +170,52 @@ export class SubscriptionsRepository {
 
   // --- Subscriptions ---
 
-  /** The subscription running now (the latest-ending one), if any. */
-  async findActive(accountId: string, audience: SubscriptionAudience): Promise<Subscription | null> {
+  /**
+   * The subscription running now (the latest-ending one), if any. With a partner plan: one for
+   * that plan or an older plan covering everything.
+   */
+  async findActive(accountId: string, audience: SubscriptionAudience, plan?: PartnerPlan): Promise<Subscription | null> {
     const result = await this.pool.query(
       `SELECT * FROM subscriptions
        WHERE account_id = $1 AND audience = $2 AND status = 'active' AND starts_at <= now() AND ends_at > now()
+         AND ($3::text IS NULL OR plan IN ($3, 'all'))
        ORDER BY ends_at DESC LIMIT 1`,
-      [accountId, audience],
+      [accountId, audience, plan ?? null],
     );
     return result.rows[0] ? mapSubscription(result.rows[0]) : null;
   }
 
   /** When this account's paid time ends (including periods bought ahead), or null. */
-  async findLastEnd(accountId: string, audience: SubscriptionAudience): Promise<string | null> {
+  async findLastEnd(accountId: string, audience: SubscriptionAudience, plan?: PartnerPlan): Promise<string | null> {
     const result = await this.pool.query(
-      `SELECT max(ends_at) AS ends_at FROM subscriptions WHERE account_id = $1 AND audience = $2 AND status = 'active' AND ends_at > now()`,
-      [accountId, audience],
+      `SELECT max(ends_at) AS ends_at FROM subscriptions WHERE account_id = $1 AND audience = $2 AND status = 'active' AND ends_at > now()
+         AND ($3::text IS NULL OR plan IN ($3, 'all'))`,
+      [accountId, audience, plan ?? null],
     );
     return iso(result.rows[0]?.ends_at);
   }
 
-  async findPending(accountId: string, audience: SubscriptionAudience): Promise<Subscription | null> {
+  async findPending(accountId: string, audience: SubscriptionAudience, plan: SubscriptionPlan = 'all'): Promise<Subscription | null> {
     const result = await this.pool.query(
       `SELECT * FROM subscriptions
-       WHERE account_id = $1 AND audience = $2 AND status = 'unpaid' AND razorpay_link_url IS NOT NULL
+       WHERE account_id = $1 AND audience = $2 AND status = 'unpaid' AND razorpay_link_url IS NOT NULL AND plan = $3
          AND created_at > now() - interval '1 day'
        ORDER BY created_at DESC LIMIT 1`,
-      [accountId, audience],
+      [accountId, audience, plan],
     );
     return result.rows[0] ? mapSubscription(result.rows[0]) : null;
   }
 
-  async createSubscription(accountId: string, audience: SubscriptionAudience, months: number, amount: number): Promise<Subscription> {
+  async createSubscription(
+    accountId: string,
+    audience: SubscriptionAudience,
+    months: number,
+    amount: number,
+    plan: SubscriptionPlan = 'all',
+  ): Promise<Subscription> {
     const result = await this.pool.query(
-      `INSERT INTO subscriptions (account_id, audience, months, amount) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [accountId, audience, months, amount],
+      `INSERT INTO subscriptions (account_id, audience, months, amount, plan) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [accountId, audience, months, amount, plan],
     );
     return mapSubscription(result.rows[0]);
   }
@@ -224,7 +243,7 @@ export class SubscriptionsRepository {
          SELECT t.id, t.months,
            GREATEST(now(), COALESCE((
              SELECT max(o.ends_at) FROM subscriptions o
-             WHERE o.account_id = t.account_id AND o.audience = t.audience AND o.status = 'active'
+             WHERE o.account_id = t.account_id AND o.audience = t.audience AND o.plan = t.plan AND o.status = 'active'
            ), now())) AS starts_at
          FROM subscriptions t WHERE t.id = $1
        ) target
@@ -236,10 +255,11 @@ export class SubscriptionsRepository {
   }
 
   /** Accounts with a subscription running now. */
-  async activeAccountIds(audience: SubscriptionAudience): Promise<string[]> {
+  async activeAccountIds(audience: SubscriptionAudience, plan?: PartnerPlan): Promise<string[]> {
     const result = await this.pool.query(
-      `SELECT DISTINCT account_id FROM subscriptions WHERE audience = $1 AND status = 'active' AND starts_at <= now() AND ends_at > now()`,
-      [audience],
+      `SELECT DISTINCT account_id FROM subscriptions WHERE audience = $1 AND status = 'active' AND starts_at <= now() AND ends_at > now()
+         AND ($2::text IS NULL OR plan IN ($2, 'all'))`,
+      [audience, plan ?? null],
     );
     return result.rows.map((row) => row.account_id);
   }

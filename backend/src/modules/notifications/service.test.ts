@@ -58,6 +58,7 @@ describe('NotificationsService.notifyProfileViewed', () => {
       title: 'Profile Viewed',
       body: 'Someone viewed your profile.',
       actorAccountId: 'viewer-1',
+      refKind: null,
     });
   });
 

@@ -26,6 +26,7 @@ import {
   SubscriptionPrices,
   SubscriptionSettings,
   subscriptionsApi,
+  PartnerPlan,
 } from '@/services/subscriptionsApi';
 import { getErrorMessage } from '@/services/errorMessages';
 import { showToast } from '@/state/toastStore';
@@ -58,6 +59,13 @@ function StatePill({ on, onLabel = 'On', offLabel = 'Off' }: { on: boolean; onLa
 }
 
 /** The four plan prices, saved together. */
+const PARTNER_PLAN_ROWS: { plan: PartnerPlan; label: string }[] = [
+  { plan: 'service', label: 'Services Plus' },
+  { plan: 'shop', label: 'Shop Plus' },
+  { plan: 'job_post', label: 'Job Post Plus' },
+];
+const PLAN_NAME: Record<PartnerPlan, string> = { service: 'Services', shop: 'Shop', job_post: 'Job posts' };
+
 function PriceEditor({ prices, onSave }: { prices: SubscriptionPrices; onSave: (prices: SubscriptionPrices) => Promise<void> }) {
   const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(PLAN_MONTHS.map((m) => [m, String(prices[m])])));
   const [saving, setSaving] = useState(false);
@@ -377,21 +385,31 @@ export function SubscriptionsPage() {
           </PlanSection>
 
           <PlanSection
-            title="Partner app (Partner Plus)"
-            note="Workers, shops and job posts subscribe to get more work"
+            title="Partner app (one plan per profile)"
+            note="Services, shops and job posts each have their own plan — partners buy the ones they need"
             icon={faHandshake}
             gradient="linear-gradient(135deg,#0a3fae,#2b83ff)"
             on={settings.partnerEnabled}
             master={master}
             perks={[
-              'Hears of Quick Book jobs and new problems first',
-              'No ads',
-              'Services, shops and job posts listed first',
-              'Sees the names of people who viewed their profile (never their numbers)',
+              'Services Plus: Quick Book jobs and problems first, no accept fee, listed first, sees who viewed (names only)',
+              'Shop Plus: no accept fee on orders, listed first, sees who viewed (names only)',
+              'Job Post Plus: sees who viewed their job posts with their numbers, listed first in Hire Staff',
+              'Every plan: no ads',
             ]}
             onToggle={(value) => save({ partnerEnabled: value }, value ? 'Partner plans on' : 'Partner plans off')}
           >
-            <PriceEditor prices={settings.partnerPrices} onSave={(prices) => save({ partnerPrices: prices }, 'Prices saved')} />
+            {PARTNER_PLAN_ROWS.map((row) => (
+              <div key={row.plan} className="sub-plan-prices">
+                <strong>{row.label}</strong>
+                <PriceEditor
+                  prices={settings.partnerPlanPrices?.[row.plan] ?? settings.partnerPrices}
+                  onSave={(prices) =>
+                    save({ partnerPlanPrices: { ...settings.partnerPlanPrices, [row.plan]: prices } }, `${row.label} prices saved`)
+                  }
+                />
+              </div>
+            ))}
             <FeeEditor
               title="Without a plan: pay once"
               fields={[
@@ -532,7 +550,7 @@ export function SubscriptionsPage() {
                   <span className="sub-row-text">
                     <strong>{sub.accountName}</strong>
                     <small>
-                      {sub.accountMobile} · {sub.audience === 'customer' ? 'Customer' : 'Partner'} · {sub.months} month{sub.months === 1 ? '' : 's'} ·{' '}
+                      {sub.accountMobile} · {sub.audience === 'customer' ? 'Customer' : `Partner${sub.plan && sub.plan !== 'all' ? ` (${PLAN_NAME[sub.plan]})` : ''}`} · {sub.months} month{sub.months === 1 ? '' : 's'} ·{' '}
                       {rupees(sub.amount)}
                     </small>
                   </span>

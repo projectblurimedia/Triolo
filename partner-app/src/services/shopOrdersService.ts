@@ -58,7 +58,8 @@ export interface ShopOrder {
   completedAt: string | null;
   items: ShopOrderItem[];
   customerFullName: string;
-  customerMobileNumber: string;
+  /** Only once the order is accepted. */
+  customerMobileNumber: string | null;
   pinAttemptsLeft: number;
 }
 
@@ -70,6 +71,8 @@ export interface ItemUpdate {
 
 export const shopOrdersService = {
   listMine: () => apiClient.get<ShopOrder[]>('/orders/shop/mine', true),
+  /** Find Orders Now: open Quick Orders nearby this shop can take join its list (returned). */
+  searchQuick: () => apiClient.post<ShopOrder[]>('/orders/shop/quick/search', undefined, true),
   get: (id: string) => apiClient.get<ShopOrder>(`/orders/shop/${id}`, true),
   accept: (id: string) => apiClient.post<null>(`/orders/${id}/accept`, undefined, true),
   decline: (id: string, reason?: string) => apiClient.post<null>(`/orders/${id}/decline`, { reason }, true),

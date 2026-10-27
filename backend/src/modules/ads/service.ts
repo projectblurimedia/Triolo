@@ -162,7 +162,9 @@ export class AdsService {
         action.promoteMobile = mobile;
       }
       if (!accountId) throw AppError.badRequest('Enter the Triolo Partner mobile number.', 'AD_ACTION_INVALID');
-      const profile = await this.promotions.find(type, accountId);
+      const profile = params.promotedPostId
+        ? await this.promotions.find(type, accountId, params.promotedPostId)
+        : await this.promotions.find(type, accountId);
       if (!profile) {
         throw AppError.badRequest(
           mobile ? `This number has no ${PROMOTED_LABEL[type]}.` : `You don't have a ${PROMOTED_LABEL[type]} to promote yet.`,

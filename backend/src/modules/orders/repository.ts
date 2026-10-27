@@ -224,6 +224,44 @@ export class OrdersRepository {
     return this.toTransition(result.rows[0]);
   }
 
+  /**
+   * "Find Orders Now": offers this shop every Quick Order still looking for a shop near it that
+   * it could take — the right kind of shop, and for delivery only if it delivers — even ones
+   * whose first push it missed or that went out before it was set up. Offer rows are made once
+   * (one per order and shop); one it declined earlier is offered again. Returns how many.
+   */
+  async offerOpenQuickOrders(shop: {
+    businessId: string;
+    ownerAccountId: string;
+    latitude: number;
+    longitude: number;
+    shopCategories: string[];
+    deliveryAvailable: boolean;
+    radiusKm: number;
+  }): Promise<number> {
+    const result = await this.pool.query(
+      `WITH open AS (
+         SELECT so.id,
+           (6371000 * acos(LEAST(1.0, GREATEST(-1.0,
+             cos(radians($3)) * cos(radians(so.latitude)) * cos(radians(so.longitude) - radians($4)) + sin(radians($3)) * sin(radians(so.latitude))
+           )))) AS distance
+         FROM shop_orders so
+         WHERE so.quick AND so.business_id IS NULL AND so.status = 'placed'
+           AND so.created_at > now() - ${ORDER_WAIT_SQL('so')}
+           AND so.account_id <> $2
+           AND so.shop_categories && $5::business_shop_category[]
+           AND (so.fulfillment = 'pickup' OR $6::boolean)
+       )
+       INSERT INTO quick_order_offers (order_id, business_id, distance_meters)
+       SELECT id, $1, distance FROM open WHERE distance <= $7 * 1000
+       ON CONFLICT (order_id, business_id) DO UPDATE SET status = 'pending'
+         WHERE quick_order_offers.status = 'declined'
+       RETURNING order_id`,
+      [shop.businessId, shop.ownerAccountId, shop.latitude, shop.longitude, shop.shopCategories, shop.deliveryAvailable, shop.radiusKm],
+    );
+    return result.rowCount ?? 0;
+  }
+
   /** A shop turns down a Quick Order: only its own offer closes; the others can still take it. */
   async declineQuickOffer(orderId: string, businessId: string): Promise<boolean> {
     const result = await this.pool.query(
@@ -565,7 +603,8 @@ export class OrdersRepository {
     return rows.map((row) => ({
       ...mapOrder(row, items.get(row.id) ?? []),
       customerFullName: row.customer_full_name,
-      customerMobileNumber: row.customer_mobile_number,
+      // The customer's number only once the shop has taken the order (like the shop's own number).
+      customerMobileNumber: row.accepted_at ? row.customer_mobile_number : null,
       pinAttemptsLeft: Math.max(0, MAX_PIN_ATTEMPTS - Number(row.pin_attempts ?? 0)),
     }));
   }

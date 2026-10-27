@@ -27,7 +27,7 @@ interface GradientHeaderProps {
   /** Right-side icon buttons — e.g. Home's notifications/messages/menu. */
   actions?: HeaderAction[];
   /** Overrides the brand-blue gradient — e.g. Bazaar's own orange, matching its Business identity everywhere else (SHOP_GRADIENT). */
-  gradient?: readonly [string, string];
+  gradient?: readonly [string, string, ...string[]];
 }
 
 /** Brand header used on every top-level screen — see docs/localization.md for why title is passed pre-translated. */

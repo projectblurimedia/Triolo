@@ -434,7 +434,7 @@ describe('BusinessesService.recordProfileView', () => {
     const service = new BusinessesService(repo as unknown as BusinessesRepository, notifications);
 
     await service.recordProfileView('business-1', 'viewer-1');
-    expect(notifications.notifyProfileViewed).toHaveBeenCalledWith('owner-1', 'viewer-1');
+    expect(notifications.notifyProfileViewed).toHaveBeenCalledWith('owner-1', 'viewer-1', 'shop');
   });
 });
 

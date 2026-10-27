@@ -43,5 +43,5 @@ export function NewForYou({ isWorker, isShop }: { isWorker: boolean; isShop: boo
       })),
   ];
 
-  return <StepStack title={t('newForYou.title')} steps={steps} style={{ marginTop: 0, marginBottom: 18 }} />;
+  return <StepStack title={t('newForYou.title')} steps={steps} minimized style={{ marginTop: 0, marginBottom: 14 }} />;
 }

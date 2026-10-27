@@ -35,6 +35,7 @@ import { HireStaffModal } from '@/components/HireStaffModal';
 import { ChooseListModal } from '@/components/ChooseListModal';
 import { QuickOrderModal } from '@/components/QuickOrderModal';
 import { SendListModal } from '@/components/SendListModal';
+import { HomeLocationBar } from '@/components/HomeLocationBar';
 import { withLocation } from '@/utils/ensureLocationOn';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
@@ -199,7 +200,7 @@ export function HomeScreen() {
       <PullToRefresh refreshing={workers.isRefetching || shops.isRefetching} onRefresh={onRefresh}>
         <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
           <Text style={[styles.greeting, { color: colors.text }]}>{t('home.greeting', { name: firstName })}</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('home.subtitle')}</Text>
+          <HomeLocationBar />
 
           <Pressable
             style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}

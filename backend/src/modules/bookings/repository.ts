@@ -18,6 +18,7 @@ import {
   MAX_PIN_ATTEMPTS,
   NotifyTarget,
   PendingOffer,
+  OfferStats,
   RatedJob,
   TRIP_STATUSES,
   VerifyPinResult,
@@ -467,6 +468,28 @@ export class BookingsRepository {
       accountId: row.account_id,
       preferredLanguage: row.preferred_language,
     }));
+  }
+
+  /** Counts the offers a worker was shown, optionally only those made between two times. */
+  async countOffersForWorker(workerId: string, from?: Date, to?: Date): Promise<OfferStats> {
+    const result = await this.pool.query(
+      `SELECT COUNT(*) AS received,
+              COUNT(*) FILTER (WHERE status = 'accepted') AS accepted,
+              COUNT(*) FILTER (WHERE status = 'declined') AS declined,
+              COUNT(*) FILTER (WHERE status = 'lost') AS missed
+       FROM booking_offers
+       WHERE worker_id = $1 AND visible_after <= now()
+         AND ($2::timestamptz IS NULL OR created_at >= $2)
+         AND ($3::timestamptz IS NULL OR created_at < $3)`,
+      [workerId, from ?? null, to ?? null],
+    );
+    const row = result.rows[0] ?? {};
+    return {
+      received: Number(row.received ?? 0),
+      accepted: Number(row.accepted ?? 0),
+      declined: Number(row.declined ?? 0),
+      missed: Number(row.missed ?? 0),
+    };
   }
 
   async findPendingOffersForWorker(workerId: string): Promise<PendingOffer[]> {

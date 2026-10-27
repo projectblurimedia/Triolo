@@ -15,6 +15,7 @@ import {
   CustomerBooking,
   MAX_PIN_ATTEMPTS,
   PendingOffer,
+  OfferStats,
   RatedJob,
   WorkerJob,
   AdminBookingDetail,
@@ -333,6 +334,13 @@ export class BookingsService {
     );
   }
 
+  /** Requests that reached this worker and how they answered, for Activity's summary. */
+  async getMyOfferStats(workerAccountId: string, from?: Date, to?: Date): Promise<OfferStats> {
+    const profile = await this.workersService.getMyProfile(workerAccountId);
+    if (!profile) return { received: 0, accepted: 0, declined: 0, missed: 0 };
+    return this.repository.countOffersForWorker(profile.id, from, to);
+  }
+
   async getMyOffers(workerAccountId: string): Promise<PendingOffer[]> {
     await this.releaseDueOffers();
     const profile = await this.workersService.getMyProfile(workerAccountId);
@@ -388,7 +396,7 @@ export class BookingsService {
 
   async acceptOffer(workerAccountId: string, bookingRequestId: string): Promise<void> {
     const profile = await this.requireWorker(workerAccountId);
-    const passId = (await this.subscriptionStatus?.usePartnerPass(workerAccountId, 'accept')) ?? null;
+    const passId = (await this.subscriptionStatus?.usePartnerPass(workerAccountId, 'accept', 'service')) ?? null;
 
     const result = await this.repository.acceptOffer(bookingRequestId, profile.id, generateArrivalPin()).catch(async (error) => {
       await this.subscriptionStatus?.restorePasses([], [passId]);

@@ -144,7 +144,7 @@ export interface CustomerOrder extends ShopOrder {
 
 export interface ShopSideOrder extends ShopOrder {
   customerFullName: string;
-  customerMobileNumber: string;
+  customerMobileNumber: string | null;
   pinAttemptsLeft: number;
 }
 

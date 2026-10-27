@@ -56,9 +56,9 @@ export function RegisterJobSeekerScreen() {
                   // One account per number: if this one already has this profile, there is nothing to
                   // register — they are signed in, so open the app.
                   jobSeekerService
-                    .getMine()
+                    .listMine()
                     .then((existing) => {
-                      if (!existing) return;
+                      if (existing.length === 0) return;
                       showToast({ variant: 'info', title: t('auth.alreadyJobPost') });
                       setCompletingRegistration(false);
                     })

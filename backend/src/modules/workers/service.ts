@@ -150,7 +150,7 @@ export class WorkersService {
   }
 
   async searchNearby(accountId: string, filter: NearbySearchFilter): Promise<WorkerNearbyResult[]> {
-    const priorityAccountIds = (await this.subscriptionStatus?.priorityPartnerIds()) ?? [];
+    const priorityAccountIds = (await this.subscriptionStatus?.priorityPartnerIds('service')) ?? [];
     return this.repository.findNearby(accountId, { ...filter, priorityAccountIds });
   }
 
@@ -187,7 +187,7 @@ export class WorkersService {
     if (!profile) {
       throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
     }
-    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId);
+    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId, 'service');
   }
 
   // --- Admin-facing (called only from modules/admin's service — see its own doc comment

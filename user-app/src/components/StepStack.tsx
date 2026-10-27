@@ -18,6 +18,8 @@ export interface StackStep {
   hint: string;
   action: string;
   onPress: () => void;
+  /** A status pill in place of "Pending" (e.g. Completed, In progress). */
+  tag?: { label: string; color: string };
 }
 
 // Cards peeking out under the front one, like a stack of iPhone notifications.
@@ -54,42 +56,58 @@ function LiveDot({ color }: { color: string }) {
   );
 }
 
-function StepCard({ step, onPress, compact }: { step: StackStep; onPress: () => void; compact?: boolean }) {
+function StepCard({
+  step,
+  onPress,
+  compact,
+  slim,
+  accent = brandColors.pending,
+}: {
+  step: StackStep;
+  onPress: () => void;
+  compact?: boolean;
+  slim?: boolean;
+  accent?: string;
+}) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const tag = step.tag ?? { label: t('continueSteps.pending'), color: brandColors.pending };
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: colors.surface, borderColor: `${brandColors.pending}99`, opacity: pressed ? 0.92 : 1 },
+        slim ? styles.cardSlim : null,
+        { backgroundColor: colors.surface, borderColor: `${accent}99`, opacity: pressed ? 0.92 : 1 },
       ]}
       accessibilityRole="button"
     >
-      <View style={[StyleSheet.absoluteFill, styles.cardTint, { backgroundColor: `${brandColors.pending}0A` }]} />
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.icon}>
-        <FontAwesome6 name={step.icon} size={17} color="#FFFFFF" solid />
+      <View style={[StyleSheet.absoluteFill, styles.cardTint, { backgroundColor: `${accent}0A` }]} />
+      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.icon, slim ? styles.iconSlim : null]}>
+        <FontAwesome6 name={step.icon} size={slim ? 14 : 17} color="#FFFFFF" solid />
       </LinearGradient>
       <View style={styles.text}>
         <View style={styles.nameRow}>
           <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
             {step.name}
           </Text>
-          <View style={[styles.pendingTag, { backgroundColor: `${brandColors.pending}1A` }]}>
-            <Text style={[styles.pendingText, { color: brandColors.pending }]}>{t('continueSteps.pending')}</Text>
+          <View style={[styles.pendingTag, { backgroundColor: `${tag.color}1A` }]}>
+            <Text style={[styles.pendingText, { color: tag.color }]} numberOfLines={1}>
+              {tag.label}
+            </Text>
           </View>
         </View>
         <Text style={[styles.step, { color: headerGradient[0] }]} numberOfLines={1}>
           {step.stepTitle}
         </Text>
-        {step.hint ? (
+        {step.hint && !slim ? (
           <Text style={[styles.hint, { color: colors.textMuted }]} numberOfLines={compact ? 1 : 2}>
             {step.hint}
           </Text>
         ) : null}
       </View>
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.go}>
-        <Text style={styles.goText}>{step.action}</Text>
+      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.go, slim ? styles.goSlim : null]}>
+        <Text style={[styles.goText, slim ? styles.goTextSlim : null]}>{step.action}</Text>
         <FontAwesome6 name="chevron-right" size={10} color="#FFFFFF" solid />
       </LinearGradient>
     </Pressable>
@@ -102,7 +120,30 @@ function StepCard({ step, onPress, compact }: { step: StackStep; onPress: () => 
  * never push the rest of Home down. One step opens straight away; with more, tapping the stack
  * opens a separate screen listing every one, each a tap from its own screen.
  */
-export function StepStack({ title, steps, style }: { title: string; steps: StackStep[]; style?: StyleProp<ViewStyle> }) {
+export function StepStack({
+  title,
+  steps,
+  style,
+  minimized = false,
+  accent = brandColors.pending,
+  live = true,
+  icon = 'clock-rotate-left',
+  hideMore = false,
+}: {
+  title: string;
+  steps: StackStep[];
+  style?: StyleProp<ViewStyle>;
+  /** A slim stack: one line per card (no hint), smaller icon, title and button. */
+  minimized?: boolean;
+  /** Border colour of the cards (default: the amber "waiting" colour). */
+  accent?: string;
+  /** A pulsing dot by the title (things under way); off for a plain history stack. */
+  live?: boolean;
+  /** The heading's icon when not live. */
+  icon?: React.ComponentProps<typeof FontAwesome6>['name'];
+  /** Leave out the "+N more — tap to see all" line (the stack itself still opens the list). */
+  hideMore?: boolean;
+}) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -121,9 +162,9 @@ export function StepStack({ title, steps, style }: { title: string; steps: Stack
 
   return (
     <View style={[styles.section, style]}>
-      <View style={styles.headerRow}>
-        <LiveDot color={brandColors.pending} />
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+      <View style={[styles.headerRow, minimized ? styles.headerRowSlim : null]}>
+        {live ? <LiveDot color={accent} /> : <FontAwesome6 name={icon} size={13} color={accent} solid />}
+        <Text style={[styles.sectionTitle, minimized ? styles.sectionTitleSlim : null, { color: colors.text }]}>{title}</Text>
         {stacked ? (
           <View style={[styles.countPill, { backgroundColor: `${colors.primary}14` }]}>
             <Text style={[styles.countText, { color: colors.primary }]}>{steps.length}</Text>
@@ -146,7 +187,7 @@ export function StepStack({ title, steps, style }: { title: string; steps: Stack
                       {
                         height: frontHeight,
                         backgroundColor: colors.surface,
-                        borderColor: `${brandColors.pending}${depth === 1 ? '66' : '40'}`,
+                        borderColor: `${accent}${depth === 1 ? '66' : '40'}`,
                         opacity: depth === 1 ? 0.9 : 0.7,
                         transform: [{ translateY: depth * PEEK_OFFSET }, { scaleX: 1 - depth * PEEK_SHRINK }],
                       },
@@ -157,10 +198,16 @@ export function StepStack({ title, steps, style }: { title: string; steps: Stack
               .reverse()
           : null}
         <View onLayout={(event) => setFrontHeight(event.nativeEvent.layout.height)}>
-          <StepCard step={front} onPress={stacked ? () => setListOpen(true) : front.onPress} compact={stacked} />
+          <StepCard
+            step={front}
+            onPress={stacked ? () => setListOpen(true) : front.onPress}
+            compact={stacked}
+            slim={minimized}
+            accent={accent}
+          />
         </View>
       </View>
-      {stacked ? (
+      {stacked && !hideMore ? (
         <Pressable onPress={() => setListOpen(true)} hitSlop={6} style={styles.moreRow}>
           <Text style={[styles.moreText, { color: colors.textMuted }]}>
             {t('continueSteps.more', { count: steps.length - 1 })}
@@ -196,7 +243,7 @@ export function StepStack({ title, steps, style }: { title: string; steps: Stack
             showsVerticalScrollIndicator={false}
           >
             {steps.map((step) => (
-              <StepCard key={step.key} step={step} onPress={() => openStep(step)} />
+              <StepCard key={step.key} step={step} onPress={() => openStep(step)} accent={accent} />
             ))}
           </ScrollView>
         </View>
@@ -225,6 +272,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardTint: { borderRadius: 18 },
+  cardSlim: { paddingVertical: 9, paddingHorizontal: 10, gap: 10, borderRadius: 16 },
+  iconSlim: { width: 36, height: 36, borderRadius: 12 },
+  goSlim: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12 },
+  goTextSlim: { fontSize: 11 },
+  headerRowSlim: { marginBottom: 8 },
+  sectionTitleSlim: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15 },
   peek: { position: 'absolute', left: 0, right: 0, top: 0, borderRadius: 18, borderWidth: 1.5 },
   icon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   text: { flex: 1, gap: 1 },

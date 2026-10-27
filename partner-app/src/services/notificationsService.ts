@@ -19,7 +19,8 @@ export type NotificationType =
   | 'order_out_for_delivery'
   | 'order_completed'
   | 'order_cancelled'
-  | 'badge_removed';
+  | 'badge_removed'
+  | 'job_post_view';
 
 export interface AppNotification {
   id: string;
@@ -29,8 +30,15 @@ export interface AppNotification {
   body: string;
   isRead: boolean;
   createdAt: string;
-  /** profile_view, for a subscribed partner: who it was (their name only). Null otherwise. */
-  viewer?: { name: string } | null;
+  /**
+   * Who viewed — profile_view on that profile's plan (name only), job_post_view on the job post
+   * plan (name and number). Null otherwise.
+   */
+  viewer?: { name: string; mobile?: string | null } | null;
+  /** What it is about: a profile kind ('service' / 'shop'), or a job post with its id. */
+  ref?: { kind: string; id: string | null } | null;
+  /** job_post_view without the job post plan: who it was is hidden. */
+  locked?: boolean;
 }
 
 export interface NotificationListResult {

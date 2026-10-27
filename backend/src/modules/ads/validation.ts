@@ -43,6 +43,8 @@ const adFields = z.object({
     .regex(/^\d{10}$/, 'Enter the 10-digit mobile number')
     .nullish()
     .or(z.literal('')),
+  // A partner boosting one of several job posts: which one (else their first live post).
+  promotedPostId: z.string().uuid().nullish(),
   // The ad's image or video, already uploaded to Cloudinary; saved together with the ad.
   imageUrl: z.string().url().nullish(),
   videoUrl: z.string().url().nullish(),

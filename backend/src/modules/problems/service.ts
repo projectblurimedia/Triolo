@@ -174,7 +174,7 @@ export class ProblemsService implements BookingLifecycleListener {
    */
   async acceptProblem(accountId: string, postId: string): Promise<ProblemPost> {
     const worker = await this.getVerifiedWorker(accountId);
-    const passId = (await this.subscriptionStatus?.usePartnerPass(accountId, 'accept')) ?? null;
+    const passId = (await this.subscriptionStatus?.usePartnerPass(accountId, 'accept', 'service')) ?? null;
     const result = await this.repository.accept(postId, worker.id, accountId);
     if (!result) {
       await this.subscriptionStatus?.restorePasses([], [passId]);

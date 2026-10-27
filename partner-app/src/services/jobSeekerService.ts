@@ -55,8 +55,30 @@ export interface JobPost {
   locationAddress: string;
   photoUrl: string | null;
   isActive: boolean;
+  /** Times customers opened it (Activity shows it as visits). */
+  viewCount?: number;
+  /** Visits not looked at yet. */
+  newViews?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Someone who opened one of my job posts. */
+export interface JobPostViewer {
+  viewerKey: string;
+  /** Hidden (null) without the job post plan. */
+  name: string | null;
+  mobile: string | null;
+  lastViewedAt: string;
+  times: number;
+  isNew: boolean;
+}
+
+export interface JobPostViewers {
+  locked: boolean;
+  total: number;
+  newCount: number;
+  viewers: JobPostViewer[];
 }
 
 export interface SaveJobPostParams {
@@ -73,17 +95,21 @@ export interface SaveJobPostParams {
   locationAddress: string;
 }
 
-/** "Looking for work" post — one per account (backend `job-seekers` module). */
+/** "Looking for work" posts — a partner may keep several (backend `job-seekers` module). */
 export const jobSeekerService = {
-  getMine: () => apiClient.get<JobPost | null>('/job-seekers/me', true),
-  save: (params: SaveJobPostParams) => apiClient.put<JobPost>('/job-seekers/me', params, true),
-  setActive: (isActive: boolean) => apiClient.patch<JobPost>('/job-seekers/me/active', { isActive }, true),
-  remove: () => apiClient.delete<null>('/job-seekers/me', true),
-  uploadPhoto: (image: PickedImage) => {
+  listMine: () => apiClient.get<JobPost[]>('/job-seekers/me/posts', true),
+  create: (params: SaveJobPostParams) => apiClient.post<JobPost>('/job-seekers/me/posts', params, true),
+  update: (id: string, params: SaveJobPostParams) => apiClient.put<JobPost>(`/job-seekers/me/posts/${id}`, params, true),
+  setActive: (id: string, isActive: boolean) =>
+    apiClient.patch<JobPost>(`/job-seekers/me/posts/${id}/active`, { isActive }, true),
+  remove: (id: string) => apiClient.delete<null>(`/job-seekers/me/posts/${id}`, true),
+  uploadPhoto: (id: string, image: PickedImage) => {
     const formData = new FormData();
     // React Native's FormData takes this {uri, name, type} file shape.
     formData.append('photo', image as unknown as Blob);
-    return apiClient.putForm<JobPost>('/job-seekers/me/photo', formData);
+    return apiClient.putForm<JobPost>(`/job-seekers/me/posts/${id}/photo`, formData);
   },
-  removePhoto: () => apiClient.delete<JobPost>('/job-seekers/me/photo', true),
+  removePhoto: (id: string) => apiClient.delete<JobPost>(`/job-seekers/me/posts/${id}/photo`, true),
+  viewers: (id: string) => apiClient.get<JobPostViewers>(`/job-seekers/me/posts/${id}/viewers`, true),
+  markViewsSeen: (id: string) => apiClient.post<null>(`/job-seekers/me/posts/${id}/viewers/seen`, undefined, true),
 };

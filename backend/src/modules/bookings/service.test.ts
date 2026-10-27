@@ -21,6 +21,7 @@ function createMockRepository(): MockRepository {
     adminActiveIdsForAccount: jest.fn(),
     declineOffer: jest.fn(),
     findPendingOffersForWorker: jest.fn(),
+    countOffersForWorker: jest.fn(),
     addOffersForOpenRequests: jest.fn(),
     findJobForWorker: jest.fn(),
     findJobsForWorker: jest.fn(),
@@ -101,6 +102,16 @@ function transition(notifyAccountId: string | null, overrides: Partial<BookingRe
 const asWorker = () => workers.getMyProfile.mockResolvedValue({ id: 'worker-1' } as never);
 
 describe('createQuickBooking', () => {
+  it('counts the offers a worker received, and none without a worker profile', async () => {
+    asWorker();
+    repo.countOffersForWorker.mockResolvedValue({ received: 4, accepted: 2, declined: 1, missed: 1 });
+    const from = new Date('2026-10-01');
+    await expect(service.getMyOfferStats('acc-w', from)).resolves.toEqual({ received: 4, accepted: 2, declined: 1, missed: 1 });
+    expect(repo.countOffersForWorker).toHaveBeenCalledWith('worker-1', from, undefined);
+    workers.getMyProfile.mockResolvedValue(null);
+    await expect(service.getMyOfferStats('acc-x')).resolves.toEqual({ received: 0, accepted: 0, declined: 0, missed: 0 });
+  });
+
   it('refuses the same work again while the first request still waits, pointing to it', async () => {
     repo.findWaitingForSameWork.mockResolvedValue('waiting-1');
     await expect(

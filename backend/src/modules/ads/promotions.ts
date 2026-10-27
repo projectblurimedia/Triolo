@@ -83,7 +83,7 @@ export class ServicePromotionResolver implements PromotionResolver {
     };
   }
 
-  async find(kind: AdPromotedKind, accountId: string): Promise<{ id: string; name: string } | null> {
+  async find(kind: AdPromotedKind, accountId: string, preferredId?: string | null): Promise<{ id: string; name: string } | null> {
     if (kind === 'service') {
       const mine = await this.workers.getMyProfile(accountId);
       if (!mine || mine.verificationStatus !== 'verified') return null;
@@ -94,8 +94,10 @@ export class ServicePromotionResolver implements PromotionResolver {
       const shop = await this.businesses.getMyProfile(accountId);
       return shop && shop.verificationStatus === 'verified' ? { id: shop.id, name: shop.shopName } : null;
     }
-    const post = await this.jobSeekers.getMine(accountId);
-    if (!post || !post.isActive) return null;
+    const live = (await this.jobSeekers.listMine(accountId)).filter((entry) => entry.isActive);
+    // The post asked for (one of several), else the first live one.
+    const post = live.find((entry) => entry.id === preferredId) ?? live[0];
+    if (!post) return null;
     const account = await this.auth.getAccount(accountId);
     return { id: post.id, name: account.fullName };
   }

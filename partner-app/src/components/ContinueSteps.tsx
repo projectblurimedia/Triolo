@@ -25,7 +25,7 @@ interface Step {
  * each one tap from its step screen — no digging through Bookings → Active after the app was
  * closed or minimised. Renders nothing when nothing is in progress.
  */
-export function ContinueSteps({ isShop }: { isShop: boolean }) {
+export function ContinueSteps({ isShop, only }: { isShop: boolean; only?: 'jobs' | 'orders' }) {
   const { t } = useTranslation();
   const jobs = useMyJobs();
   const orders = useShopOrders(isShop);
@@ -33,7 +33,7 @@ export function ContinueSteps({ isShop }: { isShop: boolean }) {
   const skills = (keys: string[]) => keys.map((key) => t(`workerProfile.skills.${key}`)).join(', ');
 
   const steps: Step[] = [
-    ...(jobs.data ?? [])
+    ...(only === 'orders' ? [] : (jobs.data ?? []))
       .filter((job) => ACTIVE_JOB_STATUSES.includes(job.status))
       .map<Step>((job) => ({
         key: `job-${job.id}`,
@@ -46,7 +46,7 @@ export function ContinueSteps({ isShop }: { isShop: boolean }) {
         urgent: job.status !== 'work_done',
         onPress: () => openJob(job.id),
       })),
-    ...(isShop ? (orders.data ?? []) : [])
+    ...(isShop && only !== 'jobs' ? (orders.data ?? []) : [])
       // New ones are in "New for you" above; here only what is under way.
       .filter((order) => ACTIVE_SHOP_STATUSES.includes(order.status))
       .map<Step>((order) => ({
@@ -72,5 +72,5 @@ export function ContinueSteps({ isShop }: { isShop: boolean }) {
     onPress: step.onPress,
   }));
   // At the top of Home: room below it, not above.
-  return <StepStack title={t('continueSteps.title')} steps={stack} style={{ marginTop: 0, marginBottom: 18 }} />;
+  return <StepStack title={t('continueSteps.title')} steps={stack} minimized style={{ marginTop: 0, marginBottom: 14 }} />;
 }
