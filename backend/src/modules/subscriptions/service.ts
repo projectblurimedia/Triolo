@@ -243,9 +243,9 @@ export class SubscriptionsService {
   /** The partner's profiles (worker / shop / job post) with each one's badge. */
   async getMyBadges(accountId: string): Promise<MyBadges> {
     const settings = await this.repository.getSettings();
-    const [worker, shop, posts, badges] = await Promise.all([
+    const [worker, shops, posts, badges] = await Promise.all([
       this.deps.workers.getMyProfile(accountId),
-      this.deps.businesses.getMyProfile(accountId),
+      this.deps.businesses.listMyShops(accountId),
       this.deps.jobSeekers.listMine(accountId),
       this.repository.findLatestBadges(accountId),
     ]);
@@ -254,7 +254,7 @@ export class SubscriptionsService {
       const [named] = worker.verificationStatus === 'verified' ? await this.deps.workers.getVerifiedProfiles([worker.id]) : [];
       profiles.push({ kind: 'service', id: worker.id, name: named?.accountFullName ?? 'My services', eligible: worker.verificationStatus === 'verified' });
     }
-    if (shop) profiles.push({ kind: 'business', id: shop.id, name: shop.shopName, eligible: shop.verificationStatus === 'verified' });
+    for (const shop of shops) profiles.push({ kind: 'business', id: shop.id, name: shop.shopName, eligible: shop.verificationStatus === 'verified' });
     for (const post of posts) profiles.push({ kind: 'job_post', id: post.id, name: post.title, eligible: post.isActive });
     return {
       enabled: settings.badgeEnabled,

@@ -324,7 +324,11 @@ export function OrderTrackingModal() {
       { key: 'packed', label: t('orders.step.packed'), at: o.packedAt, done: !!o.packedAt },
       {
         key: 'ready',
-        label: t(`orders.step.${o.fulfillment === 'delivery' ? 'out_for_delivery' : 'ready_for_pickup'}`),
+        // The shop's delivery person by name, once they took it.
+        label:
+          o.fulfillment === 'delivery' && o.deliveryPersonName
+            ? t('orders.step.outForDeliveryBy', { name: o.deliveryPersonName })
+            : t(`orders.step.${o.fulfillment === 'delivery' ? 'out_for_delivery' : 'ready_for_pickup'}`),
         at: o.readyAt,
         done: !!o.readyAt,
       },

@@ -139,7 +139,7 @@ describe('NotificationsService.registerPushToken', () => {
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await service.registerPushToken('account-1', 'device-token-123');
-    expect(repo.upsertPushToken).toHaveBeenCalledWith('account-1', 'device-token-123', 'legacy');
+    expect(repo.upsertPushToken).toHaveBeenCalledWith('account-1', 'device-token-123', 'legacy', false);
   });
 });
 
@@ -289,7 +289,7 @@ describe('push tokens per app', () => {
     await service.registerPushToken('account-1', 'phone', 'partner');
     await service.unregisterPushToken('account-1', 'partner', 'phone');
 
-    expect(repository.upsertPushToken).toHaveBeenCalledWith('account-1', 'phone', 'partner');
+    expect(repository.upsertPushToken).toHaveBeenCalledWith('account-1', 'phone', 'partner', false);
     expect(repository.removePushToken).toHaveBeenCalledWith('account-1', 'partner', 'phone');
   });
 });
@@ -320,5 +320,23 @@ describe('NotificationsService — who viewed (subscribed partners)', () => {
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
     const list = await service.listForAccount('account-1');
     expect(list.items[0]).toMatchObject({ title: 'Profile Viewed', viewer: null });
+  });
+
+  it('a new job goes to a pop-up-capable phone as data, to an older build as a notification', async () => {
+    const repository = createMockRepository();
+    repository.findPushTokens.mockResolvedValue([{ token: 'new-phone', app: 'partner', fullScreen: true }]);
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    await service.sendRawPush('account-1', 'New job', 'Someone nearby', { data: { kind: 'booking_offer', bookingRequestId: 'r1' } });
+    expect(sendPushNotification).toHaveBeenLastCalledWith(
+      'new-phone',
+      'New job',
+      'Someone nearby',
+      expect.objectContaining({ dataOnly: true, data: expect.objectContaining({ popup: '1', kind: 'booking_offer' }) }),
+    );
+
+    repository.findPushTokens.mockResolvedValue([{ token: 'old-phone', app: 'partner', fullScreen: false }]);
+    await service.sendRawPush('account-1', 'New job', 'Someone nearby', { data: { kind: 'booking_offer', bookingRequestId: 'r1' } });
+    expect(sendPushNotification).toHaveBeenLastCalledWith('old-phone', 'New job', 'Someone nearby', expect.not.objectContaining({ dataOnly: true }));
   });
 });

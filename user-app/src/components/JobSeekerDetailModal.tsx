@@ -150,7 +150,7 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                       {t('hireStaff.numberHiddenTitle')}
                     </Text>
                     <Text style={[styles.phoneLabel, { color: colors.textMuted }]} numberOfLines={1}>
-                      {fee ? t('hireStaff.payToSee', { fee }) : t('hireStaff.tapToSee')}
+                      {fee ? t('hireStaff.payToSee') : t('hireStaff.tapToSee')}
                     </Text>
                   </View>
                 </View>
@@ -162,7 +162,7 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                 <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>
                   <FontAwesome6 name="phone" size={15} color="#FFFFFF" solid />
                   <Text style={styles.callText} numberOfLines={1}>
-                    {!number && fee ? t('hireStaff.payAmount', { fee }) : t('hireStaff.callNow')}
+                    {!number && fee ? t('hireStaff.payAmount') : t('hireStaff.callNow')}
                   </Text>
                 </LinearGradient>
               </Pressable>

@@ -28,8 +28,12 @@ export function usePayHint(kind: 'book' | 'order' | 'staff_contact'): number | n
   return fee > 0 ? fee : null;
 }
 
-/** "Book Nearby · ₹10" when there's something to pay. */
-export const withFee = (label: string, fee: number | null) => (fee ? `${label} · ₹${fee}` : label);
+/**
+ * Buttons never show a price (asked for): the amount appears only in the pay sheet, when a
+ * payment is really needed at that moment. Kept as a function so call sites stay simple.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const withFee = (label: string, _fee: number | null) => label;
 
 /** Profiles marked "Trusted by Triolo". */
 export function useTrustedIds() {

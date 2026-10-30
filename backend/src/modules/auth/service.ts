@@ -1,3 +1,4 @@
+import { PreferredLanguage } from './interfaces';
 import { AppError } from '@/common/errors/AppError';
 import { env } from '@/config/env';
 import { deletePhotosFromCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
@@ -278,6 +279,32 @@ export class AuthService {
   }
 
   // --- Admin ---
+
+  /**
+   * The account with this number, made (active, no password — they sign in with OTP) if there is
+   * none yet: a shop owner adding delivery staff who have never used Triolo.
+   */
+  async findOrCreateByMobile(
+    mobileNumber: string,
+    fullName: string,
+    preferredLanguage: PreferredLanguage = 'en',
+  ): Promise<{ id: string; fullName: string }> {
+    const existing = await this.repository.findAccountByMobile(mobileNumber);
+    if (existing) return { id: existing.id, fullName: existing.fullName };
+    const account = await this.repository.createAccount({
+      fullName,
+      mobileNumber,
+      email: null,
+      role: 'user',
+      status: 'active',
+      // The owner's language (they set the person up); the person can change it after logging in.
+      preferredLanguage,
+      latitude: null,
+      longitude: null,
+      locationAddress: null,
+    });
+    return { id: account.id, fullName: account.fullName };
+  }
 
   /** The account with this mobile number (for other modules, e.g. promoting a profile in an ad). */
   async findAccountByMobile(mobileNumber: string): Promise<{ id: string; fullName: string } | null> {

@@ -38,6 +38,7 @@ function createMockRepository(): MockRepository {
     findWaitingForSameWork: jest.fn().mockResolvedValue(null),
     findWorkerContact: jest.fn(),
     findAccountName: jest.fn(),
+    findAcceptedWorkerName: jest.fn().mockResolvedValue(null),
     declineDirect: jest.fn(),
     cancelLate: jest.fn(),
   } as unknown as MockRepository;

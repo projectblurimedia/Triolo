@@ -1,3 +1,4 @@
+import { ContinueSteps } from '@/components/ContinueSteps';
 import React, { useMemo, useState } from 'react';
 
 // How many service tiles Home shows before "See all".
@@ -213,6 +214,9 @@ export function HomeScreen() {
             </Text>
           </Pressable>
 
+
+          {/* Every booking and order still going (only here, not on Services / Bazaar). */}
+          <ContinueSteps />
 
           {renderSummary()}
 

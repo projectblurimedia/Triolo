@@ -327,6 +327,18 @@ export class BookingsRepository {
   }
 
   /** The customer's name, for the worker's personal request. */
+  /** The accepted worker's name, for the customer's step notifications. */
+  async findAcceptedWorkerName(bookingRequestId: string): Promise<string | null> {
+    const result = await this.pool.query(
+      `SELECT a.full_name FROM booking_requests br
+       JOIN worker_profiles w ON w.id = br.accepted_worker_id
+       JOIN accounts a ON a.id = w.account_id
+       WHERE br.id = $1`,
+      [bookingRequestId],
+    );
+    return result.rows[0]?.full_name ?? null;
+  }
+
   async findAccountName(accountId: string): Promise<string | null> {
     const result = await this.pool.query(`SELECT full_name FROM accounts WHERE id = $1`, [accountId]);
     return result.rows[0]?.full_name ?? null;

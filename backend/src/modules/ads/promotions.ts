@@ -91,8 +91,10 @@ export class ServicePromotionResolver implements PromotionResolver {
       return profile ? { id: profile.id, name: profile.accountFullName } : null;
     }
     if (kind === 'business') {
-      const shop = await this.businesses.getMyProfile(accountId);
-      return shop && shop.verificationStatus === 'verified' ? { id: shop.id, name: shop.shopName } : null;
+      // The shop asked for (one of several), else the first verified one.
+      const verified = (await this.businesses.listMyShops(accountId)).filter((shop) => shop.verificationStatus === 'verified');
+      const shop = verified.find((entry) => entry.id === preferredId) ?? verified[0];
+      return shop ? { id: shop.id, name: shop.shopName } : null;
     }
     const live = (await this.jobSeekers.listMine(accountId)).filter((entry) => entry.isActive);
     // The post asked for (one of several), else the first live one.

@@ -11,6 +11,8 @@ import { bookingOffersService, PendingOffer } from '@/services/bookingOffersServ
 import { BOOKING_OFFERS_QUERY_KEY } from '@/hooks/useBookingOffers';
 import { NEARBY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
 import { showToast } from '@/state/toastStore';
+import { useIncomingStore } from '@/state/incomingStore';
+import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { useLocationGatedMutation } from '@/hooks/useLocationGatedMutation';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -71,6 +73,12 @@ export function FindJobsButton({
   const search = useLocationGatedMutation({
     mutationFn: async (_: void) => bookingOffersService.search(await currentPosition()),
     onSuccess: (offers) => {
+      // Found some: they open in the New requests list (before the list updates, so the
+      // pop-up for a single new request doesn't open instead).
+      if (offers.length > 0) {
+        usePendingOfferStore.getState().clearFocusedOffer();
+        useIncomingStore.getState().openList();
+      }
       queryClient.setQueryData(BOOKING_OFFERS_QUERY_KEY, offers);
       queryClient.invalidateQueries({ queryKey: NEARBY_PROBLEMS_QUERY_KEY });
       if (offers.length > 0) {

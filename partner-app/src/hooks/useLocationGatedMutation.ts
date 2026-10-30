@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { MutateOptions, useMutation, UseMutationOptions } from '@tanstack/react-query';
 import { ensureLocationOn } from '@/utils/ensureLocationOn';
 import { requireLocationNow } from '@/utils/requireLocation';
@@ -30,17 +30,24 @@ export function useLocationGatedMutation<TData, TVariables, TContext = unknown>(
     },
   });
   const asking = useRef(false);
+  // The location check and the pay check run before the request: the button spins from the
+  // tap, not only once the request starts (it looked dead for a moment before).
+  const [preparing, setPreparing] = useState(false);
   const { mutate: run, mutateAsync: runAsync } = mutation;
 
   const mutate = useCallback(
     (variables: TVariables, mutateOptions?: MutateOptions<TData, Error, TVariables, TContext>) => {
       if (asking.current) return;
       asking.current = true;
+      setPreparing(true);
       ensureLocationOn()
         .then(async () => (payKind ? payIfNeeded(payKind, null, payPlan) : true))
         .then((go) => {
-          asking.current = false;
           if (go) run(variables, mutateOptions);
+        })
+        .finally(() => {
+          asking.current = false;
+          setPreparing(false);
         });
     },
     [run],
@@ -54,5 +61,5 @@ export function useLocationGatedMutation<TData, TVariables, TContext = unknown>(
     [runAsync],
   );
 
-  return { ...mutation, mutate, mutateAsync };
+  return { ...mutation, isPending: mutation.isPending || preparing, mutate, mutateAsync };
 }

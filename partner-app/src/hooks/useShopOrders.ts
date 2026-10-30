@@ -8,7 +8,8 @@ export const SHOP_ORDERS_QUERY_KEY = ['shop-orders', 'mine'];
 export const shopOrderQueryKey = (id: string | null) => ['shop-orders', 'detail', id];
 
 // New lists should feel close to instant for the shop; a running order a little less so.
-const LIST_POLL_MS = 10000;
+// New orders should show up within seconds, even without a push.
+const LIST_POLL_MS = 6000;
 const ACTIVE_POLL_MS = 8000;
 
 export function useShopOrders(enabled: boolean) {

@@ -41,7 +41,10 @@ export function IncomingJobModal() {
   const focusedBookingRequestId = usePendingOfferStore((state) => state.focusedBookingRequestId);
   const clearFocusedOffer = usePendingOfferStore((state) => state.clearFocusedOffer);
   const listOpen = useIncomingStore((state) => state.listOpen);
-  const visible = focusedBookingRequestId !== null && !listOpen;
+  // Only for Accept tapped on the notification itself; everything else opens the swipe screen
+  // (IncomingRequestsHub), which shows every request waiting, not one at a time.
+  const autoAcceptFlag = usePendingOfferStore((state) => state.autoAccept);
+  const visible = focusedBookingRequestId !== null && !listOpen && autoAcceptFlag;
   const liveOffer = offers?.find((item) => item.bookingRequestId === focusedBookingRequestId) ?? null;
   // Accepting takes the offer out of the list (it's no longer an open offer, it's this
   // worker's job) while the job screen is still loading — keep showing the offer the worker

@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
 import { SupportedLanguage } from '@/localization/i18n';
+import { useAuthStore } from '@/state/authStore';
+import { authService } from '@/services/authService';
 
 const OPTIONS: { code: SupportedLanguage; gradient: readonly [string, string] }[] = [
   { code: 'en', gradient: ['#0EA5E9', '#0284C7'] },
@@ -25,6 +27,7 @@ export function LanguagePickerModal({ visible, onClose, onChange }: LanguagePick
   const { colors } = useThemeColors();
   const language = useSettingsStore((state) => state.language);
   const setLanguage = useSettingsStore((state) => state.setLanguage);
+  const signedIn = useAuthStore((state) => !!state.accessToken);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -54,6 +57,9 @@ export function LanguagePickerModal({ visible, onClose, onChange }: LanguagePick
                   ]}
                   onPress={() => {
                     setLanguage(option.code);
+                    // Signed in: saved to the account. Not yet: kept for the coming sign-in.
+                    if (signedIn) authService.updateLanguage(option.code).catch(() => undefined);
+                    else useSettingsStore.getState().setPickedBeforeLogin(true);
                     onChange?.(option.code);
                     onClose();
                   }}

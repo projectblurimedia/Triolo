@@ -8,7 +8,7 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { shopOrdersService } from '@/services/shopOrdersService';
 import { SHOP_ORDERS_QUERY_KEY } from '@/hooks/useShopOrders';
 import { useLocationGatedMutation } from '@/hooks/useLocationGatedMutation';
-import { navigateToBookings } from '@/navigation/navigationRef';
+import { useIncomingStore } from '@/state/incomingStore';
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography } from '@/theme';
@@ -26,11 +26,12 @@ export function FindOrdersButton() {
   const search = useLocationGatedMutation({
     mutationFn: async (_: void) => shopOrdersService.searchQuick(),
     onSuccess: (orders) => {
-      queryClient.setQueryData(SHOP_ORDERS_QUERY_KEY, orders);
       const open = orders.filter((order) => order.quick && order.status === 'placed' && !order.businessId).length;
+      // Found some: they open in the New requests list, not Activity (which is a record).
+      if (open > 0) useIncomingStore.getState().openList();
+      queryClient.setQueryData(SHOP_ORDERS_QUERY_KEY, orders);
       if (open > 0) {
         showToast({ variant: 'success', title: t('findOrders.foundTitle', { count: open }), message: t('findOrders.foundMessage') });
-        navigateToBookings('orders');
       } else {
         showToast({ variant: 'info', title: t('findOrders.noneTitle'), message: t('findOrders.noneMessage') });
       }

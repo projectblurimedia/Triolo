@@ -19,7 +19,7 @@ type Step = StackStep & { createdAt: string };
  * app was closed or minimised. Renders nothing when nothing is in progress. The Services tab
  * shows only the bookings (`only="bookings"`), the Bazaar tab only the shop orders.
  */
-export function ContinueSteps({ only }: { only?: 'bookings' | 'orders' } = {}) {
+export function ContinueSteps({ only, expanded }: { only?: 'bookings' | 'orders'; expanded?: boolean } = {}) {
   const { t } = useTranslation();
   const bookings = useMyBookings();
   const orders = useMyOrders();
@@ -59,5 +59,5 @@ export function ContinueSteps({ only }: { only?: 'bookings' | 'orders' } = {}) {
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   // Right under Home's search bar (which already leaves a gap): little room above, some below.
-  return <StepStack title={t('continueSteps.title')} steps={steps} style={{ marginTop: 2, marginBottom: 16 }} />;
+  return <StepStack title={t('continueSteps.title')} steps={steps} expanded={expanded} style={{ marginTop: 2, marginBottom: 16 }} />;
 }

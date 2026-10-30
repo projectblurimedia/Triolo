@@ -1,3 +1,5 @@
+import { DraftStaffEditor, ShopStaffEditor } from '@/components/DeliveryStaffSection';
+import { StaffDraft } from '@/services/businessesService';
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -62,6 +64,7 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
   const [deliveryPricePerKm, setDeliveryPricePerKm] = useState('');
+  const [staff, setStaff] = useState<StaffDraft[]>([]);
   const [fullName, setFullName] = useState(account?.fullName ?? '');
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -172,7 +175,7 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
       const existingPhotoUrls = photos.filter((image) => image.uri.startsWith('http')).map((image) => image.uri);
       const newPhotos = photos.filter((image) => !image.uri.startsWith('http'));
       updateProfile.mutate(
-        { ...commonPayload, existingPhotoUrls, shopPhotos: newPhotos },
+        { ...commonPayload, existingPhotoUrls, shopPhotos: newPhotos, shopId: profile?.id },
         {
           onSuccess: () => {
             showToast({
@@ -180,22 +183,22 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
               title: t('businessProfile.updateSuccessTitle'),
               message: t('businessProfile.updateSuccessMessage'),
             });
-            navigation.replace('MyInfo', { capability: 'business' });
+            navigation.replace('MyInfo', { capability: 'business', shopId: profile?.id });
           },
           onError: handleMutationError,
         },
       );
     } else {
       createProfile.mutate(
-        { ...commonPayload, shopPhotos: photos },
+        { ...commonPayload, shopPhotos: photos, staff },
         {
-          onSuccess: () => {
+          onSuccess: (saved) => {
             showToast({
               variant: 'success',
               title: t('businessProfile.successTitle'),
               message: t('businessProfile.successMessage'),
             });
-            navigation.replace('MyInfo', { capability: 'business' });
+            navigation.replace('MyInfo', { capability: 'business', shopId: saved?.id });
           },
           onError: handleMutationError,
         },
@@ -204,7 +207,7 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
   };
 
   const handleDelete = () => {
-    deleteProfile.mutate(undefined, {
+    deleteProfile.mutate(profile?.id, {
       onSuccess: () => {
         setShowDeleteConfirm(false);
         showToast({
@@ -326,6 +329,9 @@ export function BusinessRegistrationScreen({ navigation, route }: Props) {
               </View>
             ) : null}
           </View>
+          {deliveryAvailable ? (
+            profile ? <ShopStaffEditor shopId={profile.id} /> : <DraftStaffEditor value={staff} onChange={setStaff} />
+          ) : null}
 
           {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 

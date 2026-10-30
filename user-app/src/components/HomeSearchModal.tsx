@@ -509,6 +509,8 @@ export function HomeSearchModal({ visible, onClose, initialScope, onPickShop }: 
           onChange={setTypes}
           clearable
           fieldIcon="filter"
+          // Kinds partners typed themselves (e.g. Fancy) are listed too.
+          searchCustom={scope === 'workers' ? workersService.customSkills : businessesService.customCategories}
         />
       </View>
     ) : null;

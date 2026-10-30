@@ -97,16 +97,16 @@ export class NotificationsRepository {
    * from every other account first — whoever logged in on the phone last gets its
    * notifications — and a legacy row for it on this account is replaced.
    */
-  async upsertPushToken(accountId: string, token: string, app: PushApp): Promise<void> {
+  async upsertPushToken(accountId: string, token: string, app: PushApp, fullScreen = false): Promise<void> {
     await this.pool.query(`DELETE FROM push_tokens WHERE token = $1 AND NOT (account_id = $2 AND app = $3)`, [
       token,
       accountId,
       app,
     ]);
     await this.pool.query(
-      `INSERT INTO push_tokens (account_id, token, app) VALUES ($1, $2, $3)
-       ON CONFLICT (account_id, app) DO UPDATE SET token = EXCLUDED.token, updated_at = now()`,
-      [accountId, token, app],
+      `INSERT INTO push_tokens (account_id, token, app, full_screen) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (account_id, app) DO UPDATE SET token = EXCLUDED.token, full_screen = EXCLUDED.full_screen, updated_at = now()`,
+      [accountId, token, app, fullScreen],
     );
   }
 
@@ -119,8 +119,8 @@ export class NotificationsRepository {
     await this.pool.query(`DELETE FROM push_tokens WHERE account_id = $1 AND app = $2`, [accountId, app]);
   }
 
-  async findPushTokens(accountId: string): Promise<{ token: string; app: PushApp | 'legacy' }[]> {
-    const result = await this.pool.query('SELECT token, app FROM push_tokens WHERE account_id = $1', [accountId]);
-    return result.rows.map((row) => ({ token: row.token, app: row.app }));
+  async findPushTokens(accountId: string): Promise<{ token: string; app: PushApp | 'legacy'; fullScreen: boolean }[]> {
+    const result = await this.pool.query('SELECT token, app, full_screen FROM push_tokens WHERE account_id = $1', [accountId]);
+    return result.rows.map((row) => ({ token: row.token, app: row.app, fullScreen: !!row.full_screen }));
   }
 }

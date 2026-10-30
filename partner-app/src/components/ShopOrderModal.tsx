@@ -1,3 +1,4 @@
+import { useMyShops } from '@/hooks/useBusinessMutations';
 import React, { useEffect, useRef, useState } from 'react';
 import { placeName } from '@/utils/formatAddress';
 import { Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -11,6 +12,11 @@ import { ConfirmModal } from './ConfirmModal';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { useAdGate, useBusyAction } from './Ads';
 import { LoadingIndicator } from './LoadingIndicator';
+import { PullToRefresh } from './PullToRefresh';
+
+// PullToRefresh's hidden room above the content (see that component).
+const PULL_ROOM = 96;
+import { DeliveryHandover } from './DeliveryHandover';
 import { ToastHost } from './ToastHost';
 import { useShopOrder, useShopOrderAction } from '@/hooks/useShopOrders';
 import { useShopOrderFocusStore } from '@/state/shopOrderFocusStore';
@@ -79,6 +85,8 @@ export function ShopOrderModal() {
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const orderId = useShopOrderFocusStore((state) => state.orderId);
+  // Several shops: say which shop this order is for.
+  const manyShops = (useMyShops(orderId !== null).data ?? []).length > 1;
   const close = useShopOrderFocusStore((state) => state.close);
   const { data: order, isLoading, isError, refetch } = useShopOrder(orderId);
   // Handover: location, then a local business's ad while the button spins, then the PIN check.
@@ -108,9 +116,16 @@ export function ShopOrderModal() {
     const y = itemYs.current[id];
     if (y === undefined) return;
     // After the keyboard has opened and the screen has shrunk above it.
-    setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, y - 90), animated: true }), 250);
+    // + PULL_ROOM: the content sits under PullToRefresh's hidden room.
+    setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(PULL_ROOM, y - 90 + PULL_ROOM), animated: true }), 250);
   };
   const [confirm, setConfirm] = useState<'decline' | 'cancel' | null>(null);
+  const [pulling, setPulling] = useState(false);
+  const pullRefresh = async () => {
+    setPulling(true);
+    await refetch();
+    setPulling(false);
+  };
   const [confirmBill, setConfirmBill] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -267,7 +282,10 @@ export function ShopOrderModal() {
           <Text style={styles.avatarText}>{initialsOf(o.customerFullName)}</Text>
         </LinearGradient>
         <View style={styles.flex}>
-          <Text style={[styles.cardLabelInline, { color: colors.textMuted }]}>{t('shopOrders.customer')}</Text>
+          <Text style={[styles.cardLabelInline, { color: colors.textMuted }]} numberOfLines={1}>
+            {t('shopOrders.customer')}
+            {manyShops && o.shopName ? ` · ${o.shopName}` : ''}
+          </Text>
           <Text style={[styles.name, { color: colors.text }]}>{o.customerFullName}</Text>
           {o.customerMobileNumber ? (
             <Text style={[styles.meta, { color: colors.textMuted }]}>{o.customerMobileNumber}</Text>
@@ -589,6 +607,25 @@ export function ShopOrderModal() {
         </>
       );
     }
+    if (o.status === 'packed' && o.fulfillment === 'delivery') {
+      // Deliver it yourself, or send it with one of the shop's delivery staff.
+      return (
+        <>
+          {renderBill(o)}
+          <DeliveryHandover
+            order={o}
+            onError={onError}
+            deliverMyselfLoading={ready.isPending}
+            onDeliverMyself={() =>
+              ready.mutate(
+                { id: o.id },
+                { onSuccess: () => showToast({ variant: 'success', title: t('shopOrders.handedOverTitle') }), onError },
+              )
+            }
+          />
+        </>
+      );
+    }
     if (o.status === 'packed') {
       return (
         <>
@@ -607,7 +644,18 @@ export function ShopOrderModal() {
         </>
       );
     }
-    if (o.status === 'ready_for_pickup' || o.status === 'out_for_delivery') {
+    if (o.status === 'out_for_delivery') {
+      // With staff, they enter the PIN at the door; the owner can still take it back.
+      return (
+        <>
+          <DeliveryHandover order={o} onError={onError} deliverMyselfLoading={false} onDeliverMyself={() => undefined} />
+          {/* Always here: the owner can enter the PIN too (e.g. the staff member's phone is off). */}
+          {renderPinEntry(o)}
+          {renderBill(o)}
+        </>
+      );
+    }
+    if (o.status === 'ready_for_pickup') {
       return (
         <>
           {renderPinEntry(o)}
@@ -618,6 +666,14 @@ export function ShopOrderModal() {
     // Finished or ended: the bill (if there was one) and the customer's feedback.
     return (
       <>
+        {o.status === 'completed' && o.deliveredByName ? (
+          <View style={[styles.card, styles.deliveredBy, { backgroundColor: `${brandColors.success}0D`, borderColor: `${brandColors.success}55` }]}>
+            <FontAwesome6 name="person-biking" size={16} color={brandColors.success} solid />
+            <Text style={[styles.meta, styles.flex, { color: colors.text }]}>
+              {t('deliveryStaff.deliveredBy', { name: o.deliveredByName, amount: formatRupees(o.totalAmount ?? 0) })}
+            </Text>
+          </View>
+        ) : null}
         {renderRating(o)}
         {o.totalAmount != null ? renderBill(o) : renderPlainList(o)}
       </>
@@ -642,7 +698,9 @@ export function ShopOrderModal() {
       );
     }
     const shopCanCancel = order.status === 'placed' ? false : ACTIVE_SHOP_STATUSES.includes(order.status);
+    // Pull down for the latest (packing, delivery, PIN) — the staff member or customer may have moved it on.
     return (
+      <PullToRefresh refreshing={pulling} onRefresh={pullRefresh} style={styles.flex}>
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 24 }]}
@@ -660,6 +718,7 @@ export function ShopOrderModal() {
           />
         ) : null}
       </ScrollView>
+      </PullToRefresh>
     );
   };
 
@@ -841,6 +900,7 @@ const styles = StyleSheet.create({
   },
   secondaryText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
   pinCard: { alignItems: 'center', borderWidth: 1.5, gap: 6 },
+  deliveredBy: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   pinTitle: { ...typography.subheading, fontFamily: fonts.semiBold },
   pinBoxes: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 10, marginBottom: 4 },
   pinBox: { width: 54, height: 62, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },

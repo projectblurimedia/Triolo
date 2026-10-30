@@ -1,3 +1,4 @@
+import { ContinueModal } from './ContinueModal';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,6 +41,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const [nearbySearchMode, setNearbySearchMode] = useState<NearbySearchMode | null>(null);
   const [hireStaffVisible, setHireStaffVisible] = useState(false);
+  const [continueVisible, setContinueVisible] = useState(false);
 
   const handleLogoutConfirm = () => {
     setLogoutConfirmVisible(false);
@@ -48,6 +50,17 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   };
 
   const items = [
+    {
+      key: 'continue',
+      icon: 'forward' as const,
+      gradient: ['#16A34A', '#4ADE80'] as const,
+      title: t('continueSteps.title'),
+      subtitle: t('continueSteps.menuHint'),
+      onPress: () => {
+        onClose();
+        setContinueVisible(true);
+      },
+    },
     {
       key: 'nearbyWorkers',
       icon: 'screwdriver-wrench' as const,
@@ -153,6 +166,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
         mode={nearbySearchMode ?? 'worker'}
         onClose={() => setNearbySearchMode(null)}
       />
+      <ContinueModal visible={continueVisible} onClose={() => setContinueVisible(false)} />
     </>
   );
 }

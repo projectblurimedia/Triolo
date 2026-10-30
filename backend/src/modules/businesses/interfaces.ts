@@ -129,3 +129,33 @@ export interface NearbySearchFilter {
 export interface BusinessNearbyResult extends BusinessProfile {
   distanceMeters: number;
 }
+
+/** Someone the owner added to deliver a shop's orders. */
+export type ShopStaffStatus = 'invited' | 'active' | 'declined';
+
+export interface ShopStaffMember {
+  id: string;
+  accountId: string;
+  fullName: string;
+  mobileNumber: string;
+  /** invited: waiting for them to join in the Partner app; only active staff get deliveries. */
+  status: ShopStaffStatus;
+  createdAt: string;
+}
+
+/** An invitation to deliver for a shop, as the invited person sees it. */
+export interface StaffInvite {
+  businessId: string;
+  shopName: string;
+  ownerName: string;
+  /** The name the owner typed for them. */
+  fullName: string;
+  createdAt: string;
+}
+
+/** A shop this account delivers for. */
+export interface StaffShop {
+  businessId: string;
+  shopName: string;
+  ownerName: string;
+}

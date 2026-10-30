@@ -1,3 +1,4 @@
+import { splitSkills } from '@/modules/bookings/skills';
 import { Pool, QueryResultRow } from 'pg';
 import { parsePgArray } from '@/common/utils/pgArray';
 import {
@@ -240,6 +241,10 @@ export class WorkersRepository {
   // to [-1, 1] since floating-point rounding can push it a hair outside that domain for two
   // nearly-identical points, which would otherwise throw a Postgres "acos: input out of range".
   async findNearby(excludeAccountId: string, filter: NearbySearchFilter): Promise<WorkerNearbyResult[]> {
+    // Fixed skills, and names workers typed themselves.
+    const skills = splitSkills(filter.skillCategory ? filter.skillCategory.split(',') : []);
+    // With custom names, 'other' would match every worker who typed anything — they match by name instead.
+    const fixedSkills = skills.custom.length > 0 ? skills.fixed.filter((key) => key !== 'other') : skills.fixed;
     const like = filter.query ? `%${filter.query}%` : null;
     // 'rating': best average first (unrated workers last), more ratings breaking ties, then
     // nearest. The CASE keeps the division out of rows with no ratings yet.
@@ -262,7 +267,13 @@ export class WorkersRepository {
        ) sub
        WHERE sub.distance_meters <= $4
          AND ($5::text IS NULL OR ${filter.nameOnly ? 'sub.account_full_name ILIKE $5' : "sub.account_full_name ILIKE $5 OR sub.other_skill_description ILIKE $5 OR sub.location_name ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.skill_categories, ',') ILIKE $5"})
-         AND ($7::worker_skill_category[] IS NULL OR sub.skill_categories && $7::worker_skill_category[])
+         AND (($7::worker_skill_category[] IS NULL AND cardinality($9::text[]) = 0)
+           OR sub.skill_categories && COALESCE($7::worker_skill_category[], '{}')
+           OR EXISTS (
+             SELECT 1 FROM unnest(string_to_array(COALESCE(sub.other_skill_description, ''), ',')) AS have(name),
+                           unnest($9::text[]) AS want(name)
+             WHERE lower(trim(have.name)) = lower(trim(want.name))
+           ))
        ORDER BY (sub.account_id = ANY($8::uuid[])) DESC, ${orderBy}
        LIMIT $6`,
       [
@@ -272,8 +283,9 @@ export class WorkersRepository {
         filter.radiusKm * 1000,
         like,
         filter.limit,
-        filter.skillCategory ? filter.skillCategory.split(',') : null,
+        fixedSkills.length > 0 ? fixedSkills : null,
         filter.priorityAccountIds ?? [],
+        skills.custom,
       ],
     );
     return result.rows.map((row) => ({

@@ -8,6 +8,13 @@ interface SettingsState {
   /** True once the user has explicitly confirmed a language on the first-launch picker. */
   hasSelectedLanguage: boolean;
   isHydrated: boolean;
+  /**
+   * Picked on a screen before signing in (Login, registration): that choice wins over the
+   * account's saved language at sign-in and is saved to the account — e.g. delivery staff whose
+   * account a shop owner made.
+   */
+  pickedBeforeLogin: boolean;
+  setPickedBeforeLogin: (picked: boolean) => void;
   setLanguage: (language: SupportedLanguage) => void;
   confirmLanguage: () => void;
   setHydrated: () => void;
@@ -24,6 +31,8 @@ export const useSettingsStore = create<SettingsState>()(
       language: i18n.language as SupportedLanguage,
       hasSelectedLanguage: false,
       isHydrated: false,
+      pickedBeforeLogin: false,
+      setPickedBeforeLogin: (pickedBeforeLogin) => set({ pickedBeforeLogin }),
       setLanguage: (language) => {
         i18n.changeLanguage(language);
         set({ language });

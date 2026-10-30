@@ -107,7 +107,11 @@ beforeEach(() => {
     exists: jest.fn(),
     findForCustomer: jest.fn(),
     listForCustomer: jest.fn(),
-    findForShop: jest.fn(),
+    lostQuickOwners: jest.fn().mockResolvedValue([]),
+    findForShop: jest.fn().mockResolvedValue({ id: 'order-1', status: 'placed', fulfillment: 'delivery', items: [] }),
+    setDeliveryStaff: jest.fn().mockResolvedValue(true),
+    listForStaff: jest.fn().mockResolvedValue([]),
+    markDeliveredBy: jest.fn(),
     listForShop: jest.fn(),
     findRatedForBusiness: jest.fn(),
     cancelByCustomer: jest.fn(),
@@ -129,6 +133,12 @@ beforeEach(() => {
     getPublicProfile: jest.fn(),
     searchNearby: jest.fn(),
     getMyProfile: jest.fn().mockResolvedValue(buildShop()),
+    // Every shop of the owner: here, the one getMyProfile gives (tests set that).
+    listMyShops: jest.fn().mockImplementation(async () => {
+      const shop = await businesses.getMyProfile('owner');
+      return shop ? [shop] : [];
+    }),
+    isStaff: jest.fn().mockResolvedValue(true),
     recordRating: jest.fn(),
   } as unknown as jest.Mocked<BusinessesService>;
   notifications = { notify: jest.fn() } as unknown as jest.Mocked<NotificationsService>;
@@ -416,5 +426,37 @@ describe('admin cancel', () => {
     repo.adminCancel.mockResolvedValue(null);
     repo.exists.mockResolvedValue(true);
     await expect(service.adminCancel('order-1', null)).rejects.toMatchObject({ code: 'ORDER_INVALID_STATE' });
+  });
+});
+
+describe('delivery staff', () => {
+  it('sends a packed delivery with staff (out for delivery), tells them, and refuses non-staff', async () => {
+    repo.findForShop.mockResolvedValue({ id: 'order-1', status: 'out_for_delivery', fulfillment: 'delivery', items: [] } as never);
+    repo.listForStaff.mockResolvedValue([{ id: 'order-1', customerFullName: 'Lakshmi', items: [{ name: 'Rice' }], totalAmount: 250 }] as never);
+    await service.assignDelivery('owner-1', 'order-1', 'staff-1');
+    expect(repo.setDeliveryStaff).toHaveBeenCalledWith('order-1', 'shop-1', 'staff-1');
+    expect(notifications.notify).toHaveBeenCalledWith('staff-1', 'delivery_assigned', expect.stringContaining('కొత్త డెలివరీ'), expect.stringContaining('Lakshmi'), expect.anything());
+
+    businesses.isStaff.mockResolvedValueOnce(false);
+    await expect(service.assignDelivery('owner-1', 'order-1', 'stranger')).rejects.toMatchObject({ code: 'STAFF_NOT_FOUND' });
+  });
+
+  it('staff see only their own delivery', async () => {
+    repo.listForStaff.mockResolvedValue([] as never);
+    await expect(service.getMyDelivery('staff-2', 'order-1')).rejects.toMatchObject({ code: 'DELIVERY_NOT_FOUND' });
+    expect(repo.listForStaff).toHaveBeenCalledWith('staff-2', 1, 'order-1');
+  });
+});
+
+describe('delivery staff accept', () => {
+  it('a staff member accepting a packed delivery sends it out; declining hands it back', async () => {
+    repo.listForStaff.mockResolvedValue([{ id: 'order-1', staffStatus: 'pending', shopId: 'shop-1', shopName: 'Sri', customerFullName: 'Lakshmi', items: [] }] as never);
+    (repo as unknown as { answerDelivery: jest.Mock }).answerDelivery = jest.fn().mockResolvedValue({ businessId: 'shop-1', status: 'out_for_delivery' });
+    (businesses as unknown as { getPublicProfile: jest.Mock }).getPublicProfile = jest.fn().mockResolvedValue({ accountId: 'owner-1' });
+    await service.answerDelivery('staff-1', 'order-1', false);
+    expect(notifications.notify).toHaveBeenCalledWith('owner-1', 'delivery_declined', expect.any(String), expect.any(String), expect.anything());
+
+    (repo as unknown as { answerDelivery: jest.Mock }).answerDelivery.mockResolvedValue(null);
+    await expect(service.answerDelivery('staff-1', 'order-1', true)).rejects.toBeTruthy();
   });
 });

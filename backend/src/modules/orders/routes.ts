@@ -12,7 +12,7 @@ import { NotificationsService } from '@/modules/notifications/service';
 import { OrdersController } from './controller';
 import { OrdersRepository } from './repository';
 import { OrdersService } from './service';
-import { createOrderSchema, createQuickOrderSchema, customerCancelSchema, rateOrderSchema, saveItemsSchema, shopCancelSchema, verifyOrderPinSchema } from './validation';
+import { createOrderSchema, createQuickOrderSchema, customerCancelSchema, rateOrderSchema, saveItemsSchema, shopCancelSchema, verifyOrderPinSchema, assignDeliverySchema, staffLocationSchema } from './validation';
 
 // Own instances over the shared pool — same wiring style as bookings/routes.ts.
 const notificationsService = new NotificationsService(new NotificationsRepository(pool));
@@ -32,6 +32,13 @@ ordersRouter.param('id', (_req, _res, next, id: string) => {
 
 // Shop side — registered before `/:id` so `shop` isn't captured as an order id.
 ordersRouter.get('/shop/mine', authenticate, controller.listShop);
+// Delivery staff: the deliveries given to me, and handing one over with the customer's PIN.
+ordersRouter.get('/staff/deliveries', authenticate, controller.listDeliveries);
+ordersRouter.get('/staff/deliveries/:id', authenticate, controller.getDelivery);
+ordersRouter.post('/staff/deliveries/:id/accept', authenticate, controller.staffAnswer(true));
+ordersRouter.post('/staff/deliveries/:id/decline', authenticate, controller.staffAnswer(false));
+ordersRouter.put('/staff/deliveries/:id/location', authenticate, validateBody(staffLocationSchema), controller.staffLocation);
+ordersRouter.post('/staff/deliveries/:id/verify-pin', authenticate, validateBody(verifyOrderPinSchema), controller.staffVerifyPin);
 ordersRouter.post('/shop/quick/search', authenticate, controller.searchQuick);
 ordersRouter.get('/shop/:id', authenticate, controller.getShop);
 
@@ -51,4 +58,6 @@ ordersRouter.put('/:id/items', authenticate, validateBody(saveItemsSchema), cont
 ordersRouter.post('/:id/packed', authenticate, controller.packed);
 ordersRouter.post('/:id/ready', authenticate, controller.ready);
 ordersRouter.post('/:id/verify-pin', authenticate, validateBody(verifyOrderPinSchema), controller.verifyPin);
+// The owner sends a delivery with staff ({ staffAccountId }, or null to take it back).
+ordersRouter.post('/:id/assign-delivery', authenticate, validateBody(assignDeliverySchema), controller.assignDelivery);
 ordersRouter.post('/:id/shop-cancel', authenticate, validateBody(shopCancelSchema), controller.shopCancel);

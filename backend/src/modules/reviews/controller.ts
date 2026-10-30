@@ -35,6 +35,6 @@ export class ReviewsController {
     if (!req.account) {
       throw AppError.unauthorized();
     }
-    return ok(res, await this.service.getForMyShop(req.account.accountId));
+    return ok(res, await this.service.getForMyShop(req.account.accountId, typeof req.query.shopId === 'string' ? req.query.shopId : undefined));
   });
 }

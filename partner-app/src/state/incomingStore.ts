@@ -5,11 +5,18 @@ interface IncomingState {
   orderId: string | null;
   /** The combined "New requests" screen (IncomingRequestsHub) — more than one request at once. */
   listOpen: boolean;
+  /** Opened from the menu (Live near you): stays open, empty or not. */
+  listManual: boolean;
+  /** The request to show first (a card tapped on Home). */
+  focusKey: string | null;
+  /** Accept tapped on the floating card: Live Requests accepts this one as it opens. */
+  autoAcceptKey: string | null;
+  setAutoAccept: (key: string | null) => void;
   /** IncomingJobModal is accepting or declining: don't swap it for the list mid-way. */
   jobBusy: boolean;
   focusOrder: (orderId: string) => void;
   clearOrder: () => void;
-  openList: () => void;
+  openList: (manual?: boolean, focusKey?: string) => void;
   closeList: () => void;
   setJobBusy: (busy: boolean) => void;
 }
@@ -22,10 +29,14 @@ interface IncomingState {
 export const useIncomingStore = create<IncomingState>((set) => ({
   orderId: null,
   listOpen: false,
+  listManual: false,
+  focusKey: null,
+  autoAcceptKey: null,
+  setAutoAccept: (autoAcceptKey) => set({ autoAcceptKey }),
   jobBusy: false,
   focusOrder: (orderId) => set({ orderId }),
   clearOrder: () => set({ orderId: null }),
-  openList: () => set({ listOpen: true, orderId: null }),
-  closeList: () => set({ listOpen: false }),
+  openList: (manual = false, focusKey) => set({ listOpen: true, listManual: manual, focusKey: focusKey ?? null, orderId: null }),
+  closeList: () => set({ listOpen: false, listManual: false, focusKey: null }),
   setJobBusy: (jobBusy) => set({ jobBusy }),
 }));

@@ -8,14 +8,15 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { VerificationBadge } from '@/components/VerificationBadge';
-import { WorkerReviewsSection } from '@/components/WorkerProfileGlass';
-import { useMyReviews, useMyShopReviews } from '@/hooks/useReviews';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
-import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { useMyShops } from '@/hooks/useBusinessMutations';
+import { MAX_SHOPS } from '@/services/businessesService';
+import { ShopAvatar, ShopsSheet } from '@/components/ShopsSheet';
+import { StackedAvatars } from '@/components/StackedAvatars';
 import { MainStackParamList, MainTabParamList } from '@/navigation/types';
-import { categoryIcon, JobPostCard, jobTitle } from '@/components/JobPostCard';
+import { categoryIcon, jobTitle } from '@/components/JobPostCard';
 import { JobPostsSheet } from '@/components/JobPostsSheet';
 import { SmartImage } from '@/components/SmartImage';
 import { useMyJobPosts } from '@/hooks/useJobPost';
@@ -42,15 +43,15 @@ export function ProfileScreen({ navigation }: Props) {
   const account = useAuthStore((state) => state.account);
 
   const workerProfile = useMyWorkerProfile();
-  const businessProfile = useMyBusinessProfile();
+  const myShops = useMyShops();
+  const shops = myShops.data ?? [];
+  const [shopsOpen, setShopsOpen] = useState(false);
   const worker = workerProfile.data;
-  const reviews = useMyReviews(!!worker);
   const jobPosts = useMyJobPosts();
   const [postsOpen, setPostsOpen] = useState(false);
   const posts = jobPosts.data ?? [];
   const livePosts = posts.filter((post) => post.isActive).length;
-  const shop = businessProfile.data;
-  const shopReviews = useMyShopReviews(!!shop);
+  const shop = shops[0] ?? null;
   // Profiles with an active Trusted by Triolo badge.
   const trustedKinds = useTrustedKinds();
 
@@ -118,80 +119,110 @@ export function ProfileScreen({ navigation }: Props) {
 
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('mainTabs.Profile.capabilitiesLabel')}</Text>
 
-        <CapabilityRow
-          icon="screwdriver-wrench"
-          title={t('mainTabs.Profile.workerTitle')}
-          profile={workerProfile.data}
-          photoUrl={worker?.profilePhotoUrl}
-          trusted={trustedKinds.has('service')}
-          name={account?.fullName}
-          quickFact={
+        {/* Services, Shop and Job Post: the same card each, so they read alike. Several shops
+            or posts are one card (their pictures overlapping) that opens a list. */}
+        <KindCard
+          kind={t('mainTabs.Profile.workerTitle')}
+          avatar={
+            worker?.profilePhotoUrl ? (
+              <SealedPhoto size={46} trusted={trustedKinds.has('service')}>
+                <SmartImage source={{ uri: worker.profilePhotoUrl }} style={styles.kindPhoto} />
+              </SealedPhoto>
+            ) : (
+              <IconAvatar icon={worker ? 'screwdriver-wrench' : 'plus'} />
+            )
+          }
+          title={worker ? (account?.fullName ?? '') : t('mainTabs.Profile.addWorker')}
+          fact={
             worker
               ? [
                   ...worker.skillCategories.filter((key) => key !== 'other').map((key) => t(`workerProfile.skills.${key}`)),
                   ...(worker.otherSkillDescription ? [worker.otherSkillDescription] : []),
                 ].join(', ')
-              : undefined
+              : t('mainTabs.Profile.addWorkerHint')
           }
-          addLabel={t('mainTabs.Profile.addWorker')}
-          onView={() => navigation.navigate('MyInfo', { capability: 'worker' })}
-          onAdd={() => navigation.navigate('WorkerRegistration')}
-          colors={colors}
-        />
-        <CapabilityRow
-          icon="store"
-          title={t('mainTabs.Profile.businessTitle')}
-          profile={businessProfile.data}
-          photoUrl={shop?.profilePhotoUrl}
-          trusted={trustedKinds.has('business')}
-          name={shop?.shopName}
-          quickFact={shop && account ? t('mainTabs.Profile.ownerLine', { name: account.fullName }) : undefined}
-          addLabel={t('mainTabs.Profile.addBusiness')}
-          onView={() => navigation.navigate('MyInfo', { capability: 'business' })}
-          onAdd={() => navigation.navigate('BusinessRegistration')}
-          colors={colors}
+          status={worker?.verificationStatus}
+          adding={!worker}
+          onPress={() => (worker ? navigation.navigate('MyInfo', { capability: 'worker' }) : navigation.navigate('WorkerRegistration'))}
         />
 
-        {posts.length === 1 ? (
-          <JobPostCard
-            post={posts[0]}
-            name={account?.fullName}
-            compact
-            onPress={() => navigation.navigate('MyInfo', { capability: 'job', postId: posts[0].id })}
-          />
+        <KindCard
+          kind={t('mainTabs.Profile.businessTitle')}
+          avatar={
+            shops.length > 1 ? (
+              <StackedAvatars items={shops} size={24} renderItem={(entry, size) => <ShopAvatar shop={entry} size={size} />} />
+            ) : shop ? (
+              <ShopAvatar shop={shop} size={46} />
+            ) : (
+              <IconAvatar icon="plus" />
+            )
+          }
+          title={shops.length > 1 ? t('shops.title') : shop ? shop.shopName : t('mainTabs.Profile.addBusiness')}
+          fact={
+            shops.length > 1
+              ? `${t('shops.count', { count: shops.length })} · ${shops.map((entry) => entry.shopName).join(', ')}`
+              : shop
+                ? t(shop.deliveryAvailable ? 'mainTabs.Profile.shopDelivers' : 'mainTabs.Profile.shopPickup')
+                : t('mainTabs.Profile.addBusinessHint')
+          }
+          status={shops.length === 1 ? shop?.verificationStatus : undefined}
+          adding={!shop}
+          onPress={() =>
+            shops.length > 1
+              ? setShopsOpen(true)
+              : shop
+                ? navigation.navigate('MyInfo', { capability: 'business', shopId: shop.id })
+                : navigation.navigate('BusinessRegistration')
+          }
+        />
+
+        <KindCard
+          kind={t('mainTabs.Profile.jobPostTitle')}
+          avatar={
+            posts.length > 1 ? (
+              <StackedAvatars items={posts} size={24} renderItem={(post, size) => <IconAvatar icon={categoryIcon(post.category)} size={size} />} />
+            ) : (
+              <IconAvatar icon={posts[0] ? categoryIcon(posts[0].category) : 'plus'} />
+            )
+          }
+          title={posts.length > 1 ? t('jobPost.postsTitle') : posts[0] ? jobTitle(posts[0], t) : t('jobPost.lookingTitle')}
+          fact={
+            posts.length > 1
+              ? t('jobPost.postsCount', { count: posts.length, live: livePosts })
+              : posts[0]
+                ? t(posts[0].isActive ? 'settingsMenu.jobPostLive' : 'settingsMenu.jobPostHidden')
+                : t('mainTabs.Profile.addJobPostHint')
+          }
+          adding={posts.length === 0}
+          onPress={() =>
+            posts.length > 1
+              ? setPostsOpen(true)
+              : posts[0]
+                ? navigation.navigate('MyInfo', { capability: 'job', postId: posts[0].id })
+                : navigation.navigate('JobPost', {})
+          }
+        />
+
+        {/* One shop / post: a second is added here. From two on, Add another is in the list. */}
+        {shops.length === 1 && shops.length < MAX_SHOPS ? (
+          <AddRow label={t('shops.addAnother')} onPress={() => navigation.navigate('BusinessRegistration')} />
         ) : null}
-        {posts.length > 1 ? (
-          <Pressable
-            onPress={() => setPostsOpen(true)}
-            style={({ pressed }) => [styles.postsCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.9 : 1 }]}
-          >
-            <View style={styles.postsIcons}>
-              {posts.slice(0, 3).map((post, index) => (
-                <LinearGradient
-                  key={post.id}
-                  colors={headerGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.postsIcon, { borderColor: colors.surface, marginLeft: index === 0 ? 0 : -12 }]}
-                >
-                  <FontAwesome6 name={categoryIcon(post.category) as never} size={13} color="#FFFFFF" solid />
-                </LinearGradient>
-              ))}
-            </View>
-            <View style={styles.flex}>
-              <Text style={[styles.addPostTitle, { color: colors.text }]} numberOfLines={1}>
-                {t('jobPost.postsTitle')}
-              </Text>
-              <Text style={[styles.addPostText, { color: colors.textMuted }]} numberOfLines={1}>
-                {posts.map((post) => jobTitle(post, t)).join(' · ')}
-              </Text>
-              <Text style={[styles.postsCount, { color: colors.primary }]}>
-                {t('jobPost.postsCount', { count: posts.length, live: livePosts })}
-              </Text>
-            </View>
-            <FontAwesome6 name="chevron-right" size={13} color={colors.textMuted} solid />
-          </Pressable>
-        ) : null}
+        {posts.length === 1 ? <AddRow label={t('jobPost.addAnother')} onPress={() => navigation.navigate('JobPost', {})} /> : null}
+
+        <ShopsSheet
+          visible={shopsOpen}
+          shops={shops}
+          canAdd={shops.length < MAX_SHOPS}
+          onClose={() => setShopsOpen(false)}
+          onOpen={(entry) => {
+            setShopsOpen(false);
+            navigation.navigate('MyInfo', { capability: 'business', shopId: entry.id });
+          }}
+          onAdd={() => {
+            setShopsOpen(false);
+            navigation.navigate('BusinessRegistration');
+          }}
+        />
         <JobPostsSheet
           visible={postsOpen}
           posts={posts}
@@ -207,37 +238,6 @@ export function ProfileScreen({ navigation }: Props) {
             navigation.navigate('JobPost', {});
           }}
         />
-        {/* The first post, or a second one; from two on, Add another lives in the sheet. */}
-        {posts.length < 2 ? (
-          <Pressable
-            onPress={() => navigation.navigate('JobPost', {})}
-            style={({ pressed }) => [styles.addPost, { borderColor: `${colors.primary}40`, backgroundColor: `${colors.primary}0A`, opacity: pressed ? 0.85 : 1 }]}
-          >
-            <View style={[styles.addPostIcon, { backgroundColor: colors.primary }]}>
-              <FontAwesome6 name="plus" size={13} color="#FFFFFF" solid />
-            </View>
-            <View style={styles.flex}>
-              <Text style={[styles.addPostTitle, { color: colors.text }]}>
-                {t(posts.length > 0 ? 'jobPost.addAnother' : 'jobPost.lookingTitle')}
-              </Text>
-              <Text style={[styles.addPostText, { color: colors.textMuted }]} numberOfLines={1}>
-                {t('jobPost.addAnotherHint')}
-              </Text>
-            </View>
-            <FontAwesome6 name="chevron-right" size={13} color={colors.textMuted} solid />
-          </Pressable>
-        ) : null}
-
-
-        {worker ? <WorkerReviewsSection summary={reviews.data} loading={reviews.isLoading} error={reviews.isError} /> : null}
-        {shop ? (
-          <WorkerReviewsSection
-            summary={shopReviews.data}
-            loading={shopReviews.isLoading}
-            error={shopReviews.isError}
-            title={t('shopOrders.shopReviewsTitle', { shop: shop.shopName })}
-          />
-        ) : null}
       </ScrollView>
     </ScreenContainer>
   );
@@ -250,64 +250,78 @@ function getInitials(fullName: string): string {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
-interface CapabilityRowProps {
-  icon: React.ComponentProps<typeof FontAwesome6>['name'];
-  title: string;
-  profile: { verificationStatus: string } | null | undefined;
-  /** This profile's own photo (worker face / shop logo); the icon shows when there is none. */
-  photoUrl?: string | null;
-  /** The profile has an active Trusted by Triolo badge (its photo shows the seal). */
-  trusted?: boolean;
-  /** Who or what this profile is: the worker's name, or the shop's name. */
-  name?: string;
-  quickFact?: string;
-  addLabel: string;
-  onView: () => void;
-  onAdd: () => void;
-  colors: ReturnType<typeof useThemeColors>['colors'];
+/** A round blue avatar with an icon (a profile with no photo, or "add"). */
+function IconAvatar({ icon, size = 46 }: { icon: string; size?: number }) {
+  return (
+    <LinearGradient
+      colors={headerGradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}
+    >
+      <FontAwesome6 name={icon as never} size={size * 0.38} color="#FFFFFF" solid />
+    </LinearGradient>
+  );
 }
 
-function CapabilityRow({ icon, title, profile, photoUrl, name, quickFact, addLabel, onView, onAdd, colors, trusted }: CapabilityRowProps) {
+/** One profile kind on the Profile tab — the same height and layout for all three. */
+function KindCard({
+  kind,
+  avatar,
+  title,
+  fact,
+  status,
+  adding,
+  onPress,
+}: {
+  kind: string;
+  avatar: React.ReactNode;
+  title: string;
+  fact: string;
+  /** Shown only when not verified (pending / rejected). */
+  status?: string;
+  /** Not made yet: the card invites adding one. */
+  adding?: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useThemeColors();
   return (
-    <Pressable style={[styles.card, { backgroundColor: colors.surface }]} onPress={profile ? onView : onAdd}>
-      {profile && photoUrl ? (
-        <View style={styles.cardPhotoWrap}>
-          <SealedPhoto size={42} trusted={!!trusted}>
-            <SmartImage source={{ uri: photoUrl }} style={styles.cardPhoto} />
-          </SealedPhoto>
-        </View>
-      ) : (
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cardIcon}>
-          <FontAwesome6 name={icon} size={18} color="#FFFFFF" solid />
-        </LinearGradient>
-      )}
-      <View style={styles.cardText}>
-        {profile ? (
-          <>
-            <Text style={[styles.cardCaption, { color: colors.primary }]}>{title}</Text>
-            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
-              {name ?? title}
-            </Text>
-            {quickFact ? (
-              <Text style={[styles.cardQuickFact, { color: colors.textMuted }]} numberOfLines={1}>
-                {quickFact}
-              </Text>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
-            <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>{addLabel}</Text>
-          </>
-        )}
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.kindCard,
+        {
+          backgroundColor: adding ? `${colors.primary}0A` : colors.surface,
+          borderColor: adding ? `${colors.primary}40` : `${colors.primary}1F`,
+          borderStyle: adding ? 'dashed' : 'solid',
+          opacity: pressed ? 0.9 : 1,
+        },
+      ]}
+    >
+      <View style={styles.kindAvatar}>{avatar}</View>
+      <View style={styles.flex}>
+        <Text style={[styles.kindLabel, { color: colors.primary }]} numberOfLines={1}>
+          {kind}
+        </Text>
+        <Text style={[styles.kindTitle, { color: colors.text }]} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={[styles.kindFact, { color: colors.textMuted }]} numberOfLines={1}>
+          {fact}
+        </Text>
       </View>
-      {/* Verified is the normal state, so it isn't shown; only "pending" / "rejected" are. */}
-      {profile && profile.verificationStatus !== 'verified' ? (
-        <View style={styles.statusWrap}>
-          <VerificationBadge status={profile.verificationStatus} />
-        </View>
-      ) : null}
-      <FontAwesome6 name="chevron-right" size={13} color={colors.textMuted} solid />
+      {status && status !== 'verified' ? <VerificationBadge status={status} /> : null}
+      <FontAwesome6 name={adding ? 'plus' : 'chevron-right'} size={13} color={adding ? colors.primary : colors.textMuted} solid />
+    </Pressable>
+  );
+}
+
+function AddRow({ label, onPress }: { label: string; onPress: () => void }) {
+  const { colors } = useThemeColors();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.addRow, { opacity: pressed ? 0.7 : 1 }]}>
+      <FontAwesome6 name="plus" size={11} color={colors.primary} solid />
+      <Text style={[styles.addRowText, { color: colors.primary }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -385,12 +399,19 @@ const styles = StyleSheet.create({
   statusWrap: { marginRight: 8 },
   flex: { flex: 1 },
   postsCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12, marginBottom: 10 },
-  postsIcons: { flexDirection: 'row' },
-  postsIcon: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   postsCount: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11.5, marginTop: 1 },
   addPost: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', paddingVertical: 10, paddingHorizontal: 12, marginBottom: 10 },
   addPostIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   addPostTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14.5 },
   addPostText: { ...typography.caption, fontSize: 11.5 },
   cardSubtitle: { ...typography.caption, marginTop: 3 },
+  // The three profile cards: one fixed height, one layout.
+  kindCard: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 82, borderRadius: 18, borderWidth: 1.5, paddingHorizontal: 12, marginBottom: 10, ...CARD_SHADOW },
+  kindAvatar: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center' },
+  kindPhoto: { width: 46, height: 46, borderRadius: 23 },
+  kindLabel: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10.5, letterSpacing: 0.4, textTransform: 'uppercase' },
+  kindTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 20 },
+  kindFact: { ...typography.caption, fontSize: 12 },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 4, marginBottom: 8 },
+  addRowText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12.5 },
 });

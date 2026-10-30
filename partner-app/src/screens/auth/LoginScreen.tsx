@@ -5,7 +5,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAwareView } from '@/components/KeyboardAwareView';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { GradientHeader } from '@/components/GradientHeader';
+import { RegisterHeader } from '@/components/RegisterHeader';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { Button } from '@/components/Button';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -49,7 +49,7 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
-      <GradientHeader title={t('auth.login')} subtitle={t('auth.loginHeaderSubtitle')} showBack />
+      <RegisterHeader title={t('auth.login')} subtitle={t('auth.loginHeaderSubtitle')} />
       <ScreenContainer edges={['left', 'right', 'bottom']}>
         <KeyboardAwareView>
           <ScrollView

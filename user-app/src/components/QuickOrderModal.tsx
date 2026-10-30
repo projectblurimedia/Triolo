@@ -1,3 +1,4 @@
+import { businessesService } from '@/services/businessesService';
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -190,6 +191,8 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
                 selected={categories}
                 onChange={setCategories}
                 fieldIcon="store"
+                // Kinds shops typed themselves (e.g. Fancy) are listed too.
+                searchCustom={businessesService.customCategories}
               />
             </View>
 

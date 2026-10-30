@@ -9,11 +9,15 @@ import { ConfirmModal } from './ConfirmModal';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
+import { useLogout } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
 import { languageLabelKey, useSettingsStore } from '@/state/settingsStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
-import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { useMyShops } from '@/hooks/useBusinessMutations';
+import { ShopsSheet } from './ShopsSheet';
+import { ForYouMode, openForYou } from '@/state/forYouStore';
+import { useIncomingStore } from '@/state/incomingStore';
+import { MAX_SHOPS } from '@/services/businessesService';
 import { useMyJobPosts } from '@/hooks/useJobPost';
 import { JobPostsSheet } from './JobPostsSheet';
 import { useAuthStore } from '@/state/authStore';
@@ -45,13 +49,14 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
   const themeMode = useThemeStore((state) => state.mode);
   const language = useSettingsStore((state) => state.language);
   const logout = useLogout();
-  const updateLanguage = useUpdateAccountLanguage();
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const [postsOpen, setPostsOpen] = useState(false);
   const worker = useMyWorkerProfile().data;
-  const shop = useMyBusinessProfile().data;
+  const shops = useMyShops().data ?? [];
+  const shop = shops[0] ?? null;
+  const [shopsOpen, setShopsOpen] = useState(false);
   const jobPosts = useMyJobPosts().data ?? [];
   const account = useAuthStore((state) => state.account);
   const jobPost = jobPosts[0] ?? null;
@@ -65,6 +70,11 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
     if (!navigationRef.isReady()) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (navigationRef.navigate as any)(route, params);
+  };
+  // Closes the drawer, then opens the list over the app.
+  const showForYou = (mode: ForYouMode) => {
+    onClose();
+    setTimeout(() => openForYou(mode), 260);
   };
   const statusLabel = (status: string) =>
     t(status === 'verified' ? 'verification.verified' : status === 'rejected' ? 'verification.rejected' : 'verification.pending');
@@ -93,6 +103,21 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
           if (navigationRef.isReady()) navigationRef.navigate('JobPost', {});
         }}
       />
+      <ShopsSheet
+        visible={shopsOpen}
+        shops={shops}
+        canAdd={shops.length < MAX_SHOPS}
+        hint={t('shops.pickToEdit')}
+        onClose={() => setShopsOpen(false)}
+        onOpen={(entry) => {
+          setShopsOpen(false);
+          if (navigationRef.isReady()) navigationRef.navigate('BusinessRegistration', { profile: entry });
+        }}
+        onAdd={() => {
+          setShopsOpen(false);
+          if (navigationRef.isReady()) navigationRef.navigate('BusinessRegistration', undefined);
+        }}
+      />
       <SideMenuDrawer
         visible={visible}
         onClose={onClose}
@@ -101,7 +126,37 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
         title={t('settingsMenu.title')}
         subtitle={t('settingsMenu.subtitle')}
       >
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settingsMenu.profilesSection')}</Text>
+        {/* Always reachable here, not only on Home (e.g. after tapping Later on an invitation). */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('forYou.menuSection')}</Text>
+        {/* Every new job and order at once, live (the same screen new requests open). */}
+        <DrawerMenuItem
+          icon="satellite-dish"
+          gradient={GREEN_GRADIENT}
+          title={t('incoming.menuTitle')}
+          subtitle={t('incoming.menuHint')}
+          onPress={() => {
+            onClose();
+            setTimeout(() => useIncomingStore.getState().openList(true), 260);
+          }}
+        />
+        {worker?.verificationStatus === 'verified' ? (
+          <DrawerMenuItem
+            icon="clipboard-list"
+            gradient={PURPLE_GRADIENT}
+            title={t('forYou.problemsTitle')}
+            subtitle={t('forYou.problemsMenuHint')}
+            onPress={() => showForYou('problems')}
+          />
+        ) : null}
+        <DrawerMenuItem
+          icon="forward"
+          gradient={headerGradient}
+          title={t('forYou.continueTitle')}
+          subtitle={t('forYou.continueMenuHint')}
+          onPress={() => showForYou('continue')}
+        />
+
+        <Text style={[styles.sectionTitle, styles.sectionGap, { color: colors.textMuted }]}>{t('settingsMenu.profilesSection')}</Text>
         <DrawerMenuItem
           icon="screwdriver-wrench"
           gradient={headerGradient}
@@ -118,9 +173,19 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
           gradient={GREEN_GRADIENT}
           title={t(shop ? 'settingsMenu.editShop' : 'settingsMenu.addShop')}
           subtitle={
-            shop ? `${statusLabel(shop.verificationStatus)} · ${t('settingsMenu.tapToEdit')}` : t('settingsMenu.addShopHint')
+            shop
+              ? shops.length > 1
+                ? t('shops.count', { count: shops.length })
+                : `${statusLabel(shop.verificationStatus)} · ${t('settingsMenu.tapToEdit')}`
+              : t('settingsMenu.addShopHint')
           }
-          onPress={() => open('BusinessRegistration', shop ? { profile: shop } : undefined)}
+          onPress={() => {
+            // None: add one. One: edit it. Several: pick which (or add another) in a sheet.
+            if (!shop) return open('BusinessRegistration', undefined);
+            if (shops.length === 1) return open('BusinessRegistration', { profile: shop });
+            onClose();
+            setTimeout(() => setShopsOpen(true), 260);
+          }}
         />
         <DrawerMenuItem
           icon="user-tie"
@@ -170,7 +235,6 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
       <LanguagePickerModal
         visible={languagePickerVisible}
         onClose={() => setLanguagePickerVisible(false)}
-        onChange={(next) => updateLanguage.mutate(next)}
       />
       <ConfirmModal
         visible={logoutConfirmVisible}

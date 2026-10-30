@@ -129,6 +129,7 @@ export function StepStack({
   live = true,
   icon = 'clock-rotate-left',
   hideMore = false,
+  expanded = false,
 }: {
   title: string;
   steps: StackStep[];
@@ -143,6 +144,8 @@ export function StepStack({
   icon?: React.ComponentProps<typeof FontAwesome6>['name'];
   /** Leave out the "+N more — tap to see all" line (the stack itself still opens the list). */
   hideMore?: boolean;
+  /** Every card one under another (a screen of its own), not a stack. */
+  expanded?: boolean;
 }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
@@ -151,6 +154,15 @@ export function StepStack({
   const [frontHeight, setFrontHeight] = useState(0);
 
   if (steps.length === 0) return null;
+  if (expanded) {
+    return (
+      <View style={[styles.expanded, style]}>
+        {steps.map((step) => (
+          <StepCard key={step.key} step={step} onPress={step.onPress} accent={accent} />
+        ))}
+      </View>
+    );
+  }
   const front = steps[0];
   const behind = steps.slice(1, 1 + PEEK_CARDS);
   const stacked = steps.length > 1;
@@ -254,6 +266,7 @@ export function StepStack({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  expanded: { gap: 12 },
   section: { marginTop: 18, marginBottom: 4 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   sectionTitle: { ...typography.subheading, fontFamily: fonts.semiBold, flex: 1 },

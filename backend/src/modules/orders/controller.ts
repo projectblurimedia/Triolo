@@ -14,6 +14,35 @@ function requireAccountId(req: Request): string {
 export class OrdersController {
   constructor(private readonly service: OrdersService) {}
 
+  // --- Delivery staff ---
+
+  assignDelivery = asyncHandler(async (req: Request, res: Response) => {
+    const staff = typeof req.body?.staffAccountId === 'string' ? req.body.staffAccountId : null;
+    return ok(res, await this.service.assignDelivery(requireAccountId(req), req.params.id, staff));
+  });
+
+  listDeliveries = asyncHandler(async (req: Request, res: Response) => {
+    return ok(res, await this.service.listMyDeliveries(requireAccountId(req)));
+  });
+
+  getDelivery = asyncHandler(async (req: Request, res: Response) => {
+    return ok(res, await this.service.getMyDelivery(requireAccountId(req), req.params.id));
+  });
+
+  staffAnswer = (accept: boolean) =>
+    asyncHandler(async (req: Request, res: Response) => {
+      return ok(res, await this.service.answerDelivery(requireAccountId(req), req.params.id, accept), accept ? 'Accepted' : 'Declined');
+    });
+
+  staffLocation = asyncHandler(async (req: Request, res: Response) => {
+    await this.service.updateStaffLocation(requireAccountId(req), req.params.id, req.body.latitude, req.body.longitude);
+    return ok(res, null);
+  });
+
+  staffVerifyPin = asyncHandler(async (req: Request, res: Response) => {
+    return ok(res, await this.service.staffVerifyPin(requireAccountId(req), req.params.id, req.body.pin), 'Delivered');
+  });
+
   // --- Customer side ---
 
   create = asyncHandler(async (req: Request, res: Response) => {

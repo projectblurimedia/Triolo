@@ -57,9 +57,22 @@ export const useAuthStore = create<AuthState>()(
       isCompletingRegistration: false,
       setSession: ({ accessToken, refreshToken, account }) => {
         set({ accessToken, refreshToken, account });
-        // The account's saved language is authoritative on login/registration —
+        const settings = useSettingsStore.getState();
+        if (settings.pickedBeforeLogin) {
+          // Chosen on this phone just before signing in: keep it, and save it to the account.
+          settings.setPickedBeforeLogin(false);
+          if (settings.language !== account.preferredLanguage) {
+            // Required lazily: authService → apiClient → this store.
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { authService } = require('@/services/authService');
+            authService.updateLanguage(settings.language).catch(() => undefined);
+            set({ account: { ...account, preferredLanguage: settings.language } });
+          }
+          return;
+        }
+        // Otherwise the account's saved language is authoritative on login/registration —
         // it overrides whatever the device's local guess/setting was. See docs/localization.md.
-        useSettingsStore.getState().setLanguage(account.preferredLanguage);
+        settings.setLanguage(account.preferredLanguage);
       },
       setAccessToken: (accessToken) => set({ accessToken }),
       setAccount: (account) => set({ account }),

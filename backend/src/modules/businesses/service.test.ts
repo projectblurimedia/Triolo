@@ -19,6 +19,17 @@ type MockRepository = {
 function createMockRepository(): MockRepository {
   return {
     findByAccountId: jest.fn(),
+    listByAccountId: jest.fn().mockResolvedValue([]),
+    countByAccountId: jest.fn().mockResolvedValue(0),
+    listStaff: jest.fn().mockResolvedValue([]),
+    countStaff: jest.fn().mockResolvedValue(0),
+    addStaff: jest.fn(),
+    removeStaff: jest.fn().mockResolvedValue(true),
+    isStaff: jest.fn().mockResolvedValue(true),
+    hasStaffRow: jest.fn().mockResolvedValue(false),
+    listInvites: jest.fn().mockResolvedValue([]),
+    answerInvite: jest.fn().mockResolvedValue(true),
+    staffShops: jest.fn().mockResolvedValue([]),
     create: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
@@ -30,7 +41,7 @@ function createMockRepository(): MockRepository {
 }
 
 function createMockNotificationsService(): jest.Mocked<NotificationsService> {
-  return { notifyProfileViewed: jest.fn() } as unknown as jest.Mocked<NotificationsService>;
+  return { notifyProfileViewed: jest.fn(), notify: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<NotificationsService>;
 }
 
 function buildProfile(overrides: Partial<BusinessProfile> = {}): BusinessProfile {
@@ -67,9 +78,9 @@ describe('BusinessesService.createProfile', () => {
     jest.clearAllMocks();
   });
 
-  it('rejects if the account already has a business profile', async () => {
+  it('rejects a sixth shop (a partner may own up to five)', async () => {
     const repo = createMockRepository();
-    repo.findByAccountId.mockResolvedValue(buildProfile());
+    repo.countByAccountId.mockResolvedValue(5);
     const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await expect(
@@ -89,7 +100,7 @@ describe('BusinessesService.createProfile', () => {
         },
         [],
       ),
-    ).rejects.toMatchObject({ statusCode: 409, code: 'BUSINESS_PROFILE_EXISTS' });
+    ).rejects.toMatchObject({ statusCode: 409, code: 'SHOP_LIMIT' });
 
     expect(repo.create).not.toHaveBeenCalled();
   });
@@ -286,6 +297,7 @@ describe('BusinessesService.updateProfile', () => {
 
     expect(repo.update).toHaveBeenCalledWith(
       'account-1',
+      'business-1',
       expect.objectContaining({
         shopName: 'New Name',
         shopCategories: ['restaurant'],
@@ -324,6 +336,7 @@ describe('BusinessesService.updateProfile', () => {
 
     expect(repo.update).toHaveBeenCalledWith(
       'account-1',
+      'business-1',
       expect.objectContaining({ shopPhotoUrls: ['https://cdn/a.jpg', 'https://cdn/new.jpg'] }),
     );
   });
@@ -379,7 +392,7 @@ describe('BusinessesService.deleteProfile', () => {
     const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
 
     await service.deleteProfile('account-1');
-    expect(repo.remove).toHaveBeenCalledWith('account-1');
+    expect(repo.remove).toHaveBeenCalledWith('account-1', 'business-1');
   });
 
   it('deletes all shop photos from Cloudinary when the profile is deleted', async () => {
@@ -523,5 +536,45 @@ describe('BusinessesService delivery charges', () => {
     );
 
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ deliveryPricePerKm: 12, deliveryMinCharge: 12 }));
+  });
+});
+
+describe('BusinessesService delivery staff', () => {
+  it('adds staff by the typed name and phone (making their account), owner number allowed', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(buildProfile());
+    const accounts = {
+      findOrCreateByMobile: jest.fn().mockResolvedValue({ id: 'staff-1', fullName: 'Ravi' }),
+      getAccount: jest.fn().mockResolvedValue({ preferredLanguage: 'en' }),
+    };
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService(), undefined, accounts);
+    await service.addStaff('account-1', 'business-1', { fullName: 'Ravi', mobileNumber: '9700000003' });
+    expect(repo.findByAccountId).toHaveBeenCalledWith('account-1', 'business-1');
+    expect(accounts.findOrCreateByMobile).toHaveBeenCalledWith('9700000003', 'Ravi', 'en');
+    // Invited first: they join in their Partner app.
+    expect(repo.addStaff).toHaveBeenCalledWith('business-1', 'staff-1', 'Ravi', 'invited');
+
+    // The owner's own number is allowed (the OTP comes to the owner); the typed name is kept.
+    accounts.findOrCreateByMobile.mockResolvedValue({ id: 'account-1', fullName: 'Owner' });
+    await service.addStaff('account-1', 'business-1', { fullName: 'Suresh', mobileNumber: '9700000001' });
+    expect(repo.addStaff).toHaveBeenLastCalledWith('business-1', 'account-1', 'Suresh', 'active');
+  });
+
+  it('only the owner of the shop manages its staff', async () => {
+    const repo = createMockRepository();
+    repo.findByAccountId.mockResolvedValue(null);
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
+    await expect(service.listStaff('someone-else', 'business-1')).rejects.toMatchObject({ code: 'SHOP_NOT_FOUND' });
+  });
+});
+
+describe('BusinessesService staff invitations', () => {
+  it('lets the invited person join or decline, and 404s when there is no invitation', async () => {
+    const repo = createMockRepository();
+    const service = new BusinessesService(repo as unknown as BusinessesRepository, createMockNotificationsService());
+    await service.answerInvite('staff-1', 'business-1', true);
+    expect(repo.answerInvite).toHaveBeenCalledWith('staff-1', 'business-1', true);
+    repo.answerInvite.mockResolvedValue(false);
+    await expect(service.answerInvite('staff-1', 'business-1', false)).rejects.toMatchObject({ code: 'STAFF_INVITE_NOT_FOUND' });
   });
 });

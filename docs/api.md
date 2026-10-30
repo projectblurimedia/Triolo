@@ -145,6 +145,20 @@ Records that the caller viewed this worker's profile (fired by `user-app` when o
 
 Adds the Business capability to the authenticated `user` account — mirrors the Workers module exactly, shop-shaped instead of skill-shaped.
 
+**A partner may own up to 5 shops** (migration `0056`). `POST /businesses/me/profile` adds one more (409 `SHOP_LIMIT` at 5). Every `/businesses/me/profile…` route takes an optional `?shopId=<uuid>` to pick the shop; without it they use the first verified shop, else the oldest (so older app builds keep working with one shop). `DELETE /businesses/me/profile` without `shopId` removes every shop.
+
+Shop kinds in `GET /businesses/nearby?shopCategory=` and `POST /orders/quick` `shopCategories` may be fixed keys or names shops typed themselves (from `GET /businesses/custom-categories`), matched by whole name, any case. `GET /workers/nearby?skillCategory=` takes typed work names the same way.
+
+### GET /businesses/me/shops
+Every shop the caller owns, oldest first. 200: `BusinessProfile[]`.
+
+### Delivery staff
+People a shop owner adds to deliver that shop's orders. Each signs in to the Partner app with their own phone and OTP (an account is made for a new number) and sees only the deliveries handed to them.
+- `GET /businesses/me/shops/:shopId/staff` → `ShopStaffMember[]` (`{ id, accountId, fullName, mobileNumber, createdAt }`). 404 `SHOP_NOT_FOUND` when the shop isn't the caller's.
+- `POST /businesses/me/shops/:shopId/staff` — body `{ fullName, mobileNumber }` (10 digits, starting 6-9) → the updated list. 409 `STAFF_LIMIT` (20 per shop). The typed name is stored for this shop and shown everywhere (even when the number belongs to an existing account — the owner's own number is allowed); the same number again renames that person. A new account gets the owner's language.
+- `DELETE /businesses/me/shops/:shopId/staff/:staffId` (`staffId` = the row `id`) → the updated list. 404 `STAFF_NOT_FOUND`.
+- `GET /businesses/staff/me` — the shops the caller delivers for: `Array<{ businessId, shopName, ownerName }>` (empty for most accounts).
+
 ### POST /businesses/me/profile
 Create the caller's business profile. `multipart/form-data`.
 - Auth: Bearer access token
@@ -510,7 +524,7 @@ The signed-in worker's own ratings and reviews.
 - 404: `WORKER_PROFILE_NOT_FOUND`
 
 ### GET /reviews/businesses/:businessId · GET /reviews/my-shop
-A shop's ratings and feedback (any signed-in user / the shop's owner), from its completed, rated orders. Same `WorkerReviewsSummary` shape as workers (`skillCategories` is always `[]`).
+`/reviews/my-shop` takes an optional `?shopId=` (one of the caller's shops; default the first). A shop's ratings and feedback (any signed-in user / the shop's owner), from its completed, rated orders. Same `WorkerReviewsSummary` shape as workers (`skillCategories` is always `[]`).
 - 404: `SHOP_NOT_FOUND` / `BUSINESS_PROFILE_NOT_FOUND`
 
 ## Orders Module
@@ -541,14 +555,20 @@ Common errors: `404 ORDER_NOT_FOUND` (also for a malformed id), `409 ORDER_INVAL
 - `POST /orders/:id/cancel` — only while `placed`; or, with body `{ rating: 1-5, review? }`, a **stalled** order: the shop took it (`accepted` … `out_for_delivery`) and it hasn't changed for `ORDER_LATE_AFTER_MINUTES` (60). The shop's rating is stored (`cancel_reason: 'late'`), counted and shown in its reviews; the shop is told why. Otherwise 409 `ORDER_NOT_LATE`. Customer orders now carry `updatedAt`.
 - `POST /orders/:id/rate` — body `{ rating: 1..5, review? }`, once, only when `completed`.
 
-### Shop (the caller's own business profile)
-- `GET /orders/shop/mine` — active first, then history (`[]` without a shop). `GET /orders/shop/:id` → `ShopSideOrder`.
+### Shop (the caller's own business profiles)
+- `GET /orders/shop/mine` — orders of **every** shop the caller owns, active first, then history (`[]` without a shop). `GET /orders/shop/:id` → `ShopSideOrder`. Each order carries `shopId`, `shopName`, `deliveryStaff: { accountId, fullName, mobileNumber } | null` and `deliveredByName`. Every step below works on any of the caller's shops.
 - `POST /orders/:id/accept` · `POST /orders/:id/decline` (body `{ reason? }`) — only while `placed` (and not expired).
 - `PUT /orders/:id/items` — body `{ items: Array<{ id, status, price? }> }`; while `accepted`/`preparing` (moves to `preparing`) → `ShopSideOrder`.
 - `POST /orders/:id/packed` — sends the bill. 400 `ORDER_ITEMS_PENDING` / `ORDER_PRICE_MISSING` / `ORDER_NOTHING_PACKED`.
 - `POST /orders/:id/ready` — `packed` → `ready_for_pickup` or `out_for_delivery` (by fulfillment), PIN generated.
 - `POST /orders/:id/verify-pin` — body `{ pin }` → `completed`. 400 `ORDER_PIN_INVALID` (`details.attemptsLeft`), 409 `ORDER_PIN_LOCKED`.
 - `POST /orders/:id/shop-cancel` — body `{ reason? }`, any step before `completed`.
+- `POST /orders/:id/assign-delivery` — body `{ staffAccountId: uuid | null }`, delivery orders only. A `packed` order goes out for delivery first (PIN generated); then it is handed to that staff member (`delivery_assigned` notification), or back to the owner with `null`. 400 `ORDER_NOT_DELIVERY` / `STAFF_NOT_FOUND`, 409 `ORDER_INVALID_STATE` unless `packed` / `out_for_delivery`.
+
+### Delivery staff
+Only what is needed at the door — no prices per item, no other orders.
+- `GET /orders/staff/deliveries` → `StaffDelivery[]` (`{ id, status, shopId, shopName, customerFullName, customerMobileNumber, latitude, longitude, locationAddress, note, items: [{ name, quantity, unit }] (packed only), totalAmount (cash to collect), assignedAt, completedAt, pinAttemptsLeft }`). `GET /orders/staff/deliveries/:id` → one; 404 `DELIVERY_NOT_FOUND`.
+- `POST /orders/staff/deliveries/:id/verify-pin` — body `{ pin }` → `completed`, records who delivered it; the customer is told, and the owner gets `delivery_completed` ("collect ₹X from your staff"). Same PIN errors as the shop's.
 
 ## Favorites Module
 

@@ -36,6 +36,15 @@ export interface ShopOrderItem {
 
 export interface ShopOrder {
   id: string;
+  /** Which of the partner's shops this order is for (a partner may own several). */
+  shopId?: string | null;
+  shopName?: string | null;
+  /** Staff member taking this delivery (null: the owner delivers). */
+  deliveryStaff?: { accountId: string; fullName: string; mobileNumber: string; accepted?: boolean } | null;
+  /** Who handed a finished delivery over, when it was staff. */
+  deliveredByName?: string | null;
+  /** Where the staff member delivering it last was (their phone sends it while delivering). */
+  staffLocation?: { latitude: number; longitude: number; at: string } | null;
   /** null while a Quick Order is still open to every shop asked. */
   businessId?: string | null;
   /** A Quick Order: sent to every matching shop nearby; the first to accept gets it. */
@@ -79,6 +88,9 @@ export const shopOrdersService = {
   saveItems: (id: string, items: ItemUpdate[]) => apiClient.put<ShopOrder>(`/orders/${id}/items`, { items }, true),
   packed: (id: string) => apiClient.post<null>(`/orders/${id}/packed`, undefined, true),
   ready: (id: string) => apiClient.post<null>(`/orders/${id}/ready`, undefined, true),
+  /** Gives a delivery order to a staff member (null: the owner takes it back). */
+  assignDelivery: (id: string, staffAccountId: string | null) =>
+    apiClient.post<null>(`/orders/${id}/assign-delivery`, { staffAccountId }, true),
   verifyPin: (id: string, pin: string) => apiClient.post<null>(`/orders/${id}/verify-pin`, { pin }, true),
   cancel: (id: string, reason?: string) => apiClient.post<null>(`/orders/${id}/shop-cancel`, { reason }, true),
 };

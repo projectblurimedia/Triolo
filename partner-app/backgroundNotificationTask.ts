@@ -1,5 +1,8 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
+import { AppState } from 'react-native';
+import { LIVE_URL, LivePopup } from './modules/live-popup';
+import i18n from '@/localization/i18n';
 import { attemptDecline, updateOfferNotification } from '@/utils/bookingOfferOutcome';
 import { BOOKING_OFFER_CATEGORY, BOOKING_OFFER_CHANNEL, DECLINE_ACTION } from '@/constants/bookingNotifications';
 
@@ -60,6 +63,31 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
 
   // A fresh data-only push arrived — compose the actual notification ourselves.
   const remoteData = (payload && 'data' in payload ? payload.data : undefined) as Record<string, string> | undefined;
+
+  // A new job or order, sent as data to a phone that can show the full-screen pop-up: the pop-up
+  // (like an incoming call) opens the Live Requests screen, even with the app closed. With the
+  // app on screen the app itself shows it (usePushNotifications / IncomingRequestsHub).
+  // Someone else took it: that pop-up (card / notification) goes away.
+  if (remoteData?.popupCancel === '1') {
+    const takenId = remoteData.bookingRequestId ?? remoteData.orderId;
+    if (takenId) LivePopup?.cancel(takenId);
+    return;
+  }
+  if (remoteData?.popup === '1' && LivePopup && AppState.currentState !== 'active') {
+    const isJob = !!remoteData.bookingRequestId;
+    const id = remoteData.bookingRequestId ?? remoteData.orderId ?? String(Date.now());
+    // Opens Live Requests on this card (the same with accept=1 accepts it).
+    const url = `${LIVE_URL}?focus=${isJob ? 'job' : 'order'}-${id}`;
+    LivePopup.show(
+      id,
+      i18n.t(isJob ? 'newForYou.jobRequest' : 'newForYou.newOrder').toUpperCase(),
+      remoteData.title ?? 'Triolo Partner',
+      remoteData.body ?? '',
+      url,
+      [i18n.t('livePopup.later'), i18n.t('livePopup.view'), i18n.t('bookings.accept')].join('|'),
+    );
+    return;
+  }
   const bookingRequestId = remoteData?.bookingRequestId;
   // Already shown by Android (the backend sends job offers as normal notifications now, so
   // they arrive even when the phone won't wake a closed app for data-only messages).

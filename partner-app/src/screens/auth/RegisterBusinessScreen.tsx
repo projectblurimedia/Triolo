@@ -1,3 +1,5 @@
+import { DraftStaffEditor } from '@/components/DeliveryStaffSection';
+import { StaffDraft } from '@/services/businessesService';
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -51,6 +53,7 @@ export function RegisterBusinessScreen() {
   const [photos, setPhotos] = useState<PickedImage[]>([]);
   const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
   const [deliveryPricePerKm, setDeliveryPricePerKm] = useState('');
+  const [staff, setStaff] = useState<StaffDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -126,6 +129,7 @@ export function RegisterBusinessScreen() {
         deliveryAvailable,
         deliveryPricePerKm: deliveryAvailable ? Number(deliveryPricePerKm) : undefined,
         shopPhotos: photos,
+        staff,
       },
       {
         onSuccess: () => {
@@ -263,6 +267,7 @@ export function RegisterBusinessScreen() {
               </View>
             ) : null}
           </View>
+          {deliveryAvailable ? <DraftStaffEditor value={staff} onChange={setStaff} /> : null}
 
           {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 

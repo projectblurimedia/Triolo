@@ -138,6 +138,8 @@ export interface OrderShop {
 
 export interface CustomerOrder extends ShopOrder {
   shop: OrderShop;
+  /** Who is bringing it, once a shop's staff member has taken the delivery. */
+  deliveryPersonName: string | null;
   /** Pickup/Delivery PIN — only while ready_for_pickup / out_for_delivery. */
   pin: string | null;
 }
@@ -145,6 +147,41 @@ export interface CustomerOrder extends ShopOrder {
 export interface ShopSideOrder extends ShopOrder {
   customerFullName: string;
   customerMobileNumber: string | null;
+  pinAttemptsLeft: number;
+  /** Which of the owner's shops it is for (an owner may have several). */
+  shopId?: string;
+  shopName?: string;
+  /** The staff member taking this delivery; null = the owner. `accepted` false: not yet taken by them. */
+  deliveryStaff: { accountId: string; fullName: string; mobileNumber: string; accepted: boolean } | null;
+  /** Who handed it over, when staff did. */
+  deliveredByName: string | null;
+  /** Where the staff member delivering it last was (from their phone), for the owner's map. */
+  staffLocation: { latitude: number; longitude: number; at: string } | null;
+}
+
+/** A delivery as the staff member taking it sees it — no shop earnings, only this order. */
+export interface StaffDelivery {
+  id: string;
+  status: ShopOrderStatus;
+  /** pending: handed to them, waiting for Accept / Decline; accepted: theirs to deliver. */
+  staffStatus: 'pending' | 'accepted';
+  shopId: string;
+  shopName: string;
+  customerFullName: string;
+  customerMobileNumber: string;
+  latitude: number;
+  longitude: number;
+  locationAddress: string | null;
+  note: string | null;
+  /** What to hand over: the packed items. */
+  items: { name: string; quantity: string; unit: string | null }[];
+  /** Cash to collect. */
+  totalAmount: number | null;
+  /** Where to pick it up (the shop), for the map. */
+  shopLatitude: number | null;
+  shopLongitude: number | null;
+  assignedAt: Date | null;
+  completedAt: Date | null;
   pinAttemptsLeft: number;
 }
 
@@ -183,6 +220,8 @@ export interface CreateQuickOrderParams {
   accountId: string;
   fulfillment: ShopOrderFulfillment;
   shopCategories: string[];
+  /** Shop kinds typed by shops themselves (matched by name). */
+  customCategories: string[];
   latitude: number;
   longitude: number;
   locationAddress: string | null;

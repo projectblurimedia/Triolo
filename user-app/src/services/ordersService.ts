@@ -89,6 +89,8 @@ export interface CustomerOrder {
   };
   /** Pickup/Delivery PIN — only while ready for pickup / out for delivery. */
   pin: string | null;
+  /** Who is bringing it, once a shop's delivery staff member took the delivery. */
+  deliveryPersonName?: string | null;
 }
 
 export interface CreateOrderParams {

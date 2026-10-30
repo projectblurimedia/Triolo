@@ -19,7 +19,11 @@ export type NotificationType =
   | 'order_cancelled'
   | 'admin_notice'
   | 'badge_removed'
-  | 'job_post_view';
+  | 'job_post_view'
+  | 'delivery_assigned'
+  | 'delivery_completed'
+  | 'staff_invite'
+  | 'delivery_declined';
 
 export const MAX_BULK_DELETE = 100;
 
@@ -86,4 +90,8 @@ export const AUDIENCE_BY_TYPE: Record<NotificationType, PushAudience> = {
   admin_notice: 'any',
   badge_removed: 'partner',
   job_post_view: 'partner',
+  delivery_assigned: 'partner',
+  delivery_completed: 'partner',
+  staff_invite: 'partner',
+  delivery_declined: 'partner',
 };

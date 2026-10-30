@@ -162,6 +162,14 @@ export function WelcomeScreen({ navigation }: Props) {
             colors={colors}
             onPress={() => navigation.navigate('RegisterJobSeeker')}
           />
+          {/* Delivery staff: the shop owner already added their number, so they only log in. */}
+          <EntryCard
+            icon="person-biking"
+            title={t('partnerWelcome.staffTitle')}
+            subtitle={t('partnerWelcome.staffSubtitle')}
+            colors={colors}
+            onPress={() => navigation.navigate('Login')}
+          />
 
           <Pressable onPress={() => navigation.navigate('Login')} hitSlop={8} style={styles.loginRow}>
             <Text style={[styles.loginPrompt, { color: colors.textMuted }]}>

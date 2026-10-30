@@ -67,11 +67,11 @@ export function GrowScreen() {
   const kinds = KIND_ORDER.filter((value) => profiles.some((profile) => profile.kind === value));
   // One side at a time, like Home and Activity; the switch only when there's more than one.
   const kind: BadgeKind | null = pickedKind && kinds.includes(pickedKind) ? pickedKind : (kinds[0] ?? null);
-  // Several job posts: one at a time, picked by its work (Teacher, Cook…).
-  const posts = profiles.filter((profile) => profile.kind === 'job_post');
+  // Several job posts / shops: one at a time, picked by its work (Teacher, Cook…) or shop name.
+  const posts = profiles.filter((profile) => profile.kind === kind && (kind === 'job_post' || kind === 'business'));
   const post = posts.find((profile) => profile.profileId === pickedPostId) ?? posts[0] ?? null;
   const postPicker =
-    kind === 'job_post' && posts.length > 1 ? (
+    posts.length > 1 ? (
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.postPickerRow} contentContainerStyle={styles.postPicker}>
         {posts.map((profile) => {
           const active = profile.profileId === post?.profileId;
@@ -84,7 +84,7 @@ export function GrowScreen() {
                 active ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: colors.surface, borderColor: `${colors.primary}33` },
               ]}
             >
-              <FontAwesome6 name="briefcase" size={11} color={active ? '#FFFFFF' : colors.primary} solid />
+              <FontAwesome6 name={kind === 'business' ? 'store' : 'briefcase'} size={11} color={active ? '#FFFFFF' : colors.primary} solid />
               <Text style={[styles.postChipText, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
                 {profile.name}
               </Text>
@@ -275,7 +275,7 @@ export function GrowScreen() {
               <ProfileGrowth
                 boostInfo={boostInfo.data ?? null}
                 kinds={[kind]}
-                profileIds={kind === 'job_post' && post ? [post.profileId] : undefined}
+                profileIds={posts.length > 1 && post ? [post.profileId] : undefined}
                 split
               />
             </>

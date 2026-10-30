@@ -51,7 +51,7 @@ export class NotificationsController {
     if (!req.account) {
       throw AppError.unauthorized();
     }
-    await this.service.registerPushToken(req.account.accountId, req.body.token, req.body.app ?? 'legacy');
+    await this.service.registerPushToken(req.account.accountId, req.body.token, req.body.app ?? 'legacy', req.body.fullScreen === true);
     return ok(res, null, 'Push token registered');
   });
 

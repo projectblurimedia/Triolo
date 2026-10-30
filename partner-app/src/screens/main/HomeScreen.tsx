@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { PopupPermissionCard } from '@/components/PopupPermissionCard';
+import { NewForYou } from '@/components/NewForYou';
+import React, { useRef, useState } from 'react';
 import { placeName } from '@/utils/formatAddress';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -23,6 +25,8 @@ import { jobQueryKey, useMyJobs } from '@/hooks/useJobs';
 import { openShopOrder } from '@/state/shopOrderFocusStore';
 import { ACTIVE_JOB_STATUSES } from '@/services/jobsService';
 import { StackStep, StepStack } from '@/components/StepStack';
+import { StaffDeliveriesCard } from '@/components/StaffDeliveriesCard';
+import { StaffInvitesCard } from '@/components/StaffInvitesCard';
 import { HomeLocationBar } from '@/components/HomeLocationBar';
 import { ACTIVE_SHOP_STATUSES, formatRupees } from '@/services/shopOrdersService';
 import { jobsService } from '@/services/jobsService';
@@ -39,7 +43,6 @@ import { ApiError } from '@/services/apiClient';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistance } from '@/utils/formatDistance';
 import { PullToRefresh } from '@/components/PullToRefresh';
-import { NewForYou } from '@/components/NewForYou';
 import { FindOrdersButton } from '@/components/FindOrdersButton';
 import { useAttentionCounts } from '@/hooks/useAttentionCounts';
 import { SmartImage } from '@/components/SmartImage';
@@ -86,6 +89,12 @@ export function HomeScreen() {
   // their "looking for work" post. Until they pick, it shows the shop when an order is waiting,
   // otherwise their worker jobs, otherwise the shop.
   const [pickedSide, setPickedSide] = useState<HomeSide | null>(null);
+  // Swiping the Live Requests pile: the page holds still (no scroll, no pull-to-refresh).
+  // While a finger is on the Live Requests pile the page holds still. Set on the scroll view
+  // itself (no page re-render), so it lands before a slight up / down drift can start a scroll
+  // or a pull-to-refresh.
+  const scrollRef = useRef<ScrollView>(null);
+  const lockScroll = (on: boolean) => scrollRef.current?.setNativeProps({ scrollEnabled: !on });
   // Only what the partner has made: a verified shop, verified services, a job post. Adding
   // or editing any of them lives in the menu (SettingsMenuModal → My Profiles).
   const jobPost = useMyJobPost();
@@ -98,13 +107,13 @@ export function HomeScreen() {
     ...(hasJobPost ? ['job' as const] : []),
   ];
   const sides: HomeSide[] = ownSides.length > 0 ? ownSides : ['job'];
-  const defaultSide: HomeSide =
-    isVerifiedShop && (newOrderCount > 0 || !isVerifiedWorker) ? 'shop' : isVerifiedWorker ? 'worker' : 'job';
+  const defaultSide: HomeSide = isVerifiedShop && (newOrderCount > 0 || !isVerifiedWorker) ? 'shop' : isVerifiedWorker ? 'worker' : 'job';
   const side: HomeSide = pickedSide && sides.includes(pickedSide) ? pickedSide : defaultSide;
   // A red dot on a side with something new or under way.
   const attention = useAttentionCounts();
   const sideWaiting = (value: HomeSide) =>
-    value === 'shop' ? attention.orders > 0 : value === 'worker' ? attention.jobs > 0 : attention.jobPostViews > 0;
+    // Only work under way (Continue where you left off): new requests are in Live Requests above.
+    value === 'shop' ? attention.activeOrders > 0 : value === 'worker' ? attention.activeJobs > 0 : attention.jobPostViews > 0;
   const nearby = useNearbyProblems(isVerifiedWorker);
   const assigned = useAssignedProblems(isVerifiedWorker);
   const acceptProblem = useAcceptProblem();
@@ -133,9 +142,7 @@ export function HomeScreen() {
         }
         // Straight into the job screen (map, customer, Start Trip): load it first so it
         // opens filled in, open it on top, then close the detail screen underneath.
-        await queryClient
-          .prefetchQuery({ queryKey: jobQueryKey(tripId), queryFn: () => jobsService.get(tripId) })
-          .catch(() => {});
+        await queryClient.prefetchQuery({ queryKey: jobQueryKey(tripId), queryFn: () => jobsService.get(tripId) }).catch(() => {});
         openJob(tripId);
         setTimeout(() => setDetailProblem(null), MODAL_HANDOFF_MS);
       },
@@ -154,8 +161,7 @@ export function HomeScreen() {
   const handleConfirmDone = () => {
     if (!confirmDoneFor) return;
     markWorkDone.mutate(confirmDoneFor.id, {
-      onSuccess: () =>
-        showToast({ variant: 'success', title: t('problems.workDoneTitle'), message: t('problems.workDoneMessage') }),
+      onSuccess: () => showToast({ variant: 'success', title: t('problems.workDoneTitle'), message: t('problems.workDoneMessage') }),
       onError: (err) => showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(err, t) }),
       onSettled: () => setConfirmDoneFor(null),
     });
@@ -167,12 +173,7 @@ export function HomeScreen() {
 
   const renderPhotos = (photoUrls: string[], onPress?: () => void) =>
     photoUrls.length > 0 ? (
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
-        horizontal
-        contentContainerStyle={styles.photoRow}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} horizontal contentContainerStyle={styles.photoRow}>
         {photoUrls.map((url) => (
           <Pressable key={url} onPress={onPress} disabled={!onPress}>
             <SmartImage source={{ uri: url }} style={styles.photo} />
@@ -203,8 +204,7 @@ export function HomeScreen() {
     // Jobs accepted since problems became trips are worked from the job screen (map, PIN,
     // work done); older ones keep their original Mark Work Done button below.
     const isWorkDone = tripId ? job.bookingStatus === 'work_done' : job.status === 'work_done';
-    const statusLabel =
-      tripId && job.bookingStatus ? t(`job.status.${job.bookingStatus}.title`) : t(`problems.status.${job.status}`);
+    const statusLabel = tripId && job.bookingStatus ? t(`job.status.${job.bookingStatus}.title`) : t(`problems.status.${job.status}`);
     return (
       <Pressable
         key={job.id}
@@ -276,10 +276,7 @@ export function HomeScreen() {
     <Pressable
       key={problem.id}
       onPress={() => setDetailProblem(problem)}
-      style={({ pressed }) => [
-        styles.card,
-        { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.92 : 1 },
-      ]}
+      style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.92 : 1 }]}
     >
       <View style={styles.cardHeader}>
         <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
@@ -315,8 +312,7 @@ export function HomeScreen() {
     </Pressable>
   );
 
-  const stepTone = (status: string, active: boolean) =>
-    active ? brandColors.error : status === 'completed' ? brandColors.success : colors.textMuted;
+  const stepTone = (status: string, active: boolean) => (active ? brandColors.error : status === 'completed' ? brandColors.success : colors.textMuted);
 
   // The last few jobs and orders, stacked like notifications — the newest in front.
   const recentJobSteps: StackStep[] = recentJobs.map((job) => ({
@@ -346,21 +342,27 @@ export function HomeScreen() {
   }));
 
   // "All bookings" / "All shop orders": a bright card leading to Activity.
+  // A light card on the page (not a solid blue block), its icon and arrow in the brand blue.
   const renderAllButton = (icon: React.ComponentProps<typeof FontAwesome6>['name'], title: string, hint: string, onPress: () => void) => (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.allWrap, { transform: [{ scale: pressed ? 0.985 : 1 }] }]}>
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.allCard}>
-        <View style={styles.allIcon}>
-          <FontAwesome6 name={icon} size={15} color="#FFFFFF" solid />
-        </View>
-        <View style={styles.flex}>
-          <Text style={styles.allTitle}>{title}</Text>
-          <Text style={styles.allHint} numberOfLines={1}>
-            {hint}
-          </Text>
-        </View>
-        <View style={styles.allGo}>
-          <FontAwesome6 name="arrow-right" size={12} color={headerGradient[0]} solid />
-        </View>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.allWrap,
+        styles.allCard,
+        { backgroundColor: `${colors.primary}0F`, borderColor: `${colors.primary}33`, transform: [{ scale: pressed ? 0.985 : 1 }] },
+      ]}
+    >
+      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.allIcon}>
+        <FontAwesome6 name={icon} size={15} color="#FFFFFF" solid />
+      </LinearGradient>
+      <View style={styles.flex}>
+        <Text style={[styles.allTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.allHint, { color: colors.textMuted }]} numberOfLines={1}>
+          {hint}
+        </Text>
+      </View>
+      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.allGo}>
+        <FontAwesome6 name="arrow-right" size={12} color="#FFFFFF" solid />
       </LinearGradient>
     </Pressable>
   );
@@ -402,9 +404,7 @@ export function HomeScreen() {
       return (
         <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('problems.loadFailedTitle')}</Text>
-          <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>
-            {getLocalizedErrorMessage(nearby.error ?? assigned.error, t)}
-          </Text>
+          <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{getLocalizedErrorMessage(nearby.error ?? assigned.error, t)}</Text>
           <View style={styles.retryWrap}>
             <Button
               label={t('common.retry')}
@@ -421,7 +421,7 @@ export function HomeScreen() {
     return (
       <>
         {renderSectionTitle('magnifying-glass-location', t('findJobs.sectionTitle'))}
-        <FindJobsButton variant="card" onFound={() => navigateToBookings('jobs', 'requests')} />
+        <FindJobsButton variant="card" />
 
         {activeJobs.length > 0 ? (
           <>
@@ -461,22 +461,17 @@ export function HomeScreen() {
   return (
     <ScreenContainer edges={['left', 'right']}>
       <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.body}
-        >
-          {/* Which side you're looking at comes first, above the greeting. */}
-          {!profilesLoading ? (
+        <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
+          {/* Every request waiting for an answer — jobs and shop orders in one swipe pile — above
+              the side switch, since it covers every side. */}
+          {profilesLoading ? null : <NewForYou isWorker={isVerifiedWorker} isShop={isVerifiedShop} onSwiping={lockScroll} />}
+          {/* Which side you're looking at comes first — only when there is more than one side. */}
+          {!profilesLoading && sides.length > 1 ? (
             <View style={[styles.sideSwitch, { borderColor: colors.border, backgroundColor: colors.surface }]}>
               {sides.map((value) => {
                 const active = side === value;
                 return (
-                  <Pressable
-                    key={value}
-                    onPress={() => setPickedSide(value)}
-                    style={[styles.sideOption, active ? { backgroundColor: colors.primary } : null]}
-                  >
+                  <Pressable key={value} onPress={() => setPickedSide(value)} style={[styles.sideOption, active ? { backgroundColor: colors.primary } : null]}>
                     <FontAwesome6 name={SIDE_ICONS[value]} size={12} color={active ? '#FFFFFF' : colors.textMuted} solid />
                     <Text
                       style={[styles.sideText, { color: active ? '#FFFFFF' : colors.textMuted }]}
@@ -496,17 +491,20 @@ export function HomeScreen() {
           ) : null}
 
           {account ? (
-            <Text style={[styles.greeting, styles.greetingTight, { color: colors.text }]}>
-              {t('mainTabs.Home.greeting', { name: account.fullName })}
-            </Text>
+            <Text style={[styles.greeting, styles.greetingTight, { color: colors.text }]}>{t('mainTabs.Home.greeting', { name: account.fullName })}</Text>
           ) : null}
           <HomeLocationBar />
 
           {/* Location off: say so first — nothing works without it. */}
           <LocationNeededCard />
+          {/* A shop invited this person to deliver: join or not. */}
+          <StaffInvitesCard />
+          {/* Delivery staff of a shop: the deliveries handed to them. */}
+          <StaffDeliveriesCard />
           {/* Job requests while the app is closed: the phone has to allow it. */}
           <BackgroundAlertsCard />
-
+          {/* New requests as a full-screen pop-up: Android 14+ needs it allowed. */}
+          <PopupPermissionCard />
 
           {profilesLoading ? (
             <View style={styles.loading}>
@@ -514,18 +512,24 @@ export function HomeScreen() {
             </View>
           ) : null}
 
-
           {profilesLoading ? null : side === 'job' ? (
             <JobPostHomeSection />
           ) : side === 'shop' && isVerifiedShop && businessProfile.data ? (
             <>
-              <NewForYou isWorker={false} isShop />
               <ContinueSteps isShop only="orders" />
               {renderSectionTitle('magnifying-glass-location', t('findOrders.sectionTitle'))}
               <FindOrdersButton />
               {recentOrders.length > 0 ? (
                 <>
-                  <StepStack title={t('home.recentOrders')} steps={recentOrderSteps} minimized live={false} hideMore accent={colors.primary} style={styles.recentStack} />
+                  <StepStack
+                    title={t('home.recentOrders')}
+                    steps={recentOrderSteps}
+                    minimized
+                    live={false}
+                    hideMore
+                    accent={colors.primary}
+                    style={styles.recentStack}
+                  />
                 </>
               ) : (
                 renderEmpty('bell', t('shopHome.noOrdersTitle'), t('shopHome.noOrdersMessage'))
@@ -534,7 +538,6 @@ export function HomeScreen() {
             </>
           ) : isVerifiedWorker ? (
             <>
-              <NewForYou isWorker isShop={false} />
               <ContinueSteps isShop={false} only="jobs" />
               {renderWorkerBody()}
             </>
@@ -631,7 +634,7 @@ const styles = StyleSheet.create({
   waitingText: { ...typography.body, fontFamily: fonts.medium, textAlign: 'center', paddingVertical: 8 },
   flex: { flex: 1 },
   greetingTight: { marginBottom: 10 },
-  allWrap: { borderRadius: 18, overflow: 'hidden', marginTop: 4, marginBottom: 6 },
+  allWrap: { borderRadius: 18, borderWidth: 1.5, overflow: 'hidden', marginTop: 4, marginBottom: 6 },
   allCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
   allIcon: {
     width: 40,

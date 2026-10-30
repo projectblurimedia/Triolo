@@ -29,7 +29,8 @@ export type MainStackParamList = {
   WorkerRegistration: { profile?: WorkerProfile } | undefined;
   BusinessRegistration: { profile?: BusinessProfile } | undefined;
   /** `postId`: which job post (a partner may keep several). */
-  MyInfo: { capability: CapabilityType | 'job'; postId?: string };
+  /** postId picks one job post, shopId one shop (a partner may have several of each). */
+  MyInfo: { capability: CapabilityType | 'job'; postId?: string; shopId?: string };
   // Create or edit the "looking for work" post (no admin review, so no verification state).
   /** Edit that post; without one, make a new post. */
   JobPost: { postId?: string } | undefined;

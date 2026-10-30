@@ -160,7 +160,8 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   }, [activeRouteKey, setActiveKey]);
   const androidBlurring = ANDROID_REAL_BLUR && !!blurTarget;
   const activity = useActivityCounts();
-  const counts: Record<string, number> = { Services: activity.services, Bazaar: activity.bazaar };
+  // Things still going show on Home (Continue where you left off), not on Services / Bazaar.
+  const counts: Record<string, number> = { Home: activity.services + activity.bazaar };
 
   // Android has no elevation shadow (see the comment above GLASS_LIGHT), so the shell only
   // needs a background when it *is* the glass — older Android without blur.

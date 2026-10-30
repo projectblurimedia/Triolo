@@ -24,6 +24,7 @@ import {
   AdminOrder,
   AdminOrderCancelResult,
   AdminOrderListFilter,
+  StaffDelivery,
 } from './interfaces';
 
 const toNumber = (value: unknown): number | null => (value == null ? null : Number(value));
@@ -53,7 +54,7 @@ function mapOrder(row: QueryResultRow, items: ShopOrderItem[]): ShopOrder {
     accountId: row.account_id,
     businessId: row.business_id ?? null,
     quick: !!row.quick,
-    shopCategories: parseCategories(row.shop_categories),
+    shopCategories: [...parseCategories(row.shop_categories), ...(Array.isArray(row.custom_categories) ? row.custom_categories : [])],
     fulfillment: row.fulfillment,
     status: row.status,
     latitude: row.latitude,
@@ -90,10 +91,13 @@ function shopAddress(row: QueryResultRow): string {
 const CUSTOMER_SELECT = `
   SELECT o.*, b.shop_name, b.shop_photo_urls, b.profile_photo_url AS shop_profile_photo_url, b.rating_sum AS shop_rating_sum, b.rating_count AS shop_rating_count,
          b.latitude AS shop_latitude, b.longitude AS shop_longitude, b.area AS shop_area, b.city AS shop_city,
-         oa.mobile_number AS shop_mobile_number
+         oa.mobile_number AS shop_mobile_number,
+         CASE WHEN o.delivery_staff_status = 'accepted' THEN COALESCE(dss.full_name, dsa.full_name) END AS delivery_person_name
   FROM shop_orders o
   LEFT JOIN business_profiles b ON b.id = o.business_id
-  LEFT JOIN accounts oa ON oa.id = b.account_id`;
+  LEFT JOIN accounts oa ON oa.id = b.account_id
+  LEFT JOIN accounts dsa ON dsa.id = o.delivery_staff_account_id
+  LEFT JOIN shop_staff dss ON dss.business_id = o.business_id AND dss.account_id = o.delivery_staff_account_id`;
 
 // Shop view: who ordered and how to reach them.
 const SHOP_SELECT = `
@@ -101,13 +105,20 @@ const SHOP_SELECT = `
   FROM shop_orders o
   JOIN accounts ca ON ca.id = o.account_id`;
 
-// The shop's own view, including Quick Orders offered to it and not taken yet ($1 = the shop).
+// The shop's own view, including Quick Orders offered to it and not taken yet ($1 = the shop),
+// with who is delivering it (staff) and who handed it over.
 const SHOP_SELECT_FOR_SHOP = `
   SELECT o.*, ca.full_name AS customer_full_name, ca.mobile_number AS customer_mobile_number,
-         CASE WHEN o.business_id IS NULL THEN qo.distance_meters END AS offer_distance_meters
+         CASE WHEN o.business_id IS NULL THEN qo.distance_meters END AS offer_distance_meters,
+         COALESCE(dss.full_name, ds.full_name) AS delivery_staff_name, ds.mobile_number AS delivery_staff_mobile,
+         COALESCE(dbs.full_name, db.full_name) AS delivered_by_name
   FROM shop_orders o
   JOIN accounts ca ON ca.id = o.account_id
-  LEFT JOIN quick_order_offers qo ON qo.order_id = o.id AND qo.business_id = $1`;
+  LEFT JOIN quick_order_offers qo ON qo.order_id = o.id AND qo.business_id = $1
+  LEFT JOIN accounts ds ON ds.id = o.delivery_staff_account_id
+  LEFT JOIN shop_staff dss ON dss.business_id = o.business_id AND dss.account_id = o.delivery_staff_account_id
+  LEFT JOIN accounts db ON db.id = o.delivered_by_account_id
+  LEFT JOIN shop_staff dbs ON dbs.business_id = o.business_id AND dbs.account_id = o.delivered_by_account_id`;
 
 // Wraps a status change so it also returns who to tell: the customer, or the shop's owner.
 const NOTIFY_CUSTOMER = `SELECT u.*, a.id AS notify_account_id, a.preferred_language AS notify_language, b.shop_name
@@ -161,11 +172,20 @@ export class OrdersRepository {
   async createQuick(params: CreateQuickOrderParams): Promise<ShopOrder> {
     return this.inTransaction(async (client) => {
       const result = await client.query(
-        `INSERT INTO shop_orders (account_id, business_id, quick, shop_categories, fulfillment, latitude, longitude,
+        `INSERT INTO shop_orders (account_id, business_id, quick, shop_categories, custom_categories, fulfillment, latitude, longitude,
                                   location_address, distance_meters, delivery_charge, note)
-         VALUES ($1, NULL, true, $2::business_shop_category[], $3, $4, $5, $6, 0, 0, $7)
+         VALUES ($1, NULL, true, $2::business_shop_category[], $8::text[], $3, $4, $5, $6, 0, 0, $7)
          RETURNING *`,
-        [params.accountId, params.shopCategories, params.fulfillment, params.latitude, params.longitude, params.locationAddress, params.note],
+        [
+          params.accountId,
+          params.shopCategories,
+          params.fulfillment,
+          params.latitude,
+          params.longitude,
+          params.locationAddress,
+          params.note,
+          params.customCategories,
+        ],
       );
       const order = result.rows[0];
       const items = await client.query(
@@ -203,6 +223,17 @@ export class OrdersRepository {
    * no shop, so two accepts at once can never both win (the second finds nothing). The other
    * offers are closed. The order then carries on like any other.
    */
+  /** Owners of the shops that were offered a Quick Order and lost it to another shop. */
+  async lostQuickOwners(orderId: string): Promise<string[]> {
+    const result = await this.pool.query(
+      `SELECT DISTINCT b.account_id FROM quick_order_offers qo
+       JOIN business_profiles b ON b.id = qo.business_id
+       WHERE qo.order_id = $1 AND qo.status = 'lost'`,
+      [orderId],
+    );
+    return result.rows.map((row) => row.account_id as string);
+  }
+
   async claimQuick(orderId: string, businessId: string, distanceMeters: number, deliveryCharge: number): Promise<OrderTransition | null> {
     const result = await this.pool.query(
       `WITH updated AS (
@@ -236,6 +267,8 @@ export class OrdersRepository {
     latitude: number;
     longitude: number;
     shopCategories: string[];
+    /** The names the shop typed under "other" (comma separated). */
+    otherCategoryDescription?: string | null;
     deliveryAvailable: boolean;
     radiusKm: number;
   }): Promise<number> {
@@ -249,7 +282,11 @@ export class OrdersRepository {
          WHERE so.quick AND so.business_id IS NULL AND so.status = 'placed'
            AND so.created_at > now() - ${ORDER_WAIT_SQL('so')}
            AND so.account_id <> $2
-           AND so.shop_categories && $5::business_shop_category[]
+           AND (so.shop_categories && $5::business_shop_category[]
+             OR EXISTS (
+               SELECT 1 FROM unnest(so.custom_categories) AS want(name), unnest(string_to_array(COALESCE($8::text, ''), ',')) AS have(name)
+               WHERE lower(trim(have.name)) = lower(trim(want.name))
+             ))
            AND (so.fulfillment = 'pickup' OR $6::boolean)
        )
        INSERT INTO quick_order_offers (order_id, business_id, distance_meters)
@@ -257,7 +294,16 @@ export class OrdersRepository {
        ON CONFLICT (order_id, business_id) DO UPDATE SET status = 'pending'
          WHERE quick_order_offers.status = 'declined'
        RETURNING order_id`,
-      [shop.businessId, shop.ownerAccountId, shop.latitude, shop.longitude, shop.shopCategories, shop.deliveryAvailable, shop.radiusKm],
+      [
+        shop.businessId,
+        shop.ownerAccountId,
+        shop.latitude,
+        shop.longitude,
+        shop.shopCategories,
+        shop.deliveryAvailable,
+        shop.radiusKm,
+        shop.otherCategoryDescription ?? null,
+      ],
     );
     return result.rowCount ?? 0;
   }
@@ -325,6 +371,89 @@ export class OrdersRepository {
       [businessId, limit],
     );
     return this.withShopShape(result.rows);
+  }
+
+  // --- Delivery staff ---
+
+  /** Gives a delivery order to a staff member (null: back to the owner). Packed or out for delivery only. */
+  async setDeliveryStaff(id: string, businessId: string, staffAccountId: string | null): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE shop_orders SET delivery_staff_account_id = $3, delivery_assigned_at = CASE WHEN $3::uuid IS NULL THEN NULL ELSE now() END,
+         delivery_staff_status = CASE WHEN $3::uuid IS NULL THEN NULL ELSE 'pending' END,
+         staff_latitude = NULL, staff_longitude = NULL, staff_location_at = NULL,
+         updated_at = now()
+       WHERE id = $1 AND business_id = $2 AND fulfillment = 'delivery' AND status IN ('packed', 'out_for_delivery')`,
+      [id, businessId, staffAccountId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /** The staff member takes (accepted) or turns down (cleared) a delivery handed to them. */
+  async answerDelivery(orderId: string, staffAccountId: string, accept: boolean): Promise<{ businessId: string; status: ShopOrderStatus } | null> {
+    const result = await this.pool.query(
+      accept
+        ? `UPDATE shop_orders SET delivery_staff_status = 'accepted', updated_at = now()
+           WHERE id = $1 AND delivery_staff_account_id = $2 AND delivery_staff_status = 'pending'
+             AND status IN ('packed', 'out_for_delivery')
+           RETURNING business_id, status`
+        : `UPDATE shop_orders SET delivery_staff_account_id = NULL, delivery_staff_status = NULL, delivery_assigned_at = NULL, updated_at = now()
+           WHERE id = $1 AND delivery_staff_account_id = $2 AND delivery_staff_status = 'pending'
+           RETURNING business_id, status`,
+      [orderId, staffAccountId],
+    );
+    const row = result.rows[0];
+    return row ? { businessId: row.business_id, status: row.status } : null;
+  }
+
+  /** The staff member's position while they have the delivery; false when it isn't theirs / out. */
+  async setStaffLocation(orderId: string, staffAccountId: string, latitude: number, longitude: number): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE shop_orders SET staff_latitude = $3, staff_longitude = $4, staff_location_at = now()
+       WHERE id = $1 AND delivery_staff_account_id = $2 AND status = 'out_for_delivery' AND delivery_staff_status = 'accepted'`,
+      [orderId, staffAccountId, latitude, longitude],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async listForStaff(staffAccountId: string, limit: number, id?: string): Promise<StaffDelivery[]> {
+    const result = await this.pool.query(
+      `SELECT o.*, b.shop_name, b.latitude AS shop_latitude, b.longitude AS shop_longitude,
+              ca.full_name AS customer_full_name, ca.mobile_number AS customer_mobile_number
+       FROM shop_orders o
+       JOIN business_profiles b ON b.id = o.business_id
+       JOIN accounts ca ON ca.id = o.account_id
+       WHERE o.delivery_staff_account_id = $1 AND ($3::uuid IS NULL OR o.id = $3)
+       ORDER BY (o.status = 'out_for_delivery') DESC, o.delivery_assigned_at DESC NULLS LAST
+       LIMIT $2`,
+      [staffAccountId, limit, id ?? null],
+    );
+    const items = await this.itemsFor(result.rows.map((row) => row.id));
+    return result.rows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      staffStatus: row.delivery_staff_status === 'pending' ? ('pending' as const) : ('accepted' as const),
+      shopId: row.business_id,
+      shopName: row.shop_name,
+      customerFullName: row.customer_full_name,
+      customerMobileNumber: row.customer_mobile_number,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      locationAddress: row.location_address ?? null,
+      note: row.note ?? null,
+      items: (items.get(row.id) ?? [])
+        .filter((item) => item.status === 'packed')
+        .map((item) => ({ name: item.name, quantity: item.quantity, unit: item.unit })),
+      totalAmount: row.total_amount != null ? Number(row.total_amount) : null,
+      shopLatitude: row.shop_latitude != null ? Number(row.shop_latitude) : null,
+      shopLongitude: row.shop_longitude != null ? Number(row.shop_longitude) : null,
+      assignedAt: row.delivery_assigned_at ?? null,
+      completedAt: row.completed_at ?? null,
+      pinAttemptsLeft: Math.max(0, MAX_PIN_ATTEMPTS - Number(row.pin_attempts ?? 0)),
+    }));
+  }
+
+  async markDeliveredBy(id: string, staffAccountId: string): Promise<void> {
+    await this.pool.query('UPDATE shop_orders SET delivered_by_account_id = $2 WHERE id = $1', [id, staffAccountId]);
   }
 
   async findRatedForBusiness(businessId: string, limit: number): Promise<RatedOrder[]> {
@@ -594,6 +723,7 @@ export class OrdersRepository {
           mobileNumber: accepted ? row.shop_mobile_number : null,
         },
         pin: HANDOVER_STATUSES.includes(row.status) ? (row.pin ?? null) : null,
+        deliveryPersonName: row.delivery_person_name ?? null,
       };
     });
   }
@@ -606,6 +736,19 @@ export class OrdersRepository {
       // The customer's number only once the shop has taken the order (like the shop's own number).
       customerMobileNumber: row.accepted_at ? row.customer_mobile_number : null,
       pinAttemptsLeft: Math.max(0, MAX_PIN_ATTEMPTS - Number(row.pin_attempts ?? 0)),
+      deliveryStaff: row.delivery_staff_account_id
+        ? {
+            accountId: row.delivery_staff_account_id,
+            fullName: row.delivery_staff_name ?? '',
+            mobileNumber: row.delivery_staff_mobile ?? '',
+            accepted: row.delivery_staff_status !== 'pending',
+          }
+        : null,
+      deliveredByName: row.delivered_by_name ?? null,
+      staffLocation:
+        row.delivery_staff_account_id && row.staff_latitude != null && row.staff_longitude != null
+          ? { latitude: Number(row.staff_latitude), longitude: Number(row.staff_longitude), at: new Date(row.staff_location_at).toISOString() }
+          : null,
     }));
   }
 

@@ -103,3 +103,41 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
 export function orderTemplate(event: OrderEvent, language: PreferredLanguage, values: OrderTemplateValues) {
   return (TEMPLATES[language] ?? TEMPLATES.en)[event](values);
 }
+
+/** Delivery staff: an order handed to them; the owner: staff delivered it (collect the cash). */
+export type DeliveryEvent = 'assigned' | 'delivered';
+
+export interface DeliveryTemplateValues {
+  shop: string;
+  customer: string;
+  count: number;
+  /** The cash to collect, formatted (e.g. "₹250"), when known. */
+  total?: string;
+}
+
+const DELIVERY_TEMPLATES: Record<PreferredLanguage, Record<DeliveryEvent, (values: DeliveryTemplateValues) => { title: string; body: string }>> = {
+  en: {
+    assigned: ({ shop, customer, count, total }) => ({
+      title: `New delivery from ${shop}`,
+      body: `${customer} · ${count} ${count === 1 ? 'item' : 'items'}${total ? ` · collect ${total}` : ''}`,
+    }),
+    delivered: ({ shop, customer, total }) => ({
+      title: `Delivered: ${customer}`,
+      body: total ? `${shop} · collect ${total} from your staff` : shop,
+    }),
+  },
+  te: {
+    assigned: ({ shop, customer, count, total }) => ({
+      title: `${shop} నుండి కొత్త డెలివరీ`,
+      body: `${customer} · ${count} వస్తువులు${total ? ` · ${total} తీసుకోండి` : ''}`,
+    }),
+    delivered: ({ shop, customer, total }) => ({
+      title: `డెలివరీ అయింది: ${customer}`,
+      body: total ? `${shop} · మీ సిబ్బంది నుండి ${total} తీసుకోండి` : shop,
+    }),
+  },
+};
+
+export function deliveryTemplate(event: DeliveryEvent, language: PreferredLanguage, values: DeliveryTemplateValues) {
+  return (DELIVERY_TEMPLATES[language] ?? DELIVERY_TEMPLATES.en)[event](values);
+}

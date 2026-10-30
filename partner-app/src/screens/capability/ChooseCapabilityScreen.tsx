@@ -17,6 +17,11 @@ import { MainStackParamList } from '@/navigation/types';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { JobPostCard } from '@/components/JobPostCard';
 import { useMyJobPost } from '@/hooks/useJobPost';
+import { StaffDeliveriesCard } from '@/components/StaffDeliveriesCard';
+import { StaffInvitesCard } from '@/components/StaffInvitesCard';
+import { AccountSheet } from '@/components/AccountSheet';
+import { openForYou } from '@/state/forYouStore';
+import { LanguagePickerModal } from '@/components/LanguagePickerModal';
 
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
@@ -34,6 +39,8 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
   const { colors } = useThemeColors();
   const account = useAuthStore((state) => state.account);
   const logout = useLogout();
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const workerProfile = useMyWorkerProfile();
@@ -85,9 +92,14 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
         subtitle={t('chooseCapability.tagline')}
         leadingIcon="shapes"
         actions={[
+          { icon: 'bell', accessibilityLabel: t('forYou.newTitle'), onPress: () => openForYou('new') },
+          { icon: 'user', accessibilityLabel: t('accountSheet.title'), onPress: () => setAccountOpen(true) },
+          { icon: 'language', accessibilityLabel: t('settings.language'), onPress: () => setLanguageOpen(true) },
           { icon: 'right-from-bracket', accessibilityLabel: t('common.logout'), onPress: () => setShowLogoutConfirm(true) },
         ]}
       />
+      <LanguagePickerModal visible={languageOpen} onClose={() => setLanguageOpen(false)} />
+      <AccountSheet visible={accountOpen} onClose={() => setAccountOpen(false)} />
 
       {isLoading ? (
         <View style={styles.loadingWrap}>
@@ -106,6 +118,9 @@ export function ChooseCapabilityScreen({ navigation }: Props) {
               </Text>
             ) : null}
 
+            {/* Someone a shop added as delivery staff: their invitation, then their deliveries. */}
+            <StaffInvitesCard />
+            <StaffDeliveriesCard />
             {cards.map((card) => (
               <CapabilityCard key={card.key} card={card} colors={colors} />
             ))}

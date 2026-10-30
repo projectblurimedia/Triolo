@@ -76,6 +76,7 @@ function makeService(repo = makeRepo()) {
     },
     businesses: {
       getMyProfile: jest.fn().mockResolvedValue({ id: 'shop-1', shopName: 'Sri Sai', verificationStatus: 'pending_verification' }),
+      listMyShops: jest.fn().mockResolvedValue([{ id: 'shop-1', shopName: 'Sri Sai', verificationStatus: 'pending_verification' }]),
       getVerifiedProfiles: jest.fn().mockResolvedValue([]),
     },
     jobSeekers: { getMine: jest.fn().mockResolvedValue(null), listMine: jest.fn().mockResolvedValue([]) },

@@ -1,3 +1,4 @@
+import { useMyShops } from '@/hooks/useBusinessMutations';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -39,6 +40,8 @@ export function ShopOrdersList({
 }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  // Several shops: each order says which shop it is for.
+  const manyShops = (useMyShops().data ?? []).length > 1;
   const [refreshing, setRefreshing] = useState(false);
   const orders = useShopOrders(true);
 
@@ -48,8 +51,9 @@ export function ShopOrdersList({
   const ended = all.filter((order) => !NEW_ORDER_STATUSES.includes(order.status) && !ACTIVE_SHOP_STATUSES.includes(order.status));
   // New first, then under way, then finished / ended — one list, narrowed by the filter.
   const lists: Record<ShopFilter, ShopOrder[]> = {
-    all: [...newOrders, ...activeOrders, ...ended],
-    new: newOrders,
+    // New (unanswered) orders are in New for you, not this record.
+    all: [...activeOrders, ...ended],
+    new: [],
     active: activeOrders,
     done: ended.filter((order) => order.status === 'completed'),
     cancelled: ended.filter((order) => order.status !== 'completed'),
@@ -104,6 +108,7 @@ export function ShopOrdersList({
             </View>
           </View>
           <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+            {manyShops && order.shopName ? `${order.shopName} · ` : ''}
             {t('shopOrders.itemsCount', { count: order.items.length })} ·{' '}
             {t(order.fulfillment === 'delivery' ? 'shopOrders.delivery' : 'shopOrders.pickup')} · {formatDate(order.createdAt)}
           </Text>
@@ -125,6 +130,18 @@ export function ShopOrdersList({
             <LoadingIndicator color={colors.primary} />
           </View>
         </>
+      ) : lists[filter].length === 0 ? (
+        // Nothing to list: no pull-to-refresh room (on a short list it could show as a gap).
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.list, { paddingBottom: bottomPadding }]}>
+          {header}
+          <View style={styles.state}>
+            <FontAwesome6 name={filter === 'active' ? 'basket-shopping' : 'clock-rotate-left'} size={22} color={colors.textMuted} solid />
+            <Text style={[styles.stateTitle, { color: colors.text }]}>
+              {filter === 'active' ? t('shopOrders.empty.active') : t('activity.emptyTitle')}
+            </Text>
+            <Text style={[styles.meta, styles.center, { color: colors.textMuted }]}>{t('shopOrders.emptyMessage')}</Text>
+          </View>
+        </ScrollView>
       ) : (
         <PullToRefresh refreshing={refreshing} onRefresh={onRefresh}>
           <ScrollView
@@ -170,8 +187,9 @@ const styles = StyleSheet.create({
   segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
   badge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: '#FFFFFF', fontSize: 10, fontFamily: fonts.semiBold },
-  list: { gap: 12, flexGrow: 1 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12 },
+  // No `gap` here: it would also space the hidden pull-to-refresh room and the filter header.
+  list: { flexGrow: 1 },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12, marginBottom: 12 },
   icon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { ...typography.body, fontFamily: fonts.semiBold, flex: 1 },

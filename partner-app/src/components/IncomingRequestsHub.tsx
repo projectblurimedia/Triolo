@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { placeName } from '@/utils/formatAddress';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -9,8 +9,10 @@ import { useTranslation } from 'react-i18next';
 import * as Notifications from 'expo-notifications';
 import { useQueryClient } from '@tanstack/react-query';
 import { LoadingIndicator } from './LoadingIndicator';
-import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from '@/hooks/useBookingOffers';
-import { useShopOrderAction, useShopOrders } from '@/hooks/useShopOrders';
+import { NewForYou } from './NewForYou';
+import { PullToRefresh } from './PullToRefresh';
+import { BOOKING_OFFERS_QUERY_KEY, useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer } from '@/hooks/useBookingOffers';
+import { SHOP_ORDERS_QUERY_KEY, useShopOrderAction, useShopOrders } from '@/hooks/useShopOrders';
 import { shopOrdersService } from '@/services/shopOrdersService';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
 import { jobQueryKey } from '@/hooks/useJobs';
@@ -36,7 +38,12 @@ const MODAL_HANDOFF_MS = 350;
 const ACCEPT_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const PREVIEW_ITEMS = 3;
 
-type Incoming = { key: string; type: 'job' | 'order'; id: string; createdAt: string };
+type Incoming = {
+  key: string;
+  type: 'job' | 'order';
+  id: string;
+  createdAt: string;
+};
 
 /**
  * Decides which incoming-request screen opens (mounted once at the app root). A partner with
@@ -60,6 +67,23 @@ export function IncomingRequestsHub() {
   const offersReady = offers !== undefined;
   const ordersReady = shopQuery.isFetched && (!shop || orders !== undefined);
   const seenRef = useRef<Set<string> | null>(null);
+  const queryClient = useQueryClient();
+
+  // Any new job or order: the lists (Live Requests, Home) refresh straight away, not on the next
+  // poll. Here (inside the QueryClientProvider), not in usePushNotifications, which runs above it.
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+      const kind = (notification.request.content.data as { kind?: string } | undefined)?.kind;
+      if (kind === 'booking_offer' || kind === 'booking_taken') queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY });
+      if (kind === 'order_placed' || kind === 'order_cancelled') queryClient.invalidateQueries({ queryKey: SHOP_ORDERS_QUERY_KEY });
+      // A new job or order while the app is open: Live Requests straight away (not on the next poll).
+      if (kind === 'booking_offer' || kind === 'order_placed') {
+        usePendingOfferStore.getState().clearFocusedOffer();
+        useIncomingStore.getState().openList();
+      }
+    });
+    return () => subscription.remove();
+  }, [queryClient]);
 
   const showAll = () => {
     usePendingOfferStore.getState().clearFocusedOffer();
@@ -81,7 +105,12 @@ export function IncomingRequestsHub() {
         id: offer.bookingRequestId,
         createdAt: offer.createdAt,
       })),
-      ...placed.map((order) => ({ key: `order:${order.id}`, type: 'order' as const, id: order.id, createdAt: order.createdAt })),
+      ...placed.map((order) => ({
+        key: `order:${order.id}`,
+        type: 'order' as const,
+        id: order.id,
+        createdAt: order.createdAt,
+      })),
     ];
     let fresh: Incoming[];
     if (seenRef.current === null) {
@@ -108,15 +137,11 @@ export function IncomingRequestsHub() {
     if (incoming.listOpen) return;
     // Mid-accept on a job: let it finish; the rest are waiting in Bookings and on Home.
     if (incoming.jobBusy || pending.autoAccept) return;
-    const showing = pending.focusedBookingRequestId !== null || incoming.orderId !== null;
-    if (showing || others.length > 1) {
-      showAll();
-      return;
-    }
-    const only = others[0];
-    if (only.type === 'job') pending.setFocusedOffer(only.id);
-    // Don't pop up over that order's own screen.
-    else if (useShopOrderFocusStore.getState().orderId !== only.id) incoming.focusOrder(only.id);
+    // One screen for everything new: the swipe pile of every request waiting (not over the
+    // order's own screen, when that one is the only new thing).
+    const only = others.length === 1 ? others[0] : null;
+    if (only && only.type === 'order' && useShopOrderFocusStore.getState().orderId === only.id) return;
+    showAll();
   }, [accessToken, offers, placed, offersReady, ordersReady]);
 
   // A job opened by a push or a notification tap while something else is up joins the list.
@@ -129,10 +154,9 @@ export function IncomingRequestsHub() {
       if (incoming.listOpen) incoming.closeList();
       return;
     }
-    if (incoming.listOpen || incoming.orderId) {
-      showAll();
-      refetchOffers();
-    }
+    // A push or a notification tap: the swipe screen, with this job among the others.
+    showAll();
+    refetchOffers();
   }, [focusedJob, autoAccept, refetchOffers]);
 
   useEffect(() => {
@@ -146,257 +170,153 @@ function IncomingRequestsList({ visible, offers, orders }: { visible: boolean; o
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
-  const queryClient = useQueryClient();
   const closeList = useIncomingStore((state) => state.closeList);
-  const acceptMutation = useAcceptBookingOffer();
-  const declineMutation = useDeclineBookingOffer();
-  const declineOrder = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.decline(id));
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
-  const [decliningId, setDecliningId] = useState<string | null>(null);
+  const manual = useIncomingStore((state) => state.listManual);
   const [handingOff, setHandingOff] = useState(false);
   const count = offers.length + orders.length;
-  const busy = acceptingId !== null || handingOff;
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  // Swiping the pile: the page holds still (no scroll, no pull-to-refresh).
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const refresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY }),
+      queryClient.invalidateQueries({ queryKey: SHOP_ORDERS_QUERY_KEY }),
+    ]);
+    setRefreshing(false);
+  };
+  const pulse = useRef(new Animated.Value(0)).current;
 
-  // Everything answered (or taken / expired meanwhile): nothing left to show.
+  // Opened by new requests: closes itself once they're all answered (taken / expired meanwhile).
+  // Opened from the menu: stays, saying there's nothing right now.
   useEffect(() => {
-    if (visible && count === 0 && !busy) closeList();
-  }, [visible, count, busy, closeList]);
+    if (visible && count === 0 && !handingOff && !manual) closeList();
+  }, [visible, count, handingOff, manual, closeList]);
 
   useEffect(() => {
-    if (!visible) {
-      setAcceptingId(null);
-      setDecliningId(null);
-      setHandingOff(false);
-    }
-  }, [visible]);
+    if (!visible) return;
+    const loop = Animated.loop(Animated.timing(pulse, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: true }));
+    pulse.setValue(0);
+    loop.start();
+    return () => loop.stop();
+  }, [visible, pulse]);
 
-  const handOff = (open: () => void) => {
+  // A job / order screen opens on top; this one closes under it.
+  const handOff = () => {
     setHandingOff(true);
-    open();
     setTimeout(() => {
       closeList();
       setHandingOff(false);
     }, MODAL_HANDOFF_MS);
   };
 
-  const accept = (id: string) => {
-    setAcceptingId(id);
-    acceptMutation.mutate(id, {
-      onSuccess: async () => {
-        Notifications.dismissNotificationAsync(id).catch(() => {});
-        await queryClient.prefetchQuery({ queryKey: jobQueryKey(id), queryFn: () => jobsService.get(id) }).catch(() => {});
-        showToast({ variant: 'success', title: t('bookings.acceptedToastTitle'), message: t('bookings.acceptedToastMessage') });
-        handOff(() => openJob(id));
-        setAcceptingId(null);
-      },
-      onError: (err) => {
-        const alreadyTaken = err instanceof ApiError && err.code === 'BOOKING_ALREADY_TAKEN';
-        showToast({
-          variant: alreadyTaken ? 'info' : 'error',
-          title: t(alreadyTaken ? 'bookings.takenToastTitle' : 'common.errorTitle'),
-          message: alreadyTaken ? t('bookings.takenToastMessage') : getLocalizedErrorMessage(err, t),
-        });
-        if (alreadyTaken) Notifications.dismissNotificationAsync(id).catch(() => {});
-        setAcceptingId(null);
-      },
-    });
+  const ring = (delay: number) => {
+    const value = Animated.modulo(Animated.add(pulse, delay), 1);
+    return {
+      opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
+      transform: [{ scale: value.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.9] }) }],
+    };
   };
-
-  const decline = (id: string) => {
-    setDecliningId(id);
-    declineMutation.mutate(id, {
-      onSuccess: () => showToast({ variant: 'info', title: t('bookings.declinedToastTitle') }),
-      onError: () => showToast({ variant: 'error', title: t('common.errorTitle'), message: t('errors.generic') }),
-      onSettled: () => {
-        Notifications.dismissNotificationAsync(id).catch(() => {});
-        setDecliningId(null);
-      },
-    });
-  };
-
-  const declineShopOrder = (id: string) => {
-    setDecliningId(id);
-    declineOrder.mutate(
-      { id },
-      {
-        onSuccess: () => showToast({ variant: 'info', title: t('shopOrders.declinedToast') }),
-        onError: (err) => showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(err, t) }),
-        onSettled: () => setDecliningId(null),
-      },
-    );
-  };
-
-  const renderDecline = (onPress: () => void, declining: boolean) => (
-    <Pressable
-      onPress={onPress}
-      disabled={busy || declining}
-      accessibilityRole="button"
-      style={[
-        styles.button,
-        styles.outline,
-        { borderColor: `${brandColors.error}59`, backgroundColor: `${brandColors.error}0D`, opacity: busy ? 0.4 : 1 },
-      ]}
-    >
-      {declining ? (
-        <LoadingIndicator color={brandColors.error} size={20} dotSize={4} />
-      ) : (
-        <>
-          <FontAwesome6 name="xmark" size={14} color={brandColors.error} solid />
-          <Text style={[styles.outlineText, { color: brandColors.error }]}>{t('bookings.decline')}</Text>
-        </>
-      )}
-    </Pressable>
-  );
-
-  const cardStyle = [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }];
-
-  const renderTop = (icon: React.ComponentProps<typeof FontAwesome6>['name'], label: string, right: string) => (
-    <View style={styles.cardTop}>
-      <View style={[styles.typeIcon, { backgroundColor: `${colors.primary}14` }]}>
-        <FontAwesome6 name={icon} size={14} color={colors.primary} solid />
-      </View>
-      <Text style={[styles.typeLabel, { color: colors.primary }]} numberOfLines={1}>
-        {label}
-      </Text>
-      <View style={[styles.pill, { backgroundColor: `${colors.primary}10` }]}>
-        <FontAwesome6 name="location-arrow" size={10} color={colors.primary} solid />
-        <Text style={[styles.pillText, { color: colors.primary }]}>{right}</Text>
-      </View>
-    </View>
-  );
-
-  const renderPerson = (name: string, place: string | null | undefined) => (
-    <>
-      <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
-        {name}
-      </Text>
-      {place ? (
-        <View style={styles.placeRow}>
-          <FontAwesome6 name="location-dot" size={11} color={colors.textMuted} solid />
-          <Text style={[styles.place, { color: colors.textMuted }]} numberOfLines={1}>
-            {place}
-          </Text>
-        </View>
-      ) : null}
-    </>
-  );
-
-  const renderChips = (labels: string[]) =>
-    labels.length > 0 ? (
-      <View style={styles.chips}>
-        {labels.map((label) => (
-          <View key={label} style={[styles.chip, { backgroundColor: `${colors.primary}0F`, borderColor: `${colors.primary}2E` }]}>
-            <Text style={[styles.chipText, { color: colors.primary }]} numberOfLines={1}>
-              {label}
-            </Text>
-          </View>
-        ))}
-      </View>
-    ) : null;
-
-  const greenButton = (label: string, icon: React.ComponentProps<typeof FontAwesome6>['name'], onPress: () => void, loading: boolean, disabled: boolean) => (
-    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" style={[styles.acceptWrap, { opacity: disabled && !loading ? 0.5 : 1 }]}>
-      <LinearGradient colors={ACCEPT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.button}>
-        {loading ? (
-          <LoadingIndicator size={20} dotSize={4} />
-        ) : (
-          <>
-            <FontAwesome6 name={icon} size={14} color="#FFFFFF" solid />
-            <Text style={styles.acceptText}>{label}</Text>
-          </>
-        )}
-      </LinearGradient>
-    </Pressable>
-  );
 
   return (
-    <Modal visible={visible} animationType="fade" onRequestClose={() => !busy && closeList()} statusBarTranslucent>
+    <Modal visible={visible} animationType="fade" onRequestClose={closeList} statusBarTranslucent>
       {visible ? <StatusBar style="light" /> : null}
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 18 }]}>
-          <View style={[styles.blob, styles.blobOne]} />
-          <View style={styles.kicker}>
-            <View style={styles.kickerDot} />
-            <Text style={styles.kickerText}>{t('incoming.kicker')}</Text>
+        {/* The usual compact header: back, title + subtitle, the LIVE pill. */}
+        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: insets.top + 14 }]}>
+          <Pressable onPress={closeList} hitSlop={8} accessibilityLabel={t('common.close')} style={styles.closeButton}>
+            <FontAwesome6 name="chevron-left" size={16} color="#FFFFFF" solid />
+          </Pressable>
+          <View style={styles.flex}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {t('incoming.menuTitle')}
+            </Text>
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              {t('incoming.menuHint')}
+            </Text>
           </View>
-          <Text style={styles.headline}>{t('incoming.headline', { count })}</Text>
-          <Text style={styles.caption}>{t('incoming.caption')}</Text>
+          <View style={styles.livePill}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>{t('incoming.live')}</Text>
+          </View>
         </LinearGradient>
 
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          {offers.map((offer) => {
-            const accepting = acceptingId === offer.bookingRequestId;
-            const declining = decliningId === offer.bookingRequestId;
-            return (
-              <View key={`job:${offer.bookingRequestId}`} style={cardStyle}>
-                {renderTop(
-                  offer.direct ? 'user-check' : 'bolt',
-                  t(offer.direct ? 'newForYou.bookedYou' : 'newForYou.jobRequest'),
-                  formatDistance(offer.distanceMeters),
-                )}
-                {renderPerson(offer.customerFullName, placeName(offer.locationAddress))}
-                {renderChips(offer.skillCategories.map((key) => t(`workerProfile.skills.${key}`)))}
-                <View style={styles.actions}>
-                  {renderDecline(() => decline(offer.bookingRequestId), declining)}
-                  {greenButton(t('bookings.accept'), 'check', () => accept(offer.bookingRequestId), accepting, busy || declining)}
+        {/* A fixed page (no scroll view): Android's scroll view kept the touch, so the cards couldn't be
+            swiped. Everything fits; the list refreshes on its own every few seconds. */}
+        <View style={[styles.body, styles.flex, { paddingBottom: insets.bottom + 16 }]}>
+            {/* What's waiting, at a glance: the radar with the count, and jobs / orders. */}
+            <LinearGradient colors={LIVE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.infoCard}>
+              <View style={[styles.blob, styles.blobOne]} />
+              <View style={styles.radarWrap}>
+                <Animated.View style={[styles.radarRing, ring(0)]} />
+                <Animated.View style={[styles.radarRing, ring(0.5)]} />
+                <View style={styles.radarCore}>
+                  <Text style={styles.radarCount}>{count}</Text>
                 </View>
               </View>
-            );
-          })}
-
-          {orders.map((order) => {
-            const items = order.items.slice(0, PREVIEW_ITEMS).map((item) => [item.name, item.quantity, item.unit].filter(Boolean).join(' '));
-            const more = order.items.length - PREVIEW_ITEMS;
-            if (more > 0) items.push(t('shopOrders.moreItems', { count: more }));
-            return (
-              <View key={`order:${order.id}`} style={cardStyle}>
-                {renderTop(
-                  'basket-shopping',
-                  `${t(order.quick ? 'newForYou.quickOrder' : 'newForYou.newOrder')} · ${t('shopOrders.itemsCount', { count: order.items.length })}`,
-                  formatDistance(order.distanceMeters),
-                )}
-                {renderPerson(order.customerFullName, placeName(order.locationAddress))}
-                <Text style={[styles.fulfillment, { color: colors.textMuted }]}>
-                  {t(order.fulfillment === 'delivery' ? 'shopOrders.fulfillmentDelivery' : 'shopOrders.fulfillmentPickup')}
-                </Text>
-                {renderChips(items)}
-                <View style={styles.actions}>
-                  {renderDecline(() => declineShopOrder(order.id), decliningId === order.id)}
-                  {greenButton(t('shopOrders.openOrder'), 'arrow-right', () => handOff(() => openShopOrder(order.id)), false, busy || decliningId === order.id)}
-                </View>
+              <View style={styles.flex}>
+                <Text style={styles.headline}>{count > 0 ? t('incoming.headline', { count }) : t('incoming.emptyHeadline')}</Text>
+                <Text style={styles.caption}>{count > 0 ? t('incoming.caption') : t('incoming.emptyCaption')}</Text>
+                {count > 0 ? (
+                  <View style={styles.statRow}>
+                    {offers.length > 0 ? (
+                      <View style={styles.statChip}>
+                        <FontAwesome6 name="bolt" size={10} color="#FFFFFF" solid />
+                        <Text style={styles.statText}>{t('incoming.jobsCount', { count: offers.length })}</Text>
+                      </View>
+                    ) : null}
+                    {orders.length > 0 ? (
+                      <View style={styles.statChip}>
+                        <FontAwesome6 name="basket-shopping" size={10} color="#FFFFFF" solid />
+                        <Text style={styles.statText}>{t('incoming.ordersCount', { count: orders.length })}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
-            );
-          })}
-        </ScrollView>
+            </LinearGradient>
 
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 14, borderTopColor: colors.border }]}>
-          <Pressable
-            onPress={closeList}
-            disabled={busy}
-            accessibilityRole="button"
-            style={[styles.button, styles.outline, { borderColor: colors.border, opacity: busy ? 0.5 : 1 }]}
-          >
-            <Text style={[styles.outlineText, { color: colors.text }]}>{t('incoming.later')}</Text>
-          </Pressable>
+            {/* The pile: answer the front card, swipe for the next — new ones join live. */}
+            {count > 0 ? (
+              <NewForYou isWorker isShop bare onOpened={handOff} onSwiping={(on) => setScrollLocked(on)} />
+            ) : (
+              <View style={styles.empty}>
+                <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}14` }]}>
+                  <FontAwesome6 name="satellite-dish" size={26} color={colors.primary} solid />
+                </View>
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t('incoming.emptyText')}</Text>
+              </View>
+            )}
         </View>
       </View>
     </Modal>
   );
 }
 
+const LIVE_GRADIENT = ['#062F86', '#0055D3', '#2B83FF'] as const;
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  hero: {
+  flex: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingBottom: 16 },
+  headerTitle: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 18 },
+  headerSubtitle: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
+  infoCard: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 14, marginBottom: 18, overflow: 'hidden' },
+  blob: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' },
+  blobOne: { width: 180, height: 180, top: -80, right: -60 },
+  heroTop: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.32)',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 26,
-    overflow: 'hidden',
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    justifyContent: 'center',
   },
-  blob: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.09)' },
-  blobOne: { width: 220, height: 220, top: -90, right: -70 },
-  kicker: {
+  livePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
@@ -407,38 +327,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
   },
-  kickerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ADE80' },
-  kickerText: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 12, letterSpacing: 1, includeFontPadding: false },
-  headline: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 28, lineHeight: 38, marginTop: 14, textAlign: 'center' },
-  caption: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.medium, fontSize: 13.5, textAlign: 'center', marginTop: 2 },
-  list: { padding: 16, gap: 14, paddingBottom: 24 },
-  card: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 16,
-    shadowColor: '#0B2A5B',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 3,
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4ADE80' },
+  liveText: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 12, letterSpacing: 1, includeFontPadding: false },
+  radarWrap: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center' },
+  radarRing: { position: 'absolute', width: 70, height: 70, borderRadius: 35, borderWidth: 2, borderColor: 'rgba(255,255,255,0.75)' },
+  radarCore: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  typeIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  typeLabel: { flex: 1, fontFamily: fonts.semiBold, fontSize: 13.5 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 26, paddingHorizontal: 10, borderRadius: 13 },
-  pillText: { fontFamily: fonts.semiBold, fontSize: 12, includeFontPadding: false },
-  name: { fontFamily: fonts.semiBold, fontSize: 17 },
-  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  place: { ...typography.caption, fontSize: 13, flex: 1 },
-  fulfillment: { ...typography.caption, fontSize: 13, marginTop: 4 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 12 },
-  chip: { height: 30, paddingHorizontal: 11, borderRadius: 15, borderWidth: 1, justifyContent: 'center', maxWidth: '100%' },
-  chipText: { fontFamily: fonts.semiBold, fontSize: 12.5, includeFontPadding: false },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  button: { flex: 1, height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  outline: { borderWidth: 1.5 },
-  outlineText: { ...typography.body, fontFamily: fonts.semiBold },
-  acceptWrap: { flex: 1.3, borderRadius: 14, overflow: 'hidden' },
-  acceptText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  footer: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  radarCount: { color: '#0055D3', fontFamily: fonts.semiBold, fontSize: 24, lineHeight: 30, includeFontPadding: false },
+  headline: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 24 },
+  caption: { color: 'rgba(255,255,255,0.86)', fontFamily: fonts.medium, fontSize: 12, marginTop: 2 },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  statChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+  },
+  statText: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 12 },
+  body: { flexGrow: 1, padding: 16 },
+  empty: { alignItems: 'center', gap: 12, paddingHorizontal: 24 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { ...typography.body, fontSize: 13.5, lineHeight: 20, textAlign: 'center' },
 });

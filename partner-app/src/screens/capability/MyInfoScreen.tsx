@@ -15,7 +15,8 @@ import { SealedPhoto } from '@/components/TrustedSeal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
-import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { useMyShop } from '@/hooks/useBusinessMutations';
+import { DeliveryStaffCard } from '@/components/DeliveryStaffSection';
 import { useMyReviews, useMyShopReviews } from '@/hooks/useReviews';
 import { useTrustedKinds, useTrustedProfileIds } from '@/hooks/useSubscription';
 import { MainStackParamList } from '@/navigation/types';
@@ -42,9 +43,9 @@ const DELIVERY_GRADIENT = ['#15803D', '#22C55E'] as const;
  * edit mode.
  */
 export function MyInfoScreen({ route, navigation }: Props) {
-  const { capability, postId } = route.params;
+  const { capability, postId, shopId } = route.params;
   if (capability === 'job') return <JobInfo navigation={navigation} postId={postId} />;
-  return capability === 'worker' ? <WorkerInfo navigation={navigation} /> : <BusinessInfo navigation={navigation} />;
+  return capability === 'worker' ? <WorkerInfo navigation={navigation} /> : <BusinessInfo navigation={navigation} shopId={shopId} />;
 }
 
 function initialsOf(name: string): string {
@@ -171,12 +172,12 @@ function WorkerInfo({ navigation }: { navigation: MyInfoNavigation }) {
   );
 }
 
-function BusinessInfo({ navigation }: { navigation: MyInfoNavigation }) {
+function BusinessInfo({ navigation, shopId }: { navigation: MyInfoNavigation; shopId?: string }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
-  const { data: profile, isLoading } = useMyBusinessProfile();
-  const reviews = useMyShopReviews(!!profile);
+  const { data: profile, isLoading } = useMyShop(shopId);
+  const reviews = useMyShopReviews(!!profile, profile?.id);
   const trustedKinds = useTrustedKinds();
   const [viewer, setViewer] = useState<{ photos: string[]; index: number } | null>(null);
 
@@ -261,6 +262,8 @@ function BusinessInfo({ navigation }: { navigation: MyInfoNavigation }) {
             <Gallery urls={profile.shopPhotoUrls} onOpen={(index) => setViewer({ photos: profile.shopPhotoUrls, index })} />
           </ProfileSection>
         ) : null}
+        {/* Only when the shop has staff; they are added / removed on Edit. */}
+        {profile.deliveryAvailable ? <DeliveryStaffCard shopId={profile.id} /> : null}
         <WorkerReviewsSection
           summary={reviews.data}
           loading={reviews.isLoading}

@@ -1,3 +1,4 @@
+import { shopKindMatchSql, splitShopCategories } from './categories';
 import { Pool, QueryResultRow } from 'pg';
 import { parsePgArray } from '@/common/utils/pgArray';
 import {
@@ -7,6 +8,9 @@ import {
   BusinessProfile,
   BusinessProfileWithAccount,
   NearbySearchFilter,
+  ShopStaffMember,
+  StaffShop,
+  StaffInvite,
 } from './interfaces';
 
 function mapBusinessProfile(row: QueryResultRow): BusinessProfile {
@@ -50,9 +54,125 @@ function mapBusinessProfileWithAccount(row: QueryResultRow): BusinessProfileWith
 export class BusinessesRepository {
   constructor(private readonly pool: Pool) {}
 
-  async findByAccountId(accountId: string): Promise<BusinessProfile | null> {
-    const result = await this.pool.query('SELECT * FROM business_profiles WHERE account_id = $1', [accountId]);
+  /**
+   * One of the account's shops: the one asked for, else its first verified shop (then its
+   * oldest) — so screens that know of one shop keep working when there are several.
+   */
+  async findByAccountId(accountId: string, shopId?: string): Promise<BusinessProfile | null> {
+    const result = shopId
+      ? await this.pool.query('SELECT * FROM business_profiles WHERE account_id = $1 AND id = $2', [accountId, shopId])
+      : await this.pool.query(
+          `SELECT * FROM business_profiles WHERE account_id = $1
+           ORDER BY (verification_status = 'verified') DESC, created_at ASC LIMIT 1`,
+          [accountId],
+        );
     return result.rows[0] ? mapBusinessProfile(result.rows[0]) : null;
+  }
+
+  /** All of the account's shops, oldest first. */
+  async listByAccountId(accountId: string): Promise<BusinessProfile[]> {
+    const result = await this.pool.query('SELECT * FROM business_profiles WHERE account_id = $1 ORDER BY created_at ASC', [accountId]);
+    return result.rows.map(mapBusinessProfile);
+  }
+
+  async countByAccountId(accountId: string): Promise<number> {
+    const result = await this.pool.query('SELECT COUNT(*)::int AS n FROM business_profiles WHERE account_id = $1', [accountId]);
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  // --- Delivery staff (shop_staff, owned here) ---
+
+  async listStaff(businessId: string): Promise<ShopStaffMember[]> {
+    const result = await this.pool.query(
+      `SELECT s.id, s.account_id, s.created_at, s.status, COALESCE(s.full_name, a.full_name) AS full_name, a.mobile_number
+       FROM shop_staff s JOIN accounts a ON a.id = s.account_id
+       WHERE s.business_id = $1 ORDER BY s.created_at ASC`,
+      [businessId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      accountId: row.account_id,
+      fullName: row.full_name,
+      mobileNumber: row.mobile_number,
+      status: row.status,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  }
+
+  async countStaff(businessId: string): Promise<number> {
+    const result = await this.pool.query('SELECT COUNT(*)::int AS n FROM shop_staff WHERE business_id = $1', [businessId]);
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  /** Adds (or renames) a staff member; someone who declined is invited again. */
+  async addStaff(businessId: string, accountId: string, fullName: string, status: 'invited' | 'active'): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO shop_staff (business_id, account_id, full_name, status) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (business_id, account_id) DO UPDATE SET full_name = EXCLUDED.full_name,
+         status = CASE WHEN shop_staff.status = 'declined' OR EXCLUDED.status = 'active' THEN EXCLUDED.status ELSE shop_staff.status END`,
+      [businessId, accountId, fullName, status],
+    );
+  }
+
+  async hasStaffRow(businessId: string, accountId: string): Promise<boolean> {
+    const result = await this.pool.query('SELECT 1 FROM shop_staff WHERE business_id = $1 AND account_id = $2', [businessId, accountId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /** Invitations this account hasn't answered yet. */
+  async listInvites(accountId: string): Promise<StaffInvite[]> {
+    const result = await this.pool.query(
+      `SELECT b.id, b.shop_name, o.full_name AS owner_name, COALESCE(s.full_name, a.full_name) AS full_name, s.created_at
+       FROM shop_staff s
+       JOIN business_profiles b ON b.id = s.business_id
+       JOIN accounts o ON o.id = b.account_id
+       JOIN accounts a ON a.id = s.account_id
+       WHERE s.account_id = $1 AND s.status = 'invited'
+       ORDER BY s.created_at DESC`,
+      [accountId],
+    );
+    return result.rows.map((row) => ({
+      businessId: row.id,
+      shopName: row.shop_name,
+      ownerName: row.owner_name,
+      fullName: row.full_name,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  }
+
+  /** Accepts / declines an open invitation; false when there is none. */
+  async answerInvite(accountId: string, businessId: string, accept: boolean): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE shop_staff SET status = $3 WHERE account_id = $1 AND business_id = $2 AND status = 'invited'`,
+      [accountId, businessId, accept ? 'active' : 'declined'],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async removeStaff(businessId: string, staffId: string): Promise<boolean> {
+    const result = await this.pool.query('DELETE FROM shop_staff WHERE business_id = $1 AND id = $2', [businessId, staffId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async isStaff(businessId: string, accountId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `SELECT 1 FROM shop_staff WHERE business_id = $1 AND account_id = $2 AND status = 'active'`,
+      [businessId, accountId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /** The shops this account delivers for (read with each shop's owner, for display). */
+  async staffShops(accountId: string): Promise<StaffShop[]> {
+    const result = await this.pool.query(
+      `SELECT b.id, b.shop_name, o.full_name AS owner_name
+       FROM shop_staff s
+       JOIN business_profiles b ON b.id = s.business_id
+       JOIN accounts o ON o.id = b.account_id
+       WHERE s.account_id = $1 AND s.status = 'active' ORDER BY s.created_at ASC`,
+      [accountId],
+    );
+    return result.rows.map((row) => ({ businessId: row.id, shopName: row.shop_name, ownerName: row.owner_name }));
   }
 
   async create(params: {
@@ -101,6 +221,7 @@ export class BusinessesRepository {
 
   async update(
     accountId: string,
+    shopId: string,
     params: {
       shopName: string;
       shopCategories: string[];
@@ -123,7 +244,7 @@ export class BusinessesRepository {
     const result = await this.pool.query(
       `UPDATE business_profiles
        SET shop_name = $2, shop_categories = $3, other_category_description = $4, latitude = $5, longitude = $6, area = $7, city = $8, district = $9, state = $10, pincode = $11, shop_photo_urls = $12, delivery_available = $13, delivery_price_per_km = $14, verification_status = $15, location_name = $16, delivery_min_charge = $17, updated_at = now()
-       WHERE account_id = $1
+       WHERE account_id = $1 AND id = $18
        RETURNING *`,
       [
         accountId,
@@ -143,6 +264,7 @@ export class BusinessesRepository {
         params.verificationStatus,
         params.locationName,
         params.deliveryMinCharge,
+        shopId,
       ],
     );
     return mapBusinessProfile(result.rows[0]);
@@ -151,20 +273,26 @@ export class BusinessesRepository {
   /** Sets (or clears) the profile photo; returns the profile and the photo it replaced, or null with no profile. */
   async setProfilePhoto(
     accountId: string,
+    shopId: string,
     photoUrl: string | null,
   ): Promise<{ profile: BusinessProfile; previousUrl: string | null } | null> {
     const result = await this.pool.query(
       `UPDATE business_profiles p SET profile_photo_url = $2, updated_at = now()
-       FROM (SELECT profile_photo_url AS previous_url FROM business_profiles WHERE account_id = $1 FOR UPDATE) old
-       WHERE p.account_id = $1
+       FROM (SELECT profile_photo_url AS previous_url FROM business_profiles WHERE account_id = $1 AND id = $3 FOR UPDATE) old
+       WHERE p.account_id = $1 AND p.id = $3
        RETURNING p.*, old.previous_url`,
-      [accountId, photoUrl],
+      [accountId, photoUrl, shopId],
     );
     if (!result.rows[0]) return null;
     return { profile: mapBusinessProfile(result.rows[0]), previousUrl: result.rows[0].previous_url ?? null };
   }
 
-  async remove(accountId: string): Promise<void> {
+  /** Deletes one shop of the account, or (no shop given) all of them. */
+  async remove(accountId: string, shopId?: string): Promise<void> {
+    if (shopId) {
+      await this.pool.query('DELETE FROM business_profiles WHERE account_id = $1 AND id = $2', [accountId, shopId]);
+      return;
+    }
     await this.pool.query('DELETE FROM business_profiles WHERE account_id = $1', [accountId]);
   }
 
@@ -250,6 +378,7 @@ export class BusinessesRepository {
   // see that method's own doc comment for the acos() domain-clamp rationale.
   async findNearby(excludeAccountId: string, filter: NearbySearchFilter): Promise<BusinessNearbyResult[]> {
     const like = filter.query ? `%${filter.query}%` : null;
+    const kinds = splitShopCategories(filter.shopCategory ? filter.shopCategory.split(',') : []);
     // 'rating': best average first (unrated shops last), more ratings then distance breaking ties.
     const orderBy =
       filter.sort === 'rating'
@@ -270,7 +399,7 @@ export class BusinessesRepository {
        ) sub
        WHERE sub.distance_meters <= $4
          AND ($5::text IS NULL OR ${filter.nameOnly ? 'sub.shop_name ILIKE $5' : "sub.shop_name ILIKE $5 OR sub.other_category_description ILIKE $5 OR sub.location_name ILIKE $5 OR sub.city ILIKE $5 OR sub.area ILIKE $5 OR array_to_string(sub.shop_categories, ',') ILIKE $5"})
-         AND ($7::business_shop_category[] IS NULL OR sub.shop_categories && $7::business_shop_category[])
+         AND ${shopKindMatchSql('sub', '7', '10')}
          AND ($8::boolean IS NOT TRUE OR sub.delivery_available)
        ORDER BY (sub.account_id = ANY($9::uuid[])) DESC, ${orderBy}
        LIMIT $6`,
@@ -281,9 +410,10 @@ export class BusinessesRepository {
         filter.radiusKm * 1000,
         like,
         filter.limit,
-        filter.shopCategory ? filter.shopCategory.split(',') : null,
+        kinds.fixed.length > 0 ? kinds.fixed : null,
         filter.deliveryOnly ?? false,
         filter.priorityAccountIds ?? [],
+        kinds.custom,
       ],
     );
     return result.rows.map((row) => ({ ...mapBusinessProfile(row), distanceMeters: Number(row.distance_meters) }));

@@ -541,9 +541,12 @@ export class BookingsService {
    */
   private async notify(transition: BookingTransition, event: TripEvent, type: NotificationType): Promise<void> {
     if (!transition.notify) return;
-    const text = tripTemplate(event, transition.notify.preferredLanguage);
     // 'completed' and a customer's 'cancelled' go to the worker; every other trip step to the customer.
     const audience = event === 'completed' || event === 'cancelled' || event === 'cancelled_late' ? 'partner' : 'user';
+    // The customer hears who: "Ravi accepted", "Ravi is on the way"…
+    const workerName =
+      audience === 'user' ? await this.repository.findAcceptedWorkerName(transition.request.id).catch(() => null) : null;
+    const text = tripTemplate(event, transition.notify.preferredLanguage, workerName);
     await this.notificationsService.notify(transition.notify.accountId, type, text.title, text.body, {
       audience,
       data: { kind: type, bookingId: transition.request.id },

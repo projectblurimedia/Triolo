@@ -120,7 +120,8 @@ export const subscriptionsService = {
         actionType: kind,
         promoteMobile: mobileNumber,
         // Which job post, when the partner has several.
-        ...(kind === 'job_post' && profileId ? { promotedPostId: profileId } : {}),
+        // Several job posts / shops: which one is promoted.
+        ...((kind === 'job_post' || kind === 'business') && profileId ? { promotedPostId: profileId } : {}),
         orientation: 'vertical',
         displaySeconds: 15,
         planDays: days,

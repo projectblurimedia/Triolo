@@ -5,6 +5,12 @@ import { AppError } from '@/common/errors/AppError';
 import { BusinessesService } from './service';
 import { nearbySearchQuerySchema } from './validation';
 
+/** Which of my shops a request is about (`?shopId=`); none = the first one. */
+function shopIdOf(req: Request): string | undefined {
+  const value = typeof req.query.shopId === 'string' ? req.query.shopId.trim() : '';
+  return /^[0-9a-f-]{36}$/i.test(value) ? value : undefined;
+}
+
 export class BusinessesController {
   constructor(private readonly service: BusinessesService) {}
 
@@ -21,7 +27,7 @@ export class BusinessesController {
     if (!req.account) {
       throw AppError.unauthorized();
     }
-    const profile = await this.service.getMyProfile(req.account.accountId);
+    const profile = await this.service.getMyProfile(req.account.accountId, shopIdOf(req));
     return ok(res, profile);
   });
 
@@ -30,7 +36,7 @@ export class BusinessesController {
       throw AppError.unauthorized();
     }
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-    const profile = await this.service.updateProfile(req.account.accountId, req.body, files);
+    const profile = await this.service.updateProfile(req.account.accountId, req.body, files, shopIdOf(req));
     return ok(res, profile, 'Business profile updated');
   });
 
@@ -38,21 +44,21 @@ export class BusinessesController {
     if (!req.account) {
       throw AppError.unauthorized();
     }
-    return ok(res, await this.service.setProfilePhoto(req.account.accountId, req.file), 'Photo saved');
+    return ok(res, await this.service.setProfilePhoto(req.account.accountId, req.file, shopIdOf(req)), 'Photo saved');
   });
 
   removeProfilePhoto = asyncHandler(async (req: Request, res: Response) => {
     if (!req.account) {
       throw AppError.unauthorized();
     }
-    return ok(res, await this.service.removeProfilePhoto(req.account.accountId), 'Photo removed');
+    return ok(res, await this.service.removeProfilePhoto(req.account.accountId, shopIdOf(req)), 'Photo removed');
   });
 
   deleteProfile = asyncHandler(async (req: Request, res: Response) => {
     if (!req.account) {
       throw AppError.unauthorized();
     }
-    await this.service.deleteProfile(req.account.accountId);
+    await this.service.deleteProfile(req.account.accountId, shopIdOf(req));
     return ok(res, null, 'Business profile deleted');
   });
 

@@ -12,7 +12,6 @@ import { ShopMiniCard } from '@/components/ShopMiniCard';
 import { NearbyResultDetailModal } from '@/components/NearbyResultDetailModal';
 import { SendListModal } from '@/components/SendListModal';
 import { ChooseListModal } from '@/components/ChooseListModal';
-import { ContinueSteps } from '@/components/ContinueSteps';
 import { NearbyHero } from '@/components/NearbyHero';
 import { SectionHeader } from '@/components/SectionHeader';
 import { useTrustedIds } from '@/hooks/useSubscription';
@@ -314,8 +313,6 @@ export function BazaarScreen() {
 
           {businessProfile ? <BusinessProfileCard profile={businessProfile} /> : null}
 
-          {/* Lists already sent to a shop and still going (as on Home). */}
-          <ContinueSteps only="orders" />
 
 
 

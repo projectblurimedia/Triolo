@@ -1,3 +1,4 @@
+import { splitShopCategories } from '@/modules/businesses/categories';
 import { randomInt } from 'crypto';
 import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
@@ -16,10 +17,16 @@ import {
   ShopSideOrder,
   AdminOrder,
   AdminOrderListFilter,
+  StaffDelivery,
 } from './interfaces';
-import { OrderEvent, orderTemplate } from './pushTemplates';
+import { OrderEvent, orderTemplate, deliveryTemplate } from './pushTemplates';
 
 const LIST_LIMIT = 50;
+
+/** An order tagged with the owner's shop it is for. */
+function tagShop(order: ShopSideOrder, shop: BusinessProfile): ShopSideOrder {
+  return { ...order, shopId: shop.id, shopName: shop.shopName };
+}
 
 /** A fresh, single-use 4-digit pickup/delivery PIN (cryptographically random). */
 function generatePin(): string {
@@ -29,8 +36,7 @@ function generatePin(): string {
 /** Haversine distance in meters. */
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const toRad = (degrees: number) => (degrees * Math.PI) / 180;
-  const a =
-    Math.sin(toRad(lat2 - lat1) / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lng2 - lng1) / 2) ** 2;
+  const a = Math.sin(toRad(lat2 - lat1) / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lng2 - lng1) / 2) ** 2;
   return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
@@ -71,9 +77,7 @@ export class OrdersService {
     }
 
     const distance =
-      shop.latitude != null && shop.longitude != null
-        ? distanceMeters(dto.latitude, dto.longitude, shop.latitude, shop.longitude)
-        : 0;
+      shop.latitude != null && shop.longitude != null ? distanceMeters(dto.latitude, dto.longitude, shop.latitude, shop.longitude) : 0;
     const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'order')) ?? null;
     const order = await this.repository.create({
       accountId,
@@ -85,13 +89,20 @@ export class OrdersService {
       distanceMeters: distance,
       deliveryCharge: dto.fulfillment === 'delivery' ? deliveryCharge(shop, distance) : 0,
       note: dto.note || null,
-      items: dto.items.map((item) => ({ name: item.name, quantity: item.quantity, unit: item.unit || null })),
+      items: dto.items.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit || null,
+      })),
     });
 
     await this.subscriptionStatus?.attachPass(passId, order.id);
 
     const language = await this.repository.languageOf(shop.accountId);
-    const text = orderTemplate('placed', language, { shop: shop.shopName, count: order.items.length });
+    const text = orderTemplate('placed', language, {
+      shop: shop.shopName,
+      count: order.items.length,
+    });
     await this.notificationsService.notify(shop.accountId, 'order_placed', text.title, text.body, {
       data: { kind: 'order_placed', orderId: order.id },
       channelId: 'default',
@@ -118,16 +129,25 @@ export class OrdersService {
       throw AppError.notFound('No matching shop nearby.', 'QUICK_ORDER_NO_SHOPS');
     }
     const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'order')) ?? null;
+    const kinds = splitShopCategories(dto.shopCategories);
     const order = await this.repository.createQuick({
       accountId,
       fulfillment: dto.fulfillment,
-      shopCategories: dto.shopCategories,
+      shopCategories: kinds.fixed,
+      customCategories: kinds.custom,
       latitude: dto.latitude,
       longitude: dto.longitude,
       locationAddress: dto.locationAddress || null,
       note: dto.note || null,
-      items: dto.items.map((item) => ({ name: item.name, quantity: item.quantity, unit: item.unit || null })),
-      offers: shops.map((shop) => ({ businessId: shop.id, distanceMeters: shop.distanceMeters })),
+      items: dto.items.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit || null,
+      })),
+      offers: shops.map((shop) => ({
+        businessId: shop.id,
+        distanceMeters: shop.distanceMeters,
+      })),
     });
     await this.subscriptionStatus?.attachPass(passId, order.id);
 
@@ -135,7 +155,10 @@ export class OrdersService {
     await Promise.all(
       shops.map(async (shop) => {
         const language = await this.repository.languageOf(shop.accountId);
-        const text = orderTemplate('quick_placed', language, { shop: shop.shopName, count: order.items.length });
+        const text = orderTemplate('quick_placed', language, {
+          shop: shop.shopName,
+          count: order.items.length,
+        });
         await this.notificationsService.notify(shop.accountId, 'order_placed', text.title, text.body, {
           data: { kind: 'order_placed', orderId: order.id },
           channelId: 'default',
@@ -202,11 +225,36 @@ export class OrdersService {
 
   // --- Shop side ---
 
+  /** Every order of every shop the owner has, each saying which shop it is for. */
   async listShopOrders(ownerAccountId: string): Promise<ShopSideOrder[]> {
-    const shop = await this.businessesService.getMyProfile(ownerAccountId);
-    if (!shop) return [];
+    const shops = await this.businessesService.listMyShops(ownerAccountId);
+    if (shops.length === 0) return [];
     await this.repository.expireStale();
-    return this.repository.listForShop(shop.id, LIST_LIMIT);
+    return this.listAcross(shops);
+  }
+
+  private async listAcross(shops: BusinessProfile[]): Promise<ShopSideOrder[]> {
+    const lists = await Promise.all(
+      shops.map(async (shop) => (await this.repository.listForShop(shop.id, LIST_LIMIT)).map((order) => tagShop(order, shop))),
+    );
+    // A Quick Order offered to two of the owner's shops shows once.
+    const seen = new Set<string>();
+    const merged = lists.flat().filter((order) => (seen.has(order.id) ? false : (seen.add(order.id), true)));
+    const ended = (order: ShopSideOrder) => ['completed', 'cancelled', 'declined', 'expired'].includes(order.status);
+    return merged
+      .sort((a, b) => Number(ended(a)) - Number(ended(b)) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, LIST_LIMIT);
+  }
+
+  /** Which of the owner's shops this order (or Quick Order offer) is for — and the order. */
+  private async shopForOrder(ownerAccountId: string, orderId: string): Promise<{ shop: BusinessProfile; order: ShopSideOrder }> {
+    const shops = await this.businessesService.listMyShops(ownerAccountId);
+    if (shops.length === 0) throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
+    for (const shop of shops) {
+      const order = await this.repository.findForShop(orderId, shop.id);
+      if (order) return { shop, order: tagShop(order, shop) };
+    }
+    throw AppError.notFound('Order not found.', 'ORDER_NOT_FOUND');
   }
 
   /**
@@ -215,34 +263,32 @@ export class OrdersService {
    * with no location on file just gets its list.
    */
   async searchOpenQuickOrders(ownerAccountId: string): Promise<ShopSideOrder[]> {
-    const shop = await this.requireShop(ownerAccountId);
+    const shops = await this.businessesService.listMyShops(ownerAccountId);
+    if (shops.length === 0) throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
     await this.repository.expireStale();
-    if (shop.verificationStatus === 'verified' && shop.latitude != null && shop.longitude != null) {
+    for (const shop of shops) {
+      if (shop.verificationStatus !== 'verified' || shop.latitude == null || shop.longitude == null) continue;
       await this.repository.offerOpenQuickOrders({
         businessId: shop.id,
         ownerAccountId,
         latitude: shop.latitude,
         longitude: shop.longitude,
         shopCategories: shop.shopCategories,
+        otherCategoryDescription: shop.otherCategoryDescription,
         deliveryAvailable: shop.deliveryAvailable,
         radiusKm: QUICK_ORDER_RADIUS_KM,
       });
     }
-    return this.repository.listForShop(shop.id, LIST_LIMIT);
+    return this.listAcross(shops);
   }
 
   async getShopOrder(ownerAccountId: string, orderId: string): Promise<ShopSideOrder> {
-    const shop = await this.requireShop(ownerAccountId);
     await this.repository.expireStale();
-    const order = await this.repository.findForShop(orderId, shop.id);
-    if (!order) {
-      throw AppError.notFound('Order not found.', 'ORDER_NOT_FOUND');
-    }
-    return order;
+    return (await this.shopForOrder(ownerAccountId, orderId)).order;
   }
 
   async acceptOrder(ownerAccountId: string, orderId: string): Promise<void> {
-    const shop = await this.requireShop(ownerAccountId);
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
     const passId = (await this.subscriptionStatus?.usePartnerPass(ownerAccountId, 'accept', 'shop')) ?? null;
     // A Quick Order offered to this shop: the first accept takes it (delivery charge from here).
     const offerDistance = await this.repository.findQuickOffer(orderId, shop.id);
@@ -260,10 +306,25 @@ export class OrdersService {
     }
     await this.subscriptionStatus?.attachPass(passId, `accept-${orderId}`);
     await this.notify(result, 'accepted', 'order_accepted');
+    // The other shops asked: their pop-up for this order closes.
+    if (offerDistance != null) {
+      const others = await this.repository.lostQuickOwners(orderId);
+      await Promise.all(
+        others
+          .filter((accountId) => accountId !== ownerAccountId)
+          .map((accountId) =>
+            this.notificationsService.sendRawPush(accountId, 'Order taken', 'Another shop took this order.', {
+              audience: 'partner',
+              data: { kind: 'order_taken', orderId },
+              channelId: 'default',
+            }),
+          ),
+      );
+    }
   }
 
   async declineOrder(ownerAccountId: string, orderId: string, reason?: string): Promise<void> {
-    const shop = await this.requireShop(ownerAccountId);
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
     // A Quick Order: only this shop's offer closes — the others can still take it.
     if (await this.repository.declineQuickOffer(orderId, shop.id)) return;
     const result = await this.repository.decline(orderId, shop.id, reason || null);
@@ -273,11 +334,15 @@ export class OrdersService {
   }
 
   async saveItems(ownerAccountId: string, orderId: string, dto: SaveItemsDto): Promise<ShopSideOrder> {
-    const shop = await this.requireShop(ownerAccountId);
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
     const saved = await this.repository.saveItems(
       orderId,
       shop.id,
-      dto.items.map((item) => ({ id: item.id, status: item.status, price: item.price ?? null })),
+      dto.items.map((item) => ({
+        id: item.id,
+        status: item.status,
+        price: item.price ?? null,
+      })),
     );
     if (!saved) throw await this.transitionError(orderId, 'Items can only be changed while packing.');
     return this.getShopOrder(ownerAccountId, orderId);
@@ -285,7 +350,7 @@ export class OrdersService {
 
   /** Sends the bill: packed items with prices, unavailable items listed separately. */
   async markPacked(ownerAccountId: string, orderId: string): Promise<void> {
-    const shop = await this.requireShop(ownerAccountId);
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
     const { transition, problem } = await this.repository.markPacked(orderId, shop.id);
     if (problem === 'pending') throw AppError.badRequest('Mark every item packed or not available first.', 'ORDER_ITEMS_PENDING');
     if (problem === 'price') throw AppError.badRequest('Enter a price for every packed item.', 'ORDER_PRICE_MISSING');
@@ -296,7 +361,7 @@ export class OrdersService {
 
   /** Ready for pickup, or out for delivery — the customer gets their PIN now. */
   async markReady(ownerAccountId: string, orderId: string): Promise<void> {
-    const shop = await this.requireShop(ownerAccountId);
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
     const result = await this.repository.markReady(orderId, shop.id, generatePin());
     if (!result) throw await this.transitionError(orderId, 'Only a packed order can be handed over.');
     const delivery = result.order.fulfillment === 'delivery';
@@ -304,7 +369,7 @@ export class OrdersService {
   }
 
   async verifyPin(ownerAccountId: string, orderId: string, pin: string): Promise<void> {
-    const shop = await this.requireShop(ownerAccountId);
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
     const result = await this.repository.verifyPin(orderId, shop.id, pin);
     if (result.outcome === 'not_found') throw await this.transitionError(orderId, 'This order is not waiting for a PIN.');
     if (result.outcome === 'locked') {
@@ -317,12 +382,126 @@ export class OrdersService {
   }
 
   async cancelByShop(ownerAccountId: string, orderId: string, reason?: string): Promise<void> {
-    const shop = await this.requireShop(ownerAccountId);
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
     const result = await this.repository.cancelByShop(orderId, shop.id, reason || null);
     if (!result) throw await this.transitionError(orderId, 'This order can no longer be cancelled.');
     await this.notify(result, 'cancelled_by_shop', 'order_cancelled');
     // Not the customer's doing: their payment is kept for the next order.
     await this.subscriptionStatus?.restorePasses([orderId]);
+  }
+
+  // --- Delivery staff ---
+
+  /**
+   * The owner sends a delivery with one of the shop's staff (or takes it back with null). The
+   * staff member has to accept it first; a packed order goes out for delivery (the customer gets
+   * their PIN) only when they do.
+   */
+  async assignDelivery(ownerAccountId: string, orderId: string, staffAccountId: string | null): Promise<ShopSideOrder> {
+    const { shop, order } = await this.shopForOrder(ownerAccountId, orderId);
+    if (order.fulfillment !== 'delivery') throw AppError.badRequest('This order is picked up at the shop.', 'ORDER_NOT_DELIVERY');
+    if (staffAccountId && !(await this.businessesService.isStaff(shop.id, staffAccountId))) {
+      throw AppError.badRequest("That person is not this shop's staff.", 'STAFF_NOT_FOUND');
+    }
+    if (!(await this.repository.setDeliveryStaff(orderId, shop.id, staffAccountId))) {
+      throw await this.transitionError(orderId, 'Only a packed order or one out for delivery can be sent with staff.');
+    }
+    if (staffAccountId) {
+      const [delivery] = await this.repository.listForStaff(staffAccountId, 1, orderId);
+      // In the staff member's own language.
+      const { title, body } = deliveryTemplate('assigned', await this.repository.languageOf(staffAccountId), {
+        shop: shop.shopName,
+        customer: delivery?.customerFullName ?? '',
+        count: delivery?.items.length ?? 0,
+        total: delivery?.totalAmount != null ? rupees(delivery.totalAmount) : undefined,
+      });
+      await this.notificationsService.notify(staffAccountId, 'delivery_assigned', title, body, {
+        audience: 'partner',
+        data: { kind: 'delivery_assigned', deliveryId: orderId },
+        channelId: 'default',
+      });
+    }
+    return this.getShopOrder(ownerAccountId, orderId);
+  }
+
+  /**
+   * The staff member answers a delivery handed to them. Accept: it is theirs (a packed order goes
+   * out for delivery now). Decline: it goes back to the owner, who is told.
+   */
+  async answerDelivery(staffAccountId: string, orderId: string, accept: boolean): Promise<StaffDelivery | null> {
+    const delivery = await this.getMyDelivery(staffAccountId, orderId);
+    const answered = await this.repository.answerDelivery(orderId, staffAccountId, accept);
+    if (!answered) throw await this.transitionError(orderId, 'This delivery is no longer waiting for you.');
+    const owner = await this.businessesService.getPublicProfile(answered.businessId);
+    if (accept) {
+      if (answered.status === 'packed' && owner) await this.markReady(owner.accountId, orderId);
+      return this.getMyDelivery(staffAccountId, orderId);
+    }
+    if (owner) {
+      const te = (await this.repository.languageOf(owner.accountId)) === 'te';
+      await this.notificationsService.notify(
+        owner.accountId,
+        'delivery_declined',
+        te ? `డెలివరీ తిరస్కరించబడింది: ${delivery.customerFullName}` : `Delivery declined: ${delivery.customerFullName}`,
+        te
+          ? `${delivery.shopName} · మీరే పంపండి లేదా మరొకరిని ఎంచుకోండి`
+          : `${delivery.shopName} · deliver it yourself or pick someone else`,
+        {
+          audience: 'partner',
+          data: { kind: 'delivery_declined', orderId },
+          channelId: 'default',
+        },
+      );
+    }
+    return null;
+  }
+
+  /** Staff phone, while delivering: where they are (the owner sees it on the map). */
+  async updateStaffLocation(staffAccountId: string, orderId: string, latitude: number, longitude: number): Promise<void> {
+    if (!(await this.repository.setStaffLocation(orderId, staffAccountId, latitude, longitude))) {
+      throw AppError.conflict('This delivery is not on its way.', 'DELIVERY_NOT_ACTIVE');
+    }
+  }
+
+  /** The deliveries given to me (as a shop's staff). */
+  async listMyDeliveries(staffAccountId: string): Promise<StaffDelivery[]> {
+    return this.repository.listForStaff(staffAccountId, LIST_LIMIT);
+  }
+
+  async getMyDelivery(staffAccountId: string, orderId: string): Promise<StaffDelivery> {
+    const [delivery] = await this.repository.listForStaff(staffAccountId, 1, orderId);
+    if (!delivery) throw AppError.notFound('Delivery not found.', 'DELIVERY_NOT_FOUND');
+    return delivery;
+  }
+
+  /** Staff hand the order over with the customer's PIN (cash already collected). */
+  async staffVerifyPin(staffAccountId: string, orderId: string, pin: string): Promise<StaffDelivery> {
+    const delivery = await this.getMyDelivery(staffAccountId, orderId);
+    if (delivery.staffStatus !== 'accepted') throw AppError.conflict('Accept this delivery first.', 'DELIVERY_NOT_ACCEPTED');
+    const result = await this.repository.verifyPin(orderId, delivery.shopId, pin);
+    if (result.outcome === 'not_found') throw await this.transitionError(orderId, 'This order is not waiting for a PIN.');
+    if (result.outcome === 'locked') throw AppError.conflict('Too many wrong PIN attempts.', 'ORDER_PIN_LOCKED');
+    if (result.outcome === 'wrong') {
+      throw AppError.badRequest('That PIN is not correct.', 'ORDER_PIN_INVALID', { attemptsLeft: result.attemptsLeft });
+    }
+    await this.repository.markDeliveredBy(orderId, staffAccountId);
+    await this.notify(result.transition, 'completed', 'order_completed');
+    // Tell the owner who delivered it and what to take from them.
+    const owner = await this.businessesService.getPublicProfile(delivery.shopId);
+    if (owner) {
+      const { title, body } = deliveryTemplate('delivered', await this.repository.languageOf(owner.accountId), {
+        shop: delivery.shopName,
+        customer: delivery.customerFullName,
+        count: delivery.items.length,
+        total: delivery.totalAmount != null ? rupees(delivery.totalAmount) : undefined,
+      });
+      await this.notificationsService.notify(owner.accountId, 'delivery_completed', title, body, {
+        audience: 'partner',
+        data: { kind: 'delivery_completed', orderId },
+        channelId: 'default',
+      });
+    }
+    return this.getMyDelivery(staffAccountId, orderId);
   }
 
   /** Rated, completed orders — for the shop's public reviews (reviews module). */
@@ -331,14 +510,6 @@ export class OrdersService {
   }
 
   // --- Helpers ---
-
-  private async requireShop(ownerAccountId: string): Promise<BusinessProfile> {
-    const shop = await this.businessesService.getMyProfile(ownerAccountId);
-    if (!shop) {
-      throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
-    }
-    return shop;
-  }
 
   private async transitionError(orderId: string, message: string): Promise<AppError> {
     if (!(await this.repository.exists(orderId))) {
@@ -421,10 +592,7 @@ export class OrdersService {
  * 1 km — a customer 300 m away pays for 1 km, one 2 km away pays 2 × the price. A larger
  * minimum a shop saved earlier still applies. 0 when the shop set no price.
  */
-export function deliveryCharge(
-  shop: Pick<BusinessProfile, 'deliveryPricePerKm' | 'deliveryMinCharge'>,
-  distance: number,
-): number {
+export function deliveryCharge(shop: Pick<BusinessProfile, 'deliveryPricePerKm' | 'deliveryMinCharge'>, distance: number): number {
   const perKm = shop.deliveryPricePerKm ?? 0;
   const byDistance = Math.round((perKm * distance) / 1000);
   return Math.max(byDistance, Math.round(Math.max(shop.deliveryMinCharge ?? 0, perKm)));

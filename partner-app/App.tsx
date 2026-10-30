@@ -1,3 +1,6 @@
+import { Linking } from 'react-native';
+import { LIVE_URL } from './modules/live-popup';
+import { useIncomingStore } from '@/state/incomingStore';
 import '@/localization/i18n';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
@@ -28,6 +31,8 @@ import { IncomingOrderModal } from '@/components/IncomingOrderModal';
 import { IncomingRequestsHub } from '@/components/IncomingRequestsHub';
 import { JobTrackingModal } from '@/components/JobTrackingModal';
 import { ShopOrderModal } from '@/components/ShopOrderModal';
+import { ForYouModal } from '@/components/ForYouModal';
+import { StaffDeliveriesModal } from '@/components/StaffDeliveriesModal';
 import { SubscribeModal } from '@/components/SubscribeModal';
 import { PayGateSheet } from '@/components/PayGateSheet';
 import { useThemeColors } from '@/theme';
@@ -88,6 +93,21 @@ export default function App() {
   const appState = useRef(AppState.currentState);
   // An update found while an ad is playing waits until the ad is closed.
   const adOnScreen = useAdOnScreen();
+
+  // The full-screen pop-up for a new job / order opens the app on Live Requests.
+  useEffect(() => {
+    const openLive = (url: string | null) => {
+      if (!url || !url.startsWith(LIVE_URL)) return;
+      // ?focus=job-<id> / order-<id> opens on that request; &accept=1 (the card's Accept) accepts it.
+      const query = new URLSearchParams(url.split('?')[1] ?? '');
+      const focus = query.get('focus') ?? undefined;
+      useIncomingStore.getState().openList(true, focus);
+      useIncomingStore.getState().setAutoAccept(focus && query.get('accept') === '1' ? focus : null);
+    };
+    Linking.getInitialURL().then(openLive).catch(() => {});
+    const subscription = Linking.addEventListener('url', (event) => openLive(event.url));
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (!isUpdateAvailable || adOnScreen) return;
@@ -180,6 +200,8 @@ export default function App() {
         {/* Mounted at the root (not inside BookingsScreen) so a Quick Book offer's big,
             full-screen takeover card can pop up over whatever screen the worker is
             currently on — see the component's own doc comment. */}
+        {/* The menu's New for you / Problems near you / Continue lists (under the job and order screens they open). */}
+        <ForYouModal />
         <IncomingJobModal />
         {/* A new shop order pops up the same way, over whatever screen is open. */}
         <IncomingOrderModal />
@@ -188,6 +210,7 @@ export default function App() {
         {/* The worker's live Quick Book job screen — opened from anywhere via jobFocusStore. */}
         <JobTrackingModal />
         <ShopOrderModal />
+        <StaffDeliveriesModal />
         {/* Plans, opened from Profile (Grow your profiles) or the menu. */}
         <SubscribeModal />
         {/* Pay once (no plan) before accepting a job / order or publishing a job post. */}

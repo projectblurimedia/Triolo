@@ -50,11 +50,8 @@ export const nearbySearchQuerySchema = z.object({
   radiusKm: z.coerce.number().min(0.1).max(50).default(10),
   query: z.string().trim().max(100).optional(),
   // One skill, or several separated by commas (any of them matches).
-  skillCategory: z
-    .string()
-    .trim()
-    .refine((value) => value.split(',').every((key) => (WORKER_SKILL_CATEGORIES as string[]).includes(key)), 'Unknown skill')
-    .optional(),
+  // Fixed skills and / or names workers typed themselves, comma separated.
+  skillCategory: z.string().trim().max(300).optional(),
   sort: z.enum(['distance', 'rating']).default('distance'),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   // With a type already picked, the search box is about names only.

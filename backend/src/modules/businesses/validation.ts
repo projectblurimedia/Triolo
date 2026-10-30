@@ -59,11 +59,8 @@ export const nearbySearchQuerySchema = z.object({
   query: z.string().trim().max(100).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   // One shop category, or several separated by commas (any of them matches).
-  shopCategory: z
-    .string()
-    .trim()
-    .refine((value) => value.split(',').every((key) => (BUSINESS_SHOP_CATEGORIES as string[]).includes(key)), 'Unknown shop category')
-    .optional(),
+  // Fixed kinds and / or names shops typed themselves ("Fancy"), comma separated.
+  shopCategory: z.string().trim().max(300).optional(),
   // With a type already picked, the search box is about names only.
   nameOnly: z
     .enum(['true', 'false'])
@@ -99,3 +96,11 @@ export const updateBusinessProfileSchema = z
     message: 'Enter a price per km for delivery',
     path: ['deliveryPricePerKm'],
   });
+
+export const addStaffSchema = z.object({
+  fullName: z.string().trim().min(2, 'Enter their name').max(80),
+  mobileNumber: z
+    .string()
+    .trim()
+    .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit Indian mobile number'),
+});

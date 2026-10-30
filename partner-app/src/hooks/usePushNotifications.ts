@@ -1,3 +1,4 @@
+import { openDeliveries } from '@/state/deliveriesStore';
 import { useEffect } from 'react';
 import i18n from '@/localization/i18n';
 import { Platform, Vibration } from 'react-native';
@@ -109,13 +110,16 @@ function openOfferFromTap(response: Notifications.NotificationResponse, bookingR
 function openUpdateFromTap(response: Notifications.NotificationResponse): boolean {
   if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return false;
   const data = response.notification.request.content.data as
-    | { orderId?: string; bookingId?: string; notificationId?: string }
+    | { orderId?: string; bookingId?: string; notificationId?: string; deliveryId?: string }
     | undefined;
-  if (!data?.orderId && !data?.bookingId && !data?.notificationId) return false;
+  if (!data?.orderId && !data?.bookingId && !data?.notificationId && !data?.deliveryId) return false;
   const key = `${response.notification.request.identifier}:${response.actionIdentifier}`;
   if (handledTaps.has(key)) return true;
   handledTaps.add(key);
-  if (data.orderId) {
+  if (data.deliveryId) {
+    // A shop handed this person a delivery: their deliveries screen.
+    openDeliveries(data.deliveryId);
+  } else if (data.orderId) {
     navigateToBookings('orders');
     openShopOrder(data.orderId);
   } else if (data.bookingId) {

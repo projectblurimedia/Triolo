@@ -42,8 +42,8 @@ export class ReviewsService {
     return this.summarizeShop(businessId, shop.ratingAverage, shop.ratingCount);
   }
 
-  async getForMyShop(accountId: string): Promise<WorkerReviewsSummary> {
-    const shop = await this.businessesService.getMyProfile(accountId);
+  async getForMyShop(accountId: string, shopId?: string): Promise<WorkerReviewsSummary> {
+    const shop = await this.businessesService.getMyProfile(accountId, shopId);
     if (!shop) {
       throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
     }

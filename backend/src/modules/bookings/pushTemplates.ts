@@ -179,6 +179,28 @@ const TRIP_TEMPLATES: Record<TripEvent, Record<PreferredLanguage, { title: strin
   },
 };
 
-export function tripTemplate(event: TripEvent, language: PreferredLanguage): { title: string; body: string } {
+/** The worker by name, where the customer is told about them. */
+const NAMED: Partial<Record<TripEvent, Record<PreferredLanguage, (name: string) => { title: string; body: string }>>> = {
+  accepted: {
+    en: (name) => ({ title: `${name} accepted`, body: `${name} accepted your request. Open the app to see them.` }),
+    te: (name) => ({ title: `${name} అంగీకరించారు`, body: `${name} మీ అభ్యర్థనను అంగీకరించారు. వారిని చూడటానికి యాప్ తెరవండి.` }),
+  },
+  on_the_way: {
+    en: (name) => ({ title: `${name} is on the way`, body: `${name} has started. Track them live in the app.` }),
+    te: (name) => ({ title: `${name} బయలుదేరారు`, body: `${name} బయలుదేరారు. యాప్‌లో లైవ్‌గా చూడండి.` }),
+  },
+  arrived: {
+    en: (name) => ({ title: `${name} has arrived`, body: `Share your PIN from the app with ${name} to start the work.` }),
+    te: (name) => ({ title: `${name} వచ్చేశారు`, body: `పని మొదలుపెట్టడానికి యాప్‌లోని మీ PINని ${name}కు చెప్పండి.` }),
+  },
+  work_done: {
+    en: (name) => ({ title: 'Work Done', body: `${name} marked the job as done. Please check, then confirm and rate.` }),
+    te: (name) => ({ title: 'పని పూర్తయింది', body: `${name} పని పూర్తయిందని తెలిపారు. దయచేసి చూసి, నిర్ధారించి రేటింగ్ ఇవ్వండి.` }),
+  },
+};
+
+export function tripTemplate(event: TripEvent, language: PreferredLanguage, workerName?: string | null): { title: string; body: string } {
+  const named = workerName ? NAMED[event]?.[language] ?? NAMED[event]?.en : undefined;
+  if (named && workerName) return named(workerName);
   return TRIP_TEMPLATES[event][language] ?? TRIP_TEMPLATES[event].en;
 }

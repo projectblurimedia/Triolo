@@ -2,6 +2,12 @@ import { apiClient } from './apiClient';
 import { appendPlace, PlaceValue } from '@/utils/place';
 import { PickedImage } from '@/components/ImagePickerField';
 
+/** A delivery staff member as the owner types them: their sign-in name and number. */
+export interface StaffDraft {
+  fullName: string;
+  mobileNumber: string;
+}
+
 export interface CreateBusinessProfileParams {
   shopName: string;
   shopCategories: string[];
@@ -14,6 +20,8 @@ export interface CreateBusinessProfileParams {
   deliveryAvailable: boolean;
   deliveryPricePerKm?: number;
   deliveryMinCharge?: number;
+  /** New shop only: delivery staff to add once it is saved. */
+  staff?: StaffDraft[];
 }
 
 export interface UpdateBusinessProfileParams extends CreateBusinessProfileParams {
@@ -45,8 +53,53 @@ export interface BusinessProfile {
   verificationStatus: string;
 }
 
+/** Someone the owner added to deliver a shop's orders. */
+export interface ShopStaffMember {
+  id: string;
+  accountId: string;
+  fullName: string;
+  mobileNumber: string;
+  /** invited: hasn't joined in their Partner app yet; only active staff get deliveries. */
+  status: 'invited' | 'active' | 'declined';
+  createdAt: string;
+}
+
+/** A shop's invitation to deliver for it, waiting for this person's answer. */
+export interface StaffInvite {
+  businessId: string;
+  shopName: string;
+  ownerName: string;
+  fullName: string;
+  createdAt: string;
+}
+
+/** A shop this account delivers for. */
+export interface StaffShop {
+  businessId: string;
+  shopName: string;
+  ownerName: string;
+}
+
+/** A partner may own up to this many shops (the backend checks it too). */
+export const MAX_SHOPS = 5;
+
+const shopQuery = (shopId?: string) => (shopId ? `?shopId=${encodeURIComponent(shopId)}` : '');
+
 export const businessesService = {
-  getMyProfile: () => apiClient.get<BusinessProfile | null>('/businesses/me/profile', true),
+  /** The partner's first shop (verified first) — or one shop by id. */
+  getMyProfile: (shopId?: string) => apiClient.get<BusinessProfile | null>(`/businesses/me/profile${shopQuery(shopId)}`, true),
+  /** Every shop the partner owns. */
+  listMine: () => apiClient.get<BusinessProfile[]>('/businesses/me/shops', true),
+  listStaff: (shopId: string) => apiClient.get<ShopStaffMember[]>(`/businesses/me/shops/${shopId}/staff`, true),
+  addStaff: (shopId: string, member: { fullName: string; mobileNumber: string }) =>
+    apiClient.post<ShopStaffMember[]>(`/businesses/me/shops/${shopId}/staff`, member, true),
+  removeStaff: (shopId: string, staffId: string) =>
+    apiClient.delete<ShopStaffMember[]>(`/businesses/me/shops/${shopId}/staff/${staffId}`, true),
+  /** Shops this account delivers for (empty unless an owner added them). */
+  staffShops: () => apiClient.get<StaffShop[]>('/businesses/staff/me', true),
+  staffInvites: () => apiClient.get<StaffInvite[]>('/businesses/staff/invites', true),
+  answerInvite: (businessId: string, accept: boolean) =>
+    apiClient.post<StaffInvite[]>(`/businesses/staff/invites/${businessId}/${accept ? 'accept' : 'decline'}`, undefined, true),
   /** Categories other shops added themselves (names) matching a search. */
   customCategories: (query: string) =>
     apiClient.get<string[]>(`/businesses/custom-categories?query=${encodeURIComponent(query)}`, true),
@@ -67,10 +120,10 @@ export const businessesService = {
     params.shopPhotos.forEach((image) => {
       formData.append('shopPhotos', { uri: image.uri, name: image.name, type: image.type } as unknown as Blob);
     });
-    return apiClient.postForm('/businesses/me/profile', formData);
+    return apiClient.postForm<BusinessProfile>('/businesses/me/profile', formData);
   },
 
-  updateProfile: (params: UpdateBusinessProfileParams) => {
+  updateProfile: (params: UpdateBusinessProfileParams, shopId?: string) => {
     const formData = new FormData();
     formData.append('shopName', params.shopName);
     formData.append('shopCategories', JSON.stringify(params.shopCategories));
@@ -87,15 +140,15 @@ export const businessesService = {
     params.shopPhotos.forEach((image) => {
       formData.append('shopPhotos', { uri: image.uri, name: image.name, type: image.type } as unknown as Blob);
     });
-    return apiClient.patchForm<BusinessProfile>('/businesses/me/profile', formData);
+    return apiClient.patchForm<BusinessProfile>(`/businesses/me/profile${shopQuery(shopId)}`, formData);
   },
 
-  deleteProfile: () => apiClient.delete<null>('/businesses/me/profile', true),
-  uploadProfilePhoto: (image: PickedImage) => {
+  deleteProfile: (shopId?: string) => apiClient.delete<null>(`/businesses/me/profile${shopQuery(shopId)}`, true),
+  uploadProfilePhoto: (image: PickedImage, shopId?: string) => {
     const formData = new FormData();
     // React Native's FormData takes this {uri, name, type} file shape.
     formData.append('photo', { uri: image.uri, name: image.name, type: image.type } as unknown as Blob);
-    return apiClient.putForm<BusinessProfile>('/businesses/me/profile/photo', formData);
+    return apiClient.putForm<BusinessProfile>(`/businesses/me/profile/photo${shopQuery(shopId)}`, formData);
   },
-  removeProfilePhoto: () => apiClient.delete<BusinessProfile>('/businesses/me/profile/photo', true),
+  removeProfilePhoto: (shopId?: string) => apiClient.delete<BusinessProfile>(`/businesses/me/profile/photo${shopQuery(shopId)}`, true),
 };

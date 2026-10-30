@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { placeName } from '@/utils/formatAddress';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import * as Notifications from 'expo-notifications';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -37,13 +37,30 @@ import { ActivitySummary } from '@/components/ActivitySummary';
 import { formatRupees } from '@/services/shopOrdersService';
 
 type Side = 'services' | 'shop' | 'job';
-type JobFilter = 'all' | 'requests' | 'active' | 'done' | 'cancelled';
-type ShopFilter = 'all' | 'new' | 'active' | 'done' | 'cancelled';
+// Activity is a record of what you did: requests waiting for an answer live in New for you.
+type JobFilter = 'all' | 'active' | 'done' | 'cancelled';
+type ShopFilter = 'all' | 'active' | 'done' | 'cancelled';
 type Row = { kind: 'offer'; key: string; offer: PendingOffer } | { kind: 'entry'; key: string; entry: HistoryEntry };
-const SIDE_ICONS = { services: 'screwdriver-wrench', shop: 'store', job: 'briefcase' } as const;
+const SIDE_ICONS = {
+  services: 'screwdriver-wrench',
+  shop: 'store',
+  job: 'briefcase',
+} as const;
 type HistoryEntry =
-  | { kind: 'job'; id: string; createdAt: string; active: boolean; job: WorkerJob }
-  | { kind: 'problem'; id: string; createdAt: string; active: boolean; problem: AssignedProblem };
+  | {
+      kind: 'job';
+      id: string;
+      createdAt: string;
+      active: boolean;
+      job: WorkerJob;
+    }
+  | {
+      kind: 'problem';
+      id: string;
+      createdAt: string;
+      active: boolean;
+      problem: AssignedProblem;
+    };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // Post a Problem jobs have their own colour and icon, so they're never mistaken for a Quick Book.
@@ -71,6 +88,13 @@ export function BookingsScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   // One list per side, narrowed by a filter (no separate tabs).
   const [jobFilter, setJobFilter] = useState<JobFilter>('all');
+  // Each time the tab comes into view its list is placed afresh: a list laid out while the tab
+  // was hidden could rest with the hidden pull-to-refresh room showing as a gap above the filter.
+  const isFocused = useIsFocused();
+  const [visit, setVisit] = useState(0);
+  useEffect(() => {
+    if (isFocused) setVisit((count) => count + 1);
+  }, [isFocused]);
   const [shopFilter, setShopFilter] = useState<ShopFilter>('all');
   // From – to dates (both sides share them).
   const [range, setRange] = useState<DateRange>(ALL_TIME);
@@ -87,15 +111,13 @@ export function BookingsScreen() {
   // A partner with both capabilities switches between their worker jobs and their shop orders.
   // Opened from a shop order (Home's shop card, an order notification) it starts on orders.
   const route = useRoute<RouteProp<MainTabParamList, 'Bookings'>>();
-  const [pickedSide, setPickedSide] = useState<Side | null>(
-    route.params?.mode === 'orders' ? 'shop' : route.params?.mode === 'jobs' ? 'services' : null,
-  );
+  const [pickedSide, setPickedSide] = useState<Side | null>(route.params?.mode === 'orders' ? 'shop' : route.params?.mode === 'jobs' ? 'services' : null);
   useEffect(() => {
     if (route.params?.mode) setPickedSide(route.params.mode === 'orders' ? 'shop' : 'services');
     const tab = route.params?.tab;
-    if (tab) setJobFilter(tab === 'history' ? 'done' : tab);
+    if (tab) setJobFilter(tab === 'history' ? 'done' : tab === 'requests' ? 'all' : tab);
     const orderTab = route.params?.orderTab;
-    if (orderTab) setShopFilter(orderTab === 'history' ? 'done' : orderTab);
+    if (orderTab) setShopFilter(orderTab === 'history' ? 'done' : orderTab === 'new' ? 'all' : orderTab);
   }, [route.params?.mode, route.params?.tab, route.params?.orderTab, route.params?.linkedAt]);
   const jobPost = useMyJobPost();
   const shopOrders = useShopOrders(isShop);
@@ -137,7 +159,11 @@ export function BookingsScreen() {
   const handleAccept = (offer: PendingOffer) => {
     acceptMutation.mutate(offer.bookingRequestId, {
       onSuccess: () => {
-        showToast({ variant: 'success', title: t('bookings.acceptedToastTitle'), message: t('bookings.acceptedToastMessage') });
+        showToast({
+          variant: 'success',
+          title: t('bookings.acceptedToastTitle'),
+          message: t('bookings.acceptedToastMessage'),
+        });
         Notifications.dismissNotificationAsync(offer.bookingRequestId).catch(() => {});
         jobs.refetch();
         openJob(offer.bookingRequestId);
@@ -163,7 +189,12 @@ export function BookingsScreen() {
         showToast({ variant: 'info', title: t('bookings.declinedToastTitle') });
         Notifications.dismissNotificationAsync(offer.bookingRequestId).catch(() => {});
       },
-      onError: () => showToast({ variant: 'error', title: t('common.errorTitle'), message: t('errors.generic') }),
+      onError: () =>
+        showToast({
+          variant: 'error',
+          title: t('common.errorTitle'),
+          message: t('errors.generic'),
+        }),
     });
   };
 
@@ -172,7 +203,16 @@ export function BookingsScreen() {
     const declining = declineMutation.isPending && declineMutation.variables === item.bookingRequestId;
     const busy = accepting || declining;
     return (
-      <View style={[styles.card, styles.thickBorder, { backgroundColor: `${brandColors.success}0D`, borderColor: `${brandColors.success}80` }]}>
+      <View
+        style={[
+          styles.card,
+          styles.thickBorder,
+          {
+            backgroundColor: `${brandColors.success}0D`,
+            borderColor: `${brandColors.success}80`,
+          },
+        ]}
+      >
         <View style={styles.offerTop}>
           <View style={[styles.offerAvatar, { backgroundColor: `${colors.primary}1A` }]}>
             <FontAwesome6 name="user" size={16} color={colors.primary} solid />
@@ -198,7 +238,9 @@ export function BookingsScreen() {
           <View style={[styles.distancePill, { backgroundColor: `${colors.primary}16` }]}>
             <FontAwesome6 name="location-dot" size={12} color={colors.primary} solid />
             <Text style={[styles.distanceText, { color: colors.primary }]}>
-              {t('bookings.distanceAway', { distance: formatDistance(item.distanceMeters) })}
+              {t('bookings.distanceAway', {
+                distance: formatDistance(item.distanceMeters),
+              })}
             </Text>
           </View>
         </View>
@@ -213,7 +255,10 @@ export function BookingsScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.declineButton,
-              { borderColor: colors.border, opacity: accepting ? 0.35 : pressed || declining ? 0.8 : 1 },
+              {
+                borderColor: colors.border,
+                opacity: accepting ? 0.35 : pressed || declining ? 0.8 : 1,
+              },
             ]}
             disabled={busy}
             onPress={() => handleDecline(item)}
@@ -227,7 +272,10 @@ export function BookingsScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.acceptButton,
-              { backgroundColor: brandColors.success, opacity: pressed || accepting ? 0.8 : 1 },
+              {
+                backgroundColor: brandColors.success,
+                opacity: pressed || accepting ? 0.8 : 1,
+              },
             ]}
             disabled={busy}
             onPress={() => handleAccept(item)}
@@ -255,9 +303,7 @@ export function BookingsScreen() {
 
   const renderEntry = (item: HistoryEntry) => {
     const isJob = item.kind === 'job';
-    const skills = (isJob ? item.job.skillCategories : item.problem.skillCategories)
-      .map((key) => t(`workerProfile.skills.${key}`))
-      .join(', ');
+    const skills = (isJob ? item.job.skillCategories : item.problem.skillCategories).map((key) => t(`workerProfile.skills.${key}`)).join(', ');
     const status = isJob ? item.job.status : item.problem.status;
     const statusLabel = isJob ? t(`job.status.${status}.title`) : t(`problems.status.${status}`);
     const customer = isJob ? item.job.customerFullName : item.problem.customerFullName;
@@ -276,8 +322,14 @@ export function BookingsScreen() {
           // Under way: red (waiting on you); done: a grey, quieter card. A problem job has its own
           // purple icon.
           item.active
-            ? { backgroundColor: `${brandColors.error}0A`, borderColor: `${brandColors.error}80` }
-            : { backgroundColor: `${colors.textMuted}0F`, borderColor: colors.border },
+            ? {
+                backgroundColor: `${brandColors.error}0A`,
+                borderColor: `${brandColors.error}80`,
+              }
+            : {
+                backgroundColor: `${colors.textMuted}0F`,
+                borderColor: colors.border,
+              },
           styles.thickBorder,
         ]}
         onPress={() => (isJob ? openJob(item.job.id) : navigation.navigate('Home'))}
@@ -330,11 +382,7 @@ export function BookingsScreen() {
   );
 
   // The partner's sides — only the ones they have; a switch only when there's more than one.
-  const sides: Side[] = [
-    ...(isWorker ? (['services'] as const) : []),
-    ...(isShop ? (['shop'] as const) : []),
-    ...(jobPost.data ? (['job'] as const) : []),
-  ];
+  const sides: Side[] = [...(isWorker ? (['services'] as const) : []), ...(isShop ? (['shop'] as const) : []), ...(jobPost.data ? (['job'] as const) : [])];
   const side: Side = pickedSide && sides.includes(pickedSide) ? pickedSide : (sides[0] ?? 'job');
 
   // Services: requests first, then work under way, then finished and cancelled, newest first.
@@ -344,37 +392,80 @@ export function BookingsScreen() {
     .filter((offer) => inRange(offer.createdAt, range))
     .map((offer) => ({ kind: 'offer', key: `o-${offer.offerId}`, offer }));
   const entryRows = (list: HistoryEntry[]): Row[] =>
-    list.filter((entry) => inRange(entry.createdAt, range)).map((entry) => ({ kind: 'entry', key: `${entry.kind}-${entry.id}`, entry }));
+    list
+      .filter((entry) => inRange(entry.createdAt, range))
+      .map((entry) => ({
+        kind: 'entry',
+        key: `${entry.kind}-${entry.id}`,
+        entry,
+      }));
   const doneEntries = historyEntries.filter((entry) => !isCancelled(entry));
   const cancelledEntries = historyEntries.filter(isCancelled);
   const jobRows: Record<JobFilter, Row[]> = {
-    all: [...offerRows, ...entryRows(activeEntries), ...entryRows(historyEntries)],
-    requests: offerRows,
+    all: [...entryRows(activeEntries), ...entryRows(historyEntries)],
     active: entryRows(activeEntries),
     done: entryRows(doneEntries),
     cancelled: entryRows(cancelledEntries),
   };
   const jobOptions = [
-    { key: 'all' as const, label: t('activity.filterAll'), icon: 'layer-group' as const, count: jobRows.all.length },
-    { key: 'requests' as const, label: t('activity.filterRequests'), icon: 'bell' as const, count: jobRows.requests.length },
-    { key: 'active' as const, label: t('activity.filterActive'), icon: 'person-digging' as const, count: jobRows.active.length },
-    { key: 'done' as const, label: t('activity.filterDone'), icon: 'circle-check' as const, count: jobRows.done.length },
-    { key: 'cancelled' as const, label: t('activity.filterCancelled'), icon: 'ban' as const, count: jobRows.cancelled.length },
+    {
+      key: 'all' as const,
+      label: t('activity.filterAll'),
+      icon: 'layer-group' as const,
+      count: jobRows.all.length,
+    },
+    {
+      key: 'active' as const,
+      label: t('activity.filterActive'),
+      icon: 'person-digging' as const,
+      count: jobRows.active.length,
+    },
+    {
+      key: 'done' as const,
+      label: t('activity.filterDone'),
+      icon: 'circle-check' as const,
+      count: jobRows.done.length,
+    },
+    {
+      key: 'cancelled' as const,
+      label: t('activity.filterCancelled'),
+      icon: 'ban' as const,
+      count: jobRows.cancelled.length,
+    },
   ];
-  const shopAll = (shopOrders.data ?? []).filter((order) => inRange(order.createdAt, range));
+  // New orders not answered yet aren't activity (they're in New for you).
+  const shopAll = (shopOrders.data ?? []).filter((order) => order.status !== 'placed' && inRange(order.createdAt, range));
   const shopCounts = {
     all: shopAll.length,
-    new: shopAll.filter((order) => order.status === 'placed').length,
     active: shopAll.filter((order) => ['accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery'].includes(order.status)).length,
     done: shopAll.filter((order) => order.status === 'completed').length,
     cancelled: shopAll.filter((order) => ['cancelled', 'declined', 'expired'].includes(order.status)).length,
   };
   const shopOptions = [
-    { key: 'all' as const, label: t('activity.filterAll'), icon: 'layer-group' as const, count: shopCounts.all },
-    { key: 'new' as const, label: t('activity.filterNew'), icon: 'bell' as const, count: shopCounts.new },
-    { key: 'active' as const, label: t('activity.filterActive'), icon: 'basket-shopping' as const, count: shopCounts.active },
-    { key: 'done' as const, label: t('activity.filterDone'), icon: 'circle-check' as const, count: shopCounts.done },
-    { key: 'cancelled' as const, label: t('activity.filterCancelled'), icon: 'ban' as const, count: shopCounts.cancelled },
+    {
+      key: 'all' as const,
+      label: t('activity.filterAll'),
+      icon: 'layer-group' as const,
+      count: shopCounts.all,
+    },
+    {
+      key: 'active' as const,
+      label: t('activity.filterActive'),
+      icon: 'basket-shopping' as const,
+      count: shopCounts.active,
+    },
+    {
+      key: 'done' as const,
+      label: t('activity.filterDone'),
+      icon: 'circle-check' as const,
+      count: shopCounts.done,
+    },
+    {
+      key: 'cancelled' as const,
+      label: t('activity.filterCancelled'),
+      icon: 'ban' as const,
+      count: shopCounts.cancelled,
+    },
   ];
 
   const loading = offersLoading || jobs.isLoading;
@@ -390,9 +481,21 @@ export function BookingsScreen() {
       value={String(jobRows.done.length)}
       gradient={headerGradient}
       stats={[
-        { icon: 'bell', value: offerStats.data?.received ?? 0, label: t('activity.offersReceived') },
-        { icon: 'handshake', value: offerStats.data?.accepted ?? 0, label: t('activity.offersAccepted') },
-        { icon: 'person-digging', value: jobRows.active.length, label: t('activity.filterActive') },
+        {
+          icon: 'bell',
+          value: offerStats.data?.received ?? 0,
+          label: t('activity.offersReceived'),
+        },
+        {
+          icon: 'handshake',
+          value: offerStats.data?.accepted ?? 0,
+          label: t('activity.offersAccepted'),
+        },
+        {
+          icon: 'person-digging',
+          value: jobRows.active.length,
+          label: t('activity.filterActive'),
+        },
       ]}
     />
   );
@@ -405,29 +508,38 @@ export function BookingsScreen() {
       value={formatRupees(shopCompleted.reduce((sum, order) => sum + (order.totalAmount ?? 0), 0))}
       gradient={headerGradient}
       stats={[
-        { icon: 'circle-check', value: shopCounts.done, label: t('activity.filterDone') },
-        { icon: 'basket-shopping', value: shopCounts.active, label: t('activity.filterActive') },
-        { icon: 'bell', value: shopCounts.new, label: t('activity.filterNew') },
+        {
+          icon: 'circle-check',
+          value: shopCounts.done,
+          label: t('activity.filterDone'),
+        },
+        {
+          icon: 'basket-shopping',
+          value: shopCounts.active,
+          label: t('activity.filterActive'),
+        },
+        {
+          icon: 'ban',
+          value: shopCounts.cancelled,
+          label: t('activity.filterCancelled'),
+        },
       ]}
     />
   );
 
+  // No switch (one side only): pull the content up, so the filter isn't far below the header.
+  const tight = sides.length < 2 ? styles.tight : null;
   const sideSwitch =
     sides.length > 1 ? (
       <View style={[styles.modeSwitch, { borderColor: colors.border }]}>
         {sides.map((value) => {
           const active = side === value;
           return (
-            <Pressable
-              key={value}
-              onPress={() => setPickedSide(value)}
-              style={[styles.modeOption, active ? { backgroundColor: colors.primary } : null]}
-            >
+            <Pressable key={value} onPress={() => setPickedSide(value)} style={[styles.modeOption, active ? { backgroundColor: colors.primary } : null]}>
               <FontAwesome6 name={SIDE_ICONS[value]} size={12} color={active ? '#FFFFFF' : colors.textMuted} solid />
               <Text style={[styles.modeText, { color: active ? '#FFFFFF' : colors.textMuted }]} numberOfLines={1}>
                 {t(`homeSides.${value === 'services' ? 'services' : value === 'shop' ? 'shop' : 'jobPost'}`)}
               </Text>
-
             </Pressable>
           );
         })}
@@ -438,17 +550,20 @@ export function BookingsScreen() {
     return (
       <ScreenContainer edges={['left', 'right']}>
         {sideSwitch}
-        {/* The summary and the filter scroll away with the orders, leaving the list room. */}
-        <ShopOrdersList
-          filter={shopFilter}
-          range={range}
-          header={
-            <>
-              {shopSummary}
-              <ActivityFilter value={shopFilter} options={shopOptions} onChange={setShopFilter} range={range} onRangeChange={setRange} />
-            </>
-          }
-        />
+        {/* The filter and the summary scroll away with the orders, leaving the list room. */}
+        <View style={[styles.flexFill, tight]}>
+          <ShopOrdersList
+            key={`shop-${visit}`}
+            filter={shopFilter}
+            range={range}
+            header={
+              <>
+                <ActivityFilter value={shopFilter} options={shopOptions} onChange={setShopFilter} range={range} onRangeChange={setRange} />
+                {shopSummary}
+              </>
+            }
+          />
+        </View>
       </ScreenContainer>
     );
   }
@@ -457,7 +572,9 @@ export function BookingsScreen() {
     return (
       <ScreenContainer edges={['left', 'right']}>
         {sideSwitch}
-        <JobPostActivity />
+        <View style={[styles.flexFill, tight]}>
+          <JobPostActivity />
+        </View>
       </ScreenContainer>
     );
   }
@@ -467,39 +584,48 @@ export function BookingsScreen() {
     <ScreenContainer edges={['left', 'right']}>
       {sideSwitch}
 
-      {loading ? (
-        <View style={styles.centerWrap}>
-          <LoadingIndicator color={colors.primary} />
-        </View>
-      ) : (
-        // Each filter gets its own list, placed fresh (never opening on the refresh gap).
-        <PullToRefresh key={`${jobFilter}-${range.from?.getTime() ?? 0}-${range.to?.getTime() ?? 0}`} refreshing={refreshing} onRefresh={onRefresh}>
-          <FlatList
-            showsVerticalScrollIndicator={false}
-            showsHorizontalScrollIndicator={false}
-            data={rows}
-            keyExtractor={(row) => row.key}
-            contentContainerStyle={styles.listContent}
-            // The summary and the filter scroll away with the list, leaving it room.
-            ListHeaderComponent={
-              <>
-                {servicesSummary}
-                <ActivityFilter value={jobFilter} options={jobOptions} onChange={setJobFilter} range={range} onRangeChange={setRange} />
-                <LocationNeededCard />
-              </>
-            }
-            renderItem={({ item: row }) => (row.kind === 'offer' ? renderOffer({ item: row.offer }) : renderEntry(row.entry))}
-            ListEmptyComponent={
-              jobFilter === 'requests'
-                ? renderEmpty('bell', t('bookings.emptyTitle'), t('bookings.emptyMessage'))
-                : jobFilter === 'active'
+      <View style={[styles.flexFill, tight]}>
+        {loading ? (
+          <View style={styles.centerWrap}>
+            <LoadingIndicator color={colors.primary} />
+          </View>
+        ) : rows.length === 0 ? (
+          // Nothing to list: no pull-to-refresh room (on a short list it could show as a gap).
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
+            <ActivityFilter value={jobFilter} options={jobOptions} onChange={setJobFilter} range={range} onRangeChange={setRange} />
+            {servicesSummary}
+            <LocationNeededCard />
+            {jobFilter === 'active'
+              ? renderEmpty('person-digging', t('bookings.emptyActiveTitle'), t('bookings.emptyActiveMessage'))
+              : renderEmpty('clock-rotate-left', t('activity.emptyTitle'), t('activity.emptyMessage'))}
+          </ScrollView>
+        ) : (
+          // Each filter gets its own list, placed fresh (never opening on the refresh gap).
+          <PullToRefresh key={`${visit}-${jobFilter}-${range.from?.getTime() ?? 0}-${range.to?.getTime() ?? 0}`} refreshing={refreshing} onRefresh={onRefresh}>
+            <FlatList
+              showsVerticalScrollIndicator={false}
+              showsHorizontalScrollIndicator={false}
+              data={rows}
+              keyExtractor={(row) => row.key}
+              contentContainerStyle={styles.listContent}
+              // The summary and the filter scroll away with the list, leaving it room.
+              ListHeaderComponent={
+                <>
+                  <ActivityFilter value={jobFilter} options={jobOptions} onChange={setJobFilter} range={range} onRangeChange={setRange} />
+                  {servicesSummary}
+                  <LocationNeededCard />
+                </>
+              }
+              renderItem={({ item: row }) => (row.kind === 'offer' ? renderOffer({ item: row.offer }) : renderEntry(row.entry))}
+              ListEmptyComponent={
+                jobFilter === 'active'
                   ? renderEmpty('person-digging', t('bookings.emptyActiveTitle'), t('bookings.emptyActiveMessage'))
                   : renderEmpty('clock-rotate-left', t('activity.emptyTitle'), t('activity.emptyMessage'))
-            }
-          />
-        </PullToRefresh>
-      )}
-      {!loading && (jobFilter === 'all' || jobFilter === 'requests') && isWorker ? <FindJobsButton variant="fab" /> : null}
+              }
+            />
+          </PullToRefresh>
+        )}
+      </View>
     </ScreenContainer>
   );
 }
@@ -516,8 +642,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginVertical: 3,
   },
-  directTagText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
-  modeSwitch: { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 3, marginBottom: 14, gap: 4 },
+  directTagText: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    fontSize: 11,
+  },
+  modeSwitch: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 3,
+    marginBottom: 14,
+    gap: 4,
+  },
   modeOption: {
     flex: 1,
     flexDirection: 'row',
@@ -529,7 +666,12 @@ const styles = StyleSheet.create({
   },
   modeText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
   modeDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
-  segment: { flexDirection: 'row', borderRadius: 14, padding: 4, marginBottom: 10 },
+  segment: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 10,
+  },
   segmentItem: {
     flex: 1,
     flexDirection: 'row',
@@ -539,18 +681,53 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 11,
   },
-  segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
-  countBadge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+  segmentText: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    fontSize: 13,
+  },
+  countBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   countText: { color: '#FFFFFF', fontSize: 10, fontFamily: fonts.semiBold },
-  centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 40 },
-  emptyTitle: { ...typography.subheading, fontFamily: fonts.semiBold, textAlign: 'center' },
+  centerWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  emptyTitle: {
+    ...typography.subheading,
+    fontFamily: fonts.semiBold,
+    textAlign: 'center',
+  },
   emptyMessage: { ...typography.body, textAlign: 'center', lineHeight: 20 },
   // Extra bottom padding clears the floating CustomTabBar.
   listContent: { paddingBottom: 120, flexGrow: 1 },
+  flexFill: { flex: 1 },
+  tight: { marginTop: -8 },
   card: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },
   cardHeaderRow: { flexDirection: 'row' },
-  offerTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  offerAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  offerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  offerAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   offerName: { ...typography.subheading, fontFamily: fonts.semiBold },
   distancePill: {
     flexDirection: 'row',
@@ -560,7 +737,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
   },
-  distanceText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  distanceText: {
+    ...typography.body,
+    fontFamily: fonts.semiBold,
+    fontSize: 14,
+  },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   tag: { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
   tagText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11 },
@@ -583,16 +764,39 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
   },
-  acceptButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  acceptButtonText: {
+    ...typography.body,
+    fontFamily: fonts.semiBold,
+    color: '#FFFFFF',
+  },
   entryCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  entryIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  entryIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   entryBody: { flex: 1, gap: 3 },
   entryTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   entryTitle: { ...typography.body, fontFamily: fonts.semiBold, flex: 1 },
-  statusPill: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, maxWidth: '50%' },
-  statusText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10 },
+  statusPill: {
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    maxWidth: '50%',
+  },
+  statusText: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    fontSize: 10,
+  },
   entryMeta: { ...typography.caption, fontSize: 12 },
-  entryType: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
+  entryType: {
+    ...typography.caption,
+    fontFamily: fonts.semiBold,
+    fontSize: 11,
+  },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   reviewText: { flex: 1, marginLeft: 6, fontStyle: 'italic' },
 });

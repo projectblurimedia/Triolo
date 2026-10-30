@@ -21,7 +21,6 @@ import { RouteProp, useRoute } from '@react-navigation/native';
 import { MainTabParamList } from '@/navigation/types';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { HomeSearchModal } from '@/components/HomeSearchModal';
-import { ContinueSteps } from '@/components/ContinueSteps';
 import { NearbyHero } from '@/components/NearbyHero';
 import { SectionHeader } from '@/components/SectionHeader';
 import { useTrustedIds } from '@/hooks/useSubscription';
@@ -331,8 +330,6 @@ export function ServicesScreen() {
 
           {workerProfile ? <WorkerProfileCard profile={workerProfile} /> : null}
 
-          {/* Bookings still going (as on Home). */}
-          <ContinueSteps only="bookings" />
 
 
           {renderBody()}

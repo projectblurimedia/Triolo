@@ -7,7 +7,8 @@ export const BOOKING_OFFERS_QUERY_KEY = ['bookingOffers'];
 // Push delivery (see usePushNotifications.ts) is what makes a new offer, or a job going to
 // someone else, feel real-time — this poll is the in-app-open fallback/refresh, same order
 // of magnitude as useNotifications()'s own interval.
-const POLL_INTERVAL_MS = 8000;
+// Requests should show up within seconds, even without a push.
+const POLL_INTERVAL_MS = 5000;
 
 /**
  * Gated on `accessToken` — `IncomingJobModal` (see App.tsx) calls this from the true app

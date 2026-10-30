@@ -33,6 +33,13 @@ async function revealsViewers(accountId: string, plan?: ViewerPlan): Promise<boo
  * the same module-boundary pattern `admin` already established for reaching into
  * `workers`/`businesses`.
  */
+/** Requests that open the full-screen pop-up on phones that support it. */
+const POPUP_KINDS = ['booking_offer', 'order_placed'];
+/** "Someone else took it": closes that pop-up (as data, on phones that show pop-ups). */
+const POPUP_CANCEL_KINDS = ['booking_taken', 'order_taken'];
+/** Only phones with the pop-up need these at all (nothing to close on the others). */
+const POPUP_ONLY_KINDS = ['order_taken'];
+
 export class NotificationsService {
   constructor(private readonly repository: NotificationsRepository) {}
 
@@ -104,8 +111,8 @@ export class NotificationsService {
     await this.repository.markReadByRef(accountId, refKind, refId);
   }
 
-  async registerPushToken(accountId: string, token: string, app: PushApp | 'legacy' = 'legacy'): Promise<void> {
-    await this.repository.upsertPushToken(accountId, token, app as PushApp);
+  async registerPushToken(accountId: string, token: string, app: PushApp | 'legacy' = 'legacy', fullScreen = false): Promise<void> {
+    await this.repository.upsertPushToken(accountId, token, app as PushApp, fullScreen);
   }
 
   async unregisterPushToken(accountId: string, app: PushApp, token?: string): Promise<void> {
@@ -124,11 +131,23 @@ export class NotificationsService {
     options?: PushNotificationOptions,
   ): Promise<void> {
     const tokens = await this.repository.findPushTokens(accountId);
-    let targets =
-      audience === 'any' ? tokens.map((row) => row.token) : tokens.filter((row) => row.app === audience).map((row) => row.token);
-    if (targets.length === 0) targets = tokens.filter((row) => row.app === 'legacy').map((row) => row.token);
-    for (const token of new Set(targets)) {
-      await sendPushNotification(token, title, body, options);
+    let targets = audience === 'any' ? tokens : tokens.filter((row) => row.app === audience);
+    if (targets.length === 0) targets = tokens.filter((row) => row.app === 'legacy');
+    // A new job or order: a phone that can show the full-screen pop-up gets it as data (the app
+    // shows the pop-up itself, even when closed); any other phone gets the normal notification.
+    const kind = options?.data?.kind ?? '';
+    const popup = POPUP_KINDS.includes(kind);
+    const popupCancel = POPUP_CANCEL_KINDS.includes(kind);
+    const sent = new Set<string>();
+    for (const row of targets) {
+      if (sent.has(row.token)) continue;
+      if (POPUP_ONLY_KINDS.includes(kind) && !row.fullScreen) continue;
+      sent.add(row.token);
+      const asData =
+        row.fullScreen && (popup || popupCancel)
+          ? { ...options, dataOnly: true, data: { ...options?.data, [popup ? 'popup' : 'popupCancel']: '1' } }
+          : options;
+      await sendPushNotification(row.token, title, body, asData);
     }
   }
 

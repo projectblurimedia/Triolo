@@ -31,10 +31,10 @@ export function useBusinessReviews(businessId: string | null) {
   });
 }
 
-export function useMyShopReviews(enabled: boolean) {
+export function useMyShopReviews(enabled: boolean, shopId?: string) {
   return useQuery({
-    queryKey: ['reviews', 'my-shop'],
-    queryFn: reviewsService.getMyShop,
+    queryKey: ['reviews', 'my-shop', shopId ?? 'first'],
+    queryFn: () => reviewsService.getMyShop(shopId),
     enabled,
     staleTime: STALE_MS,
   });
