@@ -90,10 +90,12 @@ function mapCustomerBooking(row: QueryResultRow): CustomerBooking {
 }
 
 function mapWorkerJob(row: QueryResultRow): WorkerJob {
+  const locked = !!row.unlock_needed && !row.unlocked_at;
   return {
     ...mapBookingRequest(row),
     customerFullName: row.customer_full_name,
-    customerMobileNumber: row.customer_mobile_number,
+    customerMobileNumber: locked ? '' : row.customer_mobile_number,
+    unlockNeeded: locked ? row.unlock_needed : null,
     distanceMeters: row.offer_distance_meters != null ? Number(row.offer_distance_meters) : null,
     workerLatitude: row.worker_latitude ?? null,
     workerLongitude: row.worker_longitude ?? null,
@@ -179,8 +181,9 @@ export class BookingsRepository {
     return this.inTransaction(async (client) => {
       const result = await client.query(
         `INSERT INTO booking_requests (account_id, skill_categories, latitude, longitude, location_address, radius_km,
-                                       status, accepted_worker_id, accepted_at, arrival_pin, problem_post_id, quotation_amount)
-         VALUES ($1, $2, $3, $4, $5, 0, 'accepted', $6, now(), $7, $8, $9)
+                                       status, accepted_worker_id, accepted_at, arrival_pin, problem_post_id, quotation_amount,
+                                       unlock_needed, unlocked_at)
+         VALUES ($1, $2, $3, $4, $5, 0, 'accepted', $6, now(), $7, $8, $9, $10, CASE WHEN $10::text IS NULL THEN now() END)
          RETURNING *`,
         [
           params.customerAccountId,
@@ -192,6 +195,7 @@ export class BookingsRepository {
           params.arrivalPin,
           params.problemPostId,
           params.quotationAmount,
+          params.unlockNeeded ?? null,
         ],
       );
       const request = mapBookingRequest(result.rows[0]);
@@ -554,17 +558,18 @@ export class BookingsRepository {
    * request flip, this worker's own offer, every other still-pending offer) happens in one
    * transaction so a crash midway can't leave two offers 'accepted'.
    */
-  async acceptOffer(bookingRequestId: string, workerId: string, arrivalPin: string): Promise<AcceptOfferResult> {
+  async acceptOffer(bookingRequestId: string, workerId: string, arrivalPin: string, unlockNeeded: 'ad' | 'pay' | null = null): Promise<AcceptOfferResult> {
     const outcome = await this.inTransaction<AcceptOfferResult | null>(
       async (client) => {
         const requestResult = await client.query(
           // A booking of a particular worker can only be accepted by that worker.
           `UPDATE booking_requests br
-         SET status = 'accepted', accepted_worker_id = $2, accepted_at = now(), arrival_pin = $3, pin_attempts = 0
+         SET status = 'accepted', accepted_worker_id = $2, accepted_at = now(), arrival_pin = $3, pin_attempts = 0,
+             unlock_needed = $4, unlocked_at = CASE WHEN $4::text IS NULL THEN now() END
          WHERE br.id = $1 AND br.status = 'broadcasting' AND ${STILL_OPEN}
            AND (br.target_worker_id IS NULL OR br.target_worker_id = $2)
          RETURNING *`,
-          [bookingRequestId, workerId, arrivalPin],
+          [bookingRequestId, workerId, arrivalPin, unlockNeeded],
         );
         if (requestResult.rowCount === 0) return null;
 
@@ -595,6 +600,98 @@ export class BookingsRepository {
       { rollbackOn: (value) => value === null },
     );
     return outcome ?? { won: false };
+  }
+
+  /** The worker did what the accept needed (watched the ad / paid): the job opens. */
+  async unlock(id: string, workerId: string): Promise<{ unlockNeeded: 'ad' | 'pay' | null; problemPostId: string | null } | null> {
+    const result = await this.pool.query(
+      `UPDATE booking_requests SET unlocked_at = now()
+       WHERE id = $1 AND accepted_worker_id = $2 AND unlocked_at IS NULL AND status = 'accepted'
+       RETURNING unlock_needed, problem_post_id`,
+      [id, workerId],
+    );
+    const row = result.rows[0];
+    return row ? { unlockNeeded: row.unlock_needed ?? null, problemPostId: row.problem_post_id ?? null } : null;
+  }
+
+  /**
+   * Gives an accepted job back before it was unlocked (the worker closed the payment, or let it
+   * wait too long). A Quick Book request looks for a worker again (this worker's offer is
+   * declined; the others' come back); a booking of this worker in particular waits for them
+   * again; a problem's trip ends (the problem reopens). Returns who to re-offer it to.
+   */
+  async releaseAccept(
+    id: string,
+    workerId: string,
+  ): Promise<{ problemPostId: string | null; reoffer: { accountId: string; preferredLanguage: string; distanceMeters: number }[]; request: BookingRequest } | null> {
+    return this.inTransaction(
+      async (client) => {
+        const current = await client.query(
+          `SELECT * FROM booking_requests WHERE id = $1 AND accepted_worker_id = $2 AND status = 'accepted' AND unlocked_at IS NULL FOR UPDATE`,
+          [id, workerId],
+        );
+        const row = current.rows[0];
+        if (!row) return null;
+        if (row.problem_post_id) {
+          await client.query(
+            `UPDATE booking_requests SET status = 'cancelled', cancelled_by = 'worker', cancel_reason = 'released', cancelled_at = now(), arrival_pin = NULL
+             WHERE id = $1`,
+            [id],
+          );
+          return { problemPostId: row.problem_post_id as string, reoffer: [], request: mapBookingRequest(row) };
+        }
+        const updated = await client.query(
+          `UPDATE booking_requests SET status = 'broadcasting', accepted_worker_id = NULL, accepted_at = NULL, arrival_pin = NULL,
+             pin_attempts = 0, unlock_needed = NULL, unlocked_at = NULL
+           WHERE id = $1 RETURNING *`,
+          [id],
+        );
+        // A personal booking waits for the same worker again; a Quick Book goes to the others.
+        const direct = !!row.target_worker_id;
+        await client.query(`UPDATE booking_offers SET status = $3 WHERE booking_request_id = $1 AND worker_id = $2`, [
+          id,
+          workerId,
+          direct ? 'pending' : 'declined',
+        ]);
+        const others = await client.query(
+          `UPDATE booking_offers bo SET status = 'pending'
+           FROM worker_profiles w, accounts a
+           WHERE bo.booking_request_id = $1 AND bo.worker_id != $2 AND bo.status = 'lost'
+             AND bo.worker_id = w.id AND w.account_id = a.id
+           RETURNING a.id AS account_id, a.preferred_language, bo.distance_meters`,
+          [id, workerId],
+        );
+        return {
+          problemPostId: null,
+          reoffer: others.rows.map((other) => ({
+            accountId: other.account_id,
+            preferredLanguage: other.preferred_language,
+            distanceMeters: Number(other.distance_meters ?? 0),
+          })),
+          request: mapBookingRequest(updated.rows[0]),
+        };
+      },
+      { rollbackOn: (value) => value === null },
+    );
+  }
+
+  /** Who to tell about a customer's booking, in their language. */
+  async customerTarget(accountId: string): Promise<NotifyTarget | null> {
+    const result = await this.pool.query(`SELECT id, preferred_language FROM accounts WHERE id = $1`, [accountId]);
+    const row = result.rows[0];
+    return row ? { accountId: row.id, preferredLanguage: row.preferred_language } : null;
+  }
+
+  /** Accepts left unpaid longer than `minutes`: (request id, worker) to release. */
+  async findUnpaidAccepts(minutes: number): Promise<{ id: string; workerId: string }[]> {
+    const result = await this.pool.query(
+      `SELECT id, accepted_worker_id FROM booking_requests
+       WHERE status = 'accepted' AND unlock_needed IS NOT NULL AND unlocked_at IS NULL
+         AND accepted_at < now() - make_interval(mins => $1)
+       LIMIT 20`,
+      [minutes],
+    );
+    return result.rows.map((row) => ({ id: row.id, workerId: row.accepted_worker_id }));
   }
 
   /** The accepted worker backs out before the PIN is verified; the customer is told. */

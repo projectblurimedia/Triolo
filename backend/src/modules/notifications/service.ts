@@ -103,7 +103,7 @@ export class NotificationsService {
         return;
       }
     }
-    await this.pushTo(recipientAccountId, 'partner', title, `${body} Subscribe to see who it was and call them.`, { data });
+    await this.pushTo(recipientAccountId, 'partner', title, `${body} Open Triolo Partner to see who it was.`, { data });
   }
 
   /** Marks read the notifications about one thing (e.g. a job post, once its views are opened). */

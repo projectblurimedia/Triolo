@@ -496,8 +496,8 @@
     "listNamePlaceholder": "List name (e.g. Monthly groceries)",
     "saveList": "Save List",
     "savedTitle": "List saved",
-    "emptyDraftTitle": "Add at least one item",
-    "emptyDraftMessage": "Give each item a name before saving the list.",
+    "emptyDraftTitle": "Add an item or a photo",
+    "emptyDraftMessage": "Type, speak or take a photo of your list before saving it.",
     "backToLists": "Back to My Lists",
     "discardTitle": "Discard changes?",
     "discardMessage": "Your changes to this list will not be saved.",
@@ -517,7 +517,11 @@
     "duplicateNameMessage": "You already have a list with this name. Choose another name.",
     "addItemManuallyHint": "Type an item, its quantity and unit",
     "editorSubtitle": "Speak or type your items, then save",
-    "listNameLabel": "List name"
+    "listNameLabel": "List name",
+    "photosCount_one": "{{count}} photo",
+    "photosCount_other": "{{count}} photos",
+    "photoTitle": "Photo of a Written List",
+    "photoHint": "Wrote your list on paper? Take a photo — the shop reads it"
   },
   "bazaar": {
     "comingSoon": "Shop ordering is coming soon.",
@@ -965,7 +969,8 @@
     "createList": "Create a List",
     "searchShops": "Search shops by name or kind",
     "filters": "Filters",
-    "nearestShops": "Nearest shops — or search above"
+    "nearestShops": "Nearest shops — or search above",
+    "sendPhotos": "Send List Photo"
   },
   "orders": {
     "title": "Your Order",
@@ -1061,7 +1066,8 @@
     "adminCancelled": "Triolo support cancelled this order.",
     "stepAcceptedBy": "{{shop}} accepted",
     "stepAcceptName": "{{shop}} accepts",
-    "stepAcceptAny": "A shop accepts"
+    "stepAcceptAny": "A shop accepts",
+    "yourListPhotos": "Photo of your list"
   },
   "myOrders": {
     "title": "My Orders",
@@ -1185,7 +1191,8 @@
     "allSubtitle": "{{count}} in progress — tap one to continue",
     "menuHint": "Bookings and orders still going",
     "emptyTitle": "Nothing going on right now",
-    "emptyText": "Bookings and orders you start show up here until they finish."
+    "emptyText": "Bookings and orders you start show up here until they finish.",
+    "opening": "Opening"
   },
   "profilePhoto": {
     "add": "Add photo",
@@ -1342,7 +1349,9 @@
     "reviews_other": "{{count}} reviews",
     "newOnTriolo": "New on Triolo",
     "findInCustomerApp": "Book them in the Triolo app",
-    "callNow": "Call Now"
+    "callNow": "Call Now",
+    "sponsored": "Sponsored",
+    "opening": "Opening…"
   },
   "directBook": {
     "button": "Book {{name}}",
@@ -1461,6 +1470,16 @@
     "paidEarlierMessage": {
       "book": "You paid for a booking that didn't go ahead, so this one is free.",
       "order": "You paid for an order that didn't go ahead, so this one is free."
+    },
+    "or": "or",
+    "plus": {
+      "title": "Go Triolo Plus",
+      "subtitle": "One plan — never pay per booking again",
+      "noFees": "No fees",
+      "noAds": "No ads",
+      "headStart": "30s head start",
+      "unlimited": "Unlimited use",
+      "cta": "See plans"
     }
   },
   "waiting": {

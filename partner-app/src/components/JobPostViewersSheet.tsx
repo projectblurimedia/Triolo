@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import { jobSeekerService } from '@/services/jobSeekerService';
 import { openSubscribe } from '@/state/subscribeStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { adThen } from './Ads';
 
 // "5m" / "3h" / "2d" ago (kept here rather than imported, so NotificationsModal can open this sheet).
 function ago(iso: string, justNow: string): string {
@@ -33,11 +34,26 @@ export function JobPostViewersSheet({ postId, title, onClose }: { postId: string
   const { colors } = useThemeColors();
   const queryClient = useQueryClient();
   const subscription = useMySubscription();
+  // Subscriptions off and ads on: who it was shows after an ad (asked again with revealed).
+  const [revealed, setRevealed] = useState(false);
+  const [watching, setWatching] = useState(false);
+  useEffect(() => setRevealed(false), [postId]);
   const viewers = useQuery({
-    queryKey: ['job-posts', 'viewers', postId],
-    queryFn: () => jobSeekerService.viewers(postId as string),
+    queryKey: ['job-posts', 'viewers', postId, revealed],
+    queryFn: () => jobSeekerService.viewers(postId as string, revealed),
     enabled: !!postId,
+    placeholderData: (previous) => previous,
   });
+  const watchAd = async () => {
+    if (watching) return;
+    setWatching(true);
+    try {
+      await adThen('viewer_reveal');
+      setRevealed(true);
+    } finally {
+      setWatching(false);
+    }
+  };
 
   // Once they've been shown, they're no longer new.
   const shownNew = (viewers.data?.newCount ?? 0) > 0;
@@ -88,7 +104,17 @@ export function JobPostViewersSheet({ postId, title, onClose }: { postId: string
             </View>
           ) : (
             <>
-              {data.locked && plansOn ? (
+              {data.locked && data.access === 'ad' ? (
+                // No subscriptions here: a short ad shows who it was.
+                <View style={[styles.adOffer, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}33` }]}>
+                  <FontAwesome6 name="eye" size={16} color={colors.primary} solid />
+                  <Text style={[styles.adOfferText, { color: colors.text }]}>{t('jobViews.adText')}</Text>
+                  <Pressable onPress={watchAd} style={({ pressed }) => [styles.adButton, { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 }]}>
+                    {watching ? <LoadingIndicator size={18} dotSize={3} color="#FFFFFF" /> : <Text style={styles.adButtonText}>{t('jobViews.adButton')}</Text>}
+                  </Pressable>
+                </View>
+              ) : null}
+              {data.locked && plansOn && data.access !== 'ad' ? (
                 <GoldCard style={styles.offer}>
                   <View style={styles.offerRow}>
                     <FontAwesome6 name="crown" size={16} color="#8A5300" solid />
@@ -153,6 +179,10 @@ export function JobPostViewersSheet({ postId, title, onClose }: { postId: string
 }
 
 const styles = StyleSheet.create({
+  adOffer: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: 1, padding: 12, margin: 12, marginBottom: 0 },
+  adOfferText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, flex: 1 },
+  adButton: { height: 36, borderRadius: 18, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  adButtonText: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 13 },
   flex: { flex: 1 },
   overlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
   sheet: { borderRadius: 22, padding: 12, maxHeight: '80%', gap: 10, overflow: 'hidden' },

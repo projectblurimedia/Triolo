@@ -18,6 +18,8 @@ export type OrderEvent =
 export interface OrderTemplateValues {
   shop: string;
   count?: number;
+  /** Photos of a written list sent with the order. */
+  photos?: number;
   packed?: number;
   total?: string;
 }
@@ -26,13 +28,17 @@ type Template = (values: OrderTemplateValues) => { title: string; body: string }
 
 const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
   en: {
-    placed: ({ count }) => ({
+    placed: ({ count, photos }) => ({
       title: 'New Order',
-      body: `A customer sent a list of ${count} item(s). Accept it to start packing.`,
+      body: count
+        ? `A customer sent a list of ${count} item(s)${photos ? ' and a photo of their list' : ''}. Accept it to start packing.`
+        : 'A customer sent a photo of their list. Accept it to start packing.',
     }),
-    quick_placed: ({ count }) => ({
+    quick_placed: ({ count, photos }) => ({
       title: 'Quick Order — be first',
-      body: `A customer nearby wants ${count} item(s). The first shop to accept gets the order.`,
+      body: count
+        ? `A customer nearby wants ${count} item(s)${photos ? ' (with a photo of their list)' : ''}. The first shop to accept gets the order.`
+        : 'A customer nearby sent a photo of their list. The first shop to accept gets the order.',
     }),
     accepted: ({ shop }) => ({ title: 'Order Accepted', body: `${shop} is checking and packing your list.` }),
     declined: ({ shop }) => ({ title: 'Order Declined', body: `${shop} can't take your list right now. Try another shop.` }),
@@ -60,11 +66,15 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
   te: {
     placed: ({ count }) => ({
       title: 'కొత్త ఆర్డర్',
-      body: `ఒక కస్టమర్ ${count} వస్తువుల జాబితా పంపారు. ప్యాక్ చేయడం ప్రారంభించడానికి అంగీకరించండి.`,
+      body: count
+        ? `ఒక కస్టమర్ ${count} వస్తువుల జాబితా పంపారు. ప్యాక్ చేయడం ప్రారంభించడానికి అంగీకరించండి.`
+        : 'ఒక కస్టమర్ తమ జాబితా ఫోటో పంపారు. ప్యాక్ చేయడం ప్రారంభించడానికి అంగీకరించండి.',
     }),
     quick_placed: ({ count }) => ({
       title: 'క్విక్ ఆర్డర్ — ముందుగా అంగీకరించండి',
-      body: `దగ్గరలోని ఒక కస్టమర్‌కు ${count} వస్తువులు కావాలి. ముందుగా అంగీకరించిన దుకాణానికే ఆర్డర్.`,
+      body: count
+        ? `దగ్గరలోని ఒక కస్టమర్‌కు ${count} వస్తువులు కావాలి. ముందుగా అంగీకరించిన దుకాణానికే ఆర్డర్.`
+        : 'దగ్గరలోని ఒక కస్టమర్ తమ జాబితా ఫోటో పంపారు. ముందుగా అంగీకరించిన దుకాణానికే ఆర్డర్.',
     }),
     accepted: ({ shop }) => ({ title: 'ఆర్డర్ అంగీకరించబడింది', body: `${shop} మీ జాబితాను చూసి ప్యాక్ చేస్తోంది.` }),
     declined: ({ shop }) => ({

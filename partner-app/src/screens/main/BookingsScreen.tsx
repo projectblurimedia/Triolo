@@ -14,7 +14,8 @@ import { useAcceptBookingOffer, useBookingOffers, useDeclineBookingOffer, useOff
 import { useMyJobs } from '@/hooks/useJobs';
 import { useAssignedProblems } from '@/hooks/useProblems';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
-import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { useMyBusinessProfile, useMyShops } from '@/hooks/useBusinessMutations';
+import { ActivityScopeChips, ScopeOption } from '@/components/ActivityScopeChips';
 import { ShopOrdersList } from '@/components/ShopOrdersList';
 import { useShopOrders } from '@/hooks/useShopOrders';
 import { PendingOffer } from '@/services/bookingOffersService';
@@ -35,6 +36,7 @@ import { JobPostActivity } from '@/components/JobPostActivity';
 import { ALL_TIME, DateRange, inRange, rangeLabel } from '@/components/DateRangeSheet';
 import { ActivitySummary } from '@/components/ActivitySummary';
 import { formatRupees } from '@/services/shopOrdersService';
+import { GivenBackError } from '@/utils/afterAccept';
 
 type Side = 'services' | 'shop' | 'job';
 // Activity is a record of what you did: requests waiting for an answer live in New for you.
@@ -96,6 +98,9 @@ export function BookingsScreen() {
     if (isFocused) setVisit((count) => count + 1);
   }, [isFocused]);
   const [shopFilter, setShopFilter] = useState<ShopFilter>('all');
+  // Several shops / several skills: which one the list is about (null = all of them).
+  const [shopScope, setShopScope] = useState<string | null>(null);
+  const [skillScope, setSkillScope] = useState<string | null>(null);
   // From – to dates (both sides share them).
   const [range, setRange] = useState<DateRange>(ALL_TIME);
   const [refreshing, setRefreshing] = useState(false);
@@ -121,6 +126,23 @@ export function BookingsScreen() {
   }, [route.params?.mode, route.params?.tab, route.params?.orderTab, route.params?.linkedAt]);
   const jobPost = useMyJobPost();
   const shopOrders = useShopOrders(isShop);
+  const shops = (useMyShops(isShop).data ?? []).filter((shop) => shop.verificationStatus === 'verified');
+  // The worker's skills: fixed ones by key, their own (custom) ones by name.
+  const skills = useMemo(() => {
+    const profile = workerProfile.data;
+    if (!profile) return [] as { key: string; label: string }[];
+    return [
+      ...profile.skillCategories.filter((key) => key !== 'other').map((key) => ({ key, label: t(`workerProfile.skills.${key}`) })),
+      ...(profile.otherSkillDescription ?? '')
+        .split(', ')
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .map((name) => ({ key: name, label: name })),
+    ];
+  }, [workerProfile.data, t]);
+  // A shop / skill picked earlier that's gone (deleted, edited) no longer narrows anything.
+  const activeShopScope = shopScope && shops.some((shop) => shop.id === shopScope) ? shopScope : null;
+  const activeSkillScope = skillScope && skills.some((skill) => skill.key === skillScope) ? skillScope : null;
   const attention = useAttentionCounts();
 
   const entries = useMemo<HistoryEntry[]>(() => {
@@ -169,6 +191,8 @@ export function BookingsScreen() {
         openJob(offer.bookingRequestId);
       },
       onError: (err) => {
+        // Backed out of paying after accepting: it was given back (a toast said so).
+        if (err instanceof GivenBackError) return;
         const alreadyTaken = err instanceof ApiError && err.code === 'BOOKING_ALREADY_TAKEN';
         showToast({
           variant: alreadyTaken ? 'info' : 'error',
@@ -391,9 +415,11 @@ export function BookingsScreen() {
   const offerRows: Row[] = (offers ?? [])
     .filter((offer) => inRange(offer.createdAt, range))
     .map((offer) => ({ kind: 'offer', key: `o-${offer.offerId}`, offer }));
-  const entryRows = (list: HistoryEntry[]): Row[] =>
+  const entrySkills = (entry: HistoryEntry) => (entry.kind === 'job' ? entry.job.skillCategories : entry.problem.skillCategories);
+  const hasSkill = (entry: HistoryEntry, skill: string) => entrySkills(entry).some((key) => key.toLowerCase() === skill.toLowerCase());
+  const entryRows = (list: HistoryEntry[], skill: string | null = activeSkillScope): Row[] =>
     list
-      .filter((entry) => inRange(entry.createdAt, range))
+      .filter((entry) => inRange(entry.createdAt, range) && (!skill || hasSkill(entry, skill)))
       .map((entry) => ({
         kind: 'entry',
         key: `${entry.kind}-${entry.id}`,
@@ -433,8 +459,24 @@ export function BookingsScreen() {
       count: jobRows.cancelled.length,
     },
   ];
+  const skillOptions: ScopeOption[] = [
+    { key: null, label: t('activity.allSkills'), count: entryRows(entries, null).length },
+    ...skills.map((skill) => ({ key: skill.key, label: skill.label, count: entryRows(entries, skill.key).length })),
+  ];
+  const skillChips =
+    skills.length > 1 ? <ActivityScopeChips icon="screwdriver-wrench" options={skillOptions} value={activeSkillScope} onChange={setSkillScope} /> : null;
+
   // New orders not answered yet aren't activity (they're in New for you).
-  const shopAll = (shopOrders.data ?? []).filter((order) => order.status !== 'placed' && inRange(order.createdAt, range));
+  const inShopScope = (businessId: string | null | undefined, scope: string | null = activeShopScope) => !scope || businessId === scope;
+  const shopRecord = (scope: string | null) =>
+    (shopOrders.data ?? []).filter((order) => order.status !== 'placed' && inRange(order.createdAt, range) && inShopScope(order.businessId, scope));
+  const shopAll = shopRecord(activeShopScope);
+  const shopOptionsByShop: ScopeOption[] = [
+    { key: null, label: t('activity.allShops'), count: shopRecord(null).length },
+    ...shops.map((shop) => ({ key: shop.id, label: shop.shopName, count: shopRecord(shop.id).length })),
+  ];
+  const shopChips =
+    shops.length > 1 ? <ActivityScopeChips icon="store" options={shopOptionsByShop} value={activeShopScope} onChange={setShopScope} /> : null;
   const shopCounts = {
     all: shopAll.length,
     active: shopAll.filter((order) => ['accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery'].includes(order.status)).length,
@@ -500,7 +542,9 @@ export function BookingsScreen() {
     />
   );
   // Shop: the bills of orders completed in these dates.
-  const shopCompleted = (shopOrders.data ?? []).filter((order) => order.status === 'completed' && inRange(order.completedAt, range));
+  const shopCompleted = (shopOrders.data ?? []).filter(
+    (order) => order.status === 'completed' && inRange(order.completedAt, range) && inShopScope(order.businessId),
+  );
   const shopSummary = (
     <ActivitySummary
       icon="indian-rupee-sign"
@@ -553,11 +597,13 @@ export function BookingsScreen() {
         {/* The filter and the summary scroll away with the orders, leaving the list room. */}
         <View style={[styles.flexFill, tight]}>
           <ShopOrdersList
-            key={`shop-${visit}`}
+            key={`shop-${visit}-${activeShopScope ?? 'all'}`}
             filter={shopFilter}
             range={range}
+            shopId={activeShopScope}
             header={
               <>
+                {shopChips}
                 <ActivityFilter value={shopFilter} options={shopOptions} onChange={setShopFilter} range={range} onRangeChange={setRange} />
                 {shopSummary}
               </>
@@ -592,6 +638,7 @@ export function BookingsScreen() {
         ) : rows.length === 0 ? (
           // Nothing to list: no pull-to-refresh room (on a short list it could show as a gap).
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
+            {skillChips}
             <ActivityFilter value={jobFilter} options={jobOptions} onChange={setJobFilter} range={range} onRangeChange={setRange} />
             {servicesSummary}
             <LocationNeededCard />
@@ -601,7 +648,7 @@ export function BookingsScreen() {
           </ScrollView>
         ) : (
           // Each filter gets its own list, placed fresh (never opening on the refresh gap).
-          <PullToRefresh key={`${visit}-${jobFilter}-${range.from?.getTime() ?? 0}-${range.to?.getTime() ?? 0}`} refreshing={refreshing} onRefresh={onRefresh}>
+          <PullToRefresh key={`${visit}-${jobFilter}-${activeSkillScope ?? 'all'}-${range.from?.getTime() ?? 0}-${range.to?.getTime() ?? 0}`} refreshing={refreshing} onRefresh={onRefresh}>
             <FlatList
               showsVerticalScrollIndicator={false}
               showsHorizontalScrollIndicator={false}
@@ -611,7 +658,8 @@ export function BookingsScreen() {
               // The summary and the filter scroll away with the list, leaving it room.
               ListHeaderComponent={
                 <>
-                  <ActivityFilter value={jobFilter} options={jobOptions} onChange={setJobFilter} range={range} onRangeChange={setRange} />
+                  {skillChips}
+            <ActivityFilter value={jobFilter} options={jobOptions} onChange={setJobFilter} range={range} onRangeChange={setRange} />
                   {servicesSummary}
                   <LocationNeededCard />
                 </>

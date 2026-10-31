@@ -1,5 +1,6 @@
 import { ContinueSteps } from '@/components/ContinueSteps';
 import React, { useMemo, useState } from 'react';
+import { HomeAdCarousel } from '@/components/Ads';
 
 // How many service tiles Home shows before "See all".
 const HOME_CATEGORY_TILES = 10;
@@ -213,6 +214,9 @@ export function HomeScreen() {
               {t('home.searchPlaceholder')}
             </Text>
           </Pressable>
+
+          {/* Local businesses' ads, sliding by (only when the admin turned it on). */}
+          <HomeAdCarousel />
 
 
           {/* Every booking and order still going (only here, not on Services / Bazaar). */}

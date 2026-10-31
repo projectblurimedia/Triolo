@@ -18,7 +18,8 @@ import {
 } from '@expo-google-fonts/poppins';
 import { GrandHotel_400Regular } from '@expo-google-fonts/grand-hotel';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
+import { QueryClientProvider, focusManager } from '@tanstack/react-query';
+import { queryClient } from '@/state/queryClient';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
@@ -44,7 +45,6 @@ registerAdPromotions();
 
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
-const queryClient = new QueryClient();
 
 SplashScreen.preventAutoHideAsync();
 

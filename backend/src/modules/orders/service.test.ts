@@ -72,9 +72,10 @@ function buildOrder(overrides: Partial<ShopOrder> = {}): ShopOrder {
     createdAt: new Date(),
     updatedAt: new Date(),
     items: [
-      { id: 'i1', position: 1, name: 'Kandipappu', quantity: '1', unit: 'kg', status: 'packed', price: 120 },
-      { id: 'i2', position: 2, name: 'Minapappu', quantity: '2', unit: 'kg', status: 'unavailable', price: null },
+      { id: 'i1', position: 1, name: 'Kandipappu', quantity: '1', unit: 'kg', status: 'packed', price: 120, addedByShop: false },
+      { id: 'i2', position: 2, name: 'Minapappu', quantity: '2', unit: 'kg', status: 'unavailable', price: null, addedByShop: false },
     ],
+    listPhotoUrls: [],
     ...overrides,
   };
 }
@@ -91,6 +92,7 @@ const orderDto = {
   businessId: 'shop-1',
   fulfillment: 'delivery' as const,
   items: [{ name: 'Kandipappu', quantity: '1', unit: 'kg' }],
+  listPhotoUrls: [] as string[],
   latitude: 16.7,
   longitude: 81.12,
 };
@@ -104,6 +106,9 @@ beforeEach(() => {
     declineQuickOffer: jest.fn().mockResolvedValue(false),
     offerOpenQuickOrders: jest.fn().mockResolvedValue(0),
     expireStale: jest.fn().mockResolvedValue([]),
+    findUnpaidAccepts: jest.fn().mockResolvedValue([]),
+    releaseAccept: jest.fn().mockResolvedValue(null),
+    unlock: jest.fn().mockResolvedValue(null),
     exists: jest.fn(),
     findForCustomer: jest.fn(),
     listForCustomer: jest.fn(),
@@ -150,6 +155,7 @@ describe('Quick Order', () => {
     shopCategories: ['grocery'],
     fulfillment: 'delivery' as const,
     items: [{ name: 'Kandipappu', quantity: '1', unit: 'kg' }],
+    listPhotoUrls: [] as string[],
     latitude: 16.7,
     longitude: 81.12,
   };
@@ -182,7 +188,7 @@ describe('Quick Order', () => {
     repo.findQuickOffer.mockResolvedValue(1200);
     repo.claimQuick.mockResolvedValue({ order: buildOrder({ status: 'accepted' }), notify: null, shopName: 'Shop' });
     await service.acceptOrder('owner-1', 'order-1');
-    expect(repo.claimQuick).toHaveBeenCalledWith('order-1', 'shop-1', 1200, expect.any(Number));
+    expect(repo.claimQuick).toHaveBeenCalledWith('order-1', 'shop-1', 1200, expect.any(Number), null);
     expect(repo.accept).not.toHaveBeenCalled();
   });
 
@@ -223,6 +229,26 @@ describe('createOrder', () => {
   it('refuses delivery from a shop that does not deliver', async () => {
     businesses.getPublicProfile.mockResolvedValue(buildShop({ deliveryAvailable: false }));
     await expect(service.createOrder('customer-1', orderDto)).rejects.toMatchObject({ code: 'ORDER_DELIVERY_UNAVAILABLE' });
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it('sends a photo-only list, and tells the shop it is a photo', async () => {
+    const photo = 'https://res.cloudinary.com/demo/image/upload/v1/triolo/order-lists/abc123.jpg';
+    businesses.getPublicProfile.mockResolvedValue(buildShop());
+    repo.languageOf.mockResolvedValue('en');
+    repo.create.mockResolvedValue(buildOrder({ items: [], listPhotoUrls: [photo] }));
+    repo.findForCustomer.mockResolvedValue({ ...buildOrder(), shop: {}, pin: null } as unknown as CustomerOrder);
+
+    await service.createOrder('customer-1', { ...orderDto, items: [], listPhotoUrls: [photo] });
+
+    expect(repo.create.mock.calls[0][0].listPhotoUrls).toEqual([photo]);
+    expect(notifications.notify.mock.calls[0][3]).toContain('photo of their list');
+  });
+
+  it('refuses a list photo that was not uploaded through Triolo', async () => {
+    await expect(
+      service.createOrder('customer-1', { ...orderDto, listPhotoUrls: ['https://example.com/list.jpg'] }),
+    ).rejects.toMatchObject({ code: 'ORDER_PHOTO_INVALID' });
     expect(repo.create).not.toHaveBeenCalled();
   });
 
@@ -300,7 +326,7 @@ describe('shop steps', () => {
   it('accepts and tells the customer', async () => {
     repo.accept.mockResolvedValue(transition({ status: 'accepted' }));
     await service.acceptOrder('owner-1', 'order-1');
-    expect(repo.accept).toHaveBeenCalledWith('order-1', 'shop-1');
+    expect(repo.accept).toHaveBeenCalledWith('order-1', 'shop-1', null);
     expect(notifications.notify).toHaveBeenCalledWith(
       'customer-1',
       'order_accepted',

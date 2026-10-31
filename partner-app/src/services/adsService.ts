@@ -83,7 +83,21 @@ function setLastSeen(id: string) {
 }
 
 /** Which key action the ad comes before (the admin switches each one on or off). */
-export type AdSpot = 'quick_book' | 'book_worker' | 'send_list' | 'post_problem' | 'hire_staff' | 'work_done' | 'order_pin';
+export type AdSpot =
+  | 'quick_book'
+  | 'book_worker'
+  | 'quick_order'
+  | 'send_list'
+  | 'post_problem'
+  | 'hire_staff'
+  | 'staff_phone'
+  | 'find_jobs'
+  | 'find_orders'
+  | 'problem_accept'
+  | 'continue_card'
+  | 'job_accept'
+  | 'order_accept'
+  | 'viewer_reveal';
 
 export interface AdViewer {
   latitude: number;
@@ -115,6 +129,12 @@ export const adsService = {
     const run = queue.then(() => serveNow(placement, here, spot));
     queue = run.catch(() => null);
     return run;
+  },
+
+  /** Home's carousel: the running ads near here (empty when it's off for this app). */
+  home(here: AdViewer): Promise<Ad[]> {
+    const params = new URLSearchParams({ app: AD_APP, latitude: String(here.latitude), longitude: String(here.longitude) });
+    return apiClient.get<Ad[]>(`/ads/home?${params.toString()}`, true).then((list) => list ?? []);
   },
 
   /** Counts an open of the ad's details (fire and forget). */

@@ -18,6 +18,8 @@ export interface Ad {
   imageUrls: string[];
   videoUrl: string | null;
   orientation: AdOrientation;
+  /** Full screen before actions, or the Home slider. */
+  showOn: 'action' | 'home';
   displaySeconds: number;
   videoSeconds: number | null;
   durationSeconds: number;
@@ -33,7 +35,10 @@ export interface Ad {
   latitude: number | null;
   longitude: number | null;
   radiusKm: number;
-  planDays: AdPlanDays;
+  planDays: AdPlanDays | 90;
+  /** Bought by days (a plan) or by views. */
+  billing?: 'days' | 'views';
+  viewLimit?: number | null;
   amount: number;
   /** 'online' = paid here through Razorpay. */
   paymentMethod: 'cash' | 'upi' | 'other' | 'pending' | 'online';
@@ -52,12 +57,19 @@ export interface Ad {
   clicks: number;
   status: AdStatus;
   deletedAt: string | null;
+  /** Who removed it: the business (withdrawn) or Triolo. */
+  deletedBy?: 'owner' | 'admin' | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface AdInfo {
   prices: AdPlanPrices;
+  /** ₹ per view, and the views a business can buy (ads bought by views). */
+  pricePerView?: number;
+  viewsMin?: number;
+  viewsMax?: number;
+  viewsValidDays?: number;
   radiusKm: number;
   maxVideoSeconds: number;
   /** How many ads may wait for review at once. */
@@ -71,6 +83,7 @@ export interface SaveOwnAd {
   promoteMobile?: string;
   description?: string;
   orientation: AdOrientation;
+  showOn: 'action' | 'home';
   displaySeconds: number;
   linkUrl?: string;
   actionType: AdActionType;
@@ -78,6 +91,8 @@ export interface SaveOwnAd {
   actionLongitude: number | null;
   actionPlace: string | null;
   planDays: AdPlanDays;
+  billing: 'days' | 'views';
+  viewLimit: number | null;
   startDate: string;
   imageUrl?: string | null;
   videoUrl?: string | null;
@@ -209,4 +224,13 @@ export async function uploadAdFile(
   }
   if (!result.secure_url) throw new Error(result.error?.message ?? 'Upload failed');
   return { url: result.secure_url, seconds: result.duration ?? null };
+}
+
+/** Quick picks for the number of views (any number in between can be typed). */
+export const AD_VIEW_PICKS = [500, 1000, 2500, 5000, 10000];
+
+/** What was bought: "1 week" or "2,500 views". */
+export function adPlanText(ad: Pick<Ad, 'planDays' | 'billing' | 'viewLimit'>): string {
+  if (ad.billing === 'views' && ad.viewLimit) return `${ad.viewLimit.toLocaleString('en-IN')} views`;
+  return AD_PLANS.find((plan) => plan.days === ad.planDays)?.label ?? '';
 }

@@ -117,10 +117,10 @@
     "editServices": "My Services",
     "addServicesHint": "Offer your skills to customers nearby",
     "addShop": "Add My Shop",
-    "editShop": "My Shop",
+    "editShop": "My Shops",
     "addShopHint": "Get orders from customers nearby",
     "addJobPost": "Create Job Post",
-    "editJobPost": "My Job Post",
+    "editJobPost": "My Job Posts",
     "addJobPostHint": "Looking for regular work? Post it here",
     "jobPostLive": "Live",
     "jobPostHidden": "Hidden",
@@ -803,7 +803,14 @@
     "quickKicker": "QUICK ORDER · FIRST TO ACCEPT",
     "quickTitle": "Quick Order — be the first",
     "quickMessage": "This list went to several shops nearby. Accept it first and it is yours.",
-    "numberAfterAccept": "Number shown after you accept"
+    "numberAfterAccept": "Number shown after you accept",
+    "listPhotos": "Customer's list (photo)",
+    "photoHint": "Tap a photo to read it, then add each item below with its price.",
+    "addItem": "Add an Item",
+    "itemNamePlaceholder": "Item name",
+    "addedByYou": "Added by you",
+    "photoListLine_one": "{{count}} photo of the list",
+    "photoListLine_other": "{{count}} photos of the list"
   },
   "shopHome": {
     "myShop": "My Shop",
@@ -948,7 +955,8 @@
     "itemCount_other": "{{count}} items",
     "pending": "Pending",
     "more": "+{{count}} more · Tap to see all",
-    "allSubtitle": "{{count}} in progress — tap one to continue"
+    "allSubtitle": "{{count}} in progress — tap one to continue",
+    "opening": "Opening"
   },
   "findJobs": {
     "button": "Find Jobs Now",
@@ -1067,7 +1075,9 @@
     "reviews_other": "{{count}} reviews",
     "newOnTriolo": "New on Triolo",
     "findInCustomerApp": "Book them in the Triolo app",
-    "callNow": "Call Now"
+    "callNow": "Call Now",
+    "sponsored": "Sponsored",
+    "opening": "Opening…"
   },
   "subscribe": {
     "title": "Triolo Partner Plus",
@@ -1232,6 +1242,16 @@
     "paidEarlierMessage": {
       "accept": "You paid for one that didn't go ahead, so this one is free.",
       "job_post": "You already paid for a job post, so this one is free."
+    },
+    "or": "or",
+    "plus": {
+      "title": "Go Partner Plus",
+      "subtitle": "One plan — never pay per accept again",
+      "noFees": "No fees",
+      "noAds": "No ads",
+      "headStart": "30s head start",
+      "unlimited": "Unlimited use",
+      "cta": "See plans"
     }
   },
   "grow": {
@@ -1303,13 +1323,14 @@
     "boostPlan": "Plan",
     "sections": {
       "service": "My Services",
-      "shop": "My Shop",
+      "shop": "My Shops",
       "job_post": "Job Posts"
     },
     "names": {
       "service": "Services Plus",
       "shop": "Shop Plus",
-      "job_post": "Job Post Plus"
+      "job_post": "Job Post Plus",
+      "all": "All in One"
     },
     "short": {
       "service": "Jobs first, no accept fee, more customers",
@@ -1319,12 +1340,13 @@
     "hero": {
       "service": "For your services: get jobs before others and accept them free.",
       "shop": "For your shop: accept orders free and show first to customers.",
-      "job_post": "For your job posts: see everyone who viewed them, with their number."
+      "job_post": "For your job posts: see everyone who viewed them, with their number.",
+      "all": "Services, shop and job posts in one plan: everything below, for one price."
     },
     "perks": {
       "noAds": "No ads in the app",
       "service": {
-        "first": "Quick Book jobs and new problems reach you first",
+        "first": "New jobs and problems reach you 30 seconds before others",
         "freeAccept": "Accept jobs with no fee",
         "top": "Your services show first to customers",
         "viewers": "See who viewed your services profile"
@@ -1337,6 +1359,12 @@
       "job_post": {
         "viewers": "See who viewed your job posts, with their phone number",
         "top": "Your job posts show first in Hire Staff"
+      },
+      "noMiniPayments": "No small payments for each accept or job post views",
+      "all": {
+        "everything": "Everything in Services Plus, Shop Plus and Job Post Plus",
+        "freeAccept": "Accept jobs, problems and orders with no fee",
+        "top": "Your services, shop and job posts show first"
       }
     },
     "extra_one": "{{count}} benefit · from ₹{{amount}}/month",
@@ -1382,7 +1410,9 @@
     "posted": "Posted",
     "updated": "Updated",
     "postedOn": "Posted {{date}}",
-    "updatedOn": "updated {{date}}"
+    "updatedOn": "updated {{date}}",
+    "allShops": "All shops",
+    "allSkills": "All skills"
   },
   "dateRange": {
     "title": "Choose dates",
@@ -1426,7 +1456,9 @@
     "seeWhoLong": "Tap to see who opened this post",
     "seeAll": "See all views of this post",
     "visits_one": "{{count}} visit",
-    "visits_other": "{{count}} visits"
+    "visits_other": "{{count}} visits",
+    "adText": "Watch a short ad to see who viewed your post, with their number.",
+    "adButton": "Watch Ad"
   },
   "homeLocation": {
     "current": "Current location",
@@ -1613,5 +1645,39 @@
     "overlayText": "Turn on \"Display over other apps\" so new jobs and orders open on your screen, like a call.",
     "later": "Later",
     "view": "View"
+  },
+  "timeline": {
+    "title": "Timeline",
+    "now": "Now",
+    "orderDetails": "Order Details",
+    "jobDetails": "Job Details",
+    "order": {
+      "placed": "Order received",
+      "accepted": "You accepted",
+      "packed": "Packed — bill sent",
+      "ready": "Ready for pickup",
+      "outForDelivery": "Out for delivery",
+      "outBy": "{{name}} is delivering",
+      "completed": "Handed over — completed",
+      "deliveredBy": "Delivered by {{name}}",
+      "rated": "Customer rated",
+      "cancelled": "Cancelled",
+      "declined": "Declined",
+      "expired": "Expired — not answered"
+    },
+    "job": {
+      "received": "Request received",
+      "accepted": "You accepted",
+      "onTheWay": "On the way",
+      "arrived": "Arrived",
+      "started": "PIN verified, work started",
+      "workDone": "Work done",
+      "completed": "Customer confirmed — finished",
+      "cancelled": "Cancelled"
+    }
+  },
+  "afterAccept": {
+    "givenBackTitle": "Given back",
+    "givenBackMessage": "You didn’t pay, so it went back to other partners."
   }
 }

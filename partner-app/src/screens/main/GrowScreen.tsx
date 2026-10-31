@@ -22,12 +22,14 @@ export const PLAN_PERKS: Record<PartnerPlan, { icon: IconName; key: string }[]> 
   service: [
     { icon: 'bolt', key: 'plans.perks.service.first' },
     { icon: 'handshake', key: 'plans.perks.service.freeAccept' },
+    { icon: 'wallet', key: 'plans.perks.noMiniPayments' },
     { icon: 'arrow-up-wide-short', key: 'plans.perks.service.top' },
     { icon: 'eye', key: 'plans.perks.service.viewers' },
     { icon: 'ban', key: 'plans.perks.noAds' },
   ],
   shop: [
     { icon: 'handshake', key: 'plans.perks.shop.freeAccept' },
+    { icon: 'wallet', key: 'plans.perks.noMiniPayments' },
     { icon: 'arrow-up-wide-short', key: 'plans.perks.shop.top' },
     { icon: 'eye', key: 'plans.perks.shop.viewers' },
     { icon: 'ban', key: 'plans.perks.noAds' },
@@ -37,9 +39,18 @@ export const PLAN_PERKS: Record<PartnerPlan, { icon: IconName; key: string }[]> 
     { icon: 'arrow-up-wide-short', key: 'plans.perks.job_post.top' },
     { icon: 'ban', key: 'plans.perks.noAds' },
   ],
+  // Everything above, in one plan.
+  all: [
+    { icon: 'layer-group', key: 'plans.perks.all.everything' },
+    { icon: 'bolt', key: 'plans.perks.service.first' },
+    { icon: 'handshake', key: 'plans.perks.all.freeAccept' },
+    { icon: 'address-book', key: 'plans.perks.job_post.viewers' },
+    { icon: 'arrow-up-wide-short', key: 'plans.perks.all.top' },
+    { icon: 'ban', key: 'plans.perks.noAds' },
+  ],
 };
 
-export const PLAN_ICON: Record<PartnerPlan, IconName> = { service: 'screwdriver-wrench', shop: 'store', job_post: 'briefcase' };
+export const PLAN_ICON: Record<PartnerPlan, IconName> = { service: 'screwdriver-wrench', shop: 'store', job_post: 'briefcase', all: 'layer-group' };
 const KIND_ORDER: BadgeKind[] = ['service', 'business', 'job_post'];
 // The switch's labels — the same names Home and Activity use.
 const SIDE_LABEL: Record<BadgeKind, string> = { service: 'homeSides.services', business: 'homeSides.shop', job_post: 'homeSides.jobPost' };
@@ -60,6 +71,8 @@ export function GrowScreen() {
   const boostInfo = useBoostInfo(profiles.length > 0);
   const [refreshing, setRefreshing] = useState(false);
   const [pickedKind, setPickedKind] = useState<BadgeKind | null>(null);
+  // This side's own plan, or the all-in-one plan (services, shop and job posts together).
+  const [allInOne, setAllInOne] = useState(false);
   const [pickedPostId, setPickedPostId] = useState<string | null>(null);
 
   const loading = subscription.isLoading || badges.isLoading || (profiles.length > 0 && boostInfo.isLoading);
@@ -238,7 +251,7 @@ export function GrowScreen() {
         )}
 
         {/* What costs money without the plan (a job post is paid for even with it). */}
-        {fee && fee > 0 && (plan === 'job_post' || !active) ? (
+        {plan !== 'all' && fee && fee > 0 && (plan === 'job_post' || !active) ? (
           <View style={[styles.note, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}2E` }]}>
             <View style={[styles.noteIcon, { backgroundColor: `${colors.primary}1A` }]}>
               <FontAwesome6 name={plan === 'job_post' ? 'briefcase' : 'handshake'} size={13} color={colors.primary} solid />
@@ -269,7 +282,27 @@ export function GrowScreen() {
           ) : (
             <>
               {sideSwitch}
-              {renderPlan(planForKind(kind))}
+              {sub?.enabled ? (
+                <View style={[styles.planChoice, { borderColor: `${GOLD_DEEP}40` }]}>
+                  {([false, true] as const).map((all) => {
+                    const active = allInOne === all;
+                    const plan = all ? 'all' : planForKind(kind);
+                    return (
+                      <Pressable
+                        key={String(all)}
+                        onPress={() => setAllInOne(all)}
+                        style={[styles.planChoiceOption, active ? { backgroundColor: GOLD_DEEP } : null]}
+                      >
+                        <FontAwesome6 name={PLAN_ICON[plan]} size={11} color={active ? '#FFFFFF' : GOLD_DEEP} solid />
+                        <Text style={[styles.planChoiceText, { color: active ? '#FFFFFF' : GOLD_DEEP }]} numberOfLines={1}>
+                          {t(`plans.names.${plan}`)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+              {renderPlan(allInOne ? 'all' : planForKind(kind))}
               {/* The badge and the boost: two cards of their own. */}
               {postPicker}
               <ProfileGrowth
@@ -287,6 +320,9 @@ export function GrowScreen() {
 }
 
 const styles = StyleSheet.create({
+  planChoice: { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 4, gap: 4, marginBottom: 12 },
+  planChoiceOption: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 10 },
+  planChoiceText: { fontFamily: fonts.semiBold, fontSize: 12.5 },
   flex: { flex: 1 },
   body: { paddingBottom: 120 },
   loading: { paddingVertical: 80, alignItems: 'center' },

@@ -75,6 +75,8 @@ export interface JobPostViewer {
 }
 
 export interface JobPostViewers {
+  /** open: shown; ad: shown after an ad (subscriptions off); plan: on the job post plan only. */
+  access?: 'open' | 'ad' | 'plan';
   locked: boolean;
   total: number;
   newCount: number;
@@ -110,6 +112,7 @@ export const jobSeekerService = {
     return apiClient.putForm<JobPost>(`/job-seekers/me/posts/${id}/photo`, formData);
   },
   removePhoto: (id: string) => apiClient.delete<JobPost>(`/job-seekers/me/posts/${id}/photo`, true),
-  viewers: (id: string) => apiClient.get<JobPostViewers>(`/job-seekers/me/posts/${id}/viewers`, true),
+  /** `revealed`: asked again once the app showed the ad (subscriptions off). */
+  viewers: (id: string, revealed = false) => apiClient.get<JobPostViewers>(`/job-seekers/me/posts/${id}/viewers${revealed ? '?revealed=1' : ''}`, true),
   markViewsSeen: (id: string) => apiClient.post<null>(`/job-seekers/me/posts/${id}/viewers/seen`, undefined, true),
 };

@@ -31,6 +31,7 @@ import {
   confirmPaymentSchema,
   saveAdSchema,
   serveQuerySchema,
+  homeQuerySchema,
   uploadSignatureSchema,
 } from './validation';
 
@@ -83,6 +84,16 @@ adsRouter.get(
         { spot: query.spot ?? null, accountId: req.account?.accountId ?? null },
       ),
     );
+  }),
+);
+
+// Home's carousel of ads (empty when the admin hasn't turned it on for this app).
+adsRouter.get(
+  '/home',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const query = parseQuery(homeQuerySchema, req);
+    return ok(res, await service.serveHome(query.app, { latitude: query.latitude, longitude: query.longitude }, req.account?.accountId ?? null));
   }),
 );
 

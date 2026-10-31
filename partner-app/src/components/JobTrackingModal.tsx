@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { placeName } from '@/utils/formatAddress';
+import { DetailSkeleton } from './DetailSkeleton';
+import { StepTimeline, TimelineStep } from './StepTimeline';
 import {
   Dimensions,
   Keyboard,
@@ -21,9 +23,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
-import { useAdGate, useBusyAction } from './Ads';
+import { useBusyAction } from './Ads';
 import { LiveMap, MapPoint } from './LiveMap';
-import { LoadingIndicator } from './LoadingIndicator';
 import { ToastHost } from './ToastHost';
 import { ProblemDetailModal } from './ProblemDetailModal';
 import { useAssignedProblems } from '@/hooks/useProblems';
@@ -109,13 +110,11 @@ export function JobTrackingModal() {
   }, []);
 
   const visible = jobId !== null;
-  // Mark Work Done: location, then a local business's ad while the button spins, then confirm.
-  const { adLoading, waitForAd } = useAdGate(visible, 'work_done');
+  // Mark Work Done: location, then confirm (no ad here — ads come after accepting instead).
   const { busy: markingDone, run } = useBusyAction();
   const markDone = () =>
     run(async () => {
-      if (adLoading || !(await askForLocation())) return;
-      if (await waitForAd()) setConfirmDone(true);
+      if (await askForLocation()) setConfirmDone(true);
     });
   const status = job?.status;
   const tripText = { title: t('job.trackingTitle'), body: t('job.trackingBody') };
@@ -323,6 +322,24 @@ export function JobTrackingModal() {
       </View>
     ) : null;
 
+  /** The job's steps with their times — the customer sees the same list. */
+  const renderTimeline = (j: WorkerJob) => {
+    const ended = j.status === 'cancelled';
+    const steps: TimelineStep[] = [
+      { key: 'received', label: t('timeline.job.received'), at: j.createdAt, done: true },
+      { key: 'accepted', label: t('timeline.job.accepted'), at: j.acceptedAt, done: !!j.acceptedAt },
+      { key: 'on_the_way', label: t('timeline.job.onTheWay'), at: j.startedAt, done: !!j.startedAt },
+      { key: 'arrived', label: t('timeline.job.arrived'), at: j.arrivedAt, done: !!j.arrivedAt },
+      { key: 'in_progress', label: t('timeline.job.started'), at: j.pinVerifiedAt, done: !!j.pinVerifiedAt },
+      { key: 'work_done', label: t('timeline.job.workDone'), at: j.workDoneAt, done: !!j.workDoneAt },
+      { key: 'completed', label: t('timeline.job.completed'), at: j.completedAt, done: !!j.completedAt },
+    ];
+    const shown = ended
+      ? [...steps.filter((step) => step.at), { key: 'cancelled', label: t('timeline.job.cancelled'), at: j.cancelledAt, done: true }]
+      : steps;
+    return <StepTimeline title={t('timeline.title')} steps={shown} ended={ended} />;
+  };
+
   const renderCustomer = (j: WorkerJob) => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.customerRow}>
@@ -452,7 +469,7 @@ export function JobTrackingModal() {
     if (j.status === 'arrived') return renderPinEntry(j);
     if (j.status === 'in_progress') {
       // A local business's ad first (when one is running nearby), then the confirmation.
-      return <Button label={t('job.markWorkDone')} onPress={markDone} loading={adLoading || markingDone} gradient={DONE_GRADIENT} />;
+      return <Button label={t('job.markWorkDone')} onPress={markDone} loading={markingDone} gradient={DONE_GRADIENT} />;
     }
     if (j.status === 'work_done') {
       return <Text style={[styles.waiting, { color: colors.textMuted }]}>{t('job.waitingForCustomer')}</Text>;
@@ -462,19 +479,15 @@ export function JobTrackingModal() {
 
   const renderBody = () => {
     if (isLoading || !job) {
-      return (
+      return isError ? (
         <View style={styles.centerBody}>
-          {isError ? (
-            <>
-              <Text style={[styles.bannerTitle, { color: colors.text }]}>{t('job.loadFailed')}</Text>
-              <View style={styles.fullWidth}>
-                <Button label={t('common.retry')} onPress={() => refetch()} />
-              </View>
-            </>
-          ) : (
-            <LoadingIndicator size={40} dotSize={6} color={colors.primary} />
-          )}
+          <Text style={[styles.bannerTitle, { color: colors.text }]}>{t('job.loadFailed')}</Text>
+          <View style={styles.fullWidth}>
+            <Button label={t('common.retry')} onPress={() => refetch()} />
+          </View>
         </View>
+      ) : (
+        <DetailSkeleton />
       );
     }
     return (
@@ -492,6 +505,7 @@ export function JobTrackingModal() {
           {renderActions(job)}
           {renderProblem(job)}
           {renderCustomer(job)}
+          {renderTimeline(job)}
           {renderFeedback(job)}
           {WORKER_CANCELLABLE_STATUSES.includes(job.status) ? (
             <CancelButton label={t('job.cancelJob')} hint={t('job.cancelHint')} onPress={() => setConfirmCancel(true)} />
@@ -523,13 +537,15 @@ export function JobTrackingModal() {
               </Pressable>
               <View style={styles.titleGroup}>
                 <Text style={styles.headerTitle} numberOfLines={1}>
-                  {status ? t(`job.status.${status}.title`) : t('job.title')}
+                  {status ? t(`job.status.${status}.title`) : t('timeline.jobDetails')}
                 </Text>
-                <Text style={styles.headerSubtitle} numberOfLines={1}>
-                  {job
-                    ? `${job.customerFullName} · ${job.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}`
-                    : ''}
-                </Text>
+                {job ? (
+                  <Text style={styles.headerSubtitle} numberOfLines={1}>
+                    {`${job.customerFullName} · ${job.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}`}
+                  </Text>
+                ) : (
+                  <View style={styles.subtitleBar} />
+                )}
               </View>
             </View>
           </LinearGradient>
@@ -579,6 +595,7 @@ const styles = StyleSheet.create({
   header: { paddingBottom: 18, paddingHorizontal: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
   titleGroup: { marginLeft: 14, flex: 1 },
+  subtitleBar: { height: 10, width: 140, borderRadius: 5, marginTop: 6, backgroundColor: 'rgba(255,255,255,0.3)' },
   headerTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF', lineHeight: 20 },
   headerSubtitle: { ...typography.caption, color: 'rgba(255, 255, 255, 0.85)', lineHeight: 14, marginTop: 2 },
   backButton: {

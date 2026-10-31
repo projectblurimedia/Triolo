@@ -14,6 +14,7 @@ import { openShopOrder } from '@/state/shopOrderFocusStore';
 import { navigateToBookings } from '@/navigation/navigationRef';
 import { showToast } from '@/state/toastStore';
 import { ACCEPT_ACTION, BOOKING_OFFER_CATEGORY, BOOKING_OFFER_CHANNEL, DECLINE_ACTION } from '@/constants/bookingNotifications';
+import { completeAccept } from '@/utils/afterAccept';
 
 // Without this, a push arriving while the app is already open/foregrounded shows no banner
 // at all in current expo-notifications versions — WhatsApp-style delivery means a
@@ -54,6 +55,8 @@ async function handleOfferAction(actionIdentifier: string, bookingRequestId: str
     const outcome = await attemptAccept(bookingRequestId);
     await updateOfferNotification(bookingRequestId, outcome);
     if (outcome === 'accepted') {
+      // The ad or the fee (without a plan) first; backed out of, the job goes back.
+      if (!(await completeAccept('job', bookingRequestId, 'job_accept'))) return;
       // The job screen is the first thing the worker sees once they open the app.
       openJob(bookingRequestId);
       showToast({ variant: 'success', title: labels.accepted, message: labels.acceptedMessage });

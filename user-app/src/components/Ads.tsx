@@ -3,6 +3,7 @@ import {
   Animated,
   AppState,
   Easing,
+  FlatList,
   Image,
   Linking,
   Modal,
@@ -27,6 +28,9 @@ import { sealSizeFor, TrustedSeal } from './TrustedSeal';
 
 /*
  * (Copied between user-app and partner-app — keep in sync. Only `AD_APP` in adsService differs.)
+ *
+ * Two kinds of ad, chosen when it's booked: full-screen ads before key actions (below), and
+ * wide ads in Home's slider (HomeAdCarousel, at the end).
  *
  * Local businesses' ads, booked by the Triolo admin: one image or one video, vertical (a reel
  * or poster, 9:16) or horizontal (16:9), with an optional link. Shown full screen only before
@@ -711,11 +715,13 @@ function ProfileAdCard({
 
 interface ActionAdState {
   ad: Ad | null;
+  /** An ad is being looked for, from a tap with no spinner of its own: a loading screen shows. */
+  looking: boolean;
   /** Runs the action (go = true) or drops it (the ad's button opened a profile instead). */
   then: ((go: boolean) => void) | null;
 }
 
-const useActionAd = create<ActionAdState>(() => ({ ad: null, then: null }));
+const useActionAd = create<ActionAdState>(() => ({ ad: null, then: null, looking: false }));
 
 // --- Ads before key actions ---
 
@@ -741,7 +747,17 @@ let lastActionShowedAd = false;
  * otherwise straight away. Never holds the action up for long: if no ad arrives quickly, the
  * action just goes ahead.
  */
-export function showAdBefore(action: (go?: boolean) => void, spot?: AdSpot): void {
+export function showAdBefore(action: (go?: boolean) => void, spot?: AdSpot, options: { loadingScreen?: boolean } = {}): void {
+  // A tap whose button has no spinner (a card): show a loading screen until the ad or the
+  // action itself is on its way, so the tap never looks ignored.
+  if (options.loadingScreen) {
+    useActionAd.setState({ looking: true });
+    const inner = action;
+    action = (go?: boolean) => {
+      useActionAd.setState({ looking: false });
+      inner(go);
+    };
+  }
   lastActionShowedAd = false;
   if (actionPending || useActionAd.getState().ad || Date.now() < adFreeUntil) {
     action();
@@ -788,7 +804,7 @@ export function showAdBefore(action: (go?: boolean) => void, spot?: AdSpot): voi
       settled = true;
       actionPending = false;
       lastActionShowedAd = true;
-      useActionAd.setState({ ad, then: action });
+      useActionAd.setState({ ad, then: action, looking: false });
     })
     .catch(() => {
       clearTimeout(waited);
@@ -859,7 +875,8 @@ export function useBusyAction(): { busy: boolean; run: (action: () => Promise<un
 /** Mounted once at the app root: shows the ad `showAdBefore` found, then runs the action. */
 export function AdActionHost() {
   const ad = useActionAd((state) => state.ad);
-  if (!ad) return null;
+  const looking = useActionAd((state) => state.looking);
+  if (!ad) return looking ? <AdLookingScreen /> : null;
   return (
     <AdPlayer
       key={ad.id}
@@ -880,8 +897,245 @@ export function AdActionHost() {
   );
 }
 
+/** A dimmed screen with a spinner while an ad is being fetched for a tap. */
+function AdLookingScreen() {
+  const { t } = useTranslation();
+  return (
+    <Modal visible transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => undefined}>
+      <View style={[styles.lookingScreen, styles.center]}>
+        <View style={styles.lookingCard}>
+          <LoadingIndicator size={36} dotSize={6} />
+          <Text style={styles.lookingText}>{t('ads.opening')}</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// --- Home carousel ---
+
+// Wide cards: Home slider ads are always horizontal (16:9).
+const CAROUSEL_RATIO = 9 / 16;
+const CAROUSEL_SLIDE_MS = 5000;
+// A video slide stays until its video has played (at most this long).
+const CAROUSEL_VIDEO_MAX_MS = 31000;
+// Coming back to the app reloads the slider if it's older than this (a deleted / ended ad goes).
+const CAROUSEL_REFRESH_MS = 2 * 60 * 1000;
+
+/** A still for a video ad: Cloudinary gives a frame for the same address ending in .jpg. */
+function stillOf(ad: Ad): string | null {
+  if (ad.videoUrl) return ad.videoUrl.replace(/\.(mp4|webm|mov|m3u8)(\?.*)?$/i, '.jpg');
+  return ad.imageUrl ?? ad.imageUrls?.[0] ?? ad.promotedCard?.photoUrl ?? null;
+}
+
+/**
+ * Top of Home, when the admin turned it on for this app: the Home-slider ads running near
+ * here (booked as "Home slider" — never the full-screen action ads), one wide card each,
+ * sliding by itself. The card on screen plays its video by itself (muted; a button turns the
+ * sound on). Tapping a card does what the ad does (link, directions, a profile), or opens it
+ * full screen when it only promotes. Nothing at all while there's no ad (or for subscribers).
+ */
+export function HomeAdCarousel() {
+  const { t } = useTranslation();
+  const { colors } = useThemeColors();
+  const { width: screenWidth } = useWindowDimensions();
+  // Plain numbers from the store (≈1 km steps): a selector returning a new object each time
+  // would re-render this forever.
+  const lat = useLocationStore((state) => {
+    const here = readyCoords(state);
+    return here ? Math.round(here.latitude * 100) / 100 : null;
+  });
+  const lng = useLocationStore((state) => {
+    const here = readyCoords(state);
+    return here ? Math.round(here.longitude * 100) / 100 : null;
+  });
+  const active = useAppActive();
+  const [ads, setAds] = useState<Ad[]>([]);
+  const [index, setIndex] = useState(0);
+  const [width, setWidth] = useState(screenWidth - 40);
+  const [muted, setMuted] = useState(true);
+  const [reload, setReload] = useState(0);
+  const listRef = useRef<FlatList<Ad>>(null);
+  const touching = useRef(false);
+  const fetchedAt = useRef(0);
+  const height = Math.round(width * CAROUSEL_RATIO);
+
+  // Once per place (≈1 km), and again on coming back to the app after a while.
+  useEffect(() => {
+    if (lat == null || lng == null) return;
+    let alive = true;
+    adsService
+      .home({ latitude: lat, longitude: lng })
+      .then((list) => {
+        if (!alive) return;
+        fetchedAt.current = Date.now();
+        setAds(list);
+        setIndex(0);
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+        list.forEach((ad) => preload(ad).catch(() => undefined));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [lat, lng, reload]);
+
+  useEffect(() => {
+    if (active && fetchedAt.current && Date.now() - fetchedAt.current > CAROUSEL_REFRESH_MS) setReload((n) => n + 1);
+  }, [active]);
+
+  // Slides on by itself (not while a finger is on it, nor in the background): a picture
+  // after a few seconds, a video once it has played.
+  const current = ads[index];
+  useEffect(() => {
+    if (ads.length < 2 || !active || !current) return;
+    const wait = current.videoUrl
+      ? Math.min(CAROUSEL_VIDEO_MAX_MS, Math.max(CAROUSEL_SLIDE_MS, current.durationSeconds * 1000 + 1500))
+      : CAROUSEL_SLIDE_MS;
+    const timer = setTimeout(() => {
+      if (touching.current) return;
+      const next = (index + 1) % ads.length;
+      listRef.current?.scrollToOffset({ offset: next * width, animated: true });
+      setIndex(next);
+    }, wait);
+    return () => clearTimeout(timer);
+  }, [ads.length, index, width, active, current]);
+
+  if (ads.length === 0) return null;
+
+  const open = (ad: Ad) => {
+    const cta = adCta(ad);
+    if (cta) cta.run();
+    // Only promotes: show it full screen.
+    else useActionAd.setState({ ad, then: null });
+  };
+
+  return (
+    <View style={styles.carouselWrap} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+      <FlatList
+        ref={listRef}
+        data={ads}
+        keyExtractor={(ad) => ad.id}
+        horizontal
+        pagingEnabled
+        scrollEnabled={ads.length > 1}
+        showsHorizontalScrollIndicator={false}
+        onScrollBeginDrag={() => {
+          touching.current = true;
+        }}
+        onMomentumScrollEnd={(event) => {
+          touching.current = false;
+          setIndex(Math.round(event.nativeEvent.contentOffset.x / Math.max(1, width)));
+        }}
+        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        extraData={`${index}:${muted}:${active}:${height}`}
+        renderItem={({ item: ad, index: i }) => {
+          const still = stillOf(ad);
+          const name = ad.promotedCard?.name ?? ad.advertiserName;
+          const playing = !!ad.videoUrl && i === index;
+          return (
+            <Pressable onPress={() => open(ad)} style={[styles.carouselCard, { width, height, backgroundColor: colors.surface }]}>
+              {still ? (
+                <>
+                  {/* Any picture fits whole: over a blurred copy of itself instead of being cut. */}
+                  <Image source={{ uri: still }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={18} />
+                  <SmartImage source={{ uri: still }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+                </>
+              ) : (
+                <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+              )}
+              {playing ? (
+                <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                  <AdVideo
+                    key={ad.id}
+                    url={ad.videoUrl as string}
+                    width={width}
+                    height={height}
+                    muted={muted}
+                    paused={!active}
+                    onStart={() => undefined}
+                  />
+                </View>
+              ) : null}
+              <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.65)']} style={styles.carouselShade} pointerEvents="none" />
+              <View style={styles.carouselTop} pointerEvents="box-none">
+                <View style={styles.sponsored}>
+                  <FontAwesome6 name="bullhorn" size={10} color="#FFFFFF" solid />
+                  <Text style={styles.sponsoredText}>{t('ads.sponsored')}</Text>
+                </View>
+                {ad.videoUrl ? (
+                  <Pressable
+                    onPress={() => setMuted((value) => !value)}
+                    style={styles.carouselSound}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={muted ? t('ads.unmute') : t('ads.mute')}
+                  >
+                    <FontAwesome6 name={muted ? 'volume-xmark' : 'volume-high'} size={12} color="#FFFFFF" solid />
+                  </Pressable>
+                ) : null}
+              </View>
+              <View style={styles.carouselFoot} pointerEvents="none">
+                <Text style={styles.carouselTitle} numberOfLines={1}>
+                  {ad.title || name}
+                </Text>
+                {ad.title && ad.title !== name ? (
+                  <Text style={styles.carouselBy} numberOfLines={1}>
+                    {name}
+                  </Text>
+                ) : null}
+              </View>
+            </Pressable>
+          );
+        }}
+      />
+      {ads.length > 1 ? (
+        <View style={styles.carouselDots}>
+          {ads.map((ad, i) => (
+            <View
+              key={ad.id}
+              style={[styles.carouselDot, { width: i === index ? 16 : 6, backgroundColor: i === index ? colors.primary : `${colors.primary}40` }]}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  carouselWrap: { marginBottom: 16 },
+  carouselCard: { borderRadius: 18, overflow: 'hidden' },
+  carouselShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 90 },
+  carouselTop: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  carouselSound: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  carouselFoot: { position: 'absolute', left: 14, right: 14, bottom: 12 },
+  carouselTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16, color: '#FFFFFF' },
+  carouselBy: { ...typography.caption, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
+  carouselDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 8 },
+  carouselDot: { height: 6, borderRadius: 3 },
   center: { alignItems: 'center', justifyContent: 'center' },
+  lookingScreen: { flex: 1, backgroundColor: 'rgba(5,7,11,0.55)' },
+  lookingCard: {
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 22,
+    borderRadius: 22,
+    backgroundColor: 'rgba(15,20,30,0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  lookingText: { ...typography.body, fontFamily: fonts.medium, color: '#FFFFFF' },
   dim: { backgroundColor: 'rgba(0,0,0,0.15)' },
   screen: { flex: 1, backgroundColor: '#05070B' },
   backdropDim: { backgroundColor: 'rgba(5,7,11,0.72)' },

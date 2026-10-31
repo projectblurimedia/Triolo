@@ -26,6 +26,8 @@ export interface WorkerJob {
   workerLatitude: number | null;
   workerLongitude: number | null;
   pinAttemptsLeft: number;
+  /** Just accepted: an ad to watch or the fee to pay before it opens (null when done). */
+  unlockNeeded?: 'ad' | 'pay' | null;
   acceptedAt: string | null;
   startedAt: string | null;
   arrivedAt: string | null;
@@ -47,6 +49,10 @@ export interface WorkerJob {
 export const jobsService = {
   listMine: () => apiClient.get<WorkerJob[]>('/bookings/jobs/mine', true),
   get: (id: string) => apiClient.get<WorkerJob>(`/bookings/jobs/${id}`, true),
+  /** After accepting: watched the ad, or pays (PAYMENT_REQUIRED until a pass is bought). */
+  unlock: (id: string, via: 'ad' | 'pay') => apiClient.post<WorkerJob>(`/bookings/${id}/unlock`, { via }, true),
+  /** After accepting: backed out of the payment — the job goes back to others. */
+  release: (id: string) => apiClient.post<null>(`/bookings/${id}/release`, undefined, true),
   startTrip: (id: string) => apiClient.post<null>(`/bookings/${id}/start`, undefined, true),
   updateLocation: (id: string, latitude: number, longitude: number) =>
     apiClient.put<null>(`/bookings/${id}/location`, { latitude, longitude }, true),

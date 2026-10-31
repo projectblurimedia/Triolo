@@ -1,4 +1,6 @@
 import { Request, Response, Router } from 'express';
+import { AdsRepository } from '@/modules/ads/repository';
+import { AdsService } from '@/modules/ads/service';
 import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
 import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { pool } from '@/config/database';
@@ -15,10 +17,12 @@ import { JobSeekersService } from './service';
 import { saveJobSeekerPostSchema, searchQuerySchema, setActiveSchema } from './validation';
 
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
+const adsService = new AdsService(new AdsRepository(pool));
 const service = new JobSeekersService(
   new JobSeekersRepository(pool),
   subscriptionStatus,
   new NotificationsService(new NotificationsRepository(pool)),
+  (spot) => adsService.partnerSpotOn(spot),
 );
 
 function accountIdOf(req: Request): string {
@@ -69,11 +73,12 @@ jobSeekersRouter.post(
   }),
 );
 
-// Who opened one of my posts (people hidden without the job post plan), and marking them seen.
+// Who opened one of my posts (people hidden until the partner may see them — see listViewers;
+// ?revealed=1 after the app showed the ad), and marking them seen.
 jobSeekersRouter.get(
   '/me/posts/:id/viewers',
   authenticate,
-  asyncHandler(async (req: Request, res: Response) => ok(res, await service.listViewers(accountIdOf(req), req.params.id))),
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.listViewers(accountIdOf(req), req.params.id, req.query.revealed === '1'))),
 );
 
 jobSeekersRouter.post(

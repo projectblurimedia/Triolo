@@ -7,6 +7,18 @@ import { ACTIVE_JOB_STATUSES } from '@/services/jobsService';
 import { ACTIVE_SHOP_STATUSES } from '@/services/shopOrdersService';
 import { openJob } from '@/state/jobFocusStore';
 import { openShopOrder } from '@/state/shopOrderFocusStore';
+import { orderListText } from '@/utils/orderListText';
+import { showAdBefore } from './Ads';
+
+/** The ad first (when one runs nearby), then the screen; settles once it's open or dropped. */
+function adThenOpen(open: () => void): Promise<void> {
+  return new Promise((resolve) =>
+    showAdBefore((go = true) => {
+      if (go) open();
+      resolve();
+    }, 'continue_card'),
+  );
+}
 
 interface Step {
   key: string;
@@ -16,7 +28,7 @@ interface Step {
   hint: string;
   createdAt: string;
   urgent: boolean;
-  onPress: () => void;
+  onPress: () => Promise<void>;
 }
 
 /**
@@ -44,7 +56,8 @@ export function ContinueSteps({ isShop, only }: { isShop: boolean; only?: 'jobs'
         createdAt: job.createdAt,
         // Waiting on the customer, not on you.
         urgent: job.status !== 'work_done',
-        onPress: () => openJob(job.id),
+        // A local business's ad first (when one runs nearby), then the job.
+        onPress: () => adThenOpen(() => openJob(job.id)),
       })),
     ...(isShop && only !== 'jobs' ? (orders.data ?? []) : [])
       // New ones are in "New for you" above; here only what is under way.
@@ -53,11 +66,11 @@ export function ContinueSteps({ isShop, only }: { isShop: boolean; only?: 'jobs'
         key: `order-${order.id}`,
         kind: 'order',
         name: order.customerFullName,
-        stepTitle: `${t(`shopOrders.status.${order.status}.title`)} · ${t('continueSteps.itemCount', { count: order.items.length })}`,
+        stepTitle: `${t(`shopOrders.status.${order.status}.title`)} · ${orderListText(t, order)}`,
         hint: t(`shopOrders.status.${order.status}.message`, { name: order.customerFullName }),
         createdAt: order.createdAt,
         urgent: order.status !== 'packed',
-        onPress: () => openShopOrder(order.id),
+        onPress: () => adThenOpen(() => openShopOrder(order.id)),
       })),
   ].sort((a, b) => Number(b.urgent) - Number(a.urgent) || b.createdAt.localeCompare(a.createdAt));
 

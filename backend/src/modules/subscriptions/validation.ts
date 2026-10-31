@@ -8,7 +8,8 @@ const months = z
 
 export const audienceQuerySchema = z.object({ audience: z.enum(SUBSCRIPTION_AUDIENCES) });
 
-export const checkoutSchema = z.object({ audience: z.enum(SUBSCRIPTION_AUDIENCES), months, plan: z.enum(PARTNER_PLANS).optional() });
+// 'all' = the all-in-one partner plan (services, shop and job posts together).
+export const checkoutSchema = z.object({ audience: z.enum(SUBSCRIPTION_AUDIENCES), months, plan: z.enum([...PARTNER_PLANS, 'all']).optional() });
 
 export const badgeCheckoutSchema = z.object({ kind: z.enum(BADGE_KINDS), profileId: z.string().uuid().optional() });
 
@@ -60,3 +61,16 @@ export const badgeListQuerySchema = z.object({
 });
 
 export const removeBadgeSchema = z.object({ reason: z.string().trim().min(3, 'Say why it is removed').max(300) });
+
+/** In-app checkout: which unpaid pass / plan / badge to open Razorpay's screen for. */
+export const inAppOrderSchema = z.object({
+  type: z.enum(['pass', 'subscription', 'badge']),
+  id: z.string().uuid(),
+});
+
+/** What Razorpay's in-app screen hands back after a payment. */
+export const inAppConfirmSchema = inAppOrderSchema.extend({
+  razorpayOrderId: z.string().min(1).max(64),
+  razorpayPaymentId: z.string().min(1).max(64),
+  razorpaySignature: z.string().min(1).max(256),
+});

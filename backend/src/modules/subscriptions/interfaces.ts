@@ -111,7 +111,8 @@ export interface MySubscription {
   /** Paid uses not used yet, per kind. */
   passes: Record<string, number>;
   /** Partner app: each plan on its own (services, shop, job posts). */
-  plans?: Record<PartnerPlan, PlanState>;
+  // Per side, plus 'all' (the all-in-one plan).
+  plans?: Record<PartnerPlan | 'all', PlanState>;
 }
 
 export interface PlanState {

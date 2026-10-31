@@ -10,9 +10,12 @@ import { CancelButton } from './CancelButton';
 import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { useAdGate, useBusyAction } from './Ads';
-import { LoadingIndicator } from './LoadingIndicator';
+import { useBusyAction } from './Ads';
 import { PullToRefresh } from './PullToRefresh';
+import { ListPhotoStrip } from './ListPhotoStrip';
+import { DetailSkeleton } from './DetailSkeleton';
+import { StepTimeline, TimelineStep } from './StepTimeline';
+import { GivenBackError } from '@/utils/afterAccept';
 
 // PullToRefresh's hidden room above the content (see that component).
 const PULL_ROOM = 96;
@@ -39,7 +42,10 @@ import { formatDistance } from '@/utils/formatDistance';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
-type Draft = Record<string, { status: ShopOrderItemStatus; price: string }>;
+// `name`: an item the shop types in itself (read from the list's photos). New ones have keys
+// starting with NEW_ITEM until they are saved.
+type Draft = Record<string, { status: ShopOrderItemStatus; price: string; name?: string }>;
+const NEW_ITEM = 'new:';
 
 const STATUS_ICONS: Record<ShopOrderStatus, IconName> = {
   placed: 'bell',
@@ -65,7 +71,9 @@ function initialsOf(name: string): string {
 
 function draftFrom(order: ShopOrder): Draft {
   const draft: Draft = {};
-  for (const item of order.items) draft[item.id] = { status: item.status, price: item.price != null ? String(item.price) : '' };
+  for (const item of order.items) {
+    draft[item.id] = { status: item.status, price: item.price != null ? String(item.price) : '', name: item.addedByShop ? item.name : undefined };
+  }
   return draft;
 }
 
@@ -90,7 +98,6 @@ export function ShopOrderModal() {
   const close = useShopOrderFocusStore((state) => state.close);
   const { data: order, isLoading, isError, refetch } = useShopOrder(orderId);
   // Handover: location, then a local business's ad while the button spins, then the PIN check.
-  const { adLoading, waitForAd } = useAdGate(orderId !== null, 'order_pin');
   const { busy: pinBusy, run: runPin } = useBusyAction();
 
   const accept = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.accept(id), 'accept');
@@ -105,6 +112,10 @@ export function ShopOrderModal() {
 
   const [draft, setDraft] = useState<Draft>({});
   const [dirty, setDirty] = useState(false);
+  // Items the shop typed in that aren't saved yet, and saved ones it took off again.
+  const [added, setAdded] = useState<string[]>([]);
+  const [removed, setRemoved] = useState<string[]>([]);
+  const [focusNameId, setFocusNameId] = useState<string | null>(null);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const pinInputRef = useRef<TextInput>(null);
@@ -131,7 +142,11 @@ export function ShopOrderModal() {
 
   // The checklist starts from what's saved; the shop's unsaved ticks/prices aren't overwritten by polling.
   useEffect(() => {
-    if (order && !dirty) setDraft(draftFrom(order));
+    if (order && !dirty) {
+      setDraft(draftFrom(order));
+      setAdded([]);
+      setRemoved([]);
+    }
   }, [order, dirty]);
 
   useEffect(() => {
@@ -151,6 +166,8 @@ export function ShopOrderModal() {
   }, []);
 
   const onError = (error: unknown) => {
+    // Backed out of paying after accepting: it was given back (a toast said so).
+    if (error instanceof GivenBackError) return;
     if (error instanceof ApiError && error.code === 'ORDER_INVALID_STATE') {
       refetch();
       showToast({ variant: 'info', title: t('shopOrders.changedTitle'), message: t('shopOrders.changedMessage') });
@@ -164,17 +181,51 @@ export function ShopOrderModal() {
     setDraft((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
   };
 
+  // The checklist: the customer's items, then the ones the shop typed in (saved and new).
+  const checklistItems = (o: ShopOrder): ShopOrderItem[] => [
+    ...o.items.filter((item) => !removed.includes(item.id)),
+    ...added.map((key, index) => ({
+      id: key,
+      position: o.items.length + index + 1,
+      name: draft[key]?.name ?? '',
+      quantity: '',
+      unit: null,
+      status: draft[key]?.status ?? 'packed',
+      price: null,
+      addedByShop: true,
+    })),
+  ];
+
+  const addItem = () => {
+    const key = `${NEW_ITEM}${Date.now()}`;
+    setDirty(true);
+    setAdded((current) => [...current, key]);
+    setDraft((current) => ({ ...current, [key]: { status: 'packed', price: '', name: '' } }));
+    setFocusNameId(key);
+  };
+
+  const removeItem = (id: string) => {
+    setDirty(true);
+    if (id.startsWith(NEW_ITEM)) setAdded((current) => current.filter((key) => key !== id));
+    else setRemoved((current) => [...current, id]);
+  };
+
   // Ticked = packed (with its price). Unticked items become "not available" only when the
-  // bill is sent (`final`); a quiet save on close keeps them undecided.
+  // bill is sent (`final`); a quiet save on close keeps them undecided. A typed-in item with
+  // no name yet is left out.
   const draftUpdates = (o: ShopOrder, final: boolean): ItemUpdate[] =>
-    o.items.map((item) => {
-      const packedNow = (draft[item.id]?.status ?? item.status) === 'packed';
-      return {
-        id: item.id,
-        status: packedNow ? 'packed' : final ? 'unavailable' : 'pending',
-        price: packedNow ? parsePrice(draft[item.id]?.price ?? '') : null,
-      };
-    });
+    checklistItems(o)
+      .filter((item) => !item.addedByShop || (draft[item.id]?.name ?? item.name).trim())
+      .map((item) => {
+        const packedNow = (draft[item.id]?.status ?? item.status) === 'packed';
+        const isNew = item.id.startsWith(NEW_ITEM);
+        return {
+          id: isNew ? undefined : item.id,
+          name: item.addedByShop ? (draft[item.id]?.name ?? item.name).trim() : undefined,
+          status: packedNow ? 'packed' : final ? 'unavailable' : 'pending',
+          price: packedNow ? parsePrice(draft[item.id]?.price ?? '') : null,
+        };
+      });
 
   // Closing mid-packing keeps the ticks and prices already entered.
   const handleClose = () => {
@@ -275,6 +326,42 @@ export function ShopOrderModal() {
     );
   };
 
+  /** The order's steps with their times — the customer sees the same list. */
+  const renderTimeline = (o: ShopOrder) => {
+    const delivery = o.fulfillment === 'delivery';
+    const endedAt = o.cancelledAt ?? o.declinedAt ?? o.expiredAt ?? null;
+    const ended = ['cancelled', 'declined', 'expired'].includes(o.status);
+    const steps: TimelineStep[] = [
+      { key: 'placed', label: t('timeline.order.placed'), at: o.createdAt, done: true },
+      { key: 'accepted', label: t('timeline.order.accepted'), at: o.acceptedAt ?? null, done: !!o.acceptedAt },
+      { key: 'packed', label: t('timeline.order.packed'), at: o.packedAt ?? null, done: !!o.packedAt },
+      {
+        key: 'ready',
+        label:
+          delivery && o.deliveryStaff?.fullName
+            ? t('timeline.order.outBy', { name: o.deliveryStaff.fullName })
+            : t(delivery ? 'timeline.order.outForDelivery' : 'timeline.order.ready'),
+        at: o.readyAt ?? null,
+        done: !!o.readyAt,
+      },
+      {
+        key: 'completed',
+        label: o.deliveredByName ? t('timeline.order.deliveredBy', { name: o.deliveredByName }) : t('timeline.order.completed'),
+        at: o.completedAt,
+        done: !!o.completedAt,
+      },
+      { key: 'rated', label: t('timeline.order.rated'), at: null, done: o.shopRating != null },
+    ];
+    // Ended early: the steps it reached, then how it ended.
+    const shown = ended
+      ? [
+          ...steps.filter((step) => step.at && step.key !== 'completed'),
+          { key: 'ended', label: t(`timeline.order.${o.status}`), at: endedAt, done: true },
+        ]
+      : steps;
+    return <StepTimeline title={t('timeline.title')} steps={shown} ended={ended} />;
+  };
+
   const renderCustomer = (o: ShopOrder) => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.row}>
@@ -329,7 +416,10 @@ export function ShopOrderModal() {
 
   const renderPlainList = (o: ShopOrder) => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('shopOrders.list', { count: o.items.length })}</Text>
+      <Text style={[styles.cardLabel, { color: colors.textMuted }]}>
+        {o.items.length > 0 ? t('shopOrders.list', { count: o.items.length }) : t('shopOrders.listPhotos')}
+      </Text>
+      <ListPhotoStrip photos={o.listPhotoUrls ?? []} size={84} />
       {o.items.map((item, index) => (
         <View key={item.id} style={styles.plainRow}>
           <Text style={[styles.index, { color: colors.textMuted }]}>{index + 1}.</Text>
@@ -341,7 +431,67 @@ export function ShopOrderModal() {
   );
 
   // One tap ticks an item as packed (then its price); unticked means not packed.
+  /** An item the shop typed in from the list's photo: its name and price, side by side. */
+  const renderAddedItem = (item: ShopOrderItem) => {
+    const entry = draft[item.id] ?? { status: item.status, price: '' };
+    return (
+      <View
+        key={item.id}
+        onLayout={(event) => {
+          itemYs.current[item.id] = event.nativeEvent.layout.y;
+        }}
+        style={[styles.addedCard, { borderColor: `${colors.primary}33`, backgroundColor: `${colors.primary}08` }]}
+      >
+        <View style={styles.addedHead}>
+          <View style={[styles.addedTag, { backgroundColor: `${colors.primary}14` }]}>
+            <FontAwesome6 name="camera" size={10} color={colors.primary} solid />
+            <Text style={[styles.addedTagText, { color: colors.primary }]}>{t('shopOrders.addedByYou')}</Text>
+          </View>
+          <Pressable
+            onPress={() => removeItem(item.id)}
+            hitSlop={8}
+            accessibilityLabel={t('common.delete')}
+            style={[styles.removeItem, { backgroundColor: `${brandColors.error}14` }]}
+          >
+            <FontAwesome6 name="xmark" size={12} color={brandColors.error} solid />
+          </Pressable>
+        </View>
+        <View style={styles.addedRow}>
+          <View style={[styles.fieldBox, styles.flex, { borderColor: `${colors.primary}40`, backgroundColor: colors.surface }]}>
+            <FontAwesome6 name="basket-shopping" size={13} color={colors.textMuted} solid />
+            <TextInput
+              style={[styles.fieldInput, styles.flex, { color: colors.text }]}
+              value={entry.name ?? item.name}
+              onChangeText={(text) => setItem(item.id, { name: text.slice(0, 100), status: 'packed' })}
+              placeholder={t('shopOrders.itemNamePlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              autoFocus={focusNameId === item.id}
+              onFocus={() => scrollToItem(item.id)}
+              returnKeyType="next"
+            />
+          </View>
+          <View style={[styles.fieldBox, styles.addedPrice, { borderColor: colors.primary, backgroundColor: colors.surface }]}>
+            <Text style={[styles.fieldRupee, { color: colors.text }]}>₹</Text>
+            <TextInput
+              style={[styles.fieldInput, styles.flex, { color: colors.text, fontFamily: fonts.semiBold }]}
+              value={entry.price}
+              onChangeText={(text) => setItem(item.id, { price: text.replace(/[^0-9.]/g, ''), status: 'packed' })}
+              keyboardType="decimal-pad"
+              placeholder={t('shopOrders.pricePlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              maxLength={9}
+              accessibilityLabel={t('shopOrders.price')}
+              onFocus={() => scrollToItem(item.id)}
+              returnKeyType="done"
+            />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const renderChecklistItem = (item: ShopOrderItem) => {
+    if (item.addedByShop) return renderAddedItem(item);
     const entry = draft[item.id] ?? { status: item.status, price: '' };
     const checked = entry.status === 'packed';
     return (
@@ -412,7 +562,9 @@ export function ShopOrderModal() {
   };
 
   const renderChecklist = (o: ShopOrder) => {
-    const entries = o.items.map((item) => draft[item.id] ?? { status: item.status, price: '' });
+    const list = checklistItems(o);
+    const photos = o.listPhotoUrls ?? [];
+    const entries = list.map((item) => draft[item.id] ?? { status: item.status, price: '' });
     const packedCount = entries.filter((entry) => entry.status === 'packed').length;
     const notPackedCount = entries.length - packedCount;
     const itemsTotal = entries.reduce((sum, entry) => sum + (entry.status === 'packed' ? (parsePrice(entry.price) ?? 0) : 0), 0);
@@ -429,8 +581,23 @@ export function ShopOrderModal() {
             <Text style={[styles.counterLabel, { color: colors.textMuted }]}>{t('shopOrders.notPackedCount')}</Text>
           </View>
         </View>
+        {photos.length > 0 ? (
+          // A photo of a written list: read it, then type each item in with its price.
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('shopOrders.listPhotos')}</Text>
+            <ListPhotoStrip photos={photos} size={84} />
+            <Text style={[styles.hint, { color: colors.textMuted }]}>{t('shopOrders.photoHint')}</Text>
+          </View>
+        ) : null}
         <Text style={[styles.hint, { color: colors.textMuted }]}>{t('shopOrders.checklistHint')}</Text>
-        {o.items.map(renderChecklistItem)}
+        {list.map(renderChecklistItem)}
+        <Pressable
+          onPress={addItem}
+          style={({ pressed }) => [styles.addItem, { borderColor: `${colors.primary}55`, backgroundColor: `${colors.primary}0A`, opacity: pressed ? 0.85 : 1 }]}
+        >
+          <FontAwesome6 name="plus" size={13} color={colors.primary} solid />
+          <Text style={[styles.addItemText, { color: colors.primary }]}>{t('shopOrders.addItem')}</Text>
+        </Pressable>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.sumRow}>
             <Text style={[styles.sumLabel, { color: colors.textMuted }]}>{t('shopOrders.itemsTotal')}</Text>
@@ -454,8 +621,15 @@ export function ShopOrderModal() {
   const renderBill = (o: ShopOrder) => {
     const packedItems = o.items.filter((item) => item.status === 'packed');
     const missing = o.items.filter((item) => item.status === 'unavailable');
+    const photos = o.listPhotoUrls ?? [];
     return (
       <>
+        {photos.length > 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('shopOrders.listPhotos')}</Text>
+            <ListPhotoStrip photos={photos} size={84} />
+          </View>
+        ) : null}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('shopOrders.bill')}</Text>
           {packedItems.map((item) => (
@@ -536,14 +710,12 @@ export function ShopOrderModal() {
       <View style={styles.fullWidth}>
         <Button
           label={t('shopOrders.verifyPin')}
-          // Handover finishes the order: a local business's ad first (when one is running nearby).
           onPress={() =>
             runPin(async () => {
-              if (adLoading || !(await askForLocation())) return;
-              if (await waitForAd()) handleVerifyPin(o);
+              if (await askForLocation()) handleVerifyPin(o);
             })
           }
-          loading={verifyPin.isPending || adLoading || pinBusy}
+          loading={verifyPin.isPending || pinBusy}
           disabled={pin.length !== 4}
         />
       </View>
@@ -682,19 +854,15 @@ export function ShopOrderModal() {
 
   const renderBody = () => {
     if (isLoading || !order) {
-      return (
+      return isError ? (
         <View style={styles.center}>
-          {isError ? (
-            <>
-              <Text style={[styles.bannerTitle, { color: colors.text }]}>{t('shopOrders.loadFailed')}</Text>
-              <View style={styles.fullWidth}>
-                <Button label={t('common.retry')} onPress={() => refetch()} />
-              </View>
-            </>
-          ) : (
-            <LoadingIndicator size={40} dotSize={6} color={colors.primary} />
-          )}
+          <Text style={[styles.bannerTitle, { color: colors.text }]}>{t('shopOrders.loadFailed')}</Text>
+          <View style={styles.fullWidth}>
+            <Button label={t('common.retry')} onPress={() => refetch()} />
+          </View>
         </View>
+      ) : (
+        <DetailSkeleton />
       );
     }
     const shopCanCancel = order.status === 'placed' ? false : ACTIVE_SHOP_STATUSES.includes(order.status);
@@ -709,6 +877,7 @@ export function ShopOrderModal() {
       >
         {renderBanner(order)}
         {renderCustomer(order)}
+        {renderTimeline(order)}
         {renderStage(order)}
         {shopCanCancel ? (
           <CancelButton
@@ -743,13 +912,15 @@ export function ShopOrderModal() {
             </Pressable>
             <View style={styles.flex}>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {order ? t(`shopOrders.status.${order.status}.title`) : t('shopOrders.title')}
+                {order ? t(`shopOrders.status.${order.status}.title`) : t('timeline.orderDetails')}
               </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {order
-                  ? `${order.customerFullName} · ${t(order.fulfillment === 'delivery' ? 'shopOrders.delivery' : 'shopOrders.pickup')}`
-                  : ''}
-              </Text>
+              {order ? (
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  {`${order.customerFullName} · ${t(order.fulfillment === 'delivery' ? 'shopOrders.delivery' : 'shopOrders.pickup')}`}
+                </Text>
+              ) : (
+                <View style={styles.subtitleBar} />
+              )}
             </View>
           </LinearGradient>
           {renderBody()}
@@ -825,6 +996,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  subtitleBar: { height: 10, width: 140, borderRadius: 5, marginTop: 6, backgroundColor: 'rgba(255,255,255,0.3)' },
   headerTitle: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 18 },
   headerSubtitle: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
   body: { padding: 18, gap: 14 },
@@ -867,6 +1039,25 @@ const styles = StyleSheet.create({
   counterValue: { fontFamily: fonts.semiBold, fontSize: 20, lineHeight: 26 },
   counterLabel: { ...typography.caption, fontSize: 11 },
   hint: { ...typography.caption, lineHeight: 18 },
+  addItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed' },
+  addItemText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  addedCard: { borderRadius: 16, borderWidth: 1, padding: 12, gap: 10 },
+  addedHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  addedTag: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  addedTagText: { fontFamily: fonts.semiBold, fontSize: 11.5 },
+  addedRow: { flexDirection: 'row', gap: 8 },
+  addedPrice: { width: 110 },
+  fieldBox: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 12 },
+  fieldRupee: { fontFamily: fonts.semiBold, fontSize: 16 },
+  fieldInput: {
+    height: 46,
+    paddingVertical: 0,
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  removeItem: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   checkItem: { borderRadius: 16, borderWidth: 1, padding: 12, gap: 10 },
   checkHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
@@ -882,7 +1073,17 @@ const styles = StyleSheet.create({
   notPackedTag: { ...typography.caption, fontSize: 11 },
   rupee: { fontFamily: fonts.semiBold, fontSize: 16 },
   // Left-aligned and narrow so the number sits right beside the ₹.
-  priceInput: { minWidth: 48, maxWidth: 90, fontFamily: fonts.semiBold, fontSize: 16, textAlign: 'left', padding: 0 },
+  priceInput: {
+    minWidth: 48,
+    maxWidth: 90,
+    height: 40,
+    fontFamily: fonts.semiBold,
+    fontSize: 16,
+    textAlign: 'left',
+    padding: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 10 },
   sumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
   sumLabel: { ...typography.body, fontSize: 13 },

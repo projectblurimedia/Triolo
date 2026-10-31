@@ -14,7 +14,10 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { SendListModal } from '@/components/SendListModal';
 import { ToastHost } from '@/components/ToastHost';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { isListNameTaken, listFallbackName, SavedList, useListStore } from '@/state/listStore';
+import { isListNameTaken, listFallbackName, MAX_LIST_PHOTOS, PrepareListPhoto, SavedList, useListStore } from '@/state/listStore';
+import { ImagePickerField, PickedImage } from '@/components/ImagePickerField';
+import { SmartImage } from '@/components/SmartImage';
+import { keepListPhoto, pruneListPhotos } from '@/utils/listPhotos';
 import { showToast } from '@/state/toastStore';
 import { parseVoiceListText } from '@/utils/parseVoiceList';
 import { RouteProp, useRoute } from '@react-navigation/native';
@@ -58,12 +61,13 @@ export function PrepareListScreen() {
   const saveDraft = useListStore((state) => state.saveDraft);
   const discardDraft = useListStore((state) => state.discardDraft);
   const deleteList = useListStore((state) => state.deleteList);
+  const setDraftPhotos = useListStore((state) => state.setDraftPhotos);
 
   // My Lists is always the tab; New List / Edit open the editor in its own full screen. An
   // unfinished draft (from before the app was closed) reopens it.
   const [screen, setScreen] = useState<'lists' | 'editor'>(() => {
     const state = useListStore.getState();
-    return state.draft.items.length > 0 || state.draft.listId ? 'editor' : 'lists';
+    return state.draft.items.length > 0 || (state.draft.photos ?? []).length > 0 || state.draft.listId ? 'editor' : 'lists';
   });
   const [recognizing, setRecognizing] = useState(false);
   const [interimText, setInterimText] = useState('');
@@ -188,6 +192,21 @@ export function PrepareListScreen() {
     });
   };
 
+  const photos = draft.photos ?? [];
+  const handlePhotosChange = (images: PickedImage[]) => {
+    const next: PrepareListPhoto[] = images.map((image) => {
+      const kept = photos.find((photo) => photo.uri === image.uri);
+      if (kept) return kept;
+      return {
+        id: `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        uri: keepListPhoto(image.uri, image.name),
+        name: image.name,
+        type: image.type,
+      };
+    });
+    setDraftPhotos(next);
+  };
+
   const handleAddBlankItem = () => {
     addItems([{ name: '', quantity: '1', unit: '' }]);
     const added = useListStore.getState().draft.items;
@@ -208,18 +227,20 @@ export function PrepareListScreen() {
       return;
     }
     showToast({ variant: 'success', title: t('prepareList.savedTitle') });
+    pruneListPhotos();
     setScreen('lists');
   };
 
   const leaveEditor = () => {
     stopListening();
     discardDraft();
+    pruneListPhotos();
     setShowDiscardConfirm(false);
     setScreen('lists');
   };
 
   const handleBack = () => {
-    if (items.some((item) => item.name.trim())) setShowDiscardConfirm(true);
+    if (items.some((item) => item.name.trim()) || photos.length > 0) setShowDiscardConfirm(true);
     else leaveEditor();
   };
 
@@ -247,7 +268,13 @@ export function PrepareListScreen() {
             {list.name}
           </Text>
           <Text style={[styles.listMeta, { color: colors.textMuted }]}>
-            {t('prepareList.itemsCount', { count: list.items.length })} ·{' '}
+            {[
+              list.items.length || !(list.photos ?? []).length ? t('prepareList.itemsCount', { count: list.items.length }) : '',
+              (list.photos ?? []).length ? t('prepareList.photosCount', { count: list.photos.length }) : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}{' '}
+            ·{' '}
             {t('prepareList.updatedOn', { date: formatShortDate(list.updatedAt) })}
           </Text>
         </View>
@@ -263,6 +290,9 @@ export function PrepareListScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.previewRow}
       >
+        {(list.photos ?? []).map((photo) => (
+          <SmartImage key={photo.id} source={{ uri: photo.uri }} style={[styles.previewPhoto, { borderColor: `${colors.primary}1F` }]} />
+        ))}
         {list.items.map((item) => (
           <View key={item.id} style={[styles.previewItem, { backgroundColor: colors.background, borderColor: `${colors.primary}1F` }]}>
             <FontAwesome6 name="basket-shopping" size={10} color={colors.primary} solid />
@@ -465,7 +495,26 @@ export function PrepareListScreen() {
           <FontAwesome6 name="plus" size={12} color={colors.primary} solid />
         </View>
       </Pressable>
-      {items.length ? (
+      {/* A list written on paper (or anywhere): its photos go to the shop instead of typed items. */}
+      <View style={[styles.photoCard, { backgroundColor: colors.surface, borderColor: `${colors.primary}26` }]}>
+        <View style={styles.photoHead}>
+          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.addIcon}>
+            <FontAwesome6 name="camera" size={15} color="#FFFFFF" solid />
+          </LinearGradient>
+          <View style={styles.flex}>
+            <Text style={[styles.addRowText, { color: colors.text }]}>{t('prepareList.photoTitle')}</Text>
+            <Text style={[styles.addRowHint, { color: colors.textMuted }]}>{t('prepareList.photoHint')}</Text>
+          </View>
+        </View>
+        <ImagePickerField
+          label=""
+          images={photos.map((photo) => ({ uri: photo.uri, name: photo.name, type: photo.type }))}
+          onChange={handlePhotosChange}
+          maxImages={MAX_LIST_PHOTOS}
+          allowCamera
+        />
+      </View>
+      {items.length || photos.length ? (
         <Pressable style={styles.saveButton} onPress={handleSave}>
           <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.saveButtonGradient}>
             <FontAwesome6 name="check" size={14} color="#FFFFFF" solid />
@@ -557,7 +606,10 @@ export function PrepareListScreen() {
         message={t('prepareList.deleteListMessage', { name: deleteTarget?.name ?? '' })}
         confirmLabel={t('prepareList.deleteList')}
         onConfirm={() => {
-          if (deleteTarget) deleteList(deleteTarget.id);
+          if (deleteTarget) {
+            deleteList(deleteTarget.id);
+            pruneListPhotos();
+          }
           setDeleteTarget(null);
         }}
         onCancel={() => setDeleteTarget(null)}
@@ -583,6 +635,9 @@ const styles = StyleSheet.create({
   listMeta: { ...typography.caption, fontSize: 12, marginTop: 1 },
   iconButton: { padding: 6 },
   previewScroll: { flexGrow: 0 },
+  previewPhoto: { width: 34, height: 34, borderRadius: 10, borderWidth: 1 },
+  photoCard: { borderRadius: 16, borderWidth: 1, padding: 12, paddingBottom: 0, marginTop: 12, gap: 10 },
+  photoHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   previewRow: { gap: 8, paddingRight: 4 },
   previewItem: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, borderRadius: 12, borderWidth: 1, paddingHorizontal: 11, maxWidth: 170 },
   previewName: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12.5, lineHeight: 17, flexShrink: 1 },

@@ -1,5 +1,6 @@
 import { AppError } from '@/common/errors/AppError';
 import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
+import type { PartnerPlan } from '@/modules/subscriptions/interfaces';
 import {
   deletePhotosFromCloudinary,
   deleteVideosFromCloudinary,
@@ -26,6 +27,11 @@ import {
   AD_MEDIA_FOLDER,
   AD_RADIUS_KM,
   AD_SELF_OPEN_LIMIT,
+  AD_HOME_MAX,
+  AD_RETIRED_SPOTS,
+  AD_VIEWS_MAX,
+  AD_VIEWS_MIN,
+  AD_VIEWS_VALID_DAYS,
   AdApp,
   AdListFilter,
   AdPlacement,
@@ -49,6 +55,7 @@ function toPublic(ad: Ad): PublicAd {
     imageUrls: ad.imageUrls.map((url) => playbackUrl(url, 'image') as string),
     videoUrl: playbackUrl(ad.videoUrl, 'video'),
     orientation: ad.orientation,
+    showOn: ad.showOn,
     durationSeconds: ad.durationSeconds,
     advertiserName: ad.advertiserName,
     // The business's own phone is the Call button's number.
@@ -82,8 +89,16 @@ function normalizeLink(link?: string | null): string | null {
 
 function clean(params: SaveAdParams): SaveAdParams {
   const optional = (value?: string | null) => (value?.trim() ? value.trim() : null);
+  const views = params.billing === 'views';
   return {
     ...params,
+    // A views ad runs until its views are used up, within AD_VIEWS_VALID_DAYS of its start.
+    billing: views ? 'views' : 'days',
+    // Home's slider is a row of wide cards: its ads are always horizontal.
+    showOn: params.showOn === 'home' ? 'home' : 'action',
+    orientation: params.showOn === 'home' ? 'horizontal' : params.orientation,
+    viewLimit: views ? params.viewLimit ?? null : null,
+    planDays: views ? AD_VIEWS_VALID_DAYS : params.planDays,
     advertiserName: params.advertiserName?.trim() ?? '',
     // The ad itself is just its media; the title only names it in the list and on the bill.
     title: params.title?.trim() || params.advertiserName?.trim() || '',
@@ -99,6 +114,27 @@ function assertStartsTodayOrLater(startDate: string): void {
   if (startDate < today) throw AppError.badRequest('Choose a start date from today on.', 'AD_START_IN_PAST');
 }
 
+/** What an ad costs at today's prices: its plan's price, or its views × the price per view. */
+export function adPrice(settings: Pick<AdSettings, 'prices' | 'pricePerView'>, params: Pick<SaveAdParams, 'billing' | 'viewLimit' | 'planDays'>): number {
+  if (params.billing === 'views') return Math.round((params.viewLimit ?? 0) * settings.pricePerView);
+  return settings.prices[String(params.planDays) as keyof AdSettings['prices']];
+}
+
+/**
+ * The partner plan whose "no ads" perk covers each partner-app spot: a Job Post plan takes the
+ * ads off the job post's screens only, not off service jobs or shop orders. Home's slider and
+ * anything without a spot are covered only by All in One.
+ */
+const PARTNER_SPOT_PLAN: Partial<Record<AdSpot, PartnerPlan>> = {
+  find_jobs: 'service',
+  problem_accept: 'service',
+  job_accept: 'service',
+  continue_card: 'service',
+  find_orders: 'shop',
+  order_accept: 'shop',
+  viewer_reveal: 'job_post',
+};
+
 /** Whether ads are switched on for this app and place (the master switch first). */
 export function placementOn(settings: AdSettings, app: AdApp, placement: AdPlacement, spot?: AdSpot | null): boolean {
   if (!settings.adsEnabled) return false;
@@ -106,6 +142,7 @@ export function placementOn(settings: AdSettings, app: AdApp, placement: AdPlace
   if (placement === 'launch') return false;
   if (!(app === 'user' ? settings.actionUser : settings.actionPartner)) return false;
   // A spot from the other app is never shown here.
+  if (spot && (AD_RETIRED_SPOTS as readonly string[]).includes(spot)) return false;
   if (spot && !(AD_SPOTS_BY_APP[app] as readonly string[]).includes(spot)) return false;
   return spot ? settings.spots[spot] !== false : true;
 }
@@ -218,10 +255,8 @@ export class AdsService {
     }
     const settings = await this.repository.getSettings();
     if (!placementOn(settings, app, placement, options.spot)) return null;
-    // A subscriber sees no ads.
-    if (options.accountId && this.subscriptionStatus) {
-      if (await this.subscriptionStatus.isActive(options.accountId, app === 'user' ? 'customer' : 'partner')) return null;
-    }
+    // A subscriber sees no ads (a partner: on the sides their plan covers).
+    if (options.accountId && (await this.adFree(options.accountId, app, options.spot ?? null))) return null;
     // Not too often for the same person (the admin's minimum gap).
     if (options.accountId && settings.actionGapSeconds > 0) {
       if (await this.repository.sawActionAdWithin(options.accountId, app, settings.actionGapSeconds)) return null;
@@ -244,6 +279,40 @@ export class AdsService {
     return served;
   }
 
+  /**
+   * Home's carousel: a few running ads near the viewer (each counted as a view), when the admin
+   * turned it on for this app. Subscribers see none.
+   */
+  async serveHome(app: AdApp, viewer: { latitude: number; longitude: number }, accountId: string | null): Promise<PublicAd[]> {
+    const settings = await this.repository.getSettings();
+    if (!settings.adsEnabled || !(app === 'user' ? settings.homeUser : settings.homePartner)) return [];
+    if (accountId && (await this.adFree(accountId, app, null))) return [];
+    const ads = await this.repository.pickManyAndCount(viewer.latitude, viewer.longitude, app === 'user', AD_HOME_MAX);
+    const trusted = ads.some((ad) => ad.promoted) && this.subscriptionStatus ? await this.subscriptionStatus.trustedIds().catch(() => null) : null;
+    return Promise.all(
+      ads.map(async (ad) => {
+        const served = toPublic(ad);
+        if (ad.promoted && this.promotions) {
+          served.promotedCard = await this.promotions.card(ad.promoted.kind, ad.promoted.id).catch(() => null);
+          if (served.promotedCard) served.promotedCard.trusted = !!trusted?.[ad.promoted.kind]?.includes(ad.promoted.id);
+        }
+        return served;
+      }),
+    );
+  }
+
+  /** Whether this person's plan takes the ads off here. */
+  private async adFree(accountId: string, app: AdApp, spot: AdSpot | null): Promise<boolean> {
+    if (!this.subscriptionStatus) return false;
+    if (app === 'user') return this.subscriptionStatus.isActive(accountId, 'customer');
+    return this.subscriptionStatus.isActive(accountId, 'partner', (spot && PARTNER_SPOT_PLAN[spot]) || 'all');
+  }
+
+  /** Whether ads run at this partner-app spot now (an ad after accepting, instead of the fee). */
+  async partnerSpotOn(spot: string): Promise<boolean> {
+    return placementOn(await this.repository.getSettings(), 'partner', 'action', spot as AdSpot);
+  }
+
   async recordClick(id: string): Promise<void> {
     await this.repository.recordClick(id);
   }
@@ -253,7 +322,16 @@ export class AdsService {
   /** What a business sees before booking: today's prices and the rules. */
   async selfInfo() {
     const settings = await this.repository.getSettings();
-    return { prices: settings.prices, radiusKm: AD_RADIUS_KM, maxVideoSeconds: AD_MAX_VIDEO_SECONDS, openLimit: AD_SELF_OPEN_LIMIT };
+    return {
+      prices: settings.prices,
+      pricePerView: settings.pricePerView,
+      viewsMin: AD_VIEWS_MIN,
+      viewsMax: AD_VIEWS_MAX,
+      viewsValidDays: AD_VIEWS_VALID_DAYS,
+      radiusKm: AD_RADIUS_KM,
+      maxVideoSeconds: AD_MAX_VIDEO_SECONDS,
+      openLimit: AD_SELF_OPEN_LIMIT,
+    };
   }
 
   listOwned(accountId: string): Promise<Ad[]> {
@@ -280,12 +358,7 @@ export class AdsService {
     }
     const stored = await this.stored({ ...params, paymentMethod: 'pending' as never }, accountId);
     const checked = isProfileAd(stored.actionType) ? null : await this.checkMedia(media.imageUrl ?? null, media.videoUrl ?? null);
-    const { prices } = await this.repository.getSettings();
-    const ad = await this.repository.create(
-      stored,
-      prices[String(params.planDays) as keyof typeof prices],
-      accountId,
-    );
+    const ad = await this.repository.create(stored, adPrice(await this.repository.getSettings(), stored), accountId);
     if (!checked) return ad;
     const result = await this.repository.setMedia(ad.id, checked.images, checked.videoUrl, checked.videoSeconds);
     return result?.ad ?? ad;
@@ -300,12 +373,12 @@ export class AdsService {
   ): Promise<Ad> {
     assertStartsTodayOrLater(params.startDate);
     const existing = await this.getOwned(accountId, id);
-    if (existing.paymentMethod === 'online' && existing.planDays !== params.planDays) {
+    const stored = await this.stored({ ...params, paymentMethod: 'pending' as never }, accountId);
+    const samePlan = existing.billing === stored.billing && existing.planDays === stored.planDays && existing.viewLimit === (stored.viewLimit ?? null);
+    if (existing.paymentMethod === 'online' && !samePlan) {
       throw AppError.conflict('It is already paid for — the plan can no longer change.', 'AD_PAID_PLAN_LOCKED');
     }
-    const { prices } = await this.repository.getSettings();
-    const amount = existing.planDays === params.planDays ? existing.amount : prices[String(params.planDays) as keyof typeof prices];
-    const stored = await this.stored({ ...params, paymentMethod: 'pending' as never }, accountId);
+    const amount = samePlan ? existing.amount : adPrice(await this.repository.getSettings(), stored);
     const ad = await this.repository.updateOwned(id, accountId, stored, amount);
     if (!ad) throw AppError.conflict('This ad was already approved — it can no longer be changed.', 'AD_NOT_EDITABLE');
     if (isProfileAd(stored.actionType)) return this.dropMedia(ad);
@@ -467,8 +540,7 @@ export class AdsService {
       !isProfileAd(stored.actionType) && media && (media.imageUrl || media.videoUrl)
         ? await this.checkMedia(media.imageUrl ?? null, media.videoUrl ?? null)
         : null;
-    const { prices } = await this.repository.getSettings();
-    const ad = await this.repository.create(stored, prices[String(params.planDays) as keyof typeof prices]);
+    const ad = await this.repository.create(stored, adPrice(await this.repository.getSettings(), stored));
     if (!checked) return ad;
     const result = await this.repository.setMedia(ad.id, checked.images, checked.videoUrl, checked.videoSeconds);
     return result?.ad ?? ad;
@@ -481,12 +553,11 @@ export class AdsService {
   async update(id: string, params: SaveAdParams, media?: AdMediaInput): Promise<Ad> {
     const existing = await this.repository.findById(id);
     if (!existing || existing.status === 'deleted') throw AppError.notFound('Ad not found, or it was deleted.', 'AD_NOT_FOUND');
-    let amount = existing.amount;
-    if (existing.planDays !== params.planDays) {
-      const { prices } = await this.repository.getSettings();
-      amount = prices[String(params.planDays) as keyof typeof prices];
-    }
     const stored = await this.stored(params, null);
+    let amount = existing.amount;
+    if (existing.billing !== stored.billing || existing.planDays !== stored.planDays || existing.viewLimit !== (stored.viewLimit ?? null)) {
+      amount = adPrice(await this.repository.getSettings(), stored);
+    }
     const ad = await this.repository.update(id, stored, amount);
     if (!ad) throw AppError.notFound('Ad not found, or it was deleted.', 'AD_NOT_FOUND');
     if (isProfileAd(stored.actionType)) return this.dropMedia(ad);

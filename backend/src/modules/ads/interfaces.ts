@@ -3,6 +3,16 @@ export type AdPlanPrices = Record<'1' | '3' | '7' | '30', number>;
 export const AD_PLAN_DAYS = [1, 3, 7, 30] as const;
 export type AdPlanDays = (typeof AD_PLAN_DAYS)[number];
 
+/** Bought by days (a plan above), or by views (a number of views at the admin's per-view price). */
+export const AD_BILLINGS = ['days', 'views'] as const;
+export type AdBilling = (typeof AD_BILLINGS)[number];
+export const AD_VIEWS_MIN = 500;
+export const AD_VIEWS_MAX = 10000;
+/** A views ad runs until its views are used up, at most this many days from its start. */
+export const AD_VIEWS_VALID_DAYS = 90;
+/** How many ads the Home carousel shows at most. */
+export const AD_HOME_MAX = 5;
+
 /** People see an ad only within this distance of the ad's place. */
 export const AD_RADIUS_KM = 5;
 
@@ -11,6 +21,12 @@ export const AD_MAX_IMAGES = 1;
 /** Longest video an ad may have (seconds). */
 export const AD_MAX_VIDEO_SECONDS = 30;
 export const AD_ORIENTATIONS = ['vertical', 'horizontal'] as const;
+/**
+ * Where an ad is shown: full screen before key actions ('action'), or as a wide card in the
+ * slider at the top of Home ('home' — always horizontal).
+ */
+export const AD_SHOW_ON = ['action', 'home'] as const;
+export type AdShowOn = (typeof AD_SHOW_ON)[number];
 export type AdOrientation = (typeof AD_ORIENTATIONS)[number];
 /** Cloudinary folder every ad's images and video live in. */
 export const AD_MEDIA_FOLDER = 'triolo/ads';
@@ -39,10 +55,15 @@ export type AdPlacement = (typeof AD_PLACEMENTS)[number];
 
 /** The key actions that can show an ad first, per app — each switched on or off by the admin. */
 export const AD_SPOTS_BY_APP = {
-  user: ['quick_book', 'book_worker', 'send_list', 'post_problem', 'hire_staff'],
-  partner: ['work_done', 'order_pin'],
+  // send_list = ordering from a particular shop; staff_phone = Hire Staff showing a phone number.
+  user: ['quick_book', 'book_worker', 'quick_order', 'send_list', 'post_problem', 'hire_staff', 'staff_phone'],
+  // Never before accepting (someone else could take it meanwhile): after an accept, before its
+  // details open (job_accept / order_accept), and on the partner's own searches and screens.
+  partner: ['find_jobs', 'find_orders', 'problem_accept', 'continue_card', 'job_accept', 'order_accept', 'viewer_reveal'],
 } as const;
-export const AD_SPOTS = [...AD_SPOTS_BY_APP.user, ...AD_SPOTS_BY_APP.partner] as const;
+/** Spots older app builds may still ask for; always off now. */
+export const AD_RETIRED_SPOTS = ['work_done', 'order_pin'] as const;
+export const AD_SPOTS = [...AD_SPOTS_BY_APP.user, ...AD_SPOTS_BY_APP.partner, ...AD_RETIRED_SPOTS] as const;
 export type AdSpot = (typeof AD_SPOTS)[number];
 
 /** in_review / rejected: a self-booked ad not approved (yet); otherwise by its dates. */
@@ -131,6 +152,11 @@ export interface AdSettings {
   actionGapSeconds: number;
   /** Applies to new bookings only — each ad keeps the amount it was booked at. */
   prices: AdPlanPrices;
+  /** ₹ per view, for ads bought by views. */
+  pricePerView: number;
+  /** A carousel of running ads at the top of Home, per app. */
+  homeUser: boolean;
+  homePartner: boolean;
   updatedAt: string;
 }
 
@@ -159,6 +185,8 @@ export interface PublicAd {
   endDate: string;
   /** Vertical (reel, 9:16) or horizontal (16:9) — the apps shape the full-screen card to it. */
   orientation: AdOrientation;
+  /** Before key actions, or in Home's slider. */
+  showOn: AdShowOn;
   /** How long it shows before it can be closed: an image's set time, or the video's length. */
   durationSeconds: number;
 }
@@ -174,7 +202,10 @@ export interface Ad extends PublicAd {
   displaySeconds: number;
   /** For a video: its length in seconds (at most 30). */
   videoSeconds: number | null;
-  planDays: AdPlanDays;
+  planDays: AdPlanDays | 90;
+  billing: AdBilling;
+  /** Views bought (views ads only); the ad ends when they are used up. */
+  viewLimit: number | null;
   amount: number;
   paymentMethod: AdPaymentState;
   startDate: string;
@@ -200,6 +231,8 @@ export interface Ad extends PublicAd {
   clicks: number;
   status: AdStatus;
   deletedAt: string | null;
+  /** Who removed it: the business itself (withdrawn) or the Triolo admin. */
+  deletedBy: 'owner' | 'admin' | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -212,6 +245,8 @@ export interface SaveAdParams {
   title?: string | null;
   description?: string | null;
   orientation: AdOrientation;
+  /** Before key actions (default) or Home's slider. */
+  showOn?: AdShowOn;
   displaySeconds: number;
   /**
    * Ignored when saving: an ad has a place only with 'Show directions' (that place — the ad is
@@ -229,7 +264,11 @@ export interface SaveAdParams {
   promoteMobile?: string | null;
   /** Boosting one of several job posts: which one. */
   promotedPostId?: string | null;
-  planDays: AdPlanDays;
+  planDays: AdPlanDays | 90;
+  /** Days (default) or views. */
+  billing?: AdBilling;
+  /** Views ads: how many views (AD_VIEWS_MIN – AD_VIEWS_MAX). */
+  viewLimit?: number | null;
   paymentMethod: AdPaymentState;
   /** YYYY-MM-DD (India date). */
   startDate: string;

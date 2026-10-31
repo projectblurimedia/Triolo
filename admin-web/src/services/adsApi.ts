@@ -7,13 +7,35 @@ export type AdStatus = 'unpaid' | 'in_review' | 'rejected' | 'scheduled' | 'runn
 /** 'online' = paid by the business through Razorpay on the Triolo Ads website. */
 export type AdPaymentMethod = 'cash' | 'upi' | 'other' | 'pending' | 'online';
 export type AdPlanDays = 1 | 3 | 7 | 30;
+/** Bought by days (a plan) or by views (a number of views at the per-view price). */
+export type AdBilling = 'days' | 'views';
+export const AD_VIEWS_MIN = 500;
+export const AD_VIEWS_MAX = 10000;
+/** Quick picks for the number of views (any number in between can be typed). */
+export const AD_VIEW_PICKS = [500, 1000, 2500, 5000, 10000];
+/** A views ad runs until its views are used up, within this many days of its start. */
+export const AD_VIEWS_VALID_DAYS = 90;
 export type AdOrientation = 'vertical' | 'horizontal';
 export type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
 import type { AdActionType, AdPromotedKind } from '@/components/AdActionField';
 export type AdPlanPrices = Record<'1' | '3' | '7' | '30', number>;
 
 /** The key actions that can show an ad first. */
-export type AdSpot = 'quick_book' | 'book_worker' | 'send_list' | 'post_problem' | 'hire_staff' | 'work_done' | 'order_pin';
+export type AdSpot =
+  | 'quick_book'
+  | 'book_worker'
+  | 'quick_order'
+  | 'send_list'
+  | 'post_problem'
+  | 'hire_staff'
+  | 'staff_phone'
+  | 'find_jobs'
+  | 'find_orders'
+  | 'problem_accept'
+  | 'continue_card'
+  | 'job_accept'
+  | 'order_accept'
+  | 'viewer_reveal';
 
 export interface AdSettings {
   adsEnabled: boolean;
@@ -29,6 +51,11 @@ export interface AdSettings {
   actionGapSeconds: number;
   /** ₹ per plan, keyed "1" / "3" / "7" / "30". New bookings only — booked ads keep their amount. */
   prices: AdPlanPrices;
+  /** ₹ per view, for ads bought by views. */
+  pricePerView: number;
+  /** The carousel of ads at the top of Home, per app. */
+  homeUser: boolean;
+  homePartner: boolean;
   updatedAt: string;
 }
 
@@ -46,6 +73,8 @@ export interface Ad {
   videoUrl: string | null;
   /** Vertical (reel, 9:16) or horizontal (16:9). */
   orientation: AdOrientation;
+  /** Full screen before actions, or the Home slider. */
+  showOn: 'action' | 'home';
   /** An image shows for this many seconds before it can be closed. */
   displaySeconds: number;
   /** A video's length in seconds (at most 30). */
@@ -68,7 +97,10 @@ export interface Ad {
   longitude: number | null;
   /** Shown only to people within this distance of the place. */
   radiusKm: number;
-  planDays: AdPlanDays;
+  planDays: AdPlanDays | 90;
+  billing?: AdBilling;
+  /** Views bought (views ads); the ad ends when they are used up. */
+  viewLimit?: number | null;
   amount: number;
   paymentMethod: AdPaymentMethod;
   razorpayPaymentId?: string | null;
@@ -89,6 +121,8 @@ export interface Ad {
   clicks: number;
   status: AdStatus;
   deletedAt: string | null;
+  /** Who removed it: the business (withdrawn) or the admin. */
+  deletedBy?: 'owner' | 'admin' | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -112,6 +146,7 @@ export interface SaveAd {
   title?: string;
   description?: string;
   orientation: AdOrientation;
+  showOn: 'action' | 'home';
   displaySeconds: number;
   linkUrl: string;
   actionType: AdActionType;
@@ -120,6 +155,8 @@ export interface SaveAd {
   actionPlace: string | null;
   promoteMobile?: string;
   planDays: AdPlanDays;
+  billing: AdBilling;
+  viewLimit: number | null;
   paymentMethod: AdPaymentMethod;
   startDate: string;
 }
@@ -259,4 +296,10 @@ export async function uploadAdFile(
   }
   if (!result.secure_url) throw new Error(result.error?.message ?? 'Upload failed');
   return { url: result.secure_url, seconds: result.duration ?? null };
+}
+
+/** What was bought: "7 days" or "2,500 views". */
+export function adPlanText(ad: Pick<Ad, 'planDays' | 'billing' | 'viewLimit'>): string {
+  if (ad.billing === 'views' && ad.viewLimit) return `${ad.viewLimit.toLocaleString('en-IN')} views`;
+  return planLabel(ad.planDays as AdPlanDays);
 }

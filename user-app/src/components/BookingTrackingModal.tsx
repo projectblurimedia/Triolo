@@ -1,3 +1,4 @@
+import { previousStepAt, stepTimeText } from '@/utils/stepTime';
 import React, { useState } from 'react';
 import { placeName } from '@/utils/formatAddress';
 import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -68,13 +69,6 @@ const FINISH_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const MAP_HEIGHT = Math.round(Dimensions.get('window').height * 0.4);
 // Same broadcast radius as the Quick Book screen (testing value, also the API max).
 const QUICK_BOOK_RADIUS_KM = 50;
-
-function formatTime(iso: string): string {
-  const date = new Date(iso);
-  const hours = date.getHours();
-  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
-  return `${hour12}:${String(date.getMinutes()).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`;
-}
 
 /**
  * The customer's live Quick Book screen (Rapido-style), mounted once at the app root and
@@ -339,7 +333,7 @@ export function BookingTrackingModal() {
                   {step.label}
                 </Text>
                 {step.at ? (
-                  <Text style={[styles.stepTime, { color: colors.textMuted }]}>{formatTime(step.at)}</Text>
+                  <Text style={[styles.stepTime, { color: colors.textMuted }]}>{stepTimeText(step.at, previousStepAt(steps, index))}</Text>
                 ) : current ? (
                   <Text style={[styles.stepTime, { color: colors.primary }]}>{t('waiting.now')}</Text>
                 ) : null}

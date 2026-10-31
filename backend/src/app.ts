@@ -20,11 +20,17 @@ import { subscriptionsRouter } from '@/modules/subscriptions/routes';
 import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
 import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { setProfileViewerReveal } from '@/modules/notifications/service';
+import { AdsRepository } from '@/modules/ads/repository';
+import { AdsService } from '@/modules/ads/service';
 import { pool } from '@/config/database';
 
-// Subscribed partners see who viewed their profile (notifications asks, without depending on subscriptions).
+// Who viewed a partner's profile: shown on the plan, or (with plans off) after an ad / straight
+// away (notifications asks, without depending on subscriptions or ads).
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
-setProfileViewerReveal((accountId, plan) => subscriptionStatus.revealsProfileViewers(accountId, plan));
+const adsForViewers = new AdsService(new AdsRepository(pool));
+setProfileViewerReveal((accountId, plan) =>
+  subscriptionStatus.revealsProfileViewers(accountId, plan, () => adsForViewers.partnerSpotOn('viewer_reveal')),
+);
 
 export function createApp(): Express {
   const app = express();

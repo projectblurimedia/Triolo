@@ -16,6 +16,7 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDay } from '@/utils/formatDate';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { payInApp } from '@/utils/inAppPay';
 
 const PERKS = [
   { icon: 'bolt', key: 'perkQuickBook' },
@@ -78,6 +79,13 @@ export function SubscribeModal() {
       const result = await subscriptionsService.checkout(months);
       waitingId.current = result.id;
       queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
+      // In the app, with the phone's UPI apps (new installs); else the payment page.
+      const outcome = await payInApp({ type: 'subscription', id: result.id });
+      if (outcome === 'paid') {
+        await check(result.id, false);
+        return;
+      }
+      if (outcome === 'cancelled') return;
       await Linking.openURL(result.paymentUrl);
     } catch (error) {
       showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) });
@@ -89,6 +97,12 @@ export function SubscribeModal() {
   const reopenPending = async () => {
     if (!data?.pending) return;
     waitingId.current = data.pending.id;
+    const outcome = await payInApp({ type: 'subscription', id: data.pending.id }).catch(() => 'unavailable' as const);
+    if (outcome === 'paid') {
+      await check(data.pending.id, false);
+      return;
+    }
+    if (outcome === 'cancelled') return;
     await Linking.openURL(data.pending.paymentUrl).catch(() => {});
   };
 

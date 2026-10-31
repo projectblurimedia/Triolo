@@ -13,6 +13,7 @@ import { colors as brandColors, fonts, headerGradient, typography, useThemeColor
 import { PullToRefresh } from './PullToRefresh';
 import { CountBadge } from './CountBadge';
 import { orderShopName } from '@/utils/orderShopName';
+import { listCountText } from '@/utils/listPhotos';
 
 type Tab = 'active' | 'history';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -78,7 +79,7 @@ export function MyOrdersModal({ visible, onClose }: { visible: boolean; onClose:
             </View>
           </View>
           <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
-            {t('orders.itemsCount', { count: item.items.length })} ·{' '}
+            {listCountText(t, item.items.length, (item.listPhotoUrls ?? []).length)} ·{' '}
             {t(item.fulfillment === 'delivery' ? 'sendList.delivery' : 'sendList.pickup')} · {formatDate(item.createdAt)}
           </Text>
           {item.totalAmount != null ? (

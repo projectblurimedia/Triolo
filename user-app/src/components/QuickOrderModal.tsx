@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from './Button';
 import { CategoryPicker } from './CategoryPicker';
 import { ListPickerRow } from './ListPickerRow';
+import { uploadListPhotos } from '@/utils/listPhotos';
 import { ToastHost } from './ToastHost';
 import { addressFor } from './QuickBookModal';
 import { useAdGate } from './Ads';
@@ -53,7 +54,7 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
   const [categories, setCategories] = useState<string[]>([]);
   // Home delivery first: it's what people want most from a quick order.
   const [fulfillment, setFulfillment] = useState<OrderFulfillment>('delivery');
-  const { waitForAd } = useAdGate(visible, 'send_list');
+  const { waitForAd } = useAdGate(visible, 'quick_order');
 
   useEffect(() => {
     if (!visible) return;
@@ -64,9 +65,10 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
 
   const list = lists.find((entry) => entry.id === listId) ?? null;
   const items = (list?.items ?? []).filter((item) => item.name.trim().length > 0);
+  const hasList = items.length > 0 || (list?.photos ?? []).length > 0;
 
   const order = async () => {
-    if (!list || items.length === 0 || categories.length === 0) return;
+    if (!list || !hasList || categories.length === 0) return;
     // Location first, then the ad, then the fee (no plan) — and only then the order goes.
     if (!(await askForLocation())) return;
     if (!(await waitForAd())) return;
@@ -77,14 +79,18 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
       return;
     }
     try {
+      // Photos of a written list go up first; the order then carries their links.
+      const listPhotos = await uploadListPhotos(list);
       const created = await ordersService.createQuick({
         shopCategories: categories,
         fulfillment,
         items: items.map((item) => ({ name: item.name.trim(), quantity: item.quantity.trim() || '1', unit: item.unit.trim() || null })),
+        listPhotoUrls: listPhotos.urls,
         latitude: here.latitude,
         longitude: here.longitude,
         locationAddress: fulfillment === 'delivery' ? await addressFor(here.latitude, here.longitude) : undefined,
       });
+      listPhotos.remember();
       // The tracker opens on it at once; My Orders, Continue and the Bazaar count too.
       queryClient.setQueryData(orderQueryKey(created.id), created);
       queryClient.setQueryData<CustomerOrder[]>(MY_ORDERS_QUERY_KEY, (current) => [
@@ -211,7 +217,7 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
             <Button
               label={withFee(t('quickOrder.orderNearby'), orderFee)}
               onPress={order}
-              disabled={!list || items.length === 0 || categories.length === 0}
+              disabled={!list || !hasList || categories.length === 0}
             />
           </View>
         ) : null}

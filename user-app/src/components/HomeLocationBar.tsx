@@ -148,28 +148,28 @@ export function HomeLocationBar() {
         onPress={() => setSheetOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={t('homeLocation.change')}
-        style={({ pressed }) => [styles.bar, { borderColor: `${colors.primary}40`, opacity: pressed ? 0.85 : 1 }]}
+        style={({ pressed }) => [styles.bar, { backgroundColor: colors.surface, borderColor: `${colors.primary}22`, opacity: pressed ? 0.88 : 1 }]}
       >
-        <LinearGradient
-          colors={[`${colors.primary}1F`, `${colors.primary}08`]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* Left: which address it is. Right: the place, with the arrow to change it. */}
-        <View style={styles.barLeft}>
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pin}>
-            <FontAwesome6 name={selected ? KIND_ICON[selected.kind] : 'location-crosshairs'} size={11} color="#FFFFFF" solid />
-          </LinearGradient>
-          <Text style={[styles.barLabel, { color: colors.primary }]} numberOfLines={1}>
-            {selected ? labelOf(selected) : t('homeLocation.current')}
-          </Text>
+        {/* A big faded map on the right, like the other Home cards. */}
+        <FontAwesome6 name="map-location-dot" size={78} color={`${colors.primary}0D`} solid style={styles.watermark} />
+        <View style={[styles.pin, { backgroundColor: `${colors.primary}14` }]}>
+          <FontAwesome6 name={selected ? KIND_ICON[selected.kind] : 'location-crosshairs'} size={17} color={colors.primary} solid />
         </View>
-        <View style={styles.barRight}>
+        {/* Which address it is (small), then the place itself (large). */}
+        <View style={styles.flex}>
+          <View style={styles.labelRow}>
+            {selected ? null : <View style={[styles.liveDot, { backgroundColor: ready ? '#16A34A' : colors.textMuted }]} />}
+            <Text style={[styles.barLabel, { color: colors.textMuted }]} numberOfLines={1}>
+              {selected ? labelOf(selected) : t('homeLocation.current')}
+            </Text>
+          </View>
           <Text style={[styles.barName, { color: colors.text }]} numberOfLines={1}>
             {shownName}
           </Text>
-          <FontAwesome6 name="chevron-down" size={11} color={colors.primary} solid />
+        </View>
+        <View style={[styles.changePill, { backgroundColor: `${colors.primary}12` }]}>
+          <Text style={[styles.changeText, { color: colors.primary }]}>{t('homeLocation.changeShort')}</Text>
+          <FontAwesome6 name="chevron-down" size={10} color={colors.primary} solid />
         </View>
       </Pressable>
 
@@ -295,20 +295,28 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    height: 46,
-    borderRadius: 15,
-    borderWidth: 1.5,
-    paddingHorizontal: 10,
+    gap: 12,
+    minHeight: 68,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginBottom: 14,
     overflow: 'hidden',
+    shadowColor: '#0B3A8A',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  barLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0, maxWidth: '50%' },
-  pin: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  barLabel: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12.5, lineHeight: 16, flexShrink: 1 },
-  barRight: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, flex: 1 },
-  barName: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 19, flexShrink: 1, textAlign: 'right' },
+  watermark: { position: 'absolute', right: -14, bottom: -18 },
+  pin: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  liveDot: { width: 7, height: 7, borderRadius: 4 },
+  barLabel: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, letterSpacing: 0.4, textTransform: 'uppercase', flexShrink: 1 },
+  barName: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 22 },
+  changePill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 11, height: 32 },
+  changeText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12.5 },
   overlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
   sheet: { borderRadius: 22, overflow: 'hidden', maxHeight: '82%' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 14, paddingVertical: 12 },

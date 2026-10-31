@@ -32,6 +32,8 @@ export interface ShopOrderItem {
   unit: string | null;
   status: ShopOrderItemStatus;
   price: number | null;
+  /** Typed in by the shop while packing (read from the list's photos). */
+  addedByShop?: boolean;
 }
 
 export interface ShopOrder {
@@ -64,16 +66,28 @@ export interface ShopOrder {
   shopRating: number | null;
   shopReview: string | null;
   createdAt: string;
+  acceptedAt?: string | null;
+  packedAt?: string | null;
+  readyAt?: string | null;
   completedAt: string | null;
+  cancelledAt?: string | null;
+  declinedAt?: string | null;
+  expiredAt?: string | null;
   items: ShopOrderItem[];
+  /** Photos of a written list the customer sent (instead of, or as well as, typed items). */
+  listPhotoUrls?: string[];
   customerFullName: string;
   /** Only once the order is accepted. */
   customerMobileNumber: string | null;
   pinAttemptsLeft: number;
+  /** Just accepted: an ad to watch or the fee to pay before it opens (null when done). */
+  unlockNeeded?: 'ad' | 'pay' | null;
 }
 
 export interface ItemUpdate {
-  id: string;
+  /** Left out for a new item the shop typed in (then `name` is needed). */
+  id?: string;
+  name?: string;
   status: ShopOrderItemStatus;
   price?: number | null;
 }
@@ -84,6 +98,10 @@ export const shopOrdersService = {
   searchQuick: () => apiClient.post<ShopOrder[]>('/orders/shop/quick/search', undefined, true),
   get: (id: string) => apiClient.get<ShopOrder>(`/orders/shop/${id}`, true),
   accept: (id: string) => apiClient.post<null>(`/orders/${id}/accept`, undefined, true),
+  /** After accepting: watched the ad, or pays (PAYMENT_REQUIRED until a pass is bought). */
+  unlock: (id: string, via: 'ad' | 'pay') => apiClient.post<ShopOrder>(`/orders/${id}/unlock`, { via }, true),
+  /** After accepting: backed out of the payment — the order goes back. */
+  release: (id: string) => apiClient.post<null>(`/orders/${id}/release`, undefined, true),
   decline: (id: string, reason?: string) => apiClient.post<null>(`/orders/${id}/decline`, { reason }, true),
   saveItems: (id: string, items: ItemUpdate[]) => apiClient.put<ShopOrder>(`/orders/${id}/items`, { items }, true),
   packed: (id: string) => apiClient.post<null>(`/orders/${id}/packed`, undefined, true),

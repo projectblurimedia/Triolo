@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AD_ACTION_TYPES, AD_SPOTS, AD_APPS, AD_ORIENTATIONS, AD_PAYMENT_METHODS, AD_PLACEMENTS, AD_PLAN_DAYS } from './interfaces';
+import { AD_ACTION_TYPES, AD_SPOTS, AD_APPS, AD_ORIENTATIONS, AD_SHOW_ON, AD_PAYMENT_METHODS, AD_PLACEMENTS, AD_PLAN_DAYS, AD_BILLINGS, AD_VIEWS_MAX, AD_VIEWS_MIN } from './interfaces';
 
 const optionalText = (max: number) => z.string().trim().max(max).nullish();
 const phone = z
@@ -16,6 +16,7 @@ const adFields = z.object({
   title: optionalText(80),
   description: optionalText(600),
   orientation: z.enum(AD_ORIENTATIONS),
+  showOn: z.enum(AD_SHOW_ON).default('action'),
   displaySeconds: z.number().int().min(3, 'At least 3 seconds').max(30, 'At most 30 seconds').default(15),
   // Older forms sent the ad's place here; it now comes only from 'Show directions' (below).
   latitude: z.number().min(-90).max(90).nullish(),
@@ -51,7 +52,11 @@ const adFields = z.object({
   planDays: z
     .number()
     .int()
-    .refine((days) => (AD_PLAN_DAYS as readonly number[]).includes(days), 'Choose 1, 3, 7 or 30 days'),
+    .refine((days) => (AD_PLAN_DAYS as readonly number[]).includes(days), 'Choose 1, 3, 7 or 30 days')
+    .default(7),
+  // By days (a plan) or by views (how many, at the admin's per-view price).
+  billing: z.enum(AD_BILLINGS).default('days'),
+  viewLimit: z.number().int().min(AD_VIEWS_MIN, `At least ${AD_VIEWS_MIN} views`).max(AD_VIEWS_MAX, `At most ${AD_VIEWS_MAX} views`).nullish(),
   // 'pending' = not paid yet (a business's own booking, until the admin records the payment).
   paymentMethod: z.enum([...AD_PAYMENT_METHODS, 'pending'] as [string, ...string[]]).default('cash'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a start date'),
@@ -63,6 +68,9 @@ const promotes = (type?: string) => type === 'service' || type === 'business' ||
 
 /** Each tap action needs its own detail: a link, a place, or (admin) the phone number. */
 function checkAction(body: AdFields, ctx: z.RefinementCtx, needsMobile: boolean): void {
+  if (body.billing === 'views' && !body.viewLimit) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Choose how many views', path: ['viewLimit'] });
+  }
   if (body.actionType === 'link' && !body.linkUrl?.trim()) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter the link', path: ['linkUrl'] });
   }
@@ -89,6 +97,9 @@ export const adSettingsSchema = z
     actionPartner: z.boolean(),
     spots: z.object(Object.fromEntries(AD_SPOTS.map((spot) => [spot, z.boolean()]))).partial(),
     actionGapSeconds: z.number().int().min(0).max(86400),
+    pricePerView: z.number().min(0).max(100),
+    homeUser: z.boolean(),
+    homePartner: z.boolean(),
     prices: z.object({
       '1': z.number().int().min(0).max(100000),
       '3': z.number().int().min(0).max(100000),
@@ -143,6 +154,12 @@ export const adMediaSchema = z
     videoUrl: z.string().url().nullable().optional(),
   })
   .refine((body) => !!body.imageUrl !== !!body.videoUrl, 'Add one image or one video');
+
+export const homeQuerySchema = z.object({
+  app: z.enum(AD_APPS),
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+});
 
 export const serveQuerySchema = z.object({
   app: z.enum(AD_APPS),

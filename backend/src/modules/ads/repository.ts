@@ -33,6 +33,7 @@ const STATUS_SQL = `CASE
   WHEN a.review_status = 'rejected' THEN 'rejected'
   WHEN ${TODAY} < a.start_date THEN 'scheduled'
   WHEN ${TODAY} > a.end_date THEN 'ended'
+  WHEN a.billing = 'views' AND a.impressions >= a.view_limit THEN 'ended'
   ELSE 'running' END`;
 
 // Great-circle distance in metres from the viewer ($2/$3) to the ad's place, same formula as
@@ -80,6 +81,7 @@ function mapAd(row: any): Ad {
     refundId: row.refund_id ?? null,
     refundedAt: row.refunded_at ? new Date(row.refunded_at).toISOString() : null,
     orientation: row.orientation,
+    showOn: row.show_on === 'home' ? 'home' : 'action',
     displaySeconds: Number(row.display_seconds),
     videoSeconds: row.video_seconds == null ? null : Number(row.video_seconds),
     durationSeconds: row.video_url ? Math.max(1, Math.ceil(Number(row.video_seconds ?? 15))) : Number(row.display_seconds),
@@ -87,6 +89,8 @@ function mapAd(row: any): Ad {
     longitude: row.longitude == null ? null : Number(row.longitude),
     radiusKm: Number(row.radius_km),
     planDays: Number(row.plan_days) as Ad['planDays'],
+    billing: row.billing ?? 'days',
+    viewLimit: row.view_limit == null ? null : Number(row.view_limit),
     amount: Number(row.amount),
     paymentMethod: row.payment_method,
     startDate: row.start_date_text,
@@ -99,6 +103,7 @@ function mapAd(row: any): Ad {
     clicks: Number(row.clicks),
     status: row.status as AdStatus,
     deletedAt: row.deleted_at ? new Date(row.deleted_at).toISOString() : null,
+    deletedBy: row.deleted_at ? (row.deleted_by === 'owner' ? 'owner' : 'admin') : null,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -121,11 +126,16 @@ function mapSettings(row: any): AdSettings {
       '7': Number(row.plan_prices['7']),
       '30': Number(row.plan_prices['30']),
     },
+    pricePerView: Number(row.price_per_view ?? 0),
+    homeUser: !!row.home_user,
+    homePartner: !!row.home_partner,
     updatedAt: new Date(row.updated_at).toISOString(),
   };
 }
 
-const SETTINGS_COLUMNS: Record<keyof Omit<AdSettings, 'updatedAt' | 'prices' | 'spots' | 'actionGapSeconds'>, string> = {
+const SETTINGS_COLUMNS: Record<keyof Omit<AdSettings, 'updatedAt' | 'prices' | 'spots' | 'actionGapSeconds' | 'pricePerView'>, string> = {
+  homeUser: 'home_user',
+  homePartner: 'home_partner',
   adsEnabled: 'ads_enabled',
   launchUser: 'launch_user',
   launchPartner: 'launch_partner',
@@ -152,6 +162,10 @@ export class AdsRepository {
       // Merged, so saving one switch never resets the others.
       values.push(JSON.stringify(changes.spots));
       sets.push(`action_spots = action_spots || $${values.length}::jsonb`);
+    }
+    if (typeof changes.pricePerView === 'number') {
+      values.push(changes.pricePerView);
+      sets.push(`price_per_view = $${values.length}`);
     }
     if (typeof changes.actionGapSeconds === 'number') {
       values.push(changes.actionGapSeconds);
@@ -181,9 +195,11 @@ export class AdsRepository {
       `WITH inserted AS (
          INSERT INTO ads (advertiser_name, advertiser_phone, title, description, latitude, longitude, location_text,
                           plan_days, amount, payment_method, start_date, end_date, link_url, orientation, display_seconds,
-                          owner_account_id, review_status, needs_payment, action_type, action_latitude, action_longitude, action_place, promoted_id, promoted_name, promote_mobile)
+                          owner_account_id, review_status, needs_payment, action_type, action_latitude, action_longitude, action_place, promoted_id, promoted_name, promote_mobile,
+                          billing, view_limit, show_on)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $11::date + ($8::int - 1), $12, $13, $14,
-                 $15, CASE WHEN $15::uuid IS NULL THEN 'approved' ELSE 'pending' END, $15::uuid IS NOT NULL, $16, $17, $18, $19, $20, $21, $22)
+                 $15, CASE WHEN $15::uuid IS NULL THEN 'approved' ELSE 'pending' END, $15::uuid IS NOT NULL, $16, $17, $18, $19, $20, $21, $22,
+                 $23, $24, $25)
          RETURNING *
        )
        SELECT ${AD_COLUMNS} FROM inserted a`,
@@ -204,6 +220,9 @@ export class AdsRepository {
         params.displaySeconds,
         ownerAccountId,
         ...actionValues(params),
+        params.billing ?? 'days',
+        params.viewLimit ?? null,
+        params.showOn ?? 'action',
       ],
     );
     return mapAd(result.rows[0]);
@@ -219,7 +238,7 @@ export class AdsRepository {
          UPDATE ads SET advertiser_name = $3, advertiser_phone = $4, title = $5, description = $6,
            latitude = $7, longitude = $8, location_text = $9, plan_days = $10, amount = $11,
            start_date = $12::date, end_date = $12::date + ($10::int - 1), link_url = $13, orientation = $14, display_seconds = $15,
-           review_status = 'pending', review_note = NULL, reviewed_at = NULL, ${actionSets(16)}, updated_at = now()
+           review_status = 'pending', review_note = NULL, reviewed_at = NULL, ${actionSets(16)}, billing = $23, view_limit = $24, show_on = $25, updated_at = now()
          WHERE id = $1 AND owner_account_id = $2 AND deleted_at IS NULL AND review_status IN ('pending', 'rejected')
          RETURNING *
        )
@@ -241,6 +260,9 @@ export class AdsRepository {
         params.orientation,
         params.displaySeconds,
         ...actionValues(params),
+        params.billing ?? 'days',
+        params.viewLimit ?? null,
+        params.showOn ?? 'action',
       ],
     );
     return result.rows[0] ? mapAd(result.rows[0]) : null;
@@ -269,7 +291,7 @@ export class AdsRepository {
   async withdrawOwned(id: string, ownerAccountId: string): Promise<Ad | null> {
     const result = await this.pool.query(
       `WITH deleted AS (
-         UPDATE ads SET deleted_at = now(), updated_at = now()
+         UPDATE ads SET deleted_at = now(), deleted_by = 'owner', updated_at = now()
          WHERE id = $1 AND owner_account_id = $2 AND deleted_at IS NULL AND review_status IN ('pending', 'rejected')
          RETURNING *
        )
@@ -363,7 +385,8 @@ export class AdsRepository {
          UPDATE ads SET advertiser_name = $2, advertiser_phone = $3, title = $4, description = $5,
            latitude = $6, longitude = $7, location_text = $8, plan_days = $9, amount = $10,
            payment_method = CASE WHEN payment_method = 'online' THEN 'online' ELSE $11 END,
-           start_date = $12::date, end_date = $12::date + ($9::int - 1), link_url = $13, orientation = $14, display_seconds = $15, ${actionSets(16)}, updated_at = now()
+           start_date = $12::date, end_date = $12::date + ($9::int - 1), link_url = $13, orientation = $14, display_seconds = $15, ${actionSets(16)},
+           billing = $23, view_limit = $24, show_on = $25, updated_at = now()
          WHERE id = $1 AND deleted_at IS NULL
          RETURNING *
        )
@@ -385,6 +408,9 @@ export class AdsRepository {
         params.orientation,
         params.displaySeconds,
         ...actionValues(params),
+        params.billing ?? 'days',
+        params.viewLimit ?? null,
+        params.showOn ?? 'action',
       ],
     );
     return result.rows[0] ? mapAd(result.rows[0]) : null;
@@ -448,7 +474,7 @@ export class AdsRepository {
   async softDelete(id: string): Promise<Ad | null> {
     const result = await this.pool.query(
       `WITH deleted AS (
-         UPDATE ads SET deleted_at = now(), updated_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING *
+         UPDATE ads SET deleted_at = now(), deleted_by = 'admin', updated_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING *
        )
        SELECT ${AD_COLUMNS} FROM deleted a`,
       [id],
@@ -532,8 +558,12 @@ export class AdsRepository {
            AND (a.latitude IS NULL OR ${DISTANCE_SQL} <= a.radius_km * 1000)
            -- Profile ads (Book Now / Order / Contact) only where they can be used.
            AND ($4::boolean OR a.action_type NOT IN ('service', 'business', 'job_post'))
+           -- A views ad only while it has views left.
+           AND (a.billing <> 'views' OR a.impressions < a.view_limit)
+           -- Home slider ads never show full screen before an action.
+           AND a.show_on = 'action'
          ORDER BY (a.id = $1::uuid) ASC NULLS FIRST, COALESCE(s.impressions, 0) ASC, random()
-         LIMIT 1
+         LIMIT $5
        ),
        daily AS (
          INSERT INTO ad_daily_stats (ad_id, day, impressions)
@@ -544,9 +574,40 @@ export class AdsRepository {
          UPDATE ads SET impressions = ads.impressions + 1 FROM picked WHERE ads.id = picked.id RETURNING ads.*
        )
        SELECT ${AD_COLUMNS} FROM counted a`,
-      [excludeId, latitude, longitude, withProfileAds],
+      [excludeId, latitude, longitude, withProfileAds, 1],
     );
     return result.rows[0] ? mapAd(result.rows[0]) : null;
+  }
+
+  /**
+   * Home's carousel: up to `limit` running ads near the viewer (fewest views today first), each
+   * counted as a view — the same fair share as one-at-a-time ads.
+   */
+  async pickManyAndCount(latitude: number, longitude: number, withProfileAds: boolean, limit: number): Promise<Ad[]> {
+    const result = await this.pool.query(
+      `WITH picked AS (
+         SELECT a.id, COALESCE(s.impressions, 0) AS today FROM ads a
+         LEFT JOIN ad_daily_stats s ON s.ad_id = a.id AND s.day = ${TODAY}
+         WHERE a.deleted_at IS NULL AND a.review_status = 'approved' AND ${TODAY} BETWEEN a.start_date AND a.end_date
+           AND (a.latitude IS NULL OR ${DISTANCE_SQL} <= a.radius_km * 1000)
+           AND ($1::boolean OR a.action_type NOT IN ('service', 'business', 'job_post'))
+           AND (a.billing <> 'views' OR a.impressions < a.view_limit)
+           AND a.show_on = 'home'
+         ORDER BY COALESCE(s.impressions, 0) ASC, random()
+         LIMIT $4
+       ),
+       daily AS (
+         INSERT INTO ad_daily_stats (ad_id, day, impressions)
+         SELECT id, ${TODAY}, 1 FROM picked
+         ON CONFLICT (ad_id, day) DO UPDATE SET impressions = ad_daily_stats.impressions + 1
+       ),
+       counted AS (
+         UPDATE ads SET impressions = ads.impressions + 1 FROM picked WHERE ads.id = picked.id RETURNING ads.*
+       )
+       SELECT ${AD_COLUMNS} FROM counted a`,
+      [withProfileAds, latitude, longitude, limit],
+    );
+    return result.rows.map(mapAd);
   }
 
   /** Whether this person saw an ad before an action less than `gapSeconds` ago (in this app). */

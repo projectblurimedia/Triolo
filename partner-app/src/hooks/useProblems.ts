@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocationGatedMutation } from './useLocationGatedMutation';
 import { problemsService } from '@/services/problemsService';
 import { MY_JOBS_QUERY_KEY } from './useJobs';
+import { completeAccept, GivenBackError } from '@/utils/afterAccept';
 
 export const NEARBY_PROBLEMS_QUERY_KEY = ['problems', 'nearby'];
 export const ASSIGNED_PROBLEMS_QUERY_KEY = ['problems', 'assigned'];
@@ -41,12 +42,17 @@ function useInvalidateProblems() {
 export function useAcceptProblem() {
   const invalidate = useInvalidateProblems();
   return useLocationGatedMutation({
-    mutationFn: (problemId: string) => problemsService.accept(problemId),
-    // No partner plan: one paid accept.
-    payKind: 'accept',
-    payPlan: 'service',
-    // Settled, not success — a lost race (409) also means the list is stale.
-    onSettled: invalidate,
+    // Instant: the ad or the fee (without a plan) comes after, on the trip it starts.
+    mutationFn: async (problemId: string) => {
+      const post = await problemsService.accept(problemId);
+      if (post?.bookingRequestId && !(await completeAccept('job', post.bookingRequestId, 'problem_accept'))) throw new GivenBackError();
+      return post;
+    },
+    // Settled, not success — a lost race (409) also means the list is stale. Not awaited: the
+    // trip opens at once, the lists refresh behind it.
+    onSettled: () => {
+      invalidate();
+    },
   });
 }
 

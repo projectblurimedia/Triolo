@@ -550,7 +550,8 @@ Common errors: `404 ORDER_NOT_FOUND` (also for a malformed id), `409 ORDER_INVAL
 `CustomerOrder`: `{ id, businessId, fulfillment: "pickup"|"delivery", status, latitude, longitude, locationAddress, distanceMeters, deliveryCharge, itemsTotal, totalAmount, note, cancelledBy, cancelReason, shopRating, shopReview, acceptedAt, packedAt, readyAt, completedAt, cancelledAt, declinedAt, expiredAt, createdAt, items: Array<{ id, position, name, quantity, unit, status: "pending"|"packed"|"unavailable", price }>, shop: { name, photoUrl, ratingAverage, ratingCount, latitude, longitude, address, mobileNumber|null }, pin: string|null }`. `ShopSideOrder` is the same order fields plus `customerFullName`, `customerMobileNumber`, `pinAttemptsLeft` (no `pin`, no `shop`).
 
 ### Customer
-- `POST /orders` — body `{ businessId, fulfillment, items: Array<{ name, quantity?, unit? }> (1–100), latitude, longitude, locationAddress?, note? }` → 201 `CustomerOrder`. 404 `SHOP_NOT_FOUND` (unknown/unverified), 400 `ORDER_OWN_SHOP`, 400 `ORDER_DELIVERY_UNAVAILABLE`.
+- `POST /orders/list-photos` — multipart, one `photo` per request (Vercel caps a body at 4.5 MB) → 201 `{ url }`, stored under Cloudinary `triolo/order-lists`. Photos of a written (paper) list, uploaded before the order is sent; ones never put on an order are removed by `npm run cleanup:cloudinary`.
+- `POST /orders` — body `{ businessId, fulfillment, items: Array<{ name, quantity?, unit? }> (0–100), listPhotoUrls?: string[] (0–5, links from `/orders/list-photos` only — else 400 `ORDER_PHOTO_INVALID`), latitude, longitude, locationAddress?, note? }` → 201 `CustomerOrder`. Needs at least one item or one photo (400 `VALIDATION_ERROR`). 404 `SHOP_NOT_FOUND` (unknown/unverified), 400 `ORDER_OWN_SHOP`, 400 `ORDER_DELIVERY_UNAVAILABLE`. `POST /orders/quick` takes `listPhotoUrls` the same way. Orders carry `listPhotoUrls`; items carry `addedByShop`.
 - `GET /orders/mine` → newest first (max 50). `GET /orders/:id` → `CustomerOrder`.
 - `POST /orders/:id/cancel` — only while `placed`; or, with body `{ rating: 1-5, review? }`, a **stalled** order: the shop took it (`accepted` … `out_for_delivery`) and it hasn't changed for `ORDER_LATE_AFTER_MINUTES` (60). The shop's rating is stored (`cancel_reason: 'late'`), counted and shown in its reviews; the shop is told why. Otherwise 409 `ORDER_NOT_LATE`. Customer orders now carry `updatedAt`.
 - `POST /orders/:id/rate` — body `{ rating: 1..5, review? }`, once, only when `completed`.
@@ -558,7 +559,7 @@ Common errors: `404 ORDER_NOT_FOUND` (also for a malformed id), `409 ORDER_INVAL
 ### Shop (the caller's own business profiles)
 - `GET /orders/shop/mine` — orders of **every** shop the caller owns, active first, then history (`[]` without a shop). `GET /orders/shop/:id` → `ShopSideOrder`. Each order carries `shopId`, `shopName`, `deliveryStaff: { accountId, fullName, mobileNumber } | null` and `deliveredByName`. Every step below works on any of the caller's shops.
 - `POST /orders/:id/accept` · `POST /orders/:id/decline` (body `{ reason? }`) — only while `placed` (and not expired).
-- `PUT /orders/:id/items` — body `{ items: Array<{ id, status, price? }> }`; while `accepted`/`preparing` (moves to `preparing`) → `ShopSideOrder`.
+- `PUT /orders/:id/items` — body `{ items: Array<{ id?, name?, status, price? }> }`; while `accepted`/`preparing` (moves to `preparing`) → `ShopSideOrder`. An entry without `id` is a new item the shop typed in (needs `name`; e.g. read from the list's photos) and is saved with `addedByShop: true`; a shop-added item left out of the list is removed, and its `name` can be changed. The customer's own items can only be marked.
 - `POST /orders/:id/packed` — sends the bill. 400 `ORDER_ITEMS_PENDING` / `ORDER_PRICE_MISSING` / `ORDER_NOTHING_PACKED`.
 - `POST /orders/:id/ready` — `packed` → `ready_for_pickup` or `out_for_delivery` (by fulfillment), PIN generated.
 - `POST /orders/:id/verify-pin` — body `{ pin }` → `completed`. 400 `ORDER_PIN_INVALID` (`details.attemptsLeft`), 409 `ORDER_PIN_LOCKED`.
@@ -707,3 +708,14 @@ The older `GET/PUT/DELETE /me`, `PATCH /me/active` and `/me/photo` act on the fi
 - `GET /api/v1/job-seekers/me/posts` — each post adds `newViews`.
 - Notifications: type `job_post_view`; items carry `ref` (`{ kind, id }`) and, for `job_post_view`, `locked` and (on Job Post Plus) `viewer: { name, mobile }`.
 - Shop side orders: `customerMobileNumber` is null until the shop accepts.
+
+## Accept, then unlock (partners) · ads by views · in-app payments
+
+- `POST /bookings/:id/unlock`, `POST /orders/:id/unlock` — body `{ via: 'ad' | 'pay' }`, after accepting, when the job / order says `unlockNeeded` ('ad' or 'pay'). 'pay' uses one paid pass (403 `PAYMENT_REQUIRED` with the price until one is bought); 'ad' only when an ad is what it needs (400 `UNLOCK_NEEDS_PAYMENT`). Returns the job / order, now with the customer's number.
+- `POST /bookings/:id/release`, `POST /orders/:id/release` — gives an accepted, not yet unlocked job / order back (also done automatically after 3 minutes).
+- `GET /ads/home?app=user|partner&latitude&longitude` — up to 5 running ads near here for the Home carousel (`[]` when off or subscribed); each counts as a view.
+- Ads have `showOn: 'action' | 'home'` (create / edit, admin and `/ads/self`; default `action`). `/ads/home` returns only `home` ads, `/ads/serve` only `action` ads; a `home` ad is saved horizontal. Ads also return `deletedBy: 'owner' | 'admin' | null`. Partner plans hide ads only on their own side's spots; `/ads/home` is hidden by All in One.
+- Ads (admin and `/ads/self`): `billing: 'days' | 'views'`, `viewLimit` (500–10,000, views ads). Settings: `pricePerView`, `homeUser`, `homePartner`. `/ads/self/info` adds `pricePerView`, `viewsMin`, `viewsMax`, `viewsValidDays`.
+- `POST /subscriptions/pay/order` — body `{ type: 'pass' | 'subscription' | 'badge', id }` → `{ keyId, orderId, amount, currency, description, prefill }` for Razorpay's in-app screen. `POST /subscriptions/pay/confirm` — the same plus `razorpayOrderId`, `razorpayPaymentId`, `razorpaySignature`; checks the signature and the order, captures, marks it paid → `{ paid: true }`.
+- `POST /subscriptions/checkout` takes `plan: 'all'` (the All in One partner plan); partner `GET /subscriptions/mine` `plans` includes `all`.
+- `GET /job-seekers/me/posts/:id/viewers?revealed=1` — `access: 'open' | 'ad' | 'plan'`; with 'ad', people show once the app has shown the ad.

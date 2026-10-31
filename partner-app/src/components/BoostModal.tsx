@@ -16,6 +16,7 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDay } from '@/utils/formatDate';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { payInApp } from '@/utils/inAppPay';
 
 // The app's own blue, like every other main card.
 const BOOST_GRADIENT = headerGradient;
@@ -73,6 +74,13 @@ export function BoostModal({ profile, onClose }: BoostModalProps) {
   };
 
   const openPayment = async (id: string, url: string) => {
+    // In the app, with the phone's UPI apps (new installs); else the payment page.
+    const outcome = await payInApp({ type: 'boost', id }).catch(() => 'unavailable' as const);
+    if (outcome === 'paid') {
+      await check(id, false);
+      return;
+    }
+    if (outcome === 'cancelled') return;
     watch(() => check(id, true));
     await Linking.openURL(url).catch(() => {});
   };

@@ -86,6 +86,18 @@ export class BookingsController {
     return ok(res, null, 'Job accepted');
   });
 
+  /** After accepting: the worker watched the ad ({ via: 'ad' }) or pays ({ via: 'pay' }). */
+  unlockJob = asyncHandler(async (req: Request, res: Response) => {
+    await this.service.unlockJob(requireAccountId(req), req.params.id, req.body?.via === 'ad' ? 'ad' : 'pay');
+    return ok(res, await this.service.getMyJob(requireAccountId(req), req.params.id), 'Job opened');
+  });
+
+  /** After accepting: the worker closed the payment / ad — the job goes back to others. */
+  releaseJob = asyncHandler(async (req: Request, res: Response) => {
+    await this.service.releaseJob(requireAccountId(req), req.params.id);
+    return ok(res, null, 'Job given back');
+  });
+
   declineOffer = asyncHandler(async (req: Request, res: Response) => {
     await this.service.declineOffer(requireAccountId(req), req.params.id);
     return ok(res, null, 'Job declined');

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_ORDER_ITEMS } from './interfaces';
+import { MAX_LIST_PHOTOS, MAX_ORDER_ITEMS } from './interfaces';
 
 const orderItemSchema = z.object({
   name: z.string().trim().min(1, 'Item name is required').max(100),
@@ -7,39 +7,59 @@ const orderItemSchema = z.object({
   unit: z.string().trim().max(20).nullish(),
 });
 
-export const createOrderSchema = z.object({
+// Photos of a written list, uploaded first (POST /orders/list-photos).
+const listPhotosSchema = z.array(z.string().url().max(500)).max(MAX_LIST_PHOTOS).default([]);
+// A list is typed items, photos of a written list, or both — never nothing.
+const hasItemsOrPhotos = (body: { items: unknown[]; listPhotoUrls: unknown[] }) => body.items.length > 0 || body.listPhotoUrls.length > 0;
+const itemsOrPhotosMessage = { message: 'Add at least one item or a photo of your list', path: ['items'] };
+
+export const createOrderSchema = z
+  .object({
   businessId: z.string().uuid(),
   fulfillment: z.enum(['pickup', 'delivery']),
-  items: z.array(orderItemSchema).min(1, 'Add at least one item').max(MAX_ORDER_ITEMS),
+  items: z.array(orderItemSchema).max(MAX_ORDER_ITEMS).default([]),
+  listPhotoUrls: listPhotosSchema,
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   locationAddress: z.string().trim().max(300).optional(),
   note: z.string().trim().max(300).optional(),
-});
+})
+  .refine(hasItemsOrPhotos, itemsOrPhotosMessage);
 
 /** Quick Order: the list goes to every matching shop nearby; the first to accept gets it. */
-export const createQuickOrderSchema = z.object({
+export const createQuickOrderSchema = z
+  .object({
   // Fixed kinds and / or names shops typed themselves ("Fancy").
   shopCategories: z.array(z.string().trim().min(1).max(40)).min(1, 'Choose a kind of shop').max(10),
   fulfillment: z.enum(['pickup', 'delivery']),
-  items: z.array(orderItemSchema).min(1, 'Add at least one item').max(MAX_ORDER_ITEMS),
+  items: z.array(orderItemSchema).max(MAX_ORDER_ITEMS).default([]),
+  listPhotoUrls: listPhotosSchema,
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   locationAddress: z.string().trim().max(300).optional(),
   note: z.string().trim().max(300).optional(),
-});
+})
+  .refine(hasItemsOrPhotos, itemsOrPhotosMessage);
 
-/** The shop's checklist: each item packed (with its price) or unavailable. */
+/**
+ * The shop's checklist: each item packed (with its price) or unavailable. An entry with no id is
+ * a new item the shop typed in (read from the list's photos); one the shop added earlier and
+ * left out is removed.
+ */
 export const saveItemsSchema = z.object({
   items: z
     .array(
-      z.object({
-        id: z.string().uuid(),
-        status: z.enum(['pending', 'packed', 'unavailable']),
-        price: z.number().min(0).max(1000000).nullish(),
-      }),
+      z
+        .object({
+          id: z.string().uuid().optional(),
+          name: z.string().trim().max(100).optional(),
+          quantity: z.string().trim().max(20).optional(),
+          unit: z.string().trim().max(20).nullish(),
+          status: z.enum(['pending', 'packed', 'unavailable']),
+          price: z.number().min(0).max(1000000).nullish(),
+        })
+        .refine((item) => !!item.id || !!item.name, { message: 'Item name is required', path: ['name'] }),
     )
-    .min(1)
     .max(MAX_ORDER_ITEMS),
 });
 

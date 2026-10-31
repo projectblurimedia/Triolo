@@ -6,15 +6,23 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { GlassBackdrop } from './Glass';
 import { LoadingIndicator } from './LoadingIndicator';
-import { GOLD_BUTTON, GOLD_DEEP, GOLD_GRADIENT } from './GoldCard';
+import { GoldCard, GOLD_BUTTON, GOLD_DEEP, GOLD_GRADIENT, GOLD_INK, GOLD_INK_SOFT } from './GoldCard';
 import { subscriptionsService } from '@/services/subscriptionsService';
 import { usePayGateStore } from '@/state/payGateStore';
 import { openSubscribe } from '@/state/subscribeStore';
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { payInApp } from '@/utils/inAppPay';
 
 type Step = 'offer' | 'starting' | 'waiting' | 'checking';
+
+// What a plan gives, shown on the "go Plus instead" card.
+const PLUS_PERKS: { icon: React.ComponentProps<typeof FontAwesome6>['name']; key: string }[] = [
+  { icon: 'ban', key: 'payGate.plus.noFees' },
+  { icon: 'eye-slash', key: 'payGate.plus.noAds' },
+  { icon: 'bolt', key: 'payGate.plus.headStart' },
+];
 
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
   book: 'screwdriver-wrench',
@@ -89,6 +97,18 @@ export function PayGateSheet() {
         return;
       }
       passId.current = result.id;
+      // In the app, with the phone's UPI apps (new installs); else the payment page.
+      if (result.id) {
+        const outcome = await payInApp({ type: 'pass', id: result.id });
+        if (outcome === 'paid') {
+          done(true);
+          return;
+        }
+        if (outcome === 'cancelled') {
+          setStep('offer');
+          return;
+        }
+      }
       setStep('waiting');
       if (result.paymentUrl) await Linking.openURL(result.paymentUrl);
     } catch (error) {
@@ -145,6 +165,12 @@ export function PayGateSheet() {
             </Pressable>
           )}
 
+          {/* Or skip fees for good: a plan. */}
+          <View style={styles.orRow}>
+            <View style={[styles.orLine, { backgroundColor: colors.border }]} />
+            <Text style={[styles.orText, { color: colors.textMuted }]}>{t('payGate.or')}</Text>
+            <View style={[styles.orLine, { backgroundColor: colors.border }]} />
+          </View>
           <Pressable
             onPress={() => {
               // The plan for this side: job posts, or services / shop for accepting.
@@ -153,11 +179,35 @@ export function PayGateSheet() {
               openSubscribe(plan);
             }}
             disabled={busy}
-            hitSlop={6}
-            style={styles.linkRow}
+            accessibilityRole="button"
+            accessibilityLabel={t('payGate.subscribeInstead')}
+            style={({ pressed }) => [styles.plusWrap, pressed && styles.pressed]}
           >
-            <FontAwesome6 name="crown" size={12} color={GOLD_DEEP} solid />
-            <Text style={[styles.link, { color: GOLD_DEEP }]}>{t('payGate.subscribeInstead')}</Text>
+            <GoldCard style={styles.plusCard}>
+              <View style={styles.plusHead}>
+                <View style={styles.crown}>
+                  <FontAwesome6 name="crown" size={18} color={GOLD_DEEP} solid />
+                </View>
+                <View style={styles.plusTitles}>
+                  <Text style={styles.plusTitle}>{t('payGate.plus.title')}</Text>
+                  <Text style={styles.plusSubtitle}>{t('payGate.plus.subtitle')}</Text>
+                </View>
+              </View>
+              <View style={styles.perks}>
+                {PLUS_PERKS.map((perk) => (
+                  <View key={perk.key} style={styles.perk}>
+                    <FontAwesome6 name={perk.icon} size={11} color={GOLD_INK} solid />
+                    <Text style={styles.perkText} numberOfLines={1}>
+                      {t(perk.key)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.plusCta}>
+                <Text style={styles.plusCtaText}>{t('payGate.plus.cta')}</Text>
+                <FontAwesome6 name="arrow-right" size={13} color="#FFE29A" solid />
+              </View>
+            </GoldCard>
           </Pressable>
           <Pressable onPress={() => done(false)} disabled={busy} hitSlop={6}>
             <Text style={[styles.cancel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
@@ -180,7 +230,46 @@ const styles = StyleSheet.create({
   payText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
   outline: { alignSelf: 'stretch', height: 50, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   outlineText: { ...typography.body, fontFamily: fonts.semiBold },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 },
-  link: { ...typography.body, fontFamily: fonts.semiBold },
+  orRow: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, marginBottom: 12 },
+  orLine: { flex: 1, height: 1 },
+  orText: { ...typography.caption, fontFamily: fonts.semiBold, letterSpacing: 1, textTransform: 'uppercase' },
+  plusWrap: { alignSelf: 'stretch' },
+  pressed: { transform: [{ scale: 0.98 }], opacity: 0.95 },
+  plusCard: { padding: 14, gap: 12 },
+  plusHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  crown: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFBEB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.8)',
+  },
+  plusTitles: { flex: 1 },
+  plusTitle: { fontFamily: fonts.semiBold, fontSize: 16, lineHeight: 21, color: GOLD_INK },
+  plusSubtitle: { ...typography.caption, fontFamily: fonts.medium, color: GOLD_INK_SOFT, lineHeight: 16 },
+  perks: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  perk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  perkText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, color: GOLD_INK, includeFontPadding: false },
+  plusCta: {
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: GOLD_INK,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  plusCtaText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14, color: '#FFE29A', includeFontPadding: false },
   cancel: { ...typography.caption, marginTop: 12 },
 });

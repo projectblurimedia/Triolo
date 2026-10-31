@@ -16,6 +16,7 @@ import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { useLocationGatedMutation } from '@/hooks/useLocationGatedMutation';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { adThen } from './Ads';
 
 const POSITION_TIMEOUT_MS = 6000;
 const FAB = 62;
@@ -71,7 +72,11 @@ export function FindJobsButton({
   }, [variant, pulse]);
   // Location is asked for before the spinner starts.
   const search = useLocationGatedMutation({
-    mutationFn: async (_: void) => bookingOffersService.search(await currentPosition()),
+    mutationFn: async (_: void) => {
+      // Location first (above), then a local business's ad, then the search.
+      await adThen('find_jobs');
+      return bookingOffersService.search(await currentPosition());
+    },
     onSuccess: (offers) => {
       // Found some: they open in the New requests list (before the list updates, so the
       // pop-up for a single new request doesn't open instead).

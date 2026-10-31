@@ -1,6 +1,11 @@
 import { AppError } from '@/common/errors/AppError';
 import { SubscriptionsRepository } from './repository';
-import { customerPlansOn, PartnerPlan, partnerPlansOn, SubscriptionAudience, SubscriptionSettings, TrustedIds } from './interfaces';
+import { customerPlansOn, PartnerPlan, partnerPlansOn, SubscriptionAudience, SubscriptionPlan, SubscriptionSettings, TrustedIds } from './interfaces';
+
+/** What a partner owes after accepting: an ad, the one-time fee, or nothing. */
+export type UnlockNeed = 'ad' | 'pay' | null;
+/** How long an accept may stay unpaid before it goes back to other partners. */
+export const UNLOCK_WINDOW_MINUTES = 3;
 
 // Short per-instance caches: these are asked on hot paths (every ad, search and booking).
 const SETTINGS_TTL_MS = 20 * 1000;
@@ -27,7 +32,7 @@ export class SubscriptionStatusService {
   }
 
   /** With a partner plan: subscribed to that plan (or an older plan covering everything). */
-  async isActive(accountId: string, audience: SubscriptionAudience, plan?: PartnerPlan): Promise<boolean> {
+  async isActive(accountId: string, audience: SubscriptionAudience, plan?: SubscriptionPlan): Promise<boolean> {
     const key = `${audience}:${plan ?? '*'}:${accountId}`;
     const cached = this.activeCache.get(key);
     if (cached && Date.now() - cached.at < ACTIVE_TTL_MS) return cached.value;
@@ -82,10 +87,20 @@ export class SubscriptionStatusService {
     return { seconds: settings.headStartSeconds, subscriberIds: new Set(await this.priorityPartnerIds('service')) };
   }
 
-  /** Partners on the plan for that profile see who viewed it. */
-  async revealsProfileViewers(accountId: string, plan?: PartnerPlan): Promise<boolean> {
-    if (!partnerPlansOn(await this.settings())) return false;
-    return this.isActive(accountId, 'partner', plan);
+  /**
+   * How a partner gets to see who viewed their profile / job post. While partner plans are on:
+   * on the plan for it ('open'), else 'plan' (offered the plan). With plans off: after an ad
+   * while ads run at that spot ('ad'), else straight away ('open').
+   */
+  async viewerAccess(accountId: string, plan?: PartnerPlan, adOn?: () => Promise<boolean>): Promise<'open' | 'ad' | 'plan'> {
+    if (partnerPlansOn(await this.settings())) return (await this.isActive(accountId, 'partner', plan)) ? 'open' : 'plan';
+    if (adOn && (await adOn().catch(() => false))) return 'ad';
+    return 'open';
+  }
+
+  /** Whether the partner sees who viewed their profile without anything more (see viewerAccess). */
+  async revealsProfileViewers(accountId: string, plan?: PartnerPlan, adOn?: () => Promise<boolean>): Promise<boolean> {
+    return (await this.viewerAccess(accountId, plan, adOn)) === 'open';
   }
 
   /**
@@ -119,6 +134,18 @@ export class SubscriptionStatusService {
       kind,
       amount: kind === 'accept' ? settings.partnerFees.accept : settings.partnerFees.jobPost,
     });
+  }
+
+  /**
+   * After accepting a job or an order (never before — someone else could take it meanwhile):
+   * what the partner still owes. Nothing on the plan for that side; else an ad while ads run at
+   * that spot (`adOn`); else, while partner plans are on, the one-time fee.
+   */
+  async unlockNeeded(accountId: string, plan: PartnerPlan, adOn?: () => Promise<boolean>): Promise<UnlockNeed> {
+    const plansOn = partnerPlansOn(await this.settings());
+    if (plansOn && (await this.isActive(accountId, 'partner', plan))) return null;
+    if (adOn && (await adOn().catch(() => false))) return 'ad';
+    return plansOn ? 'pay' : null;
   }
 
   attachPass(id: string | null, ref: string): Promise<void> {

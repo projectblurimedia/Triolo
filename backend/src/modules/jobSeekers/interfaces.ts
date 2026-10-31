@@ -132,6 +132,8 @@ export interface JobPostViewer {
 
 export interface JobPostViewers {
   /** Who viewed is hidden: the partner isn't on the job post plan. */
+  /** open: shown; ad: shown after an ad (with plans off); plan: on the job post plan only. */
+  access: 'open' | 'ad' | 'plan';
   locked: boolean;
   total: number;
   newCount: number;

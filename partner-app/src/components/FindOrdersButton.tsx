@@ -12,6 +12,7 @@ import { useIncomingStore } from '@/state/incomingStore';
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography } from '@/theme';
+import { adThen } from './Ads';
 
 /**
  * "Find Orders Now" on My Shop — the shop's Find Jobs Now: asks the server for every Quick
@@ -24,7 +25,11 @@ export function FindOrdersButton() {
   const queryClient = useQueryClient();
   // Location is asked for first, as for every partner action.
   const search = useLocationGatedMutation({
-    mutationFn: async (_: void) => shopOrdersService.searchQuick(),
+    mutationFn: async (_: void) => {
+      // Location first (above), then a local business's ad, then the search.
+      await adThen('find_orders');
+      return shopOrdersService.searchQuick();
+    },
     onSuccess: (orders) => {
       const open = orders.filter((order) => order.quick && order.status === 'placed' && !order.businessId).length;
       // Found some: they open in the New requests list, not Activity (which is a record).

@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { AdsRepository } from '@/modules/ads/repository';
+import { AdsService } from '@/modules/ads/service';
 import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
 import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { pool } from '@/config/database';
@@ -22,7 +24,10 @@ const workersService = new WorkersService(new WorkersRepository(pool), notificat
 // Accepting a problem starts a trip in the bookings module; that trip reports back here.
 const bookingsService = new BookingsService(new BookingsRepository(pool), workersService, notificationsService);
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
-const service = new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService, bookingsService, subscriptionStatus);
+const adsService = new AdsService(new AdsRepository(pool));
+const service = new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService, bookingsService, subscriptionStatus, (spot) =>
+  adsService.partnerSpotOn(spot),
+);
 bookingsService.setLifecycleListener(service);
 const controller = new ProblemsController(service);
 

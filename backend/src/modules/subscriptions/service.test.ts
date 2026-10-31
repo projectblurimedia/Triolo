@@ -8,6 +8,12 @@ jest.mock('@/common/services/razorpayService', () => ({
   razorpayService: {
     createPaymentLink: jest.fn().mockResolvedValue({ id: 'plink_1', short_url: 'https://rzp.io/l/abc' }),
     paidLinkPayment: jest.fn(),
+    keyId: jest.fn().mockReturnValue('rzp_test_key'),
+    createOrder: jest.fn().mockResolvedValue({ id: 'order_1', amount: 1000, currency: 'INR' }),
+    order: jest.fn(),
+    payment: jest.fn(),
+    capture: jest.fn(),
+    signatureValid: jest.fn(),
   },
 }));
 const razorpay = razorpayService as unknown as Record<string, jest.Mock>;
@@ -241,5 +247,34 @@ describe('pay per use', () => {
     const access = await status.staffContactAccess('cust-1');
     expect(access.all).toBe(false);
     expect(access.ids.has('post-1')).toBe(true);
+  });
+});
+
+describe('in-app payment', () => {
+  it('opens a Razorpay order for an unpaid pass, then marks it paid once the payment checks out', async () => {
+    const { service, repo } = makeService();
+    repo.findPass.mockResolvedValue({ id: 'pass-1', accountId: 'acc-1', kind: 'accept', status: 'unpaid', amount: 10 });
+    const order = await service.inAppOrder('acc-1', 'pass', 'pass-1');
+    expect(razorpay.createOrder).toHaveBeenCalledWith(1000, 'pass-pass-1', { type: 'pass', id: 'pass-1', accountId: 'acc-1' });
+    expect(order).toMatchObject({ keyId: 'rzp_test_key', orderId: 'order_1', prefill: { name: 'Ravi', contact: '9700000001' } });
+
+    razorpay.signatureValid.mockReturnValue(true);
+    razorpay.order.mockResolvedValue({ id: 'order_1', amount: 1000, notes: { type: 'pass', id: 'pass-1', accountId: 'acc-1' } });
+    razorpay.payment.mockResolvedValue({ id: 'pay_1', order_id: 'order_1', amount: 1000, status: 'authorized' });
+    razorpay.capture.mockResolvedValue({ id: 'pay_1', order_id: 'order_1', amount: 1000, status: 'captured' });
+    const body = { type: 'pass' as const, id: 'pass-1', razorpayOrderId: 'order_1', razorpayPaymentId: 'pay_1', razorpaySignature: 'sig' };
+    expect(await service.inAppConfirm('acc-1', body)).toEqual({ paid: true });
+    expect(repo.markPassPaid).toHaveBeenCalledWith('pass-1', 'pay_1');
+  });
+
+  it('refuses a payment whose signature or order does not match', async () => {
+    const { service, repo } = makeService();
+    const body = { type: 'pass' as const, id: 'pass-1', razorpayOrderId: 'order_1', razorpayPaymentId: 'pay_1', razorpaySignature: 'sig' };
+    razorpay.signatureValid.mockReturnValue(false);
+    await expect(service.inAppConfirm('acc-1', body)).rejects.toMatchObject({ code: 'PAYMENT_INVALID' });
+    razorpay.signatureValid.mockReturnValue(true);
+    razorpay.order.mockResolvedValue({ id: 'order_1', amount: 1000, notes: { type: 'pass', id: 'pass-1', accountId: 'someone-else' } });
+    await expect(service.inAppConfirm('acc-1', body)).rejects.toMatchObject({ code: 'PAYMENT_INVALID' });
+    expect(repo.markPassPaid).not.toHaveBeenCalled();
   });
 });

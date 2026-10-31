@@ -1,6 +1,8 @@
 import { splitShopCategories } from '@/modules/businesses/categories';
 import { randomInt } from 'crypto';
+import { uploadToCloudinary } from '@/common/services/cloudinaryService';
 import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
+import { UNLOCK_WINDOW_MINUTES } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
 import { BusinessesService } from '@/modules/businesses/service';
 import { BusinessProfile } from '@/modules/businesses/interfaces';
@@ -10,6 +12,7 @@ import { OrdersRepository } from './repository';
 import { CreateOrderDto, CreateQuickOrderDto, CustomerCancelDto, RateOrderDto, SaveItemsDto } from './dto';
 import {
   CustomerOrder,
+  LIST_PHOTOS_FOLDER,
   OrderTransition,
   QUICK_ORDER_MAX_SHOPS,
   QUICK_ORDER_RADIUS_KM,
@@ -60,11 +63,21 @@ export class OrdersService {
     private readonly notificationsService: NotificationsService,
     // Ordering needs a customer subscription while those are on.
     private readonly subscriptionStatus?: SubscriptionStatusService,
+    // Whether a partner-app ad spot is on (an ad after accepting, instead of the fee).
+    private readonly adSpotOn?: (spot: string) => Promise<boolean>,
   ) {}
 
   // --- Customer side ---
 
+  /** One photo of a written list, uploaded before the order is sent; returns its link. */
+  async uploadListPhoto(file: Express.Multer.File | undefined): Promise<{ url: string }> {
+    if (!file) throw AppError.badRequest('A photo is required.', 'PHOTO_REQUIRED');
+    const uploaded = await uploadToCloudinary(file.path, LIST_PHOTOS_FOLDER);
+    return { url: uploaded.url };
+  }
+
   async createOrder(accountId: string, dto: CreateOrderDto): Promise<CustomerOrder> {
+    assertListPhotos(dto.listPhotoUrls);
     const shop = await this.businessesService.getPublicProfile(dto.businessId);
     if (!shop || shop.verificationStatus !== 'verified') {
       throw AppError.notFound('Shop not found.', 'SHOP_NOT_FOUND');
@@ -94,6 +107,7 @@ export class OrdersService {
         quantity: item.quantity,
         unit: item.unit || null,
       })),
+      listPhotoUrls: dto.listPhotoUrls,
     });
 
     await this.subscriptionStatus?.attachPass(passId, order.id);
@@ -102,6 +116,7 @@ export class OrdersService {
     const text = orderTemplate('placed', language, {
       shop: shop.shopName,
       count: order.items.length,
+      photos: order.listPhotoUrls.length,
     });
     await this.notificationsService.notify(shop.accountId, 'order_placed', text.title, text.body, {
       data: { kind: 'order_placed', orderId: order.id },
@@ -117,6 +132,7 @@ export class OrdersService {
    * is created (or paid) when no shop matches.
    */
   async createQuickOrder(accountId: string, dto: CreateQuickOrderDto): Promise<CustomerOrder> {
+    assertListPhotos(dto.listPhotoUrls);
     const shops = await this.businessesService.searchNearby(accountId, {
       latitude: dto.latitude,
       longitude: dto.longitude,
@@ -144,6 +160,7 @@ export class OrdersService {
         quantity: item.quantity,
         unit: item.unit || null,
       })),
+      listPhotoUrls: dto.listPhotoUrls,
       offers: shops.map((shop) => ({
         businessId: shop.id,
         distanceMeters: shop.distanceMeters,
@@ -158,6 +175,7 @@ export class OrdersService {
         const text = orderTemplate('quick_placed', language, {
           shop: shop.shopName,
           count: order.items.length,
+          photos: order.listPhotoUrls.length,
         });
         await this.notificationsService.notify(shop.accountId, 'order_placed', text.title, text.body, {
           data: { kind: 'order_placed', orderId: order.id },
@@ -169,7 +187,56 @@ export class OrdersService {
   }
 
   /** Ends unanswered orders and gives back what was paid for them. */
+  /** Orders accepted but left unpaid for UNLOCK_WINDOW_MINUTES go back (see releaseAccept). */
+  private async releaseUnpaidAccepts(): Promise<void> {
+    const due = await this.repository.findUnpaidAccepts(UNLOCK_WINDOW_MINUTES).catch(() => []);
+    for (const accept of due) await this.release(accept.id, accept.businessId).catch(() => undefined);
+  }
+
+  private async release(orderId: string, businessId: string): Promise<boolean> {
+    const released = await this.repository.releaseAccept(orderId, businessId);
+    if (!released) return false;
+    // The other shops asked before hear about the Quick Order again.
+    await Promise.all(
+      released.reofferOwners.map((accountId) =>
+        this.notificationsService.sendRawPush(accountId, 'Quick Order', 'A customer nearby is still looking for a shop. Accept it first to get it.', {
+          audience: 'partner',
+          data: { kind: 'order_placed', orderId },
+          channelId: 'default',
+        }),
+      ),
+    );
+    return true;
+  }
+
+  /**
+   * The shop watched the ad or pays the fee for an order it accepted: the order opens (the
+   * customer's number shows) and the customer hears it was accepted. Paying uses one pass
+   * (PAYMENT_REQUIRED with the price when there's none — the app pays, then asks again).
+   */
+  async unlockOrder(ownerAccountId: string, orderId: string, via: 'ad' | 'pay'): Promise<ShopSideOrder> {
+    const { shop, order } = await this.shopForOrder(ownerAccountId, orderId);
+    if (!order.unlockNeeded) return order;
+    if (via === 'ad' && order.unlockNeeded !== 'ad') throw AppError.badRequest('This order needs the payment.', 'UNLOCK_NEEDS_PAYMENT');
+    const passId = via === 'pay' ? ((await this.subscriptionStatus?.usePartnerPass(ownerAccountId, 'accept', 'shop')) ?? null) : null;
+    const result = await this.repository.unlock(orderId, shop.id);
+    if (!result) {
+      await this.subscriptionStatus?.restorePasses([], [passId]);
+      throw await this.transitionError(orderId, 'This order was given back — it can no longer be opened.');
+    }
+    await this.subscriptionStatus?.attachPass(passId, `accept-${orderId}`);
+    await this.notify(result, 'accepted', 'order_accepted');
+    return this.getShopOrder(ownerAccountId, orderId);
+  }
+
+  /** The shop closed the payment / ad after accepting: the order goes back. */
+  async releaseOrder(ownerAccountId: string, orderId: string): Promise<void> {
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
+    await this.release(orderId, shop.id);
+  }
+
   private async expireStale(): Promise<void> {
+    await this.releaseUnpaidAccepts();
     const expired = await this.repository.expireStale();
     if (expired.length > 0) await this.subscriptionStatus?.restorePasses(expired);
   }
@@ -283,29 +350,32 @@ export class OrdersService {
   }
 
   async getShopOrder(ownerAccountId: string, orderId: string): Promise<ShopSideOrder> {
+    await this.releaseUnpaidAccepts();
     await this.repository.expireStale();
     return (await this.shopForOrder(ownerAccountId, orderId)).order;
   }
 
   async acceptOrder(ownerAccountId: string, orderId: string): Promise<void> {
     const { shop } = await this.shopForOrder(ownerAccountId, orderId);
-    const passId = (await this.subscriptionStatus?.usePartnerPass(ownerAccountId, 'accept', 'shop')) ?? null;
+    // Accepting is instant and free; an ad or the fee comes after (unlockOrder), so no other
+    // shop can take it while this one is still paying.
+    const unlockNeeded = this.subscriptionStatus
+      ? await this.subscriptionStatus.unlockNeeded(ownerAccountId, 'shop', this.adSpotOn ? () => this.adSpotOn!('order_accept') : undefined)
+      : null;
     // A Quick Order offered to this shop: the first accept takes it (delivery charge from here).
     const offerDistance = await this.repository.findQuickOffer(orderId, shop.id);
     const result =
       offerDistance != null
-        ? await this.repository.claimQuick(orderId, shop.id, offerDistance, deliveryCharge(shop, offerDistance))
-        : await this.repository.accept(orderId, shop.id);
+        ? await this.repository.claimQuick(orderId, shop.id, offerDistance, deliveryCharge(shop, offerDistance), unlockNeeded)
+        : await this.repository.accept(orderId, shop.id, unlockNeeded);
     if (!result && offerDistance != null) {
-      await this.subscriptionStatus?.restorePasses([], [passId]);
       throw AppError.conflict('Another shop took this order first.', 'ORDER_ALREADY_TAKEN');
     }
     if (!result) {
-      await this.subscriptionStatus?.restorePasses([], [passId]);
       throw await this.transitionError(orderId, 'This order can no longer be accepted.');
     }
-    await this.subscriptionStatus?.attachPass(passId, `accept-${orderId}`);
-    await this.notify(result, 'accepted', 'order_accepted');
+    // With something still owed, the customer hears once it's done (unlockOrder).
+    if (!unlockNeeded) await this.notify(result, 'accepted', 'order_accepted');
     // The other shops asked: their pop-up for this order closes.
     if (offerDistance != null) {
       const others = await this.repository.lostQuickOwners(orderId);
@@ -339,7 +409,10 @@ export class OrdersService {
       orderId,
       shop.id,
       dto.items.map((item) => ({
-        id: item.id,
+        id: item.id ?? null,
+        name: item.name ?? null,
+        quantity: item.quantity ?? null,
+        unit: item.unit ?? null,
         status: item.status,
         price: item.price ?? null,
       })),
@@ -596,4 +669,13 @@ export function deliveryCharge(shop: Pick<BusinessProfile, 'deliveryPricePerKm' 
   const perKm = shop.deliveryPricePerKm ?? 0;
   const byDistance = Math.round((perKm * distance) / 1000);
   return Math.max(byDistance, Math.round(Math.max(shop.deliveryMinCharge ?? 0, perKm)));
+}
+
+const LIST_PHOTO_PATTERN = new RegExp(`^https://res\\.cloudinary\\.com/[^/]+/image/upload/(v\\d+/)?${LIST_PHOTOS_FOLDER}/[^/?#]+$`);
+
+/** Only photos uploaded through POST /orders/list-photos can go on an order. */
+function assertListPhotos(urls: string[]): void {
+  if (urls.some((url) => !LIST_PHOTO_PATTERN.test(url))) {
+    throw AppError.badRequest('That list photo could not be used. Add it again.', 'ORDER_PHOTO_INVALID');
+  }
 }

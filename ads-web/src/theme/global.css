@@ -3035,3 +3035,69 @@ a.row:hover {
 .viewer-img {
   max-height: calc(100dvh - 112px);
 }
+
+/* ---------- Where an ad shows ---------- */
+
+.show-on {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.show-on-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--input);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.show-on-card strong {
+  font-size: 15px;
+}
+
+.show-on-card > span:last-child {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.show-on-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+  background: rgba(0, 85, 211, 0.1);
+  color: #0055d3;
+}
+
+.show-on-card.active {
+  background: var(--gradient);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(0, 85, 211, 0.25);
+}
+
+.show-on-card.active > span:last-child {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.show-on-card.active .show-on-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.show-on-card:disabled {
+  cursor: default;
+  opacity: 0.7;
+}

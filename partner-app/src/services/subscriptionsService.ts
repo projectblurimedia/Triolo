@@ -5,7 +5,7 @@ export type SubscriptionPrices = Record<'1' | '3' | '6' | '12', number>;
 export type PassKind = 'accept' | 'job_post';
 export type BadgeKind = 'service' | 'business' | 'job_post';
 /** Partner plans are bought per side: services, a shop, or job posts — each with its own perks. */
-export type PartnerPlan = 'service' | 'shop' | 'job_post';
+export type PartnerPlan = 'service' | 'shop' | 'job_post' | 'all';
 export const PARTNER_PLANS: PartnerPlan[] = ['service', 'shop', 'job_post'];
 /** The plan that goes with a profile kind. */
 export const planForKind = (kind: BadgeKind): PartnerPlan => (kind === 'business' ? 'shop' : kind);

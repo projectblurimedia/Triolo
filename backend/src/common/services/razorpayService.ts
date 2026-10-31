@@ -68,6 +68,10 @@ export const razorpayService = {
     return call<RazorpayOrder>('POST', '/orders', { amount: amountPaise, currency: 'INR', receipt, notes });
   },
 
+  order(orderId: string): Promise<RazorpayOrder & { notes?: Record<string, string> }> {
+    return call<RazorpayOrder & { notes?: Record<string, string> }>('GET', `/orders/${orderId}`);
+  },
+
   async orderPayments(orderId: string): Promise<RazorpayPayment[]> {
     return (await call<{ items: RazorpayPayment[] }>('GET', `/orders/${orderId}/payments`)).items ?? [];
   },

@@ -9,11 +9,27 @@ export interface PrepareListItem {
   unit: string;
 }
 
+/** A photo of a written (paper) list. */
+export interface PrepareListPhoto {
+  id: string;
+  /** The copy kept on this phone. */
+  uri: string;
+  name: string;
+  type: string;
+  /** Its link once it has been sent with an order (so it isn't uploaded again). */
+  url?: string;
+}
+
+/** Most photos one list can have (the same limit as an order). */
+export const MAX_LIST_PHOTOS = 5;
+
 /** A finished list the customer can edit, delete, or send to a shop. */
 export interface SavedList {
   id: string;
   name: string;
   items: PrepareListItem[];
+  /** Photos of a written list, instead of (or as well as) typed items. */
+  photos: PrepareListPhoto[];
   createdAt: string;
   updatedAt: string;
 }
@@ -23,6 +39,7 @@ interface Draft {
   listId: string | null;
   name: string;
   items: PrepareListItem[];
+  photos: PrepareListPhoto[];
 }
 
 interface ListState {
@@ -34,6 +51,9 @@ interface ListState {
   updateItem: (id: string, patch: Partial<Omit<PrepareListItem, 'id'>>) => void;
   removeItem: (id: string) => void;
   clearDraftItems: () => void;
+  setDraftPhotos: (photos: PrepareListPhoto[]) => void;
+  /** Links of photos just sent with an order, by photo id. */
+  setPhotoUrls: (listId: string, urls: Record<string, string>) => void;
   setDraftName: (name: string) => void;
   startNewList: () => void;
   editList: (id: string) => void;
@@ -49,7 +69,7 @@ interface ListState {
 
 export type SaveResult = { status: 'saved'; id: string } | { status: 'empty' } | { status: 'duplicate' };
 
-const EMPTY_DRAFT: Draft = { listId: null, name: '', items: [] };
+const EMPTY_DRAFT: Draft = { listId: null, name: '', items: [], photos: [] };
 
 let nextId = 0;
 function generateId(prefix: string): string {
@@ -111,16 +131,29 @@ export const useListStore = create<ListState>()(
       removeItem: (id) =>
         set((state) => ({ draft: { ...state.draft, items: state.draft.items.filter((item) => item.id !== id) } })),
       clearDraftItems: () => set((state) => ({ draft: { ...state.draft, items: [] } })),
+      setDraftPhotos: (photos) => set((state) => ({ draft: { ...state.draft, photos: photos.slice(0, MAX_LIST_PHOTOS) } })),
+      setPhotoUrls: (listId, urls) =>
+        set((state) => ({
+          lists: state.lists.map((list) =>
+            list.id === listId ? { ...list, photos: (list.photos ?? []).map((photo) => (urls[photo.id] ? { ...photo, url: urls[photo.id] } : photo)) } : list,
+          ),
+        })),
       setDraftName: (name) => set((state) => ({ draft: { ...state.draft, name } })),
       startNewList: () => set({ draft: EMPTY_DRAFT }),
       editList: (id) => {
         const list = get().lists.find((entry) => entry.id === id);
-        if (list) set({ draft: { listId: list.id, name: list.name, items: list.items.map((item) => ({ ...item })) } });
+        if (list) {
+          set({
+            draft: { listId: list.id, name: list.name, items: list.items.map((item) => ({ ...item })), photos: (list.photos ?? []).map((photo) => ({ ...photo })) },
+          });
+        }
       },
       saveDraft: (fallbackName) => {
         const { draft, lists } = get();
         const items = cleanItems(draft.items);
-        if (items.length === 0) return { status: 'empty' };
+        const photos = draft.photos ?? [];
+        // A list is typed items, photos of a written list, or both.
+        if (items.length === 0 && photos.length === 0) return { status: 'empty' };
         const editingId = draft.listId && lists.some((list) => list.id === draft.listId) ? draft.listId : null;
         const typed = draft.name.trim().replace(/s+/g, ' ');
         // A name the customer typed must be new; the automatic one just gets a number added.
@@ -129,13 +162,13 @@ export const useListStore = create<ListState>()(
         const name = typed || uniqueName(lists, fallbackName, editingId);
         if (editingId) {
           set({
-            lists: lists.map((list) => (list.id === draft.listId ? { ...list, name, items, updatedAt: now } : list)),
+            lists: lists.map((list) => (list.id === draft.listId ? { ...list, name, items, photos, updatedAt: now } : list)),
             draft: EMPTY_DRAFT,
           });
           return { status: 'saved', id: editingId };
         }
         const id = generateId('list');
-        set({ lists: [{ id, name, items, createdAt: now, updatedAt: now }, ...lists], draft: EMPTY_DRAFT });
+        set({ lists: [{ id, name, items, photos, createdAt: now, updatedAt: now }, ...lists], draft: EMPTY_DRAFT });
         return { status: 'saved', id };
       },
       discardDraft: () => set({ draft: EMPTY_DRAFT }),
@@ -144,7 +177,7 @@ export const useListStore = create<ListState>()(
     }),
     {
       name: 'prepare-list-storage',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({ lists: state.lists, draft: state.draft }),
       migrate: (persisted, version) => {
@@ -153,17 +186,18 @@ export const useListStore = create<ListState>()(
           const items = cleanItems(old.items ?? []);
           const now = new Date().toISOString();
           return {
-            lists: items.length ? [{ id: generateId('list'), name: 'My List', items, createdAt: now, updatedAt: now }] : [],
+            lists: items.length ? [{ id: generateId('list'), name: 'My List', items, photos: [], createdAt: now, updatedAt: now }] : [],
             draft: EMPTY_DRAFT,
           };
         }
         // Version 3: list names are unique — earlier duplicates get a number added.
+        // Version 4: lists (and the draft) can hold photos of a written list.
         const state = persisted as { lists: SavedList[]; draft: Draft };
         const renamed: SavedList[] = [];
         for (const list of [...(state.lists ?? [])].reverse()) {
-          renamed.unshift({ ...list, name: uniqueName(renamed, list.name, list.id) });
+          renamed.unshift({ ...list, photos: list.photos ?? [], name: version < 3 ? uniqueName(renamed, list.name, list.id) : list.name });
         }
-        return { ...state, lists: renamed };
+        return { ...state, lists: renamed, draft: { ...EMPTY_DRAFT, ...(state.draft ?? {}), photos: state.draft?.photos ?? [] } };
       },
       // isHydrated must be set via the store's own setHydrated() action (set()), not by
       // mutating `state` directly here — see authStore.ts's identical fix for why a direct

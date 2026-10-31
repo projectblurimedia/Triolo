@@ -10,6 +10,8 @@ import { NotificationsRepository } from '@/modules/notifications/repository';
 import { NotificationsService } from '@/modules/notifications/service';
 import { ProblemsRepository } from '@/modules/problems/repository';
 import { ProblemsService } from '@/modules/problems/service';
+import { AdsRepository } from '@/modules/ads/repository';
+import { AdsService } from '@/modules/ads/service';
 import { BookingsController } from './controller';
 import { BookingsService } from './service';
 import { BookingsRepository } from './repository';
@@ -32,7 +34,11 @@ const notificationsService = new NotificationsService(new NotificationsRepositor
 const workersService = new WorkersService(new WorkersRepository(pool), notificationsService);
 const repository = new BookingsRepository(pool);
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
-const service = new BookingsService(repository, workersService, notificationsService, subscriptionStatus);
+// After accepting, an ad may come instead of the fee (the admin's partner ad spots).
+const adsService = new AdsService(new AdsRepository(pool));
+const service = new BookingsService(repository, workersService, notificationsService, subscriptionStatus, (spot) =>
+  adsService.partnerSpotOn(spot),
+);
 // Trips started from a Your Problems post report back when they finish or are cancelled.
 service.setLifecycleListener(new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService, service));
 const controller = new BookingsController(service);
@@ -56,6 +62,8 @@ bookingsRouter.post('/:id/complete', authenticate, validateBody(completeBookingS
 
 // Worker
 bookingsRouter.post('/:id/accept', authenticate, controller.acceptOffer);
+bookingsRouter.post('/:id/unlock', authenticate, controller.unlockJob);
+bookingsRouter.post('/:id/release', authenticate, controller.releaseJob);
 bookingsRouter.post('/:id/decline', authenticate, controller.declineOffer);
 bookingsRouter.post('/:id/start', authenticate, controller.startTrip);
 bookingsRouter.put('/:id/location', authenticate, validateBody(updateWorkerLocationSchema), controller.updateLocation);

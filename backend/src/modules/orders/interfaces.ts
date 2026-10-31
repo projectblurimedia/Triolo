@@ -75,6 +75,10 @@ export const ORDER_LATE_STATUSES: ShopOrderStatus[] = [
 ];
 export const MAX_PIN_ATTEMPTS = 5;
 export const MAX_ORDER_ITEMS = 100;
+/** Photos of a written list one order can carry. */
+export const MAX_LIST_PHOTOS = 5;
+/** Where list photos are uploaded; an order only accepts photo links from here. */
+export const LIST_PHOTOS_FOLDER = 'triolo/order-lists';
 
 export interface ShopOrderItem {
   id: string;
@@ -85,6 +89,8 @@ export interface ShopOrderItem {
   status: ShopOrderItemStatus;
   /** Rupees, for a packed item. */
   price: number | null;
+  /** Typed in by the shop while packing (read from the list's photos). */
+  addedByShop: boolean;
 }
 
 export interface ShopOrder {
@@ -121,6 +127,8 @@ export interface ShopOrder {
   /** Last change — an accepted order unchanged for ORDER_LATE_AFTER_MINUTES is stalled. */
   updatedAt: Date;
   items: ShopOrderItem[];
+  /** Photos of a written list (instead of, or as well as, typed items). */
+  listPhotoUrls: string[];
 }
 
 /** The shop as the customer sees it on their order. */
@@ -146,7 +154,10 @@ export interface CustomerOrder extends ShopOrder {
 
 export interface ShopSideOrder extends ShopOrder {
   customerFullName: string;
+  /** Hidden until the order is accepted — and until what the accept needs is done. */
   customerMobileNumber: string | null;
+  /** After accepting: an ad to watch or the fee to pay before the order opens; null when done. */
+  unlockNeeded: 'ad' | 'pay' | null;
   pinAttemptsLeft: number;
   /** Which of the owner's shops it is for (an owner may have several). */
   shopId?: string;
@@ -214,6 +225,7 @@ export interface CreateOrderParams {
   deliveryCharge: number;
   note: string | null;
   items: { name: string; quantity: string; unit: string | null }[];
+  listPhotoUrls: string[];
 }
 
 export interface CreateQuickOrderParams {
@@ -227,11 +239,16 @@ export interface CreateQuickOrderParams {
   locationAddress: string | null;
   note: string | null;
   items: { name: string; quantity: string; unit: string | null }[];
+  listPhotoUrls: string[];
   offers: { businessId: string; distanceMeters: number }[];
 }
 
 export interface ItemUpdate {
-  id: string;
+  /** null: a new item the shop typed in (needs a name). */
+  id: string | null;
+  name: string | null;
+  quantity: string | null;
+  unit: string | null;
   status: ShopOrderItemStatus;
   price: number | null;
 }

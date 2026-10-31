@@ -1,4 +1,4 @@
-import { AdsService, placementOn } from './service';
+import { AdsService, adPrice, placementOn } from './service';
 import { razorpayService } from '@/common/services/razorpayService';
 import { AdsRepository } from './repository';
 import { Ad, AdSettings, SaveAdParams } from './interfaces';
@@ -58,16 +58,30 @@ const SETTINGS: AdSettings = {
     send_list: false,
     post_problem: true,
     hire_staff: true,
+    quick_order: true,
+    staff_phone: true,
+    find_jobs: true,
+    find_orders: true,
+    problem_accept: true,
+    continue_card: true,
+    job_accept: true,
+    order_accept: true,
+    viewer_reveal: true,
     work_done: true,
     order_pin: true,
   },
   actionGapSeconds: 0,
+  pricePerView: 0.2,
+  homeUser: true,
+  homePartner: false,
   // Admin-set prices (not the old defaults), to prove they're used.
   prices: { '1': 25, '3': 60, '7': 120, '30': 350 },
   updatedAt: '2026-10-18T00:00:00.000Z',
 };
 
 const AD: Ad = {
+  billing: 'days',
+  viewLimit: null,
   id: 'ad-1',
   billNumber: 7,
   advertiserName: 'Sri Sai Textiles',
@@ -78,6 +92,7 @@ const AD: Ad = {
   imageUrls: [`${OURS}image/upload/v1/triolo/ads/a.jpg`],
   videoUrl: null,
   orientation: 'vertical',
+  showOn: 'action',
   displaySeconds: 5,
   videoSeconds: null,
   durationSeconds: 5,
@@ -111,6 +126,7 @@ const AD: Ad = {
   clicks: 0,
   status: 'running',
   deletedAt: null,
+  deletedBy: null,
   createdAt: '2026-10-18T00:00:00.000Z',
   updatedAt: '2026-10-18T00:00:00.000Z',
 };
@@ -178,6 +194,9 @@ describe('placementOn', () => {
     expect(placementOn(SETTINGS, 'user', 'action', 'send_list')).toBe(false);
     // A spot of the other app is never shown.
     expect(placementOn(SETTINGS, 'user', 'action', 'work_done')).toBe(false);
+    // Retired partner spots stay off even when switched on.
+    expect(placementOn(SETTINGS, 'partner', 'action', 'work_done')).toBe(false);
+    expect(placementOn(SETTINGS, 'partner', 'action', 'find_jobs')).toBe(true);
   });
 });
 
@@ -196,6 +215,7 @@ describe('AdsService', () => {
       imageUrls: AD.imageUrls,
       videoUrl: AD.videoUrl,
       orientation: 'vertical',
+      showOn: 'action',
       durationSeconds: 5,
       advertiserName: AD.advertiserName,
       contactPhone: AD.advertiserPhone,
@@ -670,5 +690,40 @@ describe('ads and subscriptions', () => {
     expect(await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null, { spot: 'quick_book', accountId: 'acc-1' })).toBeNull();
     expect(status.isActive).toHaveBeenCalledWith('acc-1', 'customer');
     expect(repository.pickAndCount).not.toHaveBeenCalled();
+  });
+
+  it("a partner's plan takes ads off its own side only", async () => {
+    const { repository } = makeService();
+    // Only a Job Post plan.
+    const status = { isActive: jest.fn(async (_id: string, _audience: string, plan?: string) => plan === 'job_post') };
+    const service = new AdsService(repository as unknown as AdsRepository, undefined, status as never);
+    const here = { latitude: 16.7, longitude: 81.1 };
+    expect(await service.serve('partner', 'action', here, null, { spot: 'viewer_reveal', accountId: 'acc-1' })).toBeNull();
+    expect(await service.serve('partner', 'action', here, null, { spot: 'find_jobs', accountId: 'acc-1' })).not.toBeNull();
+    expect(status.isActive).toHaveBeenCalledWith('acc-1', 'partner', 'service');
+  });
+});
+
+describe('ads by views', () => {
+  it('a Home slider ad is always horizontal', async () => {
+    const { service, repository } = makeService();
+    repository.create.mockImplementation(async (params: unknown, amount: number) => ({ ...AD, ...(params as object), amount }));
+    await service.create({ ...PARAMS, orientation: 'vertical', showOn: 'home' });
+    expect(repository.create.mock.calls[0][0]).toMatchObject({ showOn: 'home', orientation: 'horizontal' });
+  });
+
+  it('prices a views ad as views × the price per view, and a days ad by its plan', () => {
+    expect(adPrice(SETTINGS, { billing: 'views', viewLimit: 1000, planDays: 90 })).toBe(200);
+    expect(adPrice(SETTINGS, { billing: 'days', viewLimit: null, planDays: 7 })).toBe(120);
+  });
+
+  it('books a views ad for 90 days, priced by its views', async () => {
+    const { service, repository } = makeService();
+    repository.create.mockImplementation(async (params: unknown, amount: number) => ({ ...AD, ...(params as object), amount }));
+    const ad = await service.create({ ...PARAMS, billing: 'views', viewLimit: 2500 });
+    const [stored, amount] = repository.create.mock.calls[0];
+    expect(stored).toMatchObject({ billing: 'views', viewLimit: 2500, planDays: 90 });
+    expect(amount).toBe(500);
+    expect(ad.amount).toBe(500);
   });
 });

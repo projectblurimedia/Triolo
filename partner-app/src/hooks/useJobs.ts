@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocationGatedMutation } from './useLocationGatedMutation';
-import { ACTIVE_JOB_STATUSES, jobsService } from '@/services/jobsService';
+import { ACTIVE_JOB_STATUSES, jobsService, WorkerJob } from '@/services/jobsService';
 import { useAuthStore } from '@/state/authStore';
 
 export const MY_JOBS_QUERY_KEY = ['jobs', 'mine'];
@@ -11,10 +11,13 @@ const LIST_POLL_MS = 12000;
 
 /** One job — refreshed while active, so a customer cancel or finish shows up promptly. */
 export function useJob(id: string | null) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: jobQueryKey(id),
     queryFn: () => jobsService.get(id as string),
     enabled: id !== null,
+    // Opened from a list: show what the list already has at once, while the fresh copy loads.
+    placeholderData: () => (id ? queryClient.getQueryData<WorkerJob[]>(MY_JOBS_QUERY_KEY)?.find((job) => job.id === id) : undefined),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return !status || ACTIVE_JOB_STATUSES.includes(status) ? ACTIVE_POLL_MS : false;

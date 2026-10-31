@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from './Button';
 import { useListStore } from '@/state/listStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { listCountText } from '@/utils/listPhotos';
 
 // The app's own blue, like every other screen's icons.
 const LIST_GRADIENT = headerGradient;
@@ -121,7 +122,7 @@ export function ChooseListModal({ visible, onClose, onPick, onCreate, shopName }
                       {list.name || t('chooseList.untitled')}
                     </Text>
                     <Text style={[styles.cardMeta, { color: colors.primary }]}>
-                      {t('chooseList.itemCount', { count: list.items.length })}
+                      {listCountText(t, list.items.length, (list.photos ?? []).length)}
                     </Text>
                     {list.items.length > 0 ? (
                       <Text style={[styles.cardPreview, { color: colors.textMuted }]} numberOfLines={2}>

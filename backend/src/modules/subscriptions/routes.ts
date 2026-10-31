@@ -22,6 +22,8 @@ import {
   badgeCheckoutSchema,
   badgeListQuerySchema,
   checkoutSchema,
+  inAppConfirmSchema,
+  inAppOrderSchema,
   passCheckoutSchema,
   passListQuerySchema,
   removeBadgeSchema,
@@ -106,6 +108,21 @@ subscriptionsRouter.post(
   '/passes/:id/check',
   authenticate,
   asyncHandler(async (req: Request, res: Response) => ok(res, await service.passCheckPayment(accountIdOf(req), req.params.id))),
+);
+
+// In-app payment (Razorpay's screen in the apps, with the phone's UPI apps): an order, then the result.
+subscriptionsRouter.post(
+  '/pay/order',
+  authenticate,
+  validateBody(inAppOrderSchema),
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.inAppOrder(accountIdOf(req), req.body.type, req.body.id))),
+);
+
+subscriptionsRouter.post(
+  '/pay/confirm',
+  authenticate,
+  validateBody(inAppConfirmSchema),
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.inAppConfirm(accountIdOf(req), req.body))),
 );
 
 subscriptionsRouter.post(

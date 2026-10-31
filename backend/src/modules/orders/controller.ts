@@ -43,7 +43,23 @@ export class OrdersController {
     return ok(res, await this.service.staffVerifyPin(requireAccountId(req), req.params.id, req.body.pin), 'Delivered');
   });
 
+  /** After accepting: the shop watched the ad ({ via: 'ad' }) or pays ({ via: 'pay' }). */
+  unlock = asyncHandler(async (req: Request, res: Response) => {
+    return ok(res, await this.service.unlockOrder(requireAccountId(req), req.params.id, req.body?.via === 'ad' ? 'ad' : 'pay'), 'Order opened');
+  });
+
+  /** After accepting: the shop closed the payment / ad — the order goes back. */
+  release = asyncHandler(async (req: Request, res: Response) => {
+    await this.service.releaseOrder(requireAccountId(req), req.params.id);
+    return ok(res, null, 'Order given back');
+  });
+
   // --- Customer side ---
+
+  uploadListPhoto = asyncHandler(async (req: Request, res: Response) => {
+    requireAccountId(req);
+    return created(res, await this.service.uploadListPhoto(req.file), 'Photo uploaded');
+  });
 
   create = asyncHandler(async (req: Request, res: Response) => {
     return created(res, await this.service.createOrder(requireAccountId(req), req.body), 'Order sent to the shop');

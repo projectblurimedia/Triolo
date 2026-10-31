@@ -15,6 +15,7 @@ import { BadgeKind, Boost, BoostInfo, MyProfileBadge, subscriptionsService } fro
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { payInApp } from '@/utils/inAppPay';
 
 const TRUST_GRADIENT = ['#047857', '#10B981'] as const;
 const KIND_ICON: Record<BadgeKind, React.ComponentProps<typeof FontAwesome6>['name']> = {
@@ -97,6 +98,13 @@ export function ProfileGrowth({
         ? { id: profile.badgeId!, paymentUrl: profile.paymentUrl! }
         : await subscriptionsService.badgeCheckout(profile.kind, profile.profileId);
       queryClient.invalidateQueries({ queryKey: BADGES_QUERY_KEY });
+      // In the app, with the phone's UPI apps (new installs); else the payment page.
+      const outcome = await payInApp({ type: 'badge', id });
+      if (outcome === 'paid') {
+        await checkBadge(id, false);
+        return;
+      }
+      if (outcome === 'cancelled') return;
       watch(() => checkBadge(id, true));
       await Linking.openURL(paymentUrl);
     } catch (error) {

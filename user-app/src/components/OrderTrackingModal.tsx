@@ -19,6 +19,8 @@ import { orderShopName } from '@/utils/orderShopName';
 import { RadarPulse } from './RadarPulse';
 import { LATE_AFTER_MS, LateNotice, useNow } from './LateNotice';
 import { FinishJobModal } from './FinishJobModal';
+import { ListPhotoStrip } from './ListPhotoStrip';
+import { previousStepAt, stepTimeText } from '@/utils/stepTime';
 
 // The shop took the order but hasn't handed it over (mirrors the backend's ORDER_LATE_STATUSES).
 const LATE_ORDER_STATUSES: OrderStatus[] = ['accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery'];
@@ -46,14 +48,6 @@ const STATUS_ICONS: Record<OrderStatus, IconName> = {
 };
 const ENDED_BADLY: OrderStatus[] = ['cancelled', 'declined', 'expired'];
 const SUCCESS_GRADIENT = ['#16A34A', '#22C55E'] as const;
-
-// Built by hand — Hermes on Android doesn't reliably ship Intl time formatting.
-function formatClock(iso: string): string {
-  const date = new Date(iso);
-  const hours = date.getHours();
-  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
-  return `${hour12}:${String(date.getMinutes()).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`;
-}
 
 function itemLabel(item: OrderItem): string {
   return [item.quantity, item.unit].filter(Boolean).join(' ');
@@ -249,7 +243,10 @@ export function OrderTrackingModal() {
     if (!billed) {
       return (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('orders.yourList', { count: o.items.length })}</Text>
+          <Text style={[styles.cardLabel, { color: colors.textMuted }]}>
+            {o.items.length > 0 ? t('orders.yourList', { count: o.items.length }) : t('orders.yourListPhotos')}
+          </Text>
+          <ListPhotoStrip photos={o.listPhotoUrls ?? []} />
           {o.items.map((item) => renderItemRow(item, false))}
           {o.fulfillment === 'delivery' && o.deliveryCharge > 0 ? (
             <Text style={[styles.meta, styles.estimate, { color: colors.textMuted }]}>
@@ -286,6 +283,12 @@ export function OrderTrackingModal() {
           </View>
           <Text style={[styles.meta, { color: colors.textMuted }]}>{t('orders.payAtHandover')}</Text>
         </View>
+        {(o.listPhotoUrls ?? []).length > 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('orders.yourListPhotos')}</Text>
+            <ListPhotoStrip photos={o.listPhotoUrls ?? []} />
+          </View>
+        ) : null}
         {missing.length > 0 ? (
           <View style={[styles.card, { backgroundColor: `${brandColors.error}0D`, borderColor: `${brandColors.error}33` }]}>
             <View style={styles.billHeader}>
@@ -371,7 +374,7 @@ export function OrderTrackingModal() {
                   {step.label}
                 </Text>
                 {step.at ? (
-                  <Text style={[styles.stepTime, { color: colors.textMuted }]}>{formatClock(step.at)}</Text>
+                  <Text style={[styles.stepTime, { color: colors.textMuted }]}>{stepTimeText(step.at, previousStepAt(steps, index))}</Text>
                 ) : current ? (
                   <Text style={[styles.stepTime, { color: colors.primary }]}>{t('waiting.now')}</Text>
                 ) : null}

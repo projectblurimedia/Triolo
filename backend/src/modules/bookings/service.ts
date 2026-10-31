@@ -1,5 +1,6 @@
 import { randomInt } from 'crypto';
 import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
+import { UNLOCK_WINDOW_MINUTES } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
 import { WorkersService } from '@/modules/workers/service';
 import { WorkerProfile } from '@/modules/workers/interfaces';
@@ -72,6 +73,8 @@ export class BookingsService {
     private readonly notificationsService: NotificationsService,
     // Customer subscriptions (Quick Book / booking a worker) and subscribed workers' head start.
     private readonly subscriptionStatus?: SubscriptionStatusService,
+    // Whether a partner-app ad spot is on (an ad after accepting, instead of the fee).
+    private readonly adSpotOn?: (spot: string) => Promise<boolean>,
   ) {}
 
   /** The problems module, told when a trip started from one of its posts ends. */
@@ -89,6 +92,81 @@ export class BookingsService {
   async createForAcceptedProblem(params: Omit<CreateAssignedBookingParams, 'arrivalPin'>): Promise<string> {
     const request = await this.repository.createAssigned({ ...params, arrivalPin: generateArrivalPin() });
     return request.id;
+  }
+
+  /**
+   * Accepts left unpaid for UNLOCK_WINDOW_MINUTES go back to other workers. Run lazily, before
+   * jobs and bookings are read.
+   */
+  private async releaseUnpaidAccepts(): Promise<void> {
+    const due = await this.repository.findUnpaidAccepts(UNLOCK_WINDOW_MINUTES).catch(() => []);
+    for (const accept of due) await this.release(accept.id, accept.workerId).catch(() => undefined);
+  }
+
+  /** Gives an accepted, not yet unlocked job back (see the repository's releaseAccept). */
+  private async release(bookingRequestId: string, workerId: string): Promise<boolean> {
+    const released = await this.repository.releaseAccept(bookingRequestId, workerId);
+    if (!released) return false;
+    if (released.problemPostId && this.lifecycleListener) {
+      await this.lifecycleListener.onProblemTripCancelled(released.problemPostId);
+    }
+    // The other workers asked before hear about it again.
+    await Promise.all(
+      released.reoffer.map((worker) =>
+        this.notificationsService.sendRawPush(
+          worker.accountId,
+          bookingOfferTitle(worker.preferredLanguage as never),
+          bookingOfferBody(worker.distanceMeters, released.request.skillCategories as never, worker.preferredLanguage as never),
+          {
+            data: { kind: 'booking_offer', bookingRequestId },
+            tag: bookingRequestId,
+            channelId: BOOKING_OFFER_CHANNEL,
+            priority: 'max',
+          },
+        ),
+      ),
+    );
+    return true;
+  }
+
+  /** What accepting this job needs after it (see SubscriptionStatusService.unlockNeeded). */
+  async unlockNeededFor(workerAccountId: string, spot: 'job_accept' | 'problem_accept'): Promise<'ad' | 'pay' | null> {
+    if (!this.subscriptionStatus) return null;
+    return this.subscriptionStatus.unlockNeeded(workerAccountId, 'service', this.adSpotOn ? () => this.adSpotOn!(spot) : undefined);
+  }
+
+  /**
+   * The worker watched the ad or pays the fee for a job they accepted: the job opens (the
+   * customer's number shows) and the customer hears it was accepted. Paying uses one pass
+   * (PAYMENT_REQUIRED with the price when there's none — the app pays, then asks again).
+   */
+  async unlockJob(workerAccountId: string, bookingRequestId: string, via: 'ad' | 'pay'): Promise<void> {
+    const worker = await this.requireWorker(workerAccountId);
+    const job = await this.repository.findJobForWorker(bookingRequestId, worker.id);
+    if (!job) throw AppError.notFound('Job not found.', 'BOOKING_REQUEST_NOT_FOUND');
+    if (!job.unlockNeeded) return;
+    if (via === 'ad' && job.unlockNeeded !== 'ad') throw AppError.badRequest('This job needs the payment.', 'UNLOCK_NEEDS_PAYMENT');
+    const passId = via === 'pay' ? ((await this.subscriptionStatus?.usePartnerPass(workerAccountId, 'accept', 'service')) ?? null) : null;
+    const unlocked = await this.repository.unlock(bookingRequestId, worker.id);
+    if (!unlocked) {
+      await this.subscriptionStatus?.restorePasses([], [passId]);
+      throw await this.transitionError(bookingRequestId, 'This job was given back — it can no longer be opened.');
+    }
+    await this.subscriptionStatus?.attachPass(passId, `accept-${bookingRequestId}`);
+    // A problem's customer already heard (from the problems module); a booking's hears now.
+    if (!unlocked.problemPostId) {
+      const fresh = await this.repository.findJobForWorker(bookingRequestId, worker.id);
+      if (fresh) {
+        const customer = await this.repository.customerTarget(fresh.accountId);
+        await this.notify({ request: fresh, notify: customer }, 'accepted', 'booking_accepted');
+      }
+    }
+  }
+
+  /** The worker closed the payment / ad after accepting: the job goes back to the others. */
+  async releaseJob(workerAccountId: string, bookingRequestId: string): Promise<void> {
+    const worker = await this.requireWorker(workerAccountId);
+    await this.release(bookingRequestId, worker.id);
   }
 
   /** Finished trips this worker was rated or reviewed on — for their public reviews. */
@@ -247,6 +325,7 @@ export class BookingsService {
   }
 
   private async expireStale(): Promise<void> {
+    await this.releaseUnpaidAccepts();
     const expired = await this.repository.expireStaleBroadcasts();
     if (expired.length > 0) await this.subscriptionStatus?.restorePasses(expired);
   }
@@ -342,6 +421,7 @@ export class BookingsService {
   }
 
   async getMyOffers(workerAccountId: string): Promise<PendingOffer[]> {
+    await this.releaseUnpaidAccepts();
     await this.releaseDueOffers();
     const profile = await this.workersService.getMyProfile(workerAccountId);
     if (!profile) {
@@ -378,6 +458,7 @@ export class BookingsService {
 
   /** Jobs this worker accepted — active first, then history. */
   async listMyJobs(workerAccountId: string): Promise<WorkerJob[]> {
+    await this.releaseUnpaidAccepts();
     const profile = await this.workersService.getMyProfile(workerAccountId);
     if (!profile) {
       return [];
@@ -396,24 +477,21 @@ export class BookingsService {
 
   async acceptOffer(workerAccountId: string, bookingRequestId: string): Promise<void> {
     const profile = await this.requireWorker(workerAccountId);
-    const passId = (await this.subscriptionStatus?.usePartnerPass(workerAccountId, 'accept', 'service')) ?? null;
-
-    const result = await this.repository.acceptOffer(bookingRequestId, profile.id, generateArrivalPin()).catch(async (error) => {
-      await this.subscriptionStatus?.restorePasses([], [passId]);
-      throw error;
-    });
+    // Accepting is instant and free; an ad or the fee comes after (unlockJob), so nobody else
+    // can take the job while this worker is still paying.
+    const unlockNeeded = await this.unlockNeededFor(workerAccountId, 'job_accept');
+    const result = await this.repository.acceptOffer(bookingRequestId, profile.id, generateArrivalPin(), unlockNeeded);
     if (!result.won) {
-      await this.subscriptionStatus?.restorePasses([], [passId]);
       throw AppError.conflict('This job has already been taken by another worker.', 'BOOKING_ALREADY_TAKEN');
     }
-    await this.subscriptionStatus?.attachPass(passId, bookingRequestId);
 
     // Best-effort, in parallel: tell the customer, and replace the original notification on
     // every losing worker's device with a "taken" message (same identifier/data-only
     // mechanism as the offer push itself, so it overwrites rather than stacks). Never blocks
     // the winning worker's own accept, which has already succeeded by this point.
     await Promise.all([
-      this.notify({ request: result.request, notify: result.customer }, 'accepted', 'booking_accepted'),
+      // With something still owed, the customer hears once it's done (unlockJob).
+      unlockNeeded ? Promise.resolve() : this.notify({ request: result.request, notify: result.customer }, 'accepted', 'booking_accepted'),
       ...result.losingWorkers.map((loser) =>
         this.notificationsService.sendRawPush(
           loser.accountId,

@@ -31,6 +31,8 @@ export class JobSeekersService {
     private readonly subscriptionStatus?: SubscriptionStatusService,
     // Tells the poster someone viewed their post (optional for the same reason).
     private readonly notifications?: NotificationsService,
+    // Whether a partner-app ad spot is on (seeing who viewed a post after an ad).
+    private readonly adSpotOn?: (spot: string) => Promise<boolean>,
   ) {}
 
   /** One live post (e.g. an ad's "Contact"). The phone number shows only with a plan or once paid for. */
@@ -153,14 +155,19 @@ export class JobSeekersService {
   }
 
   /**
-   * Who opened one of my posts. Without the job post plan the people are hidden (the count
-   * and times still show) and the app offers the plan.
+   * Who opened one of my posts. Hidden (the count and times still show) until the partner may
+   * see them: on the job post plan, or — with plans off — after an ad (`revealed`, asked for
+   * once the app showed it) or straight away when there's no ad. `access` says which.
    */
-  async listViewers(accountId: string, postId: string): Promise<JobPostViewers> {
+  async listViewers(accountId: string, postId: string, revealed = false): Promise<JobPostViewers> {
     const viewers = await this.repository.listViewers(accountId, postId);
     if (!viewers) throw AppError.notFound('Job post not found.', 'JOB_POST_NOT_FOUND');
-    const locked = !(await this.subscriptionStatus?.revealsProfileViewers(accountId, 'job_post'));
+    const access = this.subscriptionStatus
+      ? await this.subscriptionStatus.viewerAccess(accountId, 'job_post', this.adSpotOn ? () => this.adSpotOn!('viewer_reveal') : undefined)
+      : 'open';
+    const locked = !(access === 'open' || (access === 'ad' && revealed));
     return {
+      access,
       locked,
       total: viewers.reduce((sum, viewer) => sum + viewer.times, 0),
       newCount: viewers.filter((viewer) => viewer.isNew).length,

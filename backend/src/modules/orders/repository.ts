@@ -45,6 +45,7 @@ function mapItem(row: QueryResultRow): ShopOrderItem {
     unit: row.unit ?? null,
     status: row.status,
     price: toNumber(row.price),
+    addedByShop: !!row.added_by_shop,
   };
 }
 
@@ -80,6 +81,7 @@ function mapOrder(row: QueryResultRow, items: ShopOrderItem[]): ShopOrder {
     expiredAt: row.expired_at ?? null,
     createdAt: row.created_at,
     items,
+    listPhotoUrls: Array.isArray(row.list_photo_urls) ? row.list_photo_urls : [],
   };
 }
 
@@ -133,8 +135,8 @@ export class OrdersRepository {
     return this.inTransaction(async (client) => {
       const result = await client.query(
         `INSERT INTO shop_orders (account_id, business_id, fulfillment, latitude, longitude, location_address,
-                                  distance_meters, delivery_charge, note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                                  distance_meters, delivery_charge, note, list_photo_urls)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::text[])
          RETURNING *`,
         [
           params.accountId,
@@ -146,6 +148,7 @@ export class OrdersRepository {
           params.distanceMeters,
           params.deliveryCharge,
           params.note,
+          params.listPhotoUrls,
         ],
       );
       const order = result.rows[0];
@@ -173,8 +176,8 @@ export class OrdersRepository {
     return this.inTransaction(async (client) => {
       const result = await client.query(
         `INSERT INTO shop_orders (account_id, business_id, quick, shop_categories, custom_categories, fulfillment, latitude, longitude,
-                                  location_address, distance_meters, delivery_charge, note)
-         VALUES ($1, NULL, true, $2::business_shop_category[], $8::text[], $3, $4, $5, $6, 0, 0, $7)
+                                  location_address, distance_meters, delivery_charge, note, list_photo_urls)
+         VALUES ($1, NULL, true, $2::business_shop_category[], $8::text[], $3, $4, $5, $6, 0, 0, $7, $9::text[])
          RETURNING *`,
         [
           params.accountId,
@@ -185,6 +188,7 @@ export class OrdersRepository {
           params.locationAddress,
           params.note,
           params.customCategories,
+          params.listPhotoUrls,
         ],
       );
       const order = result.rows[0];
@@ -234,17 +238,23 @@ export class OrdersRepository {
     return result.rows.map((row) => row.account_id as string);
   }
 
-  async claimQuick(orderId: string, businessId: string, distanceMeters: number, deliveryCharge: number): Promise<OrderTransition | null> {
+  async claimQuick(
+    orderId: string,
+    businessId: string,
+    distanceMeters: number,
+    deliveryCharge: number,
+    unlockNeeded: 'ad' | 'pay' | null = null,
+  ): Promise<OrderTransition | null> {
     const result = await this.pool.query(
       `WITH updated AS (
          UPDATE shop_orders so SET business_id = $2, status = 'accepted', accepted_at = now(), updated_at = now(),
-           distance_meters = $3, delivery_charge = $4
+           distance_meters = $3, delivery_charge = $4, unlock_needed = $5, unlocked_at = CASE WHEN $5::text IS NULL THEN now() END
          WHERE so.id = $1 AND so.quick AND so.business_id IS NULL AND so.status = 'placed'
            AND so.created_at > now() - ${ORDER_WAIT_SQL('so')}
            AND EXISTS (SELECT 1 FROM quick_order_offers qo WHERE qo.order_id = so.id AND qo.business_id = $2 AND qo.status = 'pending')
          RETURNING so.*
        ) ${NOTIFY_CUSTOMER}`,
-      [orderId, businessId, distanceMeters, deliveryCharge],
+      [orderId, businessId, distanceMeters, deliveryCharge, unlockNeeded],
     );
     if (!result.rows[0]) return null;
     await this.pool.query(
@@ -525,17 +535,84 @@ export class OrdersRepository {
   // --- Shop transitions (all scoped to the shop's own business id) ---
 
   /** placed → accepted: the shop starts reviewing; the customer can no longer cancel. */
-  async accept(id: string, businessId: string): Promise<OrderTransition | null> {
+  async accept(id: string, businessId: string, unlockNeeded: 'ad' | 'pay' | null = null): Promise<OrderTransition | null> {
     const result = await this.pool.query(
       `WITH updated AS (
-         UPDATE shop_orders so SET status = 'accepted', accepted_at = now(), updated_at = now()
+         UPDATE shop_orders so SET status = 'accepted', accepted_at = now(), updated_at = now(),
+           unlock_needed = $3, unlocked_at = CASE WHEN $3::text IS NULL THEN now() END
          WHERE so.id = $1 AND so.business_id = $2 AND so.status = 'placed'
            AND so.created_at > now() - ${ORDER_WAIT_SQL('so')}
+         RETURNING so.*
+       ) ${NOTIFY_CUSTOMER}`,
+      [id, businessId, unlockNeeded],
+    );
+    return this.toTransition(result.rows[0]);
+  }
+
+  /** The shop watched the ad / paid for an order it accepted: it opens. With who to tell. */
+  async unlock(id: string, businessId: string): Promise<OrderTransition | null> {
+    const result = await this.pool.query(
+      `WITH updated AS (
+         UPDATE shop_orders so SET unlocked_at = now(), updated_at = now()
+         WHERE so.id = $1 AND so.business_id = $2 AND so.status = 'accepted' AND so.unlocked_at IS NULL
          RETURNING so.*
        ) ${NOTIFY_CUSTOMER}`,
       [id, businessId],
     );
     return this.toTransition(result.rows[0]);
+  }
+
+  /**
+   * Gives an accepted order back before it was unlocked: a Quick Order looks for a shop again
+   * (this shop's offer declined, the others' back), an order for this shop waits for it again.
+   * Returns the owners to offer a Quick Order to again, or null when there was nothing to give back.
+   */
+  async releaseAccept(id: string, businessId: string): Promise<{ reofferOwners: string[] } | null> {
+    return this.inTransaction(
+      async (client) => {
+        const current = await client.query(
+          `SELECT * FROM shop_orders WHERE id = $1 AND business_id = $2 AND status = 'accepted' AND unlocked_at IS NULL FOR UPDATE`,
+          [id, businessId],
+        );
+        const row = current.rows[0];
+        if (!row) return null;
+        if (!row.quick) {
+          await client.query(
+            `UPDATE shop_orders SET status = 'placed', accepted_at = NULL, unlock_needed = NULL, updated_at = now() WHERE id = $1`,
+            [id],
+          );
+          return { reofferOwners: [] };
+        }
+        await client.query(
+          `UPDATE shop_orders SET status = 'placed', business_id = NULL, accepted_at = NULL, unlock_needed = NULL,
+             distance_meters = 0, delivery_charge = 0, updated_at = now()
+           WHERE id = $1`,
+          [id],
+        );
+        await client.query(`UPDATE quick_order_offers SET status = 'declined' WHERE order_id = $1 AND business_id = $2`, [id, businessId]);
+        const others = await client.query(
+          `UPDATE quick_order_offers qo SET status = 'pending'
+           FROM business_profiles b
+           WHERE qo.order_id = $1 AND qo.status = 'lost' AND b.id = qo.business_id
+           RETURNING b.account_id`,
+          [id],
+        );
+        return { reofferOwners: [...new Set(others.rows.map((other) => other.account_id as string))] };
+      },
+      { rollbackOn: (value) => value === null },
+    );
+  }
+
+  /** Accepted orders left unpaid longer than `minutes`: (order, shop) to release. */
+  async findUnpaidAccepts(minutes: number): Promise<{ id: string; businessId: string }[]> {
+    const result = await this.pool.query(
+      `SELECT id, business_id FROM shop_orders
+       WHERE status = 'accepted' AND unlock_needed IS NOT NULL AND unlocked_at IS NULL
+         AND accepted_at < now() - make_interval(mins => $1)
+       LIMIT 20`,
+      [minutes],
+    );
+    return result.rows.map((row) => ({ id: row.id, businessId: row.business_id }));
   }
 
   async decline(id: string, businessId: string, reason: string | null): Promise<OrderTransition | null> {
@@ -564,15 +641,51 @@ export class OrdersRepository {
           [id, businessId, PACKING_STATUSES],
         );
         if (order.rowCount === 0) return false;
-        // Only this order's own items can change; a price is kept for packed items only.
+        const existing = items.filter((item) => item.id);
+        const added = items.filter((item) => !item.id && item.name);
+        // Items the shop typed in earlier and has since removed. The customer's own items stay.
+        await client.query(
+          `DELETE FROM shop_order_items WHERE order_id = $1 AND added_by_shop AND NOT (id = ANY($2::uuid[]))`,
+          [id, existing.map((item) => item.id)],
+        );
+        // Only this order's own items can change; a price is kept for packed items only. The
+        // shop may also rename the items it typed in itself.
         await client.query(
           `UPDATE shop_order_items i
            SET status = u.status::shop_order_item_status,
-               price = CASE WHEN u.status = 'packed' THEN u.price ELSE NULL END
-           FROM unnest($2::uuid[], $3::text[], $4::numeric[]) AS u(id, status, price)
+               price = CASE WHEN u.status = 'packed' THEN u.price ELSE NULL END,
+               name = CASE WHEN i.added_by_shop AND u.name <> '' THEN u.name ELSE i.name END,
+               quantity = CASE WHEN i.added_by_shop THEN COALESCE(NULLIF(u.quantity, ''), i.quantity) ELSE i.quantity END,
+               unit = CASE WHEN i.added_by_shop THEN NULLIF(u.unit, '') ELSE i.unit END
+           FROM unnest($2::uuid[], $3::text[], $4::numeric[], $5::text[], $6::text[], $7::text[]) AS u(id, status, price, name, quantity, unit)
            WHERE i.id = u.id AND i.order_id = $1`,
-          [id, items.map((item) => item.id), items.map((item) => item.status), items.map((item) => item.price)],
+          [
+            id,
+            existing.map((item) => item.id),
+            existing.map((item) => item.status),
+            existing.map((item) => item.price),
+            existing.map((item) => item.name ?? ''),
+            existing.map((item) => item.quantity ?? ''),
+            existing.map((item) => item.unit ?? ''),
+          ],
         );
+        if (added.length > 0) {
+          await client.query(
+            `INSERT INTO shop_order_items (order_id, position, name, quantity, unit, status, price, added_by_shop)
+             SELECT $1, (SELECT COALESCE(MAX(position), 0) FROM shop_order_items WHERE order_id = $1) + ord, name,
+                    COALESCE(NULLIF(quantity, ''), '1'), NULLIF(unit, ''), status::shop_order_item_status,
+                    CASE WHEN status = 'packed' THEN price END, true
+             FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::numeric[]) WITH ORDINALITY AS t(name, quantity, unit, status, price, ord)`,
+            [
+              id,
+              added.map((item) => item.name),
+              added.map((item) => item.quantity ?? ''),
+              added.map((item) => item.unit ?? ''),
+              added.map((item) => item.status),
+              added.map((item) => item.price),
+            ],
+          );
+        }
         return true;
       },
       { rollbackOn: (saved) => !saved },
@@ -733,8 +846,10 @@ export class OrdersRepository {
     return rows.map((row) => ({
       ...mapOrder(row, items.get(row.id) ?? []),
       customerFullName: row.customer_full_name,
-      // The customer's number only once the shop has taken the order (like the shop's own number).
-      customerMobileNumber: row.accepted_at ? row.customer_mobile_number : null,
+      // The customer's number only once the shop has taken the order (like the shop's own number)
+      // and done what accepting it needs (an ad / the fee).
+      customerMobileNumber: row.accepted_at && !(row.unlock_needed && !row.unlocked_at) ? row.customer_mobile_number : null,
+      unlockNeeded: row.accepted_at && row.unlock_needed && !row.unlocked_at ? row.unlock_needed : null,
       pinAttemptsLeft: Math.max(0, MAX_PIN_ATTEMPTS - Number(row.pin_attempts ?? 0)),
       deliveryStaff: row.delivery_staff_account_id
         ? {

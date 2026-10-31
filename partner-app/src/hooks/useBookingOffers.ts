@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { bookingOffersService } from '@/services/bookingOffersService';
 import { useAuthStore } from '@/state/authStore';
 import { useLocationGatedMutation } from './useLocationGatedMutation';
+import { completeAccept, GivenBackError } from '@/utils/afterAccept';
 
 export const BOOKING_OFFERS_QUERY_KEY = ['bookingOffers'];
 // Push delivery (see usePushNotifications.ts) is what makes a new offer, or a job going to
@@ -44,11 +45,15 @@ export function useAcceptBookingOffer() {
   const queryClient = useQueryClient();
   // Location must be on to take a job (as for every partner action) — asked for first.
   return useLocationGatedMutation({
-    mutationFn: (bookingRequestId: string) => bookingOffersService.accept(bookingRequestId),
-    // No partner plan: one paid accept.
-    payKind: 'accept',
-    payPlan: 'service',
-    onSettled: () => queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY }),
+    // Instant: the ad or the fee (without a plan) comes after accepting — see completeAccept.
+    mutationFn: async (bookingRequestId: string) => {
+      await bookingOffersService.accept(bookingRequestId);
+      if (!(await completeAccept('job', bookingRequestId, 'job_accept'))) throw new GivenBackError();
+    },
+    // Not awaited: the job opens at once, the lists refresh behind it.
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY });
+    },
   });
 }
 

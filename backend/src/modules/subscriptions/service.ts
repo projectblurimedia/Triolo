@@ -72,6 +72,9 @@ const PASS_LABEL: Record<PassKind, string> = {
 /** Which partner plan a payment is for (shown on the Razorpay page). */
 const PLAN_LABEL: Record<PartnerPlan, string> = { service: '(services)', shop: '(shop)', job_post: '(job posts)' };
 
+/** What the apps pay for in-app: a one-time pass, a plan, or a Trusted badge. */
+export type InAppPayType = 'pass' | 'subscription' | 'badge';
+
 export class SubscriptionsService {
   private trustedCache: { at: number; value: TrustedIds } | null = null;
 
@@ -84,14 +87,16 @@ export class SubscriptionsService {
   // --- Apps: subscriptions ---
 
   /** One partner plan's prices, running plan and open payment. */
-  private async planState(accountId: string, plan: PartnerPlan, settings: SubscriptionSettings): Promise<PlanState> {
+  private async planState(accountId: string, plan: PartnerPlan | 'all', settings: SubscriptionSettings): Promise<PlanState> {
+    // 'all' (the all-in-one plan) is looked up as a plan of its own.
+    const asPlan = plan as PartnerPlan;
     const [active, lastEnd, pending] = await Promise.all([
-      this.repository.findActive(accountId, 'partner', plan),
-      this.repository.findLastEnd(accountId, 'partner', plan),
-      this.repository.findPending(accountId, 'partner', plan),
+      this.repository.findActive(accountId, 'partner', asPlan),
+      this.repository.findLastEnd(accountId, 'partner', asPlan),
+      this.repository.findPending(accountId, 'partner', asPlan),
     ]);
     return {
-      prices: settings.partnerPlanPrices[plan],
+      prices: plan === 'all' ? settings.partnerPrices : settings.partnerPlanPrices[plan],
       active: active ? { months: active.months, startsAt: active.startsAt as string, endsAt: lastEnd ?? (active.endsAt as string) } : null,
       pending: pending?.paymentUrl ? { id: pending.id, months: pending.months, amount: pending.amount, paymentUrl: pending.paymentUrl } : null,
     };
@@ -120,8 +125,10 @@ export class SubscriptionsService {
       ...(audience === 'partner'
         ? {
             plans: Object.fromEntries(
-              await Promise.all(PARTNER_PLANS.map(async (plan) => [plan, await this.planState(accountId, plan, settings)] as const)),
-            ) as Record<PartnerPlan, PlanState>,
+              await Promise.all(
+                [...PARTNER_PLANS, 'all' as const].map(async (plan) => [plan, await this.planState(accountId, plan, settings)] as const),
+              ),
+            ) as Record<PartnerPlan | 'all', PlanState>,
           }
         : {}),
     };
@@ -186,6 +193,82 @@ export class SubscriptionsService {
     return { paid: true };
   }
 
+  // --- In-app checkout (Razorpay's own screen in the apps, which lists the phone's UPI apps) ---
+
+  /** What an unpaid pass, plan or badge costs and is called, or an error when it's not this account's or already paid. */
+  private async payable(accountId: string, type: InAppPayType, id: string): Promise<{ amount: number; description: string }> {
+    if (type === 'pass') {
+      const pass = await this.repository.findPass(id);
+      if (!pass || pass.accountId !== accountId) throw AppError.notFound('Payment not found.', 'PASS_NOT_FOUND');
+      if (pass.status !== 'unpaid') throw AppError.conflict('Already paid.', 'ALREADY_PAID');
+      return { amount: pass.amount, description: PASS_LABEL[pass.kind] };
+    }
+    if (type === 'subscription') {
+      const subscription = await this.repository.findSubscription(id);
+      if (!subscription || subscription.accountId !== accountId) throw AppError.notFound('Not found.', 'SUBSCRIPTION_NOT_FOUND');
+      if (subscription.status !== 'unpaid') throw AppError.conflict('Already paid.', 'ALREADY_PAID');
+      return { amount: subscription.amount, description: `Triolo subscription — ${subscription.months} month${subscription.months === 1 ? '' : 's'}` };
+    }
+    const badge = await this.repository.findBadge(id);
+    if (!badge || badge.accountId !== accountId) throw AppError.notFound('Not found.', 'BADGE_NOT_FOUND');
+    if (badge.status !== 'unpaid') throw AppError.conflict('Already paid.', 'ALREADY_PAID');
+    return { amount: badge.amount, description: 'Trusted by Triolo badge' };
+  }
+
+  /** A Razorpay order for something started with a checkout above, for the app's in-app payment screen. */
+  async inAppOrder(accountId: string, type: InAppPayType, id: string) {
+    const { amount, description } = await this.payable(accountId, type, id);
+    const contact = await this.repository.accountContact(accountId);
+    const order = await razorpayService.createOrder(amount * 100, `${type}-${id}`.slice(0, 40), { type, id, accountId });
+    return {
+      keyId: razorpayService.keyId(),
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      description,
+      prefill: { name: contact?.name ?? '', contact: contact?.mobile ?? '' },
+    };
+  }
+
+  /**
+   * The in-app payment succeeded: the signature proves it came from Razorpay, the order says what
+   * it was for, and the payment is taken (captured) — then the pass / plan / badge is marked paid.
+   */
+  async inAppConfirm(
+    accountId: string,
+    body: { type: InAppPayType; id: string; razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+  ): Promise<{ paid: boolean }> {
+    if (!razorpayService.signatureValid(body.razorpayOrderId, body.razorpayPaymentId, body.razorpaySignature)) {
+      throw AppError.badRequest('The payment could not be verified.', 'PAYMENT_INVALID');
+    }
+    const order = await razorpayService.order(body.razorpayOrderId);
+    const notes = order.notes ?? {};
+    if (notes.type !== body.type || notes.id !== body.id || notes.accountId !== accountId) {
+      throw AppError.badRequest('This payment is not for this.', 'PAYMENT_INVALID');
+    }
+    let payment = await razorpayService.payment(body.razorpayPaymentId);
+    if (payment.order_id !== order.id || payment.amount !== order.amount) throw AppError.badRequest('This payment is not for this.', 'PAYMENT_INVALID');
+    if (payment.status === 'authorized') payment = await razorpayService.capture(payment.id, payment.amount);
+    if (payment.status !== 'captured') throw AppError.conflict('The payment has not gone through yet.', 'PAYMENT_NOT_DONE');
+    if (body.type === 'pass') {
+      await this.repository.markPassPaid(body.id, payment.id);
+    } else if (body.type === 'subscription') {
+      await this.repository.activateSubscription(body.id, payment.id);
+      this.status.forget(accountId);
+    } else {
+      const badge = await this.repository.findBadge(body.id);
+      if (badge && badge.status === 'unpaid') {
+        if (await this.repository.findActiveBadge(badge.kind, badge.profileId)) {
+          logger.warn({ badgeId: badge.id, paymentId: payment.id }, 'Badge paid while another is active — refund it from Razorpay');
+        } else {
+          await this.repository.activateBadge(badge.id, payment.id);
+          this.trustedCache = null;
+        }
+      }
+    }
+    return { paid: true };
+  }
+
   listPasses(filter: Parameters<SubscriptionsRepository['listPasses']>[0]) {
     return this.repository.listPasses(filter);
   }
@@ -195,7 +278,9 @@ export class SubscriptionsService {
    * Starts paying for a plan: a payment link to open (the plan starts once it's paid). Partners
    * choose which plan (services, shop or job posts); without one (older app builds) it covers all.
    */
-  async checkout(accountId: string, audience: SubscriptionAudience, months: SubscriptionMonths, plan?: PartnerPlan) {
+  async checkout(accountId: string, audience: SubscriptionAudience, months: SubscriptionMonths, requested?: PartnerPlan | 'all') {
+    // The all-in-one plan is bought as a plan covering everything (no single side).
+    const plan = requested === 'all' ? undefined : requested;
     const settings = await this.repository.getSettings();
     if (!(audience === 'customer' ? customerPlansOn(settings) : partnerPlansOn(settings))) {
       throw AppError.conflict('Subscriptions are not available right now.', 'SUBSCRIPTIONS_OFF');

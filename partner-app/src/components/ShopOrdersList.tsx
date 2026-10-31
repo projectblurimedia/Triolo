@@ -10,6 +10,7 @@ import { ACTIVE_SHOP_STATUSES, formatRupees, NEW_ORDER_STATUSES, ShopOrder, Shop
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from './PullToRefresh';
 import { ALL_TIME, DateRange, inRange } from './DateRangeSheet';
+import { orderListText } from '@/utils/orderListText';
 
 export type ShopFilter = 'all' | 'new' | 'active' | 'done' | 'cancelled';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -30,8 +31,11 @@ export function ShopOrdersList({
   bottomPadding = 120,
   filter = 'all',
   range = ALL_TIME,
+  shopId = null,
   header,
 }: {
+  /** Only this shop's orders (a partner with several shops); null = every shop. */
+  shopId?: string | null;
   /** Shown at the top of the list, scrolling with it (Activity's summary and filter). */
   header?: React.ReactNode;
   bottomPadding?: number;
@@ -45,7 +49,7 @@ export function ShopOrdersList({
   const [refreshing, setRefreshing] = useState(false);
   const orders = useShopOrders(true);
 
-  const all = (orders.data ?? []).filter((order) => inRange(order.createdAt, range));
+  const all = (orders.data ?? []).filter((order) => inRange(order.createdAt, range) && (!shopId || order.businessId === shopId));
   const newOrders = all.filter((order) => NEW_ORDER_STATUSES.includes(order.status));
   const activeOrders = all.filter((order) => ACTIVE_SHOP_STATUSES.includes(order.status));
   const ended = all.filter((order) => !NEW_ORDER_STATUSES.includes(order.status) && !ACTIVE_SHOP_STATUSES.includes(order.status));
@@ -109,7 +113,7 @@ export function ShopOrdersList({
           </View>
           <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
             {manyShops && order.shopName ? `${order.shopName} · ` : ''}
-            {t('shopOrders.itemsCount', { count: order.items.length })} ·{' '}
+            {orderListText(t, order, 'shopOrders.itemsCount')} ·{' '}
             {t(order.fulfillment === 'delivery' ? 'shopOrders.delivery' : 'shopOrders.pickup')} · {formatDate(order.createdAt)}
           </Text>
           {order.totalAmount != null ? (

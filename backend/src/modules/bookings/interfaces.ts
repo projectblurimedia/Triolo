@@ -102,7 +102,10 @@ export interface CustomerBooking extends BookingRequest {
 /** The worker's view of a job they accepted — includes the customer's contact details. */
 export interface WorkerJob extends BookingRequest {
   customerFullName: string;
+  /** Hidden ('') until the worker has done what the accept needs (see unlockNeeded). */
   customerMobileNumber: string;
+  /** After accepting: an ad to watch or the fee to pay before the job opens; null when done. */
+  unlockNeeded: 'ad' | 'pay' | null;
   distanceMeters: number | null;
   /** Their own latest shared position. */
   workerLatitude: number | null;
@@ -198,6 +201,8 @@ export interface CreateAssignedBookingParams {
   problemPostId: string;
   quotationAmount: number;
   arrivalPin: string;
+  /** What the worker owes after accepting (null: nothing). */
+  unlockNeeded?: 'ad' | 'pay' | null;
 }
 
 /**

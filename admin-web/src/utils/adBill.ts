@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { Ad, planLabel } from '@/services/adsApi';
+import { Ad, adPlanText } from '@/services/adsApi';
 
 export const billNumber = (ad: Pick<Ad, 'billNumber'>) => `TRI-AD-${String(ad.billNumber).padStart(4, '0')}`;
 
@@ -76,7 +76,7 @@ export function downloadAdBill(ad: Ad): void {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(91, 100, 114);
-  doc.text(`${planLabel(ad.planDays)} plan · ${dayLabel(ad.startDate)} to ${dayLabel(ad.endDate)}`, left + 3, y);
+  doc.text(`${adPlanText(ad)} · ${dayLabel(ad.startDate)} to ${dayLabel(ad.endDate)}`, left + 3, y);
   doc.text('Shown in the Triolo customer and partner apps', left + 3, y + 5);
 
   y += 13;

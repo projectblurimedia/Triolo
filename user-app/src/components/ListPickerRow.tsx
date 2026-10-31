@@ -5,6 +5,8 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { SavedList } from '@/state/listStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { ListPhotoStrip } from './ListPhotoStrip';
+import { listCountText } from '@/utils/listPhotos';
 
 const PREVIEW_ITEMS = 4;
 
@@ -32,6 +34,7 @@ export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProp
         {lists.map((list) => {
           const active = list.id === selectedId;
           const count = list.items.filter((item) => item.name.trim()).length;
+          const photoCount = (list.photos ?? []).length;
           const content = (
             <>
               <FontAwesome6 name="basket-shopping" size={13} color={active ? '#FFFFFF' : colors.primary} solid />
@@ -40,7 +43,7 @@ export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProp
                   {list.name || t('chooseList.untitled')}
                 </Text>
                 <Text style={[styles.count, { color: active ? 'rgba(255,255,255,0.85)' : colors.textMuted }]}>
-                  {t('chooseList.itemCount', { count })}
+                  {listCountText(t, count, photoCount)}
                 </Text>
               </View>
             </>
@@ -58,6 +61,7 @@ export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProp
           );
         })}
       </ScrollView>
+      <ListPhotoStrip photos={(selected?.photos ?? []).map((photo) => photo.uri)} size={56} />
       {names.length > 0 ? (
         <Text style={[styles.preview, { color: colors.textMuted }]} numberOfLines={1}>
           {more > 0 ? `${shown} ${t('chooseList.more', { count: more })}` : shown}

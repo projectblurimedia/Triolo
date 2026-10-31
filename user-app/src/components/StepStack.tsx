@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { LoadingIndicator } from './LoadingIndicator';
 
 /*
  * (Copied between user-app and partner-app — keep in sync.)
@@ -17,7 +18,8 @@ export interface StackStep {
   stepTitle: string;
   hint: string;
   action: string;
-  onPress: () => void;
+  /** May return a promise (e.g. an ad first): the card shows it's opening until it settles. */
+  onPress: () => void | Promise<void>;
   /** A status pill in place of "Pending" (e.g. Completed, In progress). */
   tag?: { label: string; color: string };
 }
@@ -56,25 +58,79 @@ function LiveDot({ color }: { color: string }) {
   );
 }
 
+/** A soft light sweeping across the card, over and over, while it opens. */
+function CardSweep() {
+  const [width, setWidth] = useState(0);
+  const x = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!width) return;
+    const loop = Animated.loop(
+      Animated.timing(x, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [width, x]);
+  const translateX = x.interpolate({ inputRange: [0, 1], outputRange: [-120, width + 40] });
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+      {width ? (
+        <Animated.View style={[styles.sweep, { transform: [{ translateX }, { rotate: '18deg' }] }]}>
+          <LinearGradient
+            colors={['rgba(0,85,211,0)', 'rgba(0,85,211,0.16)', 'rgba(0,85,211,0)']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
+
+/** The card's icon breathing while it opens. */
+function usePulse(on: boolean) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!on) {
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [on, pulse]);
+  return pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+}
+
 function StepCard({
   step,
   onPress,
   compact,
   slim,
   accent = brandColors.pending,
+  loading = false,
 }: {
   step: StackStep;
   onPress: () => void;
   compact?: boolean;
   slim?: boolean;
   accent?: string;
+  /** Opening (an ad is being fetched / shown first): sweep, pulsing icon, spinner button. */
+  loading?: boolean;
 }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const tag = step.tag ?? { label: t('continueSteps.pending'), color: brandColors.pending };
+  const iconScale = usePulse(loading);
   return (
     <Pressable
       onPress={onPress}
+      disabled={loading}
       style={({ pressed }) => [
         styles.card,
         slim ? styles.cardSlim : null,
@@ -82,10 +138,13 @@ function StepCard({
       ]}
       accessibilityRole="button"
     >
-      <View style={[StyleSheet.absoluteFill, styles.cardTint, { backgroundColor: `${accent}0A` }]} />
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.icon, slim ? styles.iconSlim : null]}>
-        <FontAwesome6 name={step.icon} size={slim ? 14 : 17} color="#FFFFFF" solid />
-      </LinearGradient>
+      <View style={[StyleSheet.absoluteFill, styles.cardTint, { backgroundColor: loading ? `${headerGradient[0]}0D` : `${accent}0A` }]} />
+      {loading ? <CardSweep /> : null}
+      <Animated.View style={{ transform: [{ scale: iconScale }] }}>
+        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.icon, slim ? styles.iconSlim : null]}>
+          <FontAwesome6 name={step.icon} size={slim ? 14 : 17} color="#FFFFFF" solid />
+        </LinearGradient>
+      </Animated.View>
       <View style={styles.text}>
         <View style={styles.nameRow}>
           <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
@@ -107,8 +166,17 @@ function StepCard({
         ) : null}
       </View>
       <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.go, slim ? styles.goSlim : null]}>
-        <Text style={[styles.goText, slim ? styles.goTextSlim : null]}>{step.action}</Text>
-        <FontAwesome6 name="chevron-right" size={10} color="#FFFFFF" solid />
+        {loading ? (
+          <>
+            <LoadingIndicator size={14} dotSize={3} color="#FFFFFF" />
+            <Text style={[styles.goText, slim ? styles.goTextSlim : null]}>{t('continueSteps.opening')}</Text>
+          </>
+        ) : (
+          <>
+            <Text style={[styles.goText, slim ? styles.goTextSlim : null]}>{step.action}</Text>
+            <FontAwesome6 name="chevron-right" size={10} color="#FFFFFF" solid />
+          </>
+        )}
       </LinearGradient>
     </Pressable>
   );
@@ -152,13 +220,24 @@ export function StepStack({
   const insets = useSafeAreaInsets();
   const [listOpen, setListOpen] = useState(false);
   const [frontHeight, setFrontHeight] = useState(0);
+  // The step being opened: its card (or the stack's front card) shows it's loading.
+  const [openingKey, setOpeningKey] = useState<string | null>(null);
+  const run = async (step: StackStep) => {
+    if (openingKey) return;
+    setOpeningKey(step.key);
+    try {
+      await step.onPress();
+    } finally {
+      setOpeningKey(null);
+    }
+  };
 
   if (steps.length === 0) return null;
   if (expanded) {
     return (
       <View style={[styles.expanded, style]}>
         {steps.map((step) => (
-          <StepCard key={step.key} step={step} onPress={step.onPress} accent={accent} />
+          <StepCard key={step.key} step={step} onPress={() => run(step)} accent={accent} loading={openingKey === step.key} />
         ))}
       </View>
     );
@@ -169,7 +248,8 @@ export function StepStack({
 
   const openStep = (step: StackStep) => {
     setListOpen(false);
-    setTimeout(step.onPress, HANDOFF_MS);
+    // The stack's front card shows it opening (the list screen has gone).
+    setTimeout(() => run(step), HANDOFF_MS);
   };
 
   return (
@@ -212,10 +292,11 @@ export function StepStack({
         <View onLayout={(event) => setFrontHeight(event.nativeEvent.layout.height)}>
           <StepCard
             step={front}
-            onPress={stacked ? () => setListOpen(true) : front.onPress}
+            onPress={stacked ? () => setListOpen(true) : () => run(front)}
             compact={stacked}
             slim={minimized}
             accent={accent}
+            loading={openingKey !== null}
           />
         </View>
       </View>
@@ -291,6 +372,7 @@ const styles = StyleSheet.create({
   goTextSlim: { fontSize: 11 },
   headerRowSlim: { marginBottom: 8 },
   sectionTitleSlim: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15 },
+  sweep: { position: 'absolute', top: -30, bottom: -30, width: 90 },
   peek: { position: 'absolute', left: 0, right: 0, top: 0, borderRadius: 18, borderWidth: 1.5 },
   icon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   text: { flex: 1, gap: 1 },

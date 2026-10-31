@@ -15,6 +15,8 @@ import { usePayHint, withFee } from '@/hooks/useSubscription';
 import { payIfNeeded } from '@/state/payGateStore';
 import { LoadingIndicator } from './LoadingIndicator';
 import { RatingStars } from './RatingStars';
+import { ListPhotoStrip } from './ListPhotoStrip';
+import { listCountText, uploadListPhotos } from '@/utils/listPhotos';
 import { ToastHost } from './ToastHost';
 import { Avatar } from './WorkerMiniCard';
 import { useListStore } from '@/state/listStore';
@@ -90,6 +92,9 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
   const [listId, setListId] = useState<string | null>(null);
   const currentList = lists.find((list) => list.id === listId) ?? lists[0] ?? null;
   const items = (currentList?.items ?? []).filter((item) => item.name.trim().length > 0);
+  // A list can be (or include) photos of a written list.
+  const photos = currentList?.photos ?? [];
+  const hasList = items.length > 0 || photos.length > 0;
   const { location, refresh: refreshLocation } = useDeviceLocation();
   const coords = location.status === 'ready' ? location : null;
   const createOrder = useCreateOrder();
@@ -206,6 +211,8 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
         return;
       }
       const locationAddress = fulfillment === 'delivery' ? await addressFor(here.latitude, here.longitude) : undefined;
+      // Photos go up first (one request each); the order then carries their links.
+      const listPhotos = currentList ? await uploadListPhotos(currentList) : { urls: [], remember: () => undefined };
       const order = await createOrder.mutateAsync({
         businessId: selected.id,
         fulfillment,
@@ -214,11 +221,13 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           quantity: item.quantity.trim() || '1',
           unit: item.unit.trim() || null,
         })),
+        listPhotoUrls: listPhotos.urls,
         latitude: here.latitude,
         longitude: here.longitude,
         locationAddress,
         note: note.trim() || undefined,
       });
+      listPhotos.remember();
       showToast({
         variant: 'success',
         title: t('sendList.sentTitle'),
@@ -241,7 +250,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           {lists.map((list) =>
             renderChip(
               list.id,
-              `${list.name} (${list.items.length})`,
+              `${list.name} (${listCountText(t, list.items.length, (list.photos ?? []).length)})`,
               list.id === currentList?.id,
               () => setListId(list.id),
               'list-check',
@@ -254,8 +263,9 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
   const renderListPreview = () => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text style={[styles.cardLabel, { color: colors.textMuted }]} numberOfLines={1}>
-        {currentList?.name} · {t('sendList.yourList', { count: items.length })}
+        {currentList?.name} · {listCountText(t, items.length, photos.length)}
       </Text>
+      <ListPhotoStrip photos={photos.map((photo) => photo.uri)} size={64} />
       {items.slice(0, PREVIEW_ITEMS).map((item, index) => (
         <View key={item.id} style={styles.previewRow}>
           <Text style={[styles.previewIndex, { color: colors.textMuted }]}>{index + 1}.</Text>
@@ -448,7 +458,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           placeholderTextColor={colors.textMuted}
         />
         <Button
-          label={withFee(t('sendList.send', { count: items.length }), orderFee)}
+          label={withFee(items.length > 0 ? t('sendList.send', { count: items.length }) : t('sendList.sendPhotos'), orderFee)}
           onPress={() => run(handleSend)}
           loading={sending || adLoading || busy}
         />
@@ -474,7 +484,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           </View>
         </LinearGradient>
 
-        {items.length === 0 ? (
+        {!hasList ? (
           <View style={styles.state}>
             <FontAwesome6 name="list-check" size={26} color={colors.textMuted} solid />
             <Text style={[styles.stateTitle, { color: colors.text }]}>{t('sendList.emptyTitle')}</Text>
@@ -549,7 +559,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           </ScrollView>
         )}
 
-        {items.length > 0 ? renderFooter() : null}
+        {hasList ? renderFooter() : null}
         <ToastHost />
       </View>
     </Modal>

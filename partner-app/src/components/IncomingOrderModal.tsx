@@ -15,6 +15,8 @@ import { useIncomingStore } from '@/state/incomingStore';
 import { ShopOrder } from '@/services/shopOrdersService';
 import { formatDistance } from '@/utils/formatDistance';
 import { typography, useThemeColors } from '@/theme';
+import { ListPhotoStrip } from './ListPhotoStrip';
+import { orderListText } from '@/utils/orderListText';
 
 // Lets the order screen finish fading in on top before this one closes underneath it.
 const MODAL_HANDOFF_MS = 350;
@@ -92,7 +94,7 @@ export function IncomingOrderModal() {
       state={gone ? 'gone' : order ? 'ready' : 'loading'}
       goneTitle={t('shopOrders.orderGoneTitle')}
       goneMessage={t('shopOrders.orderGoneMessage')}
-      headline={order ? t('shopOrders.itemsCount', { count: order.items.length }) : undefined}
+      headline={order ? orderListText(t, order, 'shopOrders.itemsCount') : undefined}
       headlineCaption={
         order
           ? `${t(order.fulfillment === 'delivery' ? 'shopOrders.fulfillmentDelivery' : 'shopOrders.fulfillmentPickup')} · ${t('bookings.distanceAway', { distance: formatDistance(order.distanceMeters) })}`
@@ -102,12 +104,19 @@ export function IncomingOrderModal() {
       personLine={placeName(order?.locationAddress) || undefined}
       chips={itemChips}
       details={
-        order?.note ? (
-          <View style={[styles.note, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}26` }]}>
-            <FontAwesome6 name="note-sticky" size={13} color={colors.primary} solid />
-            <Text style={[styles.noteText, { color: colors.text }]}>{order.note}</Text>
-          </View>
-        ) : null
+        <>
+          {(order?.listPhotoUrls ?? []).length > 0 ? (
+            <View style={styles.photos}>
+              <ListPhotoStrip photos={order?.listPhotoUrls ?? []} size={84} />
+            </View>
+          ) : null}
+          {order?.note ? (
+            <View style={[styles.note, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}26` }]}>
+              <FontAwesome6 name="note-sticky" size={13} color={colors.primary} solid />
+              <Text style={[styles.noteText, { color: colors.text }]}>{order.note}</Text>
+            </View>
+          ) : null}
+        </>
       }
       decline={{
         label: t(gone ? 'common.close' : 'shopOrders.decline'),
@@ -128,6 +137,7 @@ export function IncomingOrderModal() {
 }
 
 const styles = StyleSheet.create({
+  photos: { marginTop: 14 },
   note: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderWidth: 1, borderRadius: 14, padding: 12, marginTop: 14 },
   noteText: { ...typography.body, fontSize: 14, lineHeight: 20, flex: 1 },
 });

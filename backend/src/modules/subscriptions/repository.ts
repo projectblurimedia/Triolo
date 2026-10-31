@@ -174,7 +174,7 @@ export class SubscriptionsRepository {
    * The subscription running now (the latest-ending one), if any. With a partner plan: one for
    * that plan or an older plan covering everything.
    */
-  async findActive(accountId: string, audience: SubscriptionAudience, plan?: PartnerPlan): Promise<Subscription | null> {
+  async findActive(accountId: string, audience: SubscriptionAudience, plan?: SubscriptionPlan): Promise<Subscription | null> {
     const result = await this.pool.query(
       `SELECT * FROM subscriptions
        WHERE account_id = $1 AND audience = $2 AND status = 'active' AND starts_at <= now() AND ends_at > now()

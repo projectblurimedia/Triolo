@@ -104,7 +104,7 @@ export function ImagePickerField({ label, images, onChange, maxImages = 6, allow
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text>
+      {label ? <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text> : null}
       <View style={styles.row}>
         {images.map((img) => (
           <View key={img.uri} style={styles.thumbWrap}>

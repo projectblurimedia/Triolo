@@ -37,6 +37,7 @@ import {
   promotesProfile,
 } from '@/components/AdActionField';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { AdShowOn, AdShowOnPicker, showOnLabel } from '@/components/AdShowOnPicker';
 import { BackLink, Badge, ErrorState, InfoRow, Loading, Notice, Spinner } from '@/components/ui';
 import { useApi } from '@/hooks/useApi';
 import {
@@ -44,7 +45,7 @@ import {
   AD_MAX_IMAGE_MB,
   AD_MAX_VIDEO_MB,
   AD_MAX_VIDEO_SECONDS,
-  AD_PLANS,
+  AD_PLANS, AD_VIEW_PICKS, adPlanText,
   AdOrientation,
   AdPlanDays,
   AdStatus,
@@ -66,6 +67,14 @@ const STATUS: Record<AdStatus, { label: string; tone: Tone; help: string }> = {
   ended: { label: 'Ended', tone: 'muted', help: 'Its days are over.' },
   deleted: { label: 'Withdrawn', tone: 'muted', help: 'You took it back.' },
 };
+
+/** The ad's status, telling apart an ad the business withdrew from one Triolo removed. */
+function statusOf(ad: Ad): { label: string; tone: Tone; help: string } {
+  if (ad.status === 'deleted' && ad.deletedBy !== 'owner') {
+    return { label: 'Removed by Triolo', tone: 'error', help: 'Triolo took this ad down. For questions, contact Triolo support.' };
+  }
+  return STATUS[ad.status];
+}
 
 /** Today's date in India as YYYY-MM-DD (ads run by the India calendar day). */
 function todayInIndia(): string {
@@ -154,7 +163,7 @@ export function MyAdsPage() {
       ) : (
         <div className="my-ads">
           {list.data.map((ad) => {
-            const status = STATUS[ad.status];
+            const status = statusOf(ad);
             return (
               <Link key={ad.id} to={`/ads/${ad.id}`} className="glass my-ad">
                 <AdThumb ad={ad} />
@@ -164,7 +173,7 @@ export function MyAdsPage() {
                     <Badge tone={status.tone}>{status.label}</Badge>
                   </div>
                   <div className="my-ad-meta">
-                    {AD_PLANS.find((plan) => plan.days === ad.planDays)?.label} · {dayLabel(ad.startDate)} –{' '}
+                    {adPlanText(ad)} · {dayLabel(ad.startDate)} –{' '}
                     {dayLabel(ad.endDate)} · {rupees(ad.amount)}
                   </div>
                   {ad.status === 'running' || ad.status === 'ended' ? (
@@ -310,9 +319,15 @@ function AdForm({ ad }: { ad?: Ad }) {
   const [action, setAction] = useState<AdActionValue>(() => (ad ? actionFromAd(ad) : EMPTY_ACTION));
   const [description, setDescription] = useState(ad?.description ?? '');
   const [orientation, setOrientation] = useState<AdOrientation>(ad?.orientation ?? 'vertical');
+  // Full screen before actions, or a wide card in Home's slider.
+  const [showOn, setShowOn] = useState<AdShowOn>(ad?.showOn ?? 'action');
+  const forHome = showOn === 'home';
   // A picture shows for 15 seconds (a video for its own length); not asked any more.
   const displaySeconds = ad?.displaySeconds ?? 15;
-  const [planDays, setPlanDays] = useState<AdPlanDays>(ad?.planDays ?? 7);
+  const [planDays, setPlanDays] = useState<AdPlanDays>(ad && ad.billing !== 'views' ? (ad.planDays as AdPlanDays) : 7);
+  // Bought by days, or by a number of views.
+  const [billing, setBilling] = useState<'days' | 'views'>(ad?.billing ?? 'days');
+  const [viewLimit, setViewLimit] = useState<number | null>(ad?.viewLimit ?? null);
   const paidOnline = ad?.paymentMethod === 'online';
   // A business can't start in the past; tomorrow by default, so there's time for the review.
   const [startDate, setStartDate] = useState(ad && ad.startDate >= todayInIndia() ? ad.startDate : addDays(todayInIndia(), 1));
@@ -329,7 +344,14 @@ function AdForm({ ad }: { ad?: Ad }) {
   const upload = useRef<{ file: File; promise: Promise<string> } | null>(null);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus | null>(null);
 
-  const price = info.data?.prices[String(planDays) as keyof typeof info.data.prices];
+  const byViews = billing === 'views';
+  const viewsMin = info.data?.viewsMin ?? 500;
+  const viewsMax = info.data?.viewsMax ?? 10000;
+  const price = byViews
+    ? info.data && viewLimit
+      ? Math.round(viewLimit * (info.data.pricePerView ?? 0))
+      : undefined
+    : info.data?.prices[String(planDays) as keyof typeof info.data.prices];
 
   const startUpload = (file: File, kind: 'image' | 'video') => {
     const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
@@ -377,6 +399,9 @@ function AdForm({ ad }: { ad?: Ad }) {
       setUploadStatus(null);
       // Taller than wide → vertical (reel / poster), else horizontal.
       if (picked.width && picked.height) setOrientation(picked.height > picked.width ? 'vertical' : 'horizontal');
+      if (forHome && picked.width && picked.height && picked.height > picked.width) {
+        setError('The Home slider needs a wide (horizontal, 16:9) picture or video. This one is tall — fine for "Before actions".');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That file could not be read.');
     }
@@ -388,6 +413,9 @@ function AdForm({ ad }: { ad?: Ad }) {
     if (actionError) return setError(actionError);
     if (!promotesProfile(action) && advertiserName.trim().length < 2) return setError('Enter your business name.');
     if (!promotesProfile(action) && !media) return setError('Add your ad: one picture or one video.');
+    if (forHome && !promotesProfile(action) && orientation === 'vertical') {
+      return setError('The Home slider needs a wide (horizontal, 16:9) picture or video. Choose a wide one, or "Before actions".');
+    }
     if (!startDate || startDate < todayInIndia()) return setError('Choose a start date from today on.');
     setError('');
     setSaving(true);
@@ -408,9 +436,12 @@ function AdForm({ ad }: { ad?: Ad }) {
         advertiserName: promotesProfile(action) ? undefined : advertiserName.trim(),
         description: description.trim() || undefined,
         ...actionBody(action),
-        orientation,
+        orientation: forHome ? 'horizontal' : orientation,
+        showOn,
         displaySeconds,
         planDays,
+        billing,
+        viewLimit: byViews ? viewLimit : null,
         startDate,
         ...mediaBody,
       };
@@ -450,6 +481,10 @@ function AdForm({ ad }: { ad?: Ad }) {
 
         <div className="card-title" style={{ marginTop: 10 }}>
           <FontAwesomeIcon icon={faBullhorn} /> The ad
+        </div>
+        <div className="field">
+          <span>Where it shows *</span>
+          <AdShowOnPicker value={showOn} onChange={setShowOn} disabled={saving} />
         </div>
         {promotesProfile(action) ? (
           <div className="profile-ad-note">
@@ -496,7 +531,7 @@ function AdForm({ ad }: { ad?: Ad }) {
             </label>
             <span className="muted" style={{ fontSize: 12 }}>
               Picture: JPG / PNG up to {AD_MAX_IMAGE_MB} MB. Video: up to {AD_MAX_VIDEO_SECONDS} seconds and {AD_MAX_VIDEO_MB} MB.
-              Vertical (like a reel or poster) fills the phone screen best.
+              {forHome ? 'Wide (16:9) only — it fills the Home slider card.' : 'Vertical (like a reel or poster) fills the phone screen best.'}
             </span>
           </div>
         </div>
@@ -523,6 +558,65 @@ function AdForm({ ad }: { ad?: Ad }) {
           <FontAwesomeIcon icon={faCalendarDays} /> When
         </div>
         <div className="field">
+          <span>Pay for</span>
+          <div className="chips">
+            {([
+              ['days', 'Days'],
+              ['views', 'Views'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`chip${billing === value ? ' active' : ''}`}
+                disabled={paidOnline && billing !== value}
+                onClick={() => {
+                  setBilling(value);
+                  if (value === 'views' && !viewLimit) setViewLimit(1000);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {byViews ? (
+          <div className="field">
+            <span>
+              How many people should see it ({viewsMin.toLocaleString('en-IN')} – {viewsMax.toLocaleString('en-IN')} views)
+              {info.data?.pricePerView ? ` · ₹${info.data.pricePerView} a view` : ''}
+            </span>
+            <div className="chips">
+              {AD_VIEW_PICKS.map((views) => (
+                <button
+                  key={views}
+                  type="button"
+                  className={`chip${viewLimit === views ? ' active' : ''}`}
+                  disabled={paidOnline && viewLimit !== views}
+                  onClick={() => setViewLimit(views)}
+                >
+                  {views.toLocaleString('en-IN')}
+                </button>
+              ))}
+            </div>
+            <input
+              value={viewLimit ?? ''}
+              disabled={paidOnline}
+              onChange={(event) => {
+                const digits = event.target.value.replace(/[^0-9]/g, '').slice(0, 5);
+                setViewLimit(digits ? Number(digits) : null);
+              }}
+              inputMode="numeric"
+              placeholder="Number of views"
+              style={{ marginTop: 8 }}
+            />
+            {viewLimit != null && (viewLimit < viewsMin || viewLimit > viewsMax) ? (
+              <small style={{ color: 'var(--danger)' }}>
+                Between {viewsMin.toLocaleString('en-IN')} and {viewsMax.toLocaleString('en-IN')} views.
+              </small>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="field" style={byViews ? { display: 'none' } : undefined}>
           <span>How long</span>
           <div className="ad-plans">
             {AD_PLANS.map((plan) => (
@@ -580,7 +674,9 @@ function AdForm({ ad }: { ad?: Ad }) {
         <div className="ad-total">
           <div>
             <div className="muted" style={{ fontSize: 13 }}>
-              Runs {startDate ? `${dayLabel(startDate)} – ${dayLabel(addDays(startDate, planDays - 1))}` : '—'}
+              {byViews
+                ? `Runs from ${startDate ? dayLabel(startDate) : '—'} until its views are used (at most ${info.data?.viewsValidDays ?? 90} days)`
+                : `Runs ${startDate ? `${dayLabel(startDate)} – ${dayLabel(addDays(startDate, planDays - 1))}` : '—'}`}
             </div>
             <div className="ad-total-amount">{price === undefined ? '…' : rupees(price)}</div>
           </div>
@@ -665,7 +761,7 @@ export function AdDetailPage() {
     );
   }
 
-  const status = STATUS[ad.status];
+  const status = statusOf(ad);
   const openRate = ad.impressions ? `${((ad.clicks / ad.impressions) * 100).toFixed(1)}%` : '—';
 
   return (
@@ -763,8 +859,10 @@ export function AdDetailPage() {
             <span className="ad-preview-tag">Ad</span>
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 10 }}>
-            {ad.orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'} ·{' '}
-            {ad.videoUrl ? `video, ${ad.durationSeconds} s` : `picture, shown ${ad.displaySeconds} s`} before it can be closed
+            {showOnLabel(ad.showOn)} · {ad.orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'}
+            {ad.showOn === 'home'
+              ? ' · slides by itself at the top of Home'
+              : ` · ${ad.videoUrl ? `video, ${ad.durationSeconds} s` : `picture, shown ${ad.displaySeconds} s`} before it can be closed`}
           </div>
           <div className="info">
             {ad.description ? (
@@ -805,7 +903,7 @@ export function AdDetailPage() {
               </span>
             </div>
             <div className="info">
-              <InfoRow icon={faCalendarDays} label={AD_PLANS.find((plan) => plan.days === ad.planDays)?.label ?? ''}>
+              <InfoRow icon={faCalendarDays} label={adPlanText(ad)}>
                 {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
               </InfoRow>
               <InfoRow icon={faWallet} label="Price">

@@ -26,11 +26,16 @@ import {
   faBasketShopping,
   faClipboardList,
   faUserTie,
-  faKey,
   faMobileScreen,
   faHandshake,
   faClock,
+  faMagnifyingGlass,
+  faListCheck,
+  faRotateRight,
+  faScrewdriverWrench,
+  faImages,
 } from '@fortawesome/free-solid-svg-icons';
+import { AdShowOnPicker, showOnLabel } from '@/components/AdShowOnPicker';
 import { Topbar } from '@/components/Layout';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Dropdown, DropdownOption } from '@/components/Dropdown';
@@ -62,7 +67,11 @@ import {
   AdStatus,
   SaveAd,
   adsApi,
-  planLabel,
+  adPlanText,
+  AD_VIEW_PICKS,
+  AD_VIEWS_MAX,
+  AD_VIEWS_MIN,
+  AD_VIEWS_VALID_DAYS,
   uploadAdFile,
 } from '@/services/adsApi';
 import { getErrorMessage } from '@/services/errorMessages';
@@ -145,6 +154,8 @@ const AD_APPS: {
   icon: IconDefinition;
   gradient: Gradient;
   setting: 'actionUser' | 'actionPartner';
+  /** The Home carousel's switch for this app. */
+  home: 'homeUser' | 'homePartner';
   spots: { spot: AdSpot; label: string; note: string; icon: IconDefinition; gradient: Gradient }[];
 }[] = [
   {
@@ -153,6 +164,7 @@ const AD_APPS: {
     icon: faMobileScreen,
     gradient: 'linear-gradient(135deg,#0055d3,#1d76fa)',
     setting: 'actionUser',
+    home: 'homeUser',
     spots: [
       { spot: 'quick_book', label: 'Quick Book', note: 'Before Book Nearby', icon: faBolt, gradient: 'linear-gradient(135deg,#0055d3,#1d76fa)' },
       {
@@ -163,9 +175,16 @@ const AD_APPS: {
         gradient: 'linear-gradient(135deg,#4338ca,#6366f1)',
       },
       {
+        spot: 'quick_order',
+        label: 'Quick Order',
+        note: 'Before sending a list to shops nearby',
+        icon: faBolt,
+        gradient: 'linear-gradient(135deg,#ea580c,#f59e0b)',
+      },
+      {
         spot: 'send_list',
-        label: 'Order from a shop',
-        note: 'Before sending a list to a shop',
+        label: 'Book a particular shop',
+        note: 'Before sending a list to one shop',
         icon: faBasketShopping,
         gradient: 'linear-gradient(135deg,#16a34a,#22c55e)',
       },
@@ -177,6 +196,13 @@ const AD_APPS: {
         gradient: 'linear-gradient(135deg,#7c3aed,#a78bfa)',
       },
       { spot: 'hire_staff', label: 'Hire Staff', note: 'Before the first search', icon: faUserTie, gradient: 'linear-gradient(135deg,#0d9488,#2dd4bf)' },
+      {
+        spot: 'staff_phone',
+        label: 'Hire Staff phone number',
+        note: 'Before calling (or seeing the number of) someone looking for work',
+        icon: faPhone,
+        gradient: 'linear-gradient(135deg,#0891b2,#22d3ee)',
+      },
     ],
   },
   {
@@ -185,15 +211,46 @@ const AD_APPS: {
     icon: faHandshake,
     gradient: 'linear-gradient(135deg,#7c3aed,#a78bfa)',
     setting: 'actionPartner',
+    home: 'homePartner',
+    // Never before accepting (someone else could take it meanwhile) — after it instead.
     spots: [
       {
-        spot: 'work_done',
-        label: 'Mark work done',
-        note: 'A worker finishing a job',
-        icon: faCircleCheck,
+        spot: 'job_accept',
+        label: 'After accepting a job',
+        note: 'Quick Book or a personal booking, before its details open (instead of the fee)',
+        icon: faHandshake,
         gradient: 'linear-gradient(135deg,#16a34a,#22c55e)',
       },
-      { spot: 'order_pin', label: 'Verify an order PIN', note: 'A shop handing over an order', icon: faKey, gradient: 'linear-gradient(135deg,#db2777,#f472b6)' },
+      {
+        spot: 'problem_accept',
+        label: 'After accepting a problem',
+        note: 'A problem nearby, before the job opens (instead of the fee)',
+        icon: faScrewdriverWrench,
+        gradient: 'linear-gradient(135deg,#7c3aed,#a78bfa)',
+      },
+      {
+        spot: 'order_accept',
+        label: 'After accepting an order',
+        note: 'A shop order, before it opens (instead of the fee)',
+        icon: faBasketShopping,
+        gradient: 'linear-gradient(135deg,#ea580c,#f59e0b)',
+      },
+      { spot: 'find_jobs', label: 'Find Jobs Now', note: 'Before searching for open jobs', icon: faMagnifyingGlass, gradient: 'linear-gradient(135deg,#0055d3,#1d76fa)' },
+      { spot: 'find_orders', label: 'Find Orders Now', note: 'Before searching for open orders', icon: faListCheck, gradient: 'linear-gradient(135deg,#0d9488,#2dd4bf)' },
+      {
+        spot: 'continue_card',
+        label: 'Continue where you left off',
+        note: 'Before opening a job or order from Home',
+        icon: faRotateRight,
+        gradient: 'linear-gradient(135deg,#db2777,#f472b6)',
+      },
+      {
+        spot: 'viewer_reveal',
+        label: 'Who viewed a job post',
+        note: 'Only while subscriptions are off: an ad shows who it was',
+        icon: faEye,
+        gradient: 'linear-gradient(135deg,#4338ca,#6366f1)',
+      },
     ],
   },
 ];
@@ -280,6 +337,18 @@ function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange
                 <StatePill on={appOn && !off} />
                 <Switch checked={appOn} disabled={off} onChange={(value) => save({ [app.setting]: value })} />
               </div>
+              {/* The Home carousel: on its own (not one of the actions above). */}
+              <label className={`ad-spot-row ad-home-row${settings[app.home] && !off ? ' on' : ''}`}>
+                <span className="ad-spot-icon" style={{ background: 'linear-gradient(135deg,#ea580c,#f59e0b)' }}>
+                  <FontAwesomeIcon icon={faImages} />
+                </span>
+                <span className="ad-spot-text">
+                  <strong>Home carousel</strong>
+                  <small>Ads slide by at the top of Home (subscribers see none)</small>
+                </span>
+                <StatePill on={settings[app.home] && !off} onLabel="Showing" offLabel="Off" />
+                <Switch checked={settings[app.home]} disabled={off} onChange={(value) => save({ [app.home]: value })} />
+              </label>
               <div className={`ad-spot-list${appOn ? '' : ' disabled'}`}>
                 {app.spots.map((item) => {
                   const spotOn = settings.spots?.[item.spot] !== false;
@@ -336,28 +405,42 @@ function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange
 
 // ---------------- Prices ----------------
 
-function AdPricesCard({ prices, onSaved }: { prices: AdPlanPrices; onSaved: (settings: AdSettings) => void }) {
+function AdPricesCard({
+  prices,
+  pricePerView,
+  onSaved,
+}: {
+  prices: AdPlanPrices;
+  pricePerView: number;
+  onSaved: (settings: AdSettings) => void;
+}) {
   const [draft, setDraft] = useState<Record<string, string>>(() =>
     Object.fromEntries(AD_PLANS.map((plan) => [plan.key, String(prices[plan.key])])),
   );
+  const [perView, setPerView] = useState(String(pricePerView));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setDraft(Object.fromEntries(AD_PLANS.map((plan) => [plan.key, String(prices[plan.key])])));
   }, [prices]);
+  useEffect(() => setPerView(String(pricePerView)), [pricePerView]);
 
-  const changed = AD_PLANS.some((plan) => Number(draft[plan.key]) !== prices[plan.key]);
-  const valid = AD_PLANS.every((plan) => /^\d{1,6}$/.test(draft[plan.key] ?? ''));
+  const changed = AD_PLANS.some((plan) => Number(draft[plan.key]) !== prices[plan.key]) || Number(perView) !== pricePerView;
+  const valid = AD_PLANS.every((plan) => /^\d{1,6}$/.test(draft[plan.key] ?? '')) && /^\d{1,2}(\.\d{1,2})?$/.test(perView);
 
   const save = async () => {
     if (!valid) {
-      showToast({ variant: 'error', title: 'Check the prices', message: 'Each price must be a whole number of rupees.' });
+      showToast({
+        variant: 'error',
+        title: 'Check the prices',
+        message: 'Each plan price must be a whole number of rupees; the price per view like 0.20.',
+      });
       return;
     }
     setSaving(true);
     try {
       const next = Object.fromEntries(AD_PLANS.map((plan) => [plan.key, Number(draft[plan.key])])) as AdPlanPrices;
-      onSaved(await adsApi.saveSettings({ prices: next }));
+      onSaved(await adsApi.saveSettings({ prices: next, pricePerView: Number(perView) }));
       showToast({
         variant: 'success',
         title: 'Prices saved',
@@ -392,6 +475,13 @@ function AdPricesCard({ prices, onSaved }: { prices: AdPlanPrices; onSaved: (set
             </div>
           </label>
         ))}
+        <label className="field">
+          <span>Per view</span>
+          <div className="ad-price-input">
+            <span>₹</span>
+            <input value={perView} onChange={(event) => setPerView(event.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" maxLength={5} />
+          </div>
+        </label>
       </div>
       <div className="ad-prices-foot">
         <span className="muted" style={{ fontSize: 12 }}>
@@ -419,7 +509,7 @@ export function AdsPage() {
     <>
       <Topbar
         title="Ads"
-        subtitle="local businesses' ads in both apps"
+        subtitle="ads from anyone who wants to promote, in both apps"
         actions={
           <Link to="/ads/new" className="btn btn-primary">
             <FontAwesomeIcon icon={faPlus} /> Book New Ad
@@ -439,6 +529,7 @@ export function AdsPage() {
           />
           <AdPricesCard
             prices={overview.data.settings.prices}
+            pricePerView={overview.data.settings.pricePerView ?? 0}
             onSaved={(settings) =>
               overview.setData((current) => (current ? { ...current, settings, prices: settings.prices } : current))
             }
@@ -537,7 +628,7 @@ export function AdsPage() {
                 <div className="row-main">
                   <div className="row-title">{ad.title}</div>
                   <div className="row-sub">
-                    {ad.advertiserName} · {planLabel(ad.planDays)} · {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
+                    {ad.advertiserName} · {showOnLabel(ad.showOn)} · {adPlanText(ad)} · {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
                   </div>
                 </div>
                 <div className="row-side">
@@ -573,8 +664,11 @@ const EMPTY_FORM: AdFormValues = {
   advertiserName: '',
   description: '',
   orientation: 'vertical',
+  showOn: 'action',
   displaySeconds: 15,
   planDays: 7,
+  billing: 'days',
+  viewLimit: null,
   paymentMethod: 'cash',
   startDate: todayInIndia(),
 };
@@ -628,8 +722,11 @@ function AdForm({ ad }: { ad?: Ad }) {
           advertiserName: ad.advertiserName,
           description: ad.description ?? '',
           orientation: ad.orientation,
+          showOn: ad.showOn ?? 'action',
           displaySeconds: ad.displaySeconds,
-          planDays: ad.planDays,
+          planDays: ad.billing === 'views' ? 7 : (ad.planDays as AdPlanDays),
+          billing: ad.billing ?? 'days',
+          viewLimit: ad.viewLimit ?? null,
           paymentMethod: ad.paymentMethod,
           startDate: ad.startDate,
         }
@@ -687,11 +784,14 @@ function AdForm({ ad }: { ad?: Ad }) {
     upload.current = { file, promise };
   };
 
-  const pricing = useApi(() => adsApi.overview().then((overview) => overview.settings.prices), []);
-  const priceOf = (days: AdPlanDays) => pricing.data?.[String(days) as keyof AdPlanPrices];
-  // An edited ad keeps the amount it was booked at, unless its plan is changed.
-  const keepsBookedAmount = !!ad && ad.planDays === form.planDays;
-  const price = keepsBookedAmount ? ad.amount : priceOf(form.planDays);
+  const pricing = useApi(() => adsApi.overview().then((overview) => overview.settings), []);
+  const priceOf = (days: AdPlanDays) => pricing.data?.prices[String(days) as keyof AdPlanPrices];
+  const byViews = form.billing === 'views';
+  const viewsPrice = pricing.data && form.viewLimit ? Math.round(form.viewLimit * pricing.data.pricePerView) : undefined;
+  // An edited ad keeps the amount it was booked at, unless what it bought is changed.
+  const keepsBookedAmount =
+    !!ad && (ad.billing ?? 'days') === form.billing && (byViews ? ad.viewLimit === form.viewLimit : ad.planDays === form.planDays);
+  const price = keepsBookedAmount ? ad.amount : byViews ? viewsPrice : priceOf(form.planDays);
   const set = <K extends keyof AdFormValues>(key: K, value: AdFormValues[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
 
@@ -718,6 +818,9 @@ function AdForm({ ad }: { ad?: Ad }) {
       setMediaStatus(null);
       // Taller than wide → vertical, else horizontal (can still be changed below).
       if (info.width && info.height) set('orientation', info.height > info.width ? 'vertical' : 'horizontal');
+      if (form.showOn === 'home' && info.width && info.height && info.height > info.width) {
+        setError('The Home slider needs a wide (horizontal, 16:9) image or video. This one is tall — fine for "Before actions".');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That file could not be read.');
     }
@@ -751,6 +854,9 @@ function AdForm({ ad }: { ad?: Ad }) {
     if (actionError) return setError(actionError);
     if (!promotesProfile(action) && form.advertiserName.trim().length < 2) return setError('Enter the business name.');
     if (!promotesProfile(action) && !media) return setError('Add the ad: one image or one video.');
+    if (form.showOn === 'home' && !promotesProfile(action) && form.orientation === 'vertical') {
+      return setError('The Home slider needs a wide (horizontal, 16:9) image or video. Choose a wide one, or "Before actions".');
+    }
     if (!form.startDate) return setError('Choose a start date.');
     setError('');
     setSaving(true);
@@ -765,6 +871,7 @@ function AdForm({ ad }: { ad?: Ad }) {
         advertiserName: promotesProfile(action) ? undefined : form.advertiserName,
         ...uploaded,
         ...actionBody(action),
+        orientation: form.showOn === 'home' ? 'horizontal' : form.orientation,
       };
       const saved = ad ? await adsApi.update(ad.id, body) : await adsApi.create(body);
       showToast({
@@ -813,6 +920,10 @@ function AdForm({ ad }: { ad?: Ad }) {
 
         <div className="card-title" style={{ marginTop: 10 }}>
           <FontAwesomeIcon icon={faBullhorn} /> The ad
+        </div>
+        <div className="field">
+          <span>Where it shows *</span>
+          <AdShowOnPicker value={form.showOn} onChange={(value) => set('showOn', value)} disabled={saving} />
         </div>
         {promotesProfile(action) ? (
           <div className="profile-ad-note">
@@ -887,6 +998,54 @@ function AdForm({ ad }: { ad?: Ad }) {
           <FontAwesomeIcon icon={faReceipt} /> Booking
         </div>
         <div className="field">
+          <span>Charged by</span>
+          <div className="chips">
+            {([
+              ['days', 'Days'],
+              ['views', 'Views'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`chip${form.billing === value ? ' active' : ''}`}
+                onClick={() => setForm((current) => ({ ...current, billing: value, viewLimit: value === 'views' ? current.viewLimit ?? 1000 : null }))}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {byViews ? (
+          <div className="field">
+            <span>
+              How many views ({AD_VIEWS_MIN.toLocaleString('en-IN')} – {AD_VIEWS_MAX.toLocaleString('en-IN')}) ·{' '}
+              {pricing.data ? `₹${pricing.data.pricePerView} a view` : '…'}
+            </span>
+            <div className="chips">
+              {AD_VIEW_PICKS.map((views) => (
+                <button key={views} type="button" className={`chip${form.viewLimit === views ? ' active' : ''}`} onClick={() => set('viewLimit', views)}>
+                  {views.toLocaleString('en-IN')}
+                </button>
+              ))}
+            </div>
+            <input
+              value={form.viewLimit ?? ''}
+              onChange={(event) => {
+                const digits = event.target.value.replace(/[^0-9]/g, '').slice(0, 5);
+                set('viewLimit', digits ? Number(digits) : null);
+              }}
+              inputMode="numeric"
+              placeholder="Number of views"
+              style={{ marginTop: 8 }}
+            />
+            {form.viewLimit != null && (form.viewLimit < AD_VIEWS_MIN || form.viewLimit > AD_VIEWS_MAX) ? (
+              <small style={{ color: 'var(--danger)' }}>
+                Between {AD_VIEWS_MIN.toLocaleString('en-IN')} and {AD_VIEWS_MAX.toLocaleString('en-IN')} views.
+              </small>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="field" style={byViews ? { display: 'none' } : undefined}>
           <span>How long</span>
           <div className="ad-plans">
             {AD_PLANS.map((plan) => (
@@ -946,7 +1105,9 @@ function AdForm({ ad }: { ad?: Ad }) {
         <div className="ad-total">
           <div>
             <div className="muted" style={{ fontSize: 13 }}>
-              Runs {form.startDate ? `${dayLabel(form.startDate)} – ${dayLabel(endDateFor(form.startDate, form.planDays))}` : '—'}
+              {byViews
+                ? `Runs from ${form.startDate ? dayLabel(form.startDate) : '—'} until its views are used (at most ${AD_VIEWS_VALID_DAYS} days)`
+                : `Runs ${form.startDate ? `${dayLabel(form.startDate)} – ${dayLabel(endDateFor(form.startDate, form.planDays))}` : '—'}`}
             </div>
             <div className="ad-total-amount">{price === undefined ? '…' : rupees(price)}</div>
             {keepsBookedAmount ? (
@@ -1165,8 +1326,10 @@ export function AdDetailPage() {
           ) : null}
           <h3 style={{ margin: '14px 0 4px' }}>{ad.advertiserName}</h3>
           <div className="muted" style={{ fontSize: 13 }}>
-            {ad.orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'} ·{' '}
-            {ad.videoUrl ? `video, ${ad.durationSeconds} s` : `image, shown ${ad.displaySeconds} s`} before it can be closed
+            {showOnLabel(ad.showOn)} · {ad.orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'}
+            {ad.showOn === 'home'
+              ? ' · slides by itself at the top of Home'
+              : ` · ${ad.videoUrl ? `video, ${ad.durationSeconds} s` : `image, shown ${ad.displaySeconds} s`} before it can be closed`}
           </div>
           <div className="info">
             {ad.description ? (
@@ -1218,8 +1381,10 @@ export function AdDetailPage() {
               </span>
             </div>
             <div className="info">
-              <InfoRow icon={faCalendarDays} label={`${planLabel(ad.planDays)} plan`}>
-                {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
+              <InfoRow icon={faCalendarDays} label={adPlanText(ad)}>
+                {ad.billing === 'views'
+                  ? `${ad.impressions.toLocaleString('en-IN')} of ${(ad.viewLimit ?? 0).toLocaleString('en-IN')} views used · from ${dayLabel(ad.startDate)}`
+                  : `${dayLabel(ad.startDate)} – ${dayLabel(ad.endDate)}`}
               </InfoRow>
               <InfoRow icon={faReceipt} label={ad.paymentMethod === 'pending' ? 'Price' : 'Paid'}>
                 {ad.paymentMethod === 'pending'
@@ -1239,7 +1404,7 @@ export function AdDetailPage() {
             </div>
             <div className="row-meta" style={{ marginTop: 6 }}>
               Booked {timeAgo(ad.createdAt)}
-              {ad.deletedAt ? ` · deleted ${timeAgo(ad.deletedAt)}` : ''}
+              {ad.deletedAt ? ` · ${ad.deletedBy === 'owner' ? 'withdrawn by the business' : 'deleted'} ${timeAgo(ad.deletedAt)}` : ''}
             </div>
           </div>
 

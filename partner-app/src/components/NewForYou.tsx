@@ -22,6 +22,9 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistance } from '@/utils/formatDistance';
 import { placeName } from '@/utils/formatAddress';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
+import { ListPhotoStrip } from './ListPhotoStrip';
+import { orderListText } from '@/utils/orderListText';
+import { GivenBackError } from '@/utils/afterAccept';
 
 type DeckItem = { key: string; createdAt: string } & ({ type: 'job'; offer: PendingOffer } | { type: 'order'; order: ShopOrder });
 
@@ -283,6 +286,8 @@ function useRequestActions(item: DeckItem | null, onOpened?: () => void) {
   const declineOrder = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.decline(id));
   const [busy, setBusy] = useState<'accept' | 'decline' | null>(null);
   const onError = (err: Error) => {
+    // Backed out of paying after accepting: it was given back (a toast said so).
+    if (err instanceof GivenBackError) return;
     const taken = err instanceof ApiError && ['BOOKING_ALREADY_TAKEN', 'ORDER_INVALID_STATE', 'ORDER_ALREADY_TAKEN'].includes(err.code ?? '');
     showToast({
       variant: taken ? 'info' : 'error',
@@ -299,7 +304,7 @@ function useRequestActions(item: DeckItem | null, onOpened?: () => void) {
       acceptJob.mutate(id, {
         onSuccess: async () => {
           Notifications.dismissNotificationAsync(id).catch(() => {});
-          await queryClient.prefetchQuery({ queryKey: jobQueryKey(id), queryFn: () => jobsService.get(id) }).catch(() => {});
+          await queryClient.prefetchQuery({ queryKey: jobQueryKey(id), queryFn: () => jobsService.get(id), staleTime: 15000 }).catch(() => {});
           showToast({ variant: 'success', title: t('bookings.acceptedToastTitle'), message: t('bookings.acceptedToastMessage') });
           openJob(id);
           onOpened?.();
@@ -355,7 +360,7 @@ function describe(item: DeckItem, manyShops: boolean, t: (key: string, options?:
     name: isJob ? item.offer.customerFullName : item.order.customerFullName,
     what: isJob
       ? item.offer.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')
-      : `${t('continueSteps.itemCount', { count: item.order.items.length })} · ${t(item.order.fulfillment === 'delivery' ? 'shopOrders.delivery' : 'shopOrders.pickup')}`,
+      : `${orderListText(t, item.order)} · ${t(item.order.fulfillment === 'delivery' ? 'shopOrders.delivery' : 'shopOrders.pickup')}`,
     distance: formatDistance(isJob ? item.offer.distanceMeters : item.order.distanceMeters),
     place: placeName((isJob ? item.offer.locationAddress : item.order.locationAddress) ?? ''),
     kind: isJob
@@ -426,7 +431,7 @@ function RequestCard({
     item.type === 'order'
       ? [
           t(item.order.fulfillment === 'delivery' ? 'shopOrders.fulfillmentDelivery' : 'shopOrders.fulfillmentPickup'),
-          t('continueSteps.itemCount', { count: item.order.items.length }),
+          orderListText(t, item.order),
           item.order.fulfillment === 'delivery' && item.order.deliveryCharge > 0
             ? t('newForYou.deliveryCharge', { amount: formatRupees(item.order.deliveryCharge) })
             : '',
@@ -549,12 +554,18 @@ function ItemsSheet({ visible, order, onClose }: { visible: boolean; order: Shop
               <Text style={[styles.sheetTitle, { color: colors.text }]} numberOfLines={1}>
                 {order.customerFullName}
               </Text>
-              <Text style={[styles.sheetSub, { color: colors.textMuted }]}>{t('continueSteps.itemCount', { count: order.items.length })}</Text>
+              <Text style={[styles.sheetSub, { color: colors.textMuted }]}>{orderListText(t, order)}</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={8} style={[styles.sheetClose, { borderColor: colors.border }]}>
               <FontAwesome6 name="xmark" size={14} color={colors.text} />
             </Pressable>
           </View>
+          {/* A photo of a written list: tap to read it full screen. */}
+          {(order.listPhotoUrls ?? []).length > 0 ? (
+            <View style={styles.sheetPhotos}>
+              <ListPhotoStrip photos={order.listPhotoUrls ?? []} size={88} />
+            </View>
+          ) : null}
           <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
             {order.items.map((entry, position) => (
               <View key={entry.id} style={[styles.sheetRow, { borderColor: colors.border }]}>
@@ -641,6 +652,7 @@ const styles = StyleSheet.create({
   sheetTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16 },
   sheetSub: { ...typography.caption, fontSize: 12.5 },
   sheetClose: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  sheetPhotos: { marginBottom: 10 },
   sheetList: { flexGrow: 0 },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
   sheetNumber: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

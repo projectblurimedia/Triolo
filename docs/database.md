@@ -194,7 +194,7 @@ Migration `0019_problem_jobs_as_trips_and_reviews.sql` also added `booking_reque
 Migrations `0013_create_problem_posts.sql`, `0014_problem_posts_location_address.sql`, `0015_problem_posts_job_flow.sql`. Indexes: `(status, created_at DESC)` and `(accepted_worker_id, created_at DESC)` (both 0015) for the worker-side nearby/assigned queries, plus `(account_id, created_at DESC)` for `GET /problems/mine`, and a GIN index on `skill_categories` for the future "show open posts to matching workers" query.
 
 ### shop_orders / shop_order_items (Orders module — implemented)
-Migration `0021_shop_orders_favorites_shop_ratings.sql`. A list the customer sends to one shop; the flow and rules are in `docs/api.md`'s Orders Module.
+Migration `0021_shop_orders_favorites_shop_ratings.sql`. A list the customer sends to one shop; the flow and rules are in `docs/api.md`'s Orders Module. Migration `0061`: `shop_orders.list_photo_urls TEXT[]` (photos of a written list, up to 5) and `shop_order_items.added_by_shop BOOLEAN` (items the shop typed in while packing).
 
 | column | type | notes |
 |---|---|---|
@@ -308,3 +308,8 @@ Partial index `(category) WHERE is_active`. No admin review: a post is live as s
 ## Migration Policy
 
 All schema changes via versioned migration files in `database/migrations/`, never manual production edits. Every migration is additive/backward-compatible where possible; destructive changes require an explicit rollout plan noted in `docs/changelog.md`.
+
+### Migration 0064 — ad placement and who removed it
+
+- `ads.show_on` TEXT NOT NULL DEFAULT 'action' (`action` = full screen before key actions, `home` = Home slider, always horizontal).
+- `ads.deleted_by` TEXT (`owner` = withdrawn by the business, `admin` = removed by Triolo); filled in for ads deleted before it.

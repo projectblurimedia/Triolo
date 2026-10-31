@@ -43,6 +43,8 @@ export interface OrderItem {
   unit: string | null;
   status: OrderItemStatus;
   price: number | null;
+  /** Typed in by the shop, read from the list's photos. */
+  addedByShop?: boolean;
 }
 
 export interface CustomerOrder {
@@ -76,6 +78,8 @@ export interface CustomerOrder {
   cancelledAt: string | null;
   createdAt: string;
   items: OrderItem[];
+  /** Photos of the written list sent with the order. */
+  listPhotoUrls?: string[];
   shop: {
     name: string;
     photoUrl: string | null;
@@ -97,6 +101,7 @@ export interface CreateOrderParams {
   businessId: string;
   fulfillment: OrderFulfillment;
   items: { name: string; quantity: string; unit?: string | null }[];
+  listPhotoUrls?: string[];
   latitude: number;
   longitude: number;
   locationAddress?: string;
@@ -107,6 +112,7 @@ export interface CreateQuickOrderParams {
   shopCategories: string[];
   fulfillment: OrderFulfillment;
   items: { name: string; quantity: string; unit?: string | null }[];
+  listPhotoUrls?: string[];
   latitude: number;
   longitude: number;
   locationAddress?: string;
@@ -119,6 +125,12 @@ export function isFindingShop(order: Pick<CustomerOrder, 'quick' | 'businessId' 
 }
 
 export const ordersService = {
+  /** One photo of a written list, before the order is sent (one per request: Vercel caps bodies at 4.5 MB). */
+  uploadListPhoto: (photo: { uri: string; name: string; type: string }) => {
+    const formData = new FormData();
+    formData.append('photo', { uri: photo.uri, name: photo.name, type: photo.type } as unknown as Blob);
+    return apiClient.postForm<{ url: string }>('/orders/list-photos', formData);
+  },
   create: (params: CreateOrderParams) => apiClient.post<CustomerOrder>('/orders', params, true),
   /** Quick Order: to every matching shop nearby at once (404 QUICK_ORDER_NO_SHOPS when none). */
   createQuick: (params: CreateQuickOrderParams) => apiClient.post<CustomerOrder>('/orders/quick', params, true),

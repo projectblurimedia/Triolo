@@ -29,6 +29,7 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistance } from '@/utils/formatDistance';
 import { placeName } from '@/utils/formatAddress';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { GivenBackError } from '@/utils/afterAccept';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 const MODAL_HANDOFF_MS = 350;
@@ -144,11 +145,13 @@ function NearbyProblems({ onDone }: { onDone: () => void }) {
         setDetail(null);
         if (!tripId) return;
         // The job screen opens on top once this list closes.
-        await queryClient.prefetchQuery({ queryKey: jobQueryKey(tripId), queryFn: () => jobsService.get(tripId) }).catch(() => {});
+        await queryClient.prefetchQuery({ queryKey: jobQueryKey(tripId), queryFn: () => jobsService.get(tripId), staleTime: 15000 }).catch(() => {});
         onDone();
         setTimeout(() => openJob(tripId), MODAL_HANDOFF_MS);
       },
       onError: (err) => {
+        // Backed out of paying after accepting: it was given back (a toast said so).
+        if (err instanceof GivenBackError) return;
         const taken = err instanceof ApiError && err.code === 'PROBLEM_ALREADY_TAKEN';
         showToast(
           taken

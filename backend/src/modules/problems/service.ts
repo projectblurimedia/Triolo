@@ -47,6 +47,8 @@ export class ProblemsService implements BookingLifecycleListener {
     private readonly bookingsService: BookingsService,
     // Subscribed workers see new problems first (the head start).
     private readonly subscriptionStatus?: SubscriptionStatusService,
+    // Whether a partner-app ad spot is on (an ad after accepting, instead of the fee).
+    private readonly adSpotOn?: (spot: string) => Promise<boolean>,
   ) {}
 
   // --- Customer side ---
@@ -174,10 +176,12 @@ export class ProblemsService implements BookingLifecycleListener {
    */
   async acceptProblem(accountId: string, postId: string): Promise<ProblemPost> {
     const worker = await this.getVerifiedWorker(accountId);
-    const passId = (await this.subscriptionStatus?.usePartnerPass(accountId, 'accept', 'service')) ?? null;
+    // Accepting is instant and free; an ad or the fee comes after (on the trip it starts).
+    const unlockNeeded = this.subscriptionStatus
+      ? await this.subscriptionStatus.unlockNeeded(accountId, 'service', this.adSpotOn ? () => this.adSpotOn!('problem_accept') : undefined)
+      : null;
     const result = await this.repository.accept(postId, worker.id, accountId);
     if (!result) {
-      await this.subscriptionStatus?.restorePasses([], [passId]);
       if (!(await this.repository.exists(postId))) {
         throw AppError.notFound('Problem not found.', 'PROBLEM_POST_NOT_FOUND');
       }
@@ -198,14 +202,13 @@ export class ProblemsService implements BookingLifecycleListener {
         distanceMeters: distanceBetween(worker.latitude, worker.longitude, post.latitude, post.longitude),
         problemPostId: post.id,
         quotationAmount: post.quotationAmount,
+        unlockNeeded,
       });
       await this.repository.setBookingRequest(post.id, bookingRequestId);
     } catch (err) {
       await this.repository.reopen(post.id);
-      await this.subscriptionStatus?.restorePasses([], [passId]);
       throw err;
     }
-    await this.subscriptionStatus?.attachPass(passId, `accept-${post.id}`);
 
     await this.push(result, problemPushTemplates.accepted(result.notifyLanguage), 'problem_accepted', bookingRequestId);
     return { ...post, bookingRequestId };

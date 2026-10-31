@@ -14,7 +14,7 @@ import { JobPostHomeSection } from '@/components/JobPostHomeSection';
 import { useMyJobPost } from '@/hooks/useJobPost';
 import { ContinueSteps } from '@/components/ContinueSteps';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { useAdGate, useBusyAction } from '@/components/Ads';
+import { HomeAdCarousel, useBusyAction } from '@/components/Ads';
 import { LocationNeededCard } from '@/components/LocationNeededCard';
 import { BackgroundAlertsCard } from '@/components/BackgroundAlertsCard';
 import { FindJobsButton } from '@/components/FindJobsButton';
@@ -46,6 +46,8 @@ import { PullToRefresh } from '@/components/PullToRefresh';
 import { FindOrdersButton } from '@/components/FindOrdersButton';
 import { useAttentionCounts } from '@/hooks/useAttentionCounts';
 import { SmartImage } from '@/components/SmartImage';
+import { orderListText } from '@/utils/orderListText';
+import { GivenBackError } from '@/utils/afterAccept';
 
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const RECENT_LIMIT = 5;
@@ -73,8 +75,7 @@ function formatShortDate(iso: string): string {
 
 export function HomeScreen() {
   const { t } = useTranslation();
-  // Mark Work Done: location, then a local business's ad while that job's button spins.
-  const { adLoading, waitForAd } = useAdGate(true, 'work_done');
+  // Mark Work Done: location, then confirm (no ad here — ads come after accepting instead).
   const { run: runWorkDone } = useBusyAction();
   const [adForJob, setAdForJob] = useState<string | null>(null);
   const { colors } = useThemeColors();
@@ -142,11 +143,13 @@ export function HomeScreen() {
         }
         // Straight into the job screen (map, customer, Start Trip): load it first so it
         // opens filled in, open it on top, then close the detail screen underneath.
-        await queryClient.prefetchQuery({ queryKey: jobQueryKey(tripId), queryFn: () => jobsService.get(tripId) }).catch(() => {});
+        await queryClient.prefetchQuery({ queryKey: jobQueryKey(tripId), queryFn: () => jobsService.get(tripId), staleTime: 15000 }).catch(() => {});
         openJob(tripId);
         setTimeout(() => setDetailProblem(null), MODAL_HANDOFF_MS);
       },
       onError: (err) => {
+        // Backed out of paying after accepting: it was given back (a toast said so).
+        if (err instanceof GivenBackError) return;
         const alreadyTaken = err instanceof ApiError && err.code === 'PROBLEM_ALREADY_TAKEN';
         showToast(
           alreadyTaken
@@ -252,12 +255,10 @@ export function HomeScreen() {
               label={t('problems.markWorkDone')}
               onPress={() =>
                 runWorkDone(async () => {
-                  if (adLoading) return;
-                  // Spins from the tap (the location check can take a moment) until the ad is done.
+                  // Spins from the tap while the location check runs.
                   setAdForJob(job.id);
                   try {
-                    if (!(await askForLocation())) return;
-                    if (await waitForAd()) setConfirmDoneFor(job);
+                    if (await askForLocation()) setConfirmDoneFor(job);
                   } finally {
                     setAdForJob(null);
                   }
@@ -329,7 +330,7 @@ export function HomeScreen() {
     key: order.id,
     icon: order.fulfillment === 'delivery' ? 'truck' : 'basket-shopping',
     name: order.customerFullName,
-    stepTitle: [t('shopOrders.itemsCount', { count: order.items.length }), order.totalAmount != null ? formatRupees(order.totalAmount) : null]
+    stepTitle: [orderListText(t, order, 'shopOrders.itemsCount'), order.totalAmount != null ? formatRupees(order.totalAmount) : null]
       .filter(Boolean)
       .join(' · '),
     hint: formatShortDate(order.createdAt),
@@ -494,6 +495,8 @@ export function HomeScreen() {
             <Text style={[styles.greeting, styles.greetingTight, { color: colors.text }]}>{t('mainTabs.Home.greeting', { name: account.fullName })}</Text>
           ) : null}
           <HomeLocationBar />
+          {/* Local businesses' ads, sliding by (only when the admin turned it on). */}
+          <HomeAdCarousel />
 
           {/* Location off: say so first — nothing works without it. */}
           <LocationNeededCard />

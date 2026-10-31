@@ -35,6 +35,10 @@ function createMockRepository(): MockRepository {
     findRatedForWorker: jest.fn(),
     findStatuses: jest.fn(),
     expireStaleBroadcasts: jest.fn().mockResolvedValue([]),
+    findUnpaidAccepts: jest.fn().mockResolvedValue([]),
+    releaseAccept: jest.fn().mockResolvedValue(null),
+    unlock: jest.fn().mockResolvedValue(null),
+    customerTarget: jest.fn().mockResolvedValue(null),
     findWaitingForSameWork: jest.fn().mockResolvedValue(null),
     findWorkerContact: jest.fn(),
     findAccountName: jest.fn(),
@@ -234,7 +238,7 @@ describe('acceptOffer', () => {
     await service.acceptOffer('worker-account-1', 'request-1');
 
     const pin = repo.acceptOffer.mock.calls[0][2];
-    expect(repo.acceptOffer).toHaveBeenCalledWith('request-1', 'worker-1', expect.any(String));
+    expect(repo.acceptOffer).toHaveBeenCalledWith('request-1', 'worker-1', expect.any(String), null);
     expect(pin).toMatch(/^\d{4}$/);
     expect(notifications.notify).toHaveBeenCalledWith(
       'account-1',
@@ -761,6 +765,65 @@ describe('subscriptions', () => {
       { bookingRequestId: 'request-1', distanceMeters: 900, skillCategories: ['plumber'], accountId: 'worker-account-2', preferredLanguage: 'en' },
     ]);
     await service.releaseDueOffers();
+    expect(notifications.sendRawPush).toHaveBeenCalledWith(
+      'worker-account-2',
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ data: { kind: 'booking_offer', bookingRequestId: 'request-1' } }),
+    );
+  });
+});
+
+describe('accepting, then the ad or the fee', () => {
+  const win = () =>
+    repo.acceptOffer.mockResolvedValue({
+      won: true,
+      request: buildRequest({ status: 'accepted', acceptedWorkerId: 'worker-1' }),
+      customer: { accountId: 'account-1', preferredLanguage: 'en' },
+      losingWorkers: [],
+    });
+
+  it('accepts at once without a pass; the customer hears only after the fee is paid', async () => {
+    const status = {
+      unlockNeeded: jest.fn().mockResolvedValue('pay'),
+      usePartnerPass: jest.fn().mockResolvedValue('pass-1'),
+      attachPass: jest.fn(),
+      restorePasses: jest.fn(),
+    };
+    const paid = new BookingsService(repo as unknown as BookingsRepository, workers, notifications, status as never);
+    asWorker();
+    win();
+
+    await paid.acceptOffer('worker-account-1', 'request-1');
+    expect(repo.acceptOffer).toHaveBeenCalledWith('request-1', 'worker-1', expect.any(String), 'pay');
+    expect(status.usePartnerPass).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalled();
+
+    repo.findJobForWorker.mockResolvedValue({ ...buildRequest({ status: 'accepted' }), unlockNeeded: 'pay' });
+    repo.unlock.mockResolvedValue({ unlockNeeded: 'pay', problemPostId: null });
+    repo.customerTarget.mockResolvedValue({ accountId: 'account-1', preferredLanguage: 'en' });
+    await paid.unlockJob('worker-account-1', 'request-1', 'pay');
+    expect(status.usePartnerPass).toHaveBeenCalledWith('worker-account-1', 'accept', 'service');
+    expect(status.attachPass).toHaveBeenCalledWith('pass-1', 'accept-request-1');
+    expect(notifications.notify).toHaveBeenCalledWith('account-1', 'booking_accepted', expect.any(String), expect.any(String), expect.any(Object));
+  });
+
+  it('an ad opens the job only when an ad is what it needs', async () => {
+    asWorker();
+    repo.findJobForWorker.mockResolvedValue({ ...buildRequest({ status: 'accepted' }), unlockNeeded: 'pay' });
+    await expect(service.unlockJob('worker-account-1', 'request-1', 'ad')).rejects.toMatchObject({ code: 'UNLOCK_NEEDS_PAYMENT' });
+    expect(repo.unlock).not.toHaveBeenCalled();
+  });
+
+  it('giving it back re-offers a Quick Book to the workers asked before', async () => {
+    asWorker();
+    repo.releaseAccept.mockResolvedValue({
+      problemPostId: null,
+      reoffer: [{ accountId: 'worker-account-2', preferredLanguage: 'te', distanceMeters: 900 }],
+      request: buildRequest(),
+    });
+    await service.releaseJob('worker-account-1', 'request-1');
+    expect(repo.releaseAccept).toHaveBeenCalledWith('request-1', 'worker-1');
     expect(notifications.sendRawPush).toHaveBeenCalledWith(
       'worker-account-2',
       expect.any(String),

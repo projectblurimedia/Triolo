@@ -1,8 +1,11 @@
 import { Router } from 'express';
+import { AdsRepository } from '@/modules/ads/repository';
+import { AdsService } from '@/modules/ads/service';
 import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
 import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
+import { logUploadedFiles, upload } from '@/common/middleware/upload';
 import { validateBody } from '@/common/middleware/validate';
 import { AppError } from '@/common/errors/AppError';
 import { BusinessesRepository } from '@/modules/businesses/repository';
@@ -18,8 +21,12 @@ import { createOrderSchema, createQuickOrderSchema, customerCancelSchema, rateOr
 const notificationsService = new NotificationsService(new NotificationsRepository(pool));
 const businessesService = new BusinessesService(new BusinessesRepository(pool), notificationsService);
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
+// After accepting, an ad may come instead of the fee (the admin's partner ad spots).
+const adsService = new AdsService(new AdsRepository(pool));
 const controller = new OrdersController(
-  new OrdersService(new OrdersRepository(pool), businessesService, notificationsService, subscriptionStatus),
+  new OrdersService(new OrdersRepository(pool), businessesService, notificationsService, subscriptionStatus, (spot) =>
+    adsService.partnerSpotOn(spot),
+  ),
 );
 
 export const ordersRouter = Router();
@@ -42,7 +49,9 @@ ordersRouter.post('/staff/deliveries/:id/verify-pin', authenticate, validateBody
 ordersRouter.post('/shop/quick/search', authenticate, controller.searchQuick);
 ordersRouter.get('/shop/:id', authenticate, controller.getShop);
 
-// Customer side.
+// Customer side. A photo of a written list is uploaded first, one per request (Vercel caps a
+// request body at 4.5 MB), then sent with the order as listPhotoUrls.
+ordersRouter.post('/list-photos', authenticate, upload.single('photo'), logUploadedFiles, controller.uploadListPhoto);
 ordersRouter.post('/', authenticate, validateBody(createOrderSchema), controller.create);
 // Quick Order: to every matching shop nearby at once (registered before /:id).
 ordersRouter.post('/quick', authenticate, validateBody(createQuickOrderSchema), controller.createQuick);
@@ -53,6 +62,8 @@ ordersRouter.post('/:id/rate', authenticate, validateBody(rateOrderSchema), cont
 
 // Shop steps.
 ordersRouter.post('/:id/accept', authenticate, controller.accept);
+ordersRouter.post('/:id/unlock', authenticate, controller.unlock);
+ordersRouter.post('/:id/release', authenticate, controller.release);
 ordersRouter.post('/:id/decline', authenticate, validateBody(shopCancelSchema), controller.decline);
 ordersRouter.put('/:id/items', authenticate, validateBody(saveItemsSchema), controller.saveItems);
 ordersRouter.post('/:id/packed', authenticate, controller.packed);

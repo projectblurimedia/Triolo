@@ -15,6 +15,7 @@ import { PendingOffer } from '@/services/bookingOffersService';
 import { formatDistance } from '@/utils/formatDistance';
 import { jobQueryKey } from '@/hooks/useJobs';
 import { jobsService } from '@/services/jobsService';
+import { GivenBackError } from '@/utils/afterAccept';
 
 // Lets the job screen finish fading in on top before this one closes underneath it.
 const MODAL_HANDOFF_MS = 350;
@@ -93,7 +94,7 @@ export function IncomingJobModal() {
         // top, and only then close this screen underneath — opening and closing two native
         // modals in the same instant could leave the wrong one showing on Android.
         setHandingOff(true);
-        await queryClient.prefetchQuery({ queryKey: jobQueryKey(id), queryFn: () => jobsService.get(id) }).catch(() => {});
+        await queryClient.prefetchQuery({ queryKey: jobQueryKey(id), queryFn: () => jobsService.get(id), staleTime: 15000 }).catch(() => {});
         openJob(id);
         showToast({ variant: 'success', title: t('bookings.acceptedToastTitle'), message: t('bookings.acceptedToastMessage') });
         setTimeout(() => {
@@ -102,6 +103,8 @@ export function IncomingJobModal() {
         }, MODAL_HANDOFF_MS);
       },
       onError: (err) => {
+        // Backed out of paying after accepting: it was given back (a toast said so).
+        if (err instanceof GivenBackError) return;
         const alreadyTaken = err instanceof ApiError && err.code === 'BOOKING_ALREADY_TAKEN';
         showToast({
           variant: alreadyTaken ? 'info' : 'error',
