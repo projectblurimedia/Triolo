@@ -189,6 +189,8 @@ export interface PublicAd {
   showOn: AdShowOn;
   /** How long it shows before it can be closed: an image's set time, or the video's length. */
   durationSeconds: number;
+  /** Home slider: how long a picture stays before the next ad (the admin's setting). */
+  slideSeconds?: number;
 }
 
 export interface Ad extends PublicAd {

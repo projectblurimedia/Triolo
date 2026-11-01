@@ -5,7 +5,7 @@ import i18n from '@/localization/i18n';
 
 interface PayRequest {
   kind: PassKind;
-  /** staff_contact: the job post whose number it unlocks. */
+  /** job_post_viewer / profile_viewer: the person it unlocks. */
   targetId: string | null;
   /** accept: the side whose plan would have made it free (services or shop). */
   plan?: PartnerPlan;
@@ -45,11 +45,12 @@ export const usePayGateStore = create<PayGateState>((set, get) => ({
 export async function payIfNeeded(kind: PassKind, targetId: string | null = null, plan?: PartnerPlan): Promise<boolean> {
   try {
     const mine = await subscriptionsService.getMine();
-    // That side's plan covers accepting work, not job posts — each post is paid for on its own.
-    const onPlan = plan && mine.plans ? !!mine.plans[plan]?.active : !!mine.active;
-    if (!mine.enabled || (onPlan && kind !== 'job_post')) return true;
-    // A phone number is paid per person, so a spare pass never covers it.
-    const perPerson = (kind as string) === 'staff_contact';
+    // The plan that makes it free: job posts' own plan, else the side it's for (or All in One).
+    const side: PartnerPlan | undefined = kind === 'job_post' || kind === 'job_post_viewer' ? 'job_post' : plan;
+    const onPlan = side && mine.plans ? !!mine.plans[side]?.active : !!mine.active;
+    if (!mine.enabled || onPlan) return true;
+    // Seeing a viewer is paid per person, so a spare pass never covers it.
+    const perPerson = kind === 'job_post_viewer' || kind === 'profile_viewer';
     if (!perPerson && (mine.passes?.[kind] ?? 0) > 0) {
       // Paid before for one that didn't go ahead: say so, so it doesn't look free by mistake.
       showToast({ variant: 'info', title: i18n.t('payGate.paidEarlierTitle'), message: i18n.t(`payGate.paidEarlierMessage.${kind}`) });
@@ -57,7 +58,7 @@ export async function payIfNeeded(kind: PassKind, targetId: string | null = null
     }
     const amount = mine.fees?.[kind] ?? 0;
     if (amount <= 0 && !perPerson) return true;
-    return await new Promise<boolean>((resolve) => usePayGateStore.getState().open({ kind, targetId, plan, amount, resolve }));
+    return await new Promise<boolean>((resolve) => usePayGateStore.getState().open({ kind, targetId, plan: side, amount, resolve }));
   } catch {
     // Can't tell (offline): let the server decide; it answers PAYMENT_REQUIRED if needed.
     return true;

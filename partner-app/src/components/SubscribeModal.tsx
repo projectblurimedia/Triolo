@@ -138,12 +138,15 @@ export function SubscribeModal() {
         </GoldCard>
 
         <View style={[styles.perks, { backgroundColor: colors.surface, borderColor: `${GOLD_BORDER}80` }]}>
-          {PLAN_PERKS[plan].map((perk) => (
+          {PLAN_PERKS[plan]
+            // No head start set: that perk isn't offered.
+            .filter((perk) => (data.headStartSeconds ?? 30) > 0 || perk.key !== 'plans.perks.service.first')
+            .map((perk) => (
             <View key={perk.key} style={styles.perkRow}>
               <View style={[styles.perkIcon, { backgroundColor: `${GOLD_DEEP}22` }]}>
                 <FontAwesome6 name={perk.icon} size={14} color={GOLD_DEEP} solid />
               </View>
-              <Text style={[styles.perkText, { color: colors.text }]}>{t(perk.key)}</Text>
+              <Text style={[styles.perkText, { color: colors.text }]}>{t(perk.key, { seconds: data.headStartSeconds ?? 30 })}</Text>
               <FontAwesome6 name="circle-check" size={16} color={GOLD_DEEP} solid />
             </View>
           ))}

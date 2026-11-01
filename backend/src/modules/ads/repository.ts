@@ -592,7 +592,8 @@ export class AdsRepository {
            AND (a.latitude IS NULL OR ${DISTANCE_SQL} <= a.radius_km * 1000)
            AND ($1::boolean OR a.action_type NOT IN ('service', 'business', 'job_post'))
            AND (a.billing <> 'views' OR a.impressions < a.view_limit)
-           AND a.show_on = 'home'
+           -- The slider is a row of wide cards: tall ads (booked before this rule) never show.
+           AND a.show_on = 'home' AND a.orientation = 'horizontal'
          ORDER BY COALESCE(s.impressions, 0) ASC, random()
          LIMIT $4
        ),

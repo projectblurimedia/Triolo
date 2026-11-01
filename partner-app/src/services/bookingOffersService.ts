@@ -23,6 +23,8 @@ export interface OfferStats {
 
 export const bookingOffersService = {
   listMine: () => apiClient.get<PendingOffer[]>('/bookings/offers/mine', true),
+  /** This month's free Quick Book accepts without the services plan (null limit = no limit). */
+  quickLimit: () => apiClient.get<{ limit: number | null; used: number; remaining: number | null }>('/bookings/offers/limit', true),
   stats: (from?: string, to?: string) => {
     const query = [from ? `from=${encodeURIComponent(from)}` : '', to ? `to=${encodeURIComponent(to)}` : ''].filter(Boolean).join('&');
     return apiClient.get<OfferStats>(`/bookings/offers/stats${query ? `?${query}` : ''}`, true);

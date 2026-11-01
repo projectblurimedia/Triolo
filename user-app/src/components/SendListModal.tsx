@@ -33,7 +33,8 @@ import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { openNewList } from '@/navigation/navigationRef';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { useAdGate, useBusyAction } from './Ads';
+import { useBusyAction } from './Ads';
+import { shopKindLabels } from '@/utils/kindLabels';
 
 interface SendListModalProps {
   visible: boolean;
@@ -85,7 +86,7 @@ async function addressFor(latitude: number, longitude: number): Promise<string |
  */
 export function SendListModal({ visible, onClose, shop: preselected, listId: initialListId, onLeave }: SendListModalProps) {
   const { t } = useTranslation();
-  const orderFee = usePayHint('order');
+  const orderFee = usePayHint('shop_order');
   const { colors, isDark } = useThemeColors();
   const insets = useSafeAreaInsets();
   const lists = useListStore((state) => state.lists);
@@ -188,18 +189,16 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
 
   // Asking for location / showing the ad: a second tap must not send the list twice.
   const preparing = useRef(false);
-  const { adLoading, waitForAd } = useAdGate(visible, 'send_list');
   const { busy, run } = useBusyAction();
 
   const handleSend = async () => {
     if (!selected || sending || preparing.current) return;
     preparing.current = true;
     try {
-      // Location first, then a local business's ad (when one is running), then the order goes.
+      // Location first, then the order goes.
       if (!(await askForLocation())) return;
-      if (!(await waitForAd())) return;
       // No plan: pay once at this last step — or subscribe.
-      if (!(await payIfNeeded('order'))) return;
+      if (!(await payIfNeeded('shop_order'))) return;
     } finally {
       preparing.current = false;
     }
@@ -309,10 +308,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
 
   const renderShop = (item: BusinessNearbyResult) => {
     const active = selected?.id === item.id;
-    const categories = item.shopCategories
-      .filter((key) => key !== 'other')
-      .map((key) => t(`businessProfile.categories.${key}`))
-      .join(', ');
+    const categories = shopKindLabels(t, item).join(', ');
     return (
       <Pressable
         onPress={() => choose(item)}
@@ -460,7 +456,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
         <Button
           label={withFee(items.length > 0 ? t('sendList.send', { count: items.length }) : t('sendList.sendPhotos'), orderFee)}
           onPress={() => run(handleSend)}
-          loading={sending || adLoading || busy}
+          loading={sending || busy}
         />
       </View>
     );

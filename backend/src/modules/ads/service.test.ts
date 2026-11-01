@@ -8,6 +8,7 @@ import {
   deleteVideosFromCloudinary,
   listCloudinaryFiles,
   videoDurationSeconds,
+  mediaSize,
 } from '@/common/services/cloudinaryService';
 
 const OURS = 'https://res.cloudinary.com/demo/';
@@ -16,6 +17,8 @@ jest.mock('@/common/services/cloudinaryService', () => ({
   deleteVideosFromCloudinary: jest.fn(),
   signDirectUpload: jest.fn(),
   videoDurationSeconds: jest.fn().mockResolvedValue(12),
+  // Wide unless a test says otherwise.
+  mediaSize: jest.fn().mockResolvedValue({ width: 1280, height: 720 }),
   // The apps' phone-friendly URL; kept as-is here.
   playbackUrl: (url: string | null) => url,
   // …/upload/v1/triolo/ads/a.jpg → triolo/ads/a
@@ -164,6 +167,7 @@ function makeService(promotions?: { accountIdByMobile: jest.Mock; find: jest.Moc
     list: jest.fn(),
     summary: jest.fn(),
     pickAndCount: jest.fn().mockResolvedValue(AD),
+    pickManyAndCount: jest.fn().mockResolvedValue([AD]),
     recordClick: jest.fn(),
     updateOwned: jest.fn(),
     listOwned: jest.fn().mockResolvedValue([]),
@@ -178,85 +182,43 @@ function makeService(promotions?: { accountIdByMobile: jest.Mock; find: jest.Moc
 }
 
 describe('placementOn', () => {
-  it('needs the master switch', () => {
-    expect(placementOn({ ...SETTINGS, adsEnabled: false }, 'user', 'action')).toBe(false);
-  });
-
-  it('never shows the (removed) app-open ad', () => {
-    expect(placementOn(SETTINGS, 'user', 'launch')).toBe(false);
+  it('never shows a full-screen ad any more (only the Home slider)', () => {
+    expect(placementOn(SETTINGS, 'user', 'action', 'quick_book')).toBe(false);
+    expect(placementOn(SETTINGS, 'partner', 'action', 'find_jobs')).toBe(false);
     expect(placementOn(SETTINGS, 'partner', 'launch')).toBe(false);
-  });
-
-  it('checks each app, then each action', () => {
-    expect(placementOn(SETTINGS, 'partner', 'action')).toBe(true);
-    expect(placementOn({ ...SETTINGS, actionUser: false }, 'user', 'action', 'quick_book')).toBe(false);
-    expect(placementOn(SETTINGS, 'user', 'action', 'quick_book')).toBe(true);
-    expect(placementOn(SETTINGS, 'user', 'action', 'send_list')).toBe(false);
-    // A spot of the other app is never shown.
-    expect(placementOn(SETTINGS, 'user', 'action', 'work_done')).toBe(false);
-    // Retired partner spots stay off even when switched on.
-    expect(placementOn(SETTINGS, 'partner', 'action', 'work_done')).toBe(false);
-    expect(placementOn(SETTINGS, 'partner', 'action', 'find_jobs')).toBe(true);
   });
 });
 
 describe('AdsService', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('serves only what people see, passing on the last ad seen', async () => {
+  it('serves nothing full screen, for older app builds that still ask', async () => {
     const { service, repository } = makeService();
-    const ad = await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, 'ad-0');
-    expect(repository.pickAndCount).toHaveBeenCalledWith('ad-0', 16.7, 81.1, true);
-    expect(ad).toEqual({
-      id: 'ad-1',
-      title: AD.title,
-      description: AD.description,
-      imageUrl: AD.imageUrl,
-      imageUrls: AD.imageUrls,
-      videoUrl: AD.videoUrl,
-      orientation: 'vertical',
-      showOn: 'action',
-      durationSeconds: 5,
-      advertiserName: AD.advertiserName,
-      contactPhone: AD.advertiserPhone,
-      locationText: AD.locationText,
-      linkUrl: AD.linkUrl,
-      actionType: 'none',
-      destination: null,
-      promoted: null,
-      endDate: AD.endDate,
-    });
+    expect(await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null, { spot: 'quick_book' })).toBeNull();
+    expect(repository.pickAndCount).not.toHaveBeenCalled();
+  });
+
+  it("the Home slider shows only what people see, and nothing while it's switched off", async () => {
+    const { service, repository } = makeService();
+    const [ad] = await service.serveHome('user', { latitude: 16.7, longitude: 81.1 }, null);
+    expect(repository.pickManyAndCount).toHaveBeenCalledWith(16.7, 81.1, true, expect.any(Number));
+    expect(ad).toMatchObject({ id: 'ad-1', advertiserName: AD.advertiserName, actionType: 'none' });
     expect(ad).not.toHaveProperty('amount');
+    // The partner app never gets Triolo Partner profile ads.
+    repository.getSettings.mockResolvedValue({ ...SETTINGS, homePartner: true });
+    await service.serveHome('partner', { latitude: 16.7, longitude: 81.1 }, null);
+    expect(repository.pickManyAndCount).toHaveBeenLastCalledWith(16.7, 81.1, false, expect.any(Number));
+    repository.getSettings.mockResolvedValue({ ...SETTINGS, homeUser: false });
+    expect(await service.serveHome('user', { latitude: 16.7, longitude: 81.1 }, null)).toEqual([]);
   });
 
-  it('the partner app is never served Triolo Partner profile ads', async () => {
-    const { service, repository } = makeService();
-    await service.serve('partner', 'action', { latitude: 16.7, longitude: 81.1 }, null);
-    expect(repository.pickAndCount).toHaveBeenCalledWith(null, 16.7, 81.1, false);
-  });
-
-  it("keeps the admin's minimum gap between two ads for the same person", async () => {
-    const { service, repository } = makeService();
-    repository.getSettings.mockResolvedValue({ ...SETTINGS, actionGapSeconds: 1800 });
-    repository.sawActionAdWithin.mockResolvedValueOnce(true);
-    const viewer = { latitude: 16.7, longitude: 81.1 };
-    expect(await service.serve('user', 'action', viewer, null, { spot: 'quick_book', accountId: 'acc-1' })).toBeNull();
-    expect(repository.pickAndCount).not.toHaveBeenCalled();
-    await service.serve('user', 'action', viewer, null, { spot: 'quick_book', accountId: 'acc-1' });
-    expect(repository.sawActionAdWithin).toHaveBeenCalledWith('acc-1', 'user', 1800);
-    expect(repository.markActionAdShown).toHaveBeenCalledWith('acc-1', 'user');
-  });
-
-  it('serves nothing before an action the admin switched off', async () => {
-    const { service, repository } = makeService();
-    expect(await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null, { spot: 'send_list' })).toBeNull();
-    expect(repository.pickAndCount).not.toHaveBeenCalled();
-  });
-
-  it('serves nothing (and counts nothing) where ads are switched off', async () => {
-    const { service, repository } = makeService();
-    expect(await service.serve('partner', 'launch', { latitude: 16.7, longitude: 81.1 }, null)).toBeNull();
-    expect(repository.pickAndCount).not.toHaveBeenCalled();
+  it('refuses a tall picture or video and deletes it', async () => {
+    const { service } = makeService();
+    (mediaSize as jest.Mock).mockResolvedValueOnce({ width: 720, height: 1280 });
+    await expect(service.setMedia('ad-1', null, `${OURS}video/upload/v4/triolo/ads/tall.mp4`)).rejects.toMatchObject({
+      code: 'AD_MUST_BE_HORIZONTAL',
+    });
+    expect(deleteVideosFromCloudinary).toHaveBeenCalledWith([`${OURS}video/upload/v4/triolo/ads/tall.mp4`]);
   });
 
   it("books at the admin's current price and tidies the text", async () => {
@@ -575,20 +537,24 @@ describe('AdsService', () => {
     it('a served profile ad carries its profile card', async () => {
       const resolver = promotions();
       const { service, repository } = makeService(resolver);
-      repository.pickAndCount.mockResolvedValue({ ...AD, imageUrl: null, imageUrls: [], actionType: 'service', promoted: { kind: 'service', id: 'worker-1', name: 'Ravi' } });
-      const ad = await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null);
+      repository.pickManyAndCount.mockResolvedValue([
+        { ...AD, imageUrl: null, imageUrls: [], actionType: 'service', promoted: { kind: 'service', id: 'worker-1', name: 'Ravi' } },
+      ]);
+      const [ad] = await service.serveHome('user', { latitude: 16.7, longitude: 81.1 }, null);
       expect(resolver.card).toHaveBeenCalledWith('service', 'worker-1');
       expect(ad?.promotedCard).toMatchObject({ name: 'Ravi', tags: ['plumber'] });
     });
 
     it('apps get the action with the ad', async () => {
       const { service, repository } = makeService();
-      repository.pickAndCount.mockResolvedValue({
-        ...AD,
-        actionType: 'business',
-        promoted: { kind: 'business', id: 'shop-1', name: 'Sri Sai' },
-      });
-      const ad = await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null);
+      repository.pickManyAndCount.mockResolvedValue([
+        {
+          ...AD,
+          actionType: 'business',
+          promoted: { kind: 'business', id: 'shop-1', name: 'Sri Sai' },
+        },
+      ]);
+      const [ad] = await service.serveHome('user', { latitude: 16.7, longitude: 81.1 }, null);
       expect(ad).toMatchObject({ actionType: 'business', promoted: { kind: 'business', id: 'shop-1' }, destination: null });
     });
   });
@@ -683,32 +649,24 @@ describe('AdsService', () => {
 });
 
 describe('ads and subscriptions', () => {
-  it('a subscriber sees no ads', async () => {
+  it('a customer plan, or a partner\'s All in One, hides the slider', async () => {
     const { repository } = makeService();
+    repository.getSettings.mockResolvedValue({ ...SETTINGS, homePartner: true });
     const status = { isActive: jest.fn().mockResolvedValue(true) };
     const service = new AdsService(repository as unknown as AdsRepository, undefined, status as never);
-    expect(await service.serve('user', 'action', { latitude: 16.7, longitude: 81.1 }, null, { spot: 'quick_book', accountId: 'acc-1' })).toBeNull();
+    expect(await service.serveHome('user', { latitude: 16.7, longitude: 81.1 }, 'acc-1')).toEqual([]);
     expect(status.isActive).toHaveBeenCalledWith('acc-1', 'customer');
-    expect(repository.pickAndCount).not.toHaveBeenCalled();
-  });
-
-  it("a partner's plan takes ads off its own side only", async () => {
-    const { repository } = makeService();
-    // Only a Job Post plan.
-    const status = { isActive: jest.fn(async (_id: string, _audience: string, plan?: string) => plan === 'job_post') };
-    const service = new AdsService(repository as unknown as AdsRepository, undefined, status as never);
-    const here = { latitude: 16.7, longitude: 81.1 };
-    expect(await service.serve('partner', 'action', here, null, { spot: 'viewer_reveal', accountId: 'acc-1' })).toBeNull();
-    expect(await service.serve('partner', 'action', here, null, { spot: 'find_jobs', accountId: 'acc-1' })).not.toBeNull();
-    expect(status.isActive).toHaveBeenCalledWith('acc-1', 'partner', 'service');
+    expect(await service.serveHome('partner', { latitude: 16.7, longitude: 81.1 }, 'acc-1')).toEqual([]);
+    expect(status.isActive).toHaveBeenLastCalledWith('acc-1', 'partner', 'all');
+    expect(repository.pickManyAndCount).not.toHaveBeenCalled();
   });
 });
 
 describe('ads by views', () => {
-  it('a Home slider ad is always horizontal', async () => {
+  it('every ad is a wide Home slider ad', async () => {
     const { service, repository } = makeService();
     repository.create.mockImplementation(async (params: unknown, amount: number) => ({ ...AD, ...(params as object), amount }));
-    await service.create({ ...PARAMS, orientation: 'vertical', showOn: 'home' });
+    await service.create({ ...PARAMS, orientation: 'vertical', showOn: 'action' });
     expect(repository.create.mock.calls[0][0]).toMatchObject({ showOn: 'home', orientation: 'horizontal' });
   });
 

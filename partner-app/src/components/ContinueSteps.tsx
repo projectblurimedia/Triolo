@@ -8,17 +8,6 @@ import { ACTIVE_SHOP_STATUSES } from '@/services/shopOrdersService';
 import { openJob } from '@/state/jobFocusStore';
 import { openShopOrder } from '@/state/shopOrderFocusStore';
 import { orderListText } from '@/utils/orderListText';
-import { showAdBefore } from './Ads';
-
-/** The ad first (when one runs nearby), then the screen; settles once it's open or dropped. */
-function adThenOpen(open: () => void): Promise<void> {
-  return new Promise((resolve) =>
-    showAdBefore((go = true) => {
-      if (go) open();
-      resolve();
-    }, 'continue_card'),
-  );
-}
 
 interface Step {
   key: string;
@@ -28,7 +17,7 @@ interface Step {
   hint: string;
   createdAt: string;
   urgent: boolean;
-  onPress: () => Promise<void>;
+  onPress: () => void;
 }
 
 /**
@@ -56,8 +45,7 @@ export function ContinueSteps({ isShop, only }: { isShop: boolean; only?: 'jobs'
         createdAt: job.createdAt,
         // Waiting on the customer, not on you.
         urgent: job.status !== 'work_done',
-        // A local business's ad first (when one runs nearby), then the job.
-        onPress: () => adThenOpen(() => openJob(job.id)),
+        onPress: () => openJob(job.id),
       })),
     ...(isShop && only !== 'jobs' ? (orders.data ?? []) : [])
       // New ones are in "New for you" above; here only what is under way.
@@ -70,7 +58,7 @@ export function ContinueSteps({ isShop, only }: { isShop: boolean; only?: 'jobs'
         hint: t(`shopOrders.status.${order.status}.message`, { name: order.customerFullName }),
         createdAt: order.createdAt,
         urgent: order.status !== 'packed',
-        onPress: () => adThenOpen(() => openShopOrder(order.id)),
+        onPress: () => openShopOrder(order.id),
       })),
   ].sort((a, b) => Number(b.urgent) - Number(a.urgent) || b.createdAt.localeCompare(a.createdAt));
 
@@ -84,6 +72,6 @@ export function ContinueSteps({ isShop, only }: { isShop: boolean; only?: 'jobs'
     action: t('continueSteps.continue'),
     onPress: step.onPress,
   }));
-  // At the top of Home: room below it, not above.
-  return <StepStack title={t('continueSteps.title')} steps={stack} minimized style={{ marginTop: 0, marginBottom: 14 }} />;
+  // The next section heading brings its own gap above it, so none is added here (same gaps as every section).
+  return <StepStack title={t('continueSteps.title')} steps={stack} minimized style={{ marginTop: 0, marginBottom: 0 }} />;
 }

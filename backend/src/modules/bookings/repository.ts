@@ -207,6 +207,16 @@ export class BookingsRepository {
     });
   }
 
+  /** Jobs this worker accepted this month (India time): Quick Book, personal bookings and problems. */
+  async countAcceptsThisMonth(workerId: string): Promise<number> {
+    const result = await this.pool.query(
+      `SELECT count(*)::int AS n FROM booking_requests
+       WHERE accepted_worker_id = $1 AND status <> 'broadcasting' AND accepted_at >= (date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata')`,
+      [workerId],
+    );
+    return result.rows[0].n;
+  }
+
   async findStatuses(ids: string[]): Promise<Map<string, BookingRequestStatus>> {
     const statuses = new Map<string, BookingRequestStatus>();
     if (ids.length === 0) return statuses;

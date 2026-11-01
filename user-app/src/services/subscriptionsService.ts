@@ -2,7 +2,8 @@ import { apiClient } from './apiClient';
 
 export type SubscriptionPrices = Record<'1' | '3' | '6' | '12', number>;
 /** One paid use (customers): a booking, an order, or a job seeker's phone number. */
-export type PassKind = 'book' | 'order' | 'staff_contact';
+/** One paid use of one action: each has its own price, set by the admin. */
+export type PassKind = 'quick_book' | 'direct_book' | 'quick_order' | 'shop_order' | 'post_problem' | 'staff_contact';
 export type BadgeKind = 'service' | 'business' | 'job_post';
 export const SUBSCRIPTION_MONTHS = [1, 3, 6, 12] as const;
 
@@ -17,6 +18,14 @@ export interface MySubscription {
   fees: Record<string, number>;
   /** Paid uses not used yet, per kind. */
   passes: Record<string, number>;
+  /** Free uses this month without a plan: bookings (incl. problem posts) and orders each have their own. */
+  freeUses?: { bookings: { limit: number; used: number } | null; orders: { limit: number; used: number } | null } | null;
+}
+
+/** Which monthly free uses an action takes from. */
+export function freeUseFor(mine: MySubscription, kind: PassKind): { limit: number; used: number } | null {
+  if (kind === 'staff_contact' || !mine.freeUses) return null;
+  return (kind === 'quick_order' || kind === 'shop_order' ? mine.freeUses.orders : mine.freeUses.bookings) ?? null;
 }
 
 export interface PassCheckout {

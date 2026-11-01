@@ -7,15 +7,13 @@ import { RatingStars } from './RatingStars';
 import { BusinessNearbyResult } from '@/services/businessesService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
+import { shopKindLabels } from '@/utils/kindLabels';
 
 /** Compact shop card for horizontal carousels (Home's marketplace row). */
 export function ShopMiniCard({ shop, onPress }: { shop: BusinessNearbyResult; onPress: () => void }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const categories = shop.shopCategories
-    .filter((key) => key !== 'other')
-    .map((key) => t(`businessProfile.categories.${key}`))
-    .join(', ');
+  const categories = shopKindLabels(t, shop).join(', ');
 
   return (
     <Pressable onPress={onPress} style={[miniCardStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

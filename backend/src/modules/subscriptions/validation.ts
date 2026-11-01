@@ -25,18 +25,31 @@ export const subscriptionSettingsSchema = z
     partnerPrices: prices,
     partnerPlanPrices: z.object({ service: prices, shop: prices, job_post: prices }),
     headStartSeconds: z.number().int().min(0).max(600),
+    // Free Quick Book / Quick Order accepts a month without a plan; null = no limit.
+    quickBookLimit: z.number().int().min(0).max(10000).nullable(),
+    quickOrderLimit: z.number().int().min(0).max(10000).nullable(),
+    // Free customer bookings (and problem posts) / orders a month without a plan; null = none.
+    customerFreeBookings: z.number().int().min(0).max(1000).nullable(),
+    customerFreeOrders: z.number().int().min(0).max(1000).nullable(),
     badgeEnabled: z.boolean(),
     badgePrice: price,
     badgeMinRating: z.number().min(1).max(5),
     badgeMinRatings: z.number().int().min(1).max(100),
-    customerFees: z.object({ book: price, order: price, staffContact: price }),
-    partnerFees: z.object({ accept: price, jobPost: price }),
+    customerFees: z.object({
+      quickBook: price,
+      directBook: price,
+      quickOrder: price,
+      shopOrder: price,
+      postProblem: price,
+      staffContact: price,
+    }),
+    partnerFees: z.object({ accept: price, jobPost: price, jobPostViewer: price, profileViewer: price }),
   })
   .partial();
 
 export const passCheckoutSchema = z.object({
   kind: z.enum(PASS_KINDS),
-  // staff_contact: the job post whose phone number it unlocks.
+  // staff_contact: the job post whose phone number it unlocks; job_post_viewer / profile_viewer: who.
   targetId: z.string().uuid().optional(),
   // accept: which side's plan would make it free (services for jobs, shop for orders).
   plan: z.enum(PARTNER_PLANS).optional(),

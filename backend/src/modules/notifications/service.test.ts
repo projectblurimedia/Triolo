@@ -1,4 +1,4 @@
-import { NotificationsService, setProfileViewerReveal } from './service';
+import { NotificationsService, setProfileViewerAccess } from './service';
 import { NotificationsRepository } from './repository';
 import { AppNotification } from './interfaces';
 import * as pushSender from './pushSender';
@@ -108,7 +108,7 @@ describe('NotificationsService.listForAccount', () => {
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await expect(service.listForAccount('account-1')).resolves.toEqual({
-      items: [{ ...buildNotification(), createdAt: expect.any(Date), viewer: null }],
+      items: [{ ...buildNotification(), createdAt: expect.any(Date), viewer: null, locked: true }],
       unreadCount: 1,
     });
     expect(repo.findForAccount).toHaveBeenCalledWith('account-1', 50);
@@ -294,11 +294,12 @@ describe('push tokens per app', () => {
   });
 });
 
-describe('NotificationsService — who viewed (subscribed partners)', () => {
-  afterEach(() => setProfileViewerReveal(async () => false));
+describe('NotificationsService — who viewed', () => {
+  const hidden = { reveals: async () => false, unlocked: async () => new Set<string>() };
+  afterEach(() => setProfileViewerAccess(hidden));
 
-  it('a subscribed partner sees the viewer’s name, never their number', async () => {
-    setProfileViewerReveal(async () => true);
+  it('on the plan (or with plans off) the partner sees who viewed, with their number', async () => {
+    setProfileViewerAccess({ ...hidden, reveals: async () => true });
     const repo = createMockRepository();
     repo.findForAccount.mockResolvedValue({
       items: [{ ...buildNotification(), actorAccountId: 'viewer-1', actorName: 'Haritha Kotha', actorMobile: '9491754784' }],
@@ -306,12 +307,28 @@ describe('NotificationsService — who viewed (subscribed partners)', () => {
     });
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
     const list = await service.listForAccount('account-1');
-    expect(list.items[0]).toMatchObject({ title: 'Haritha Kotha viewed your profile', viewer: { name: 'Haritha Kotha' } });
-    expect(JSON.stringify(list.items[0])).not.toContain('9491754784');
+    expect(list.items[0]).toMatchObject({
+      title: 'Haritha Kotha viewed your profile',
+      viewer: { name: 'Haritha Kotha', mobile: '9491754784' },
+      locked: false,
+    });
     expect(list.items[0]).not.toHaveProperty('actorMobile');
   });
 
-  it('without a subscription the viewer stays hidden', async () => {
+  it('a viewer paid for one by one shows without the plan', async () => {
+    const notification = buildNotification();
+    setProfileViewerAccess({ ...hidden, unlocked: async () => new Set([notification.id]) });
+    const repo = createMockRepository();
+    repo.findForAccount.mockResolvedValue({
+      items: [{ ...notification, actorAccountId: 'viewer-1', actorName: 'Haritha Kotha', actorMobile: '9491754784' }],
+      unreadCount: 1,
+    });
+    const service = new NotificationsService(repo as unknown as NotificationsRepository);
+    const list = await service.listForAccount('account-1');
+    expect(list.items[0]).toMatchObject({ viewer: { name: 'Haritha Kotha', mobile: '9491754784' }, locked: false });
+  });
+
+  it('without the plan the viewer stays hidden (locked)', async () => {
     const repo = createMockRepository();
     repo.findForAccount.mockResolvedValue({
       items: [{ ...buildNotification(), actorAccountId: 'viewer-1', actorName: 'Haritha Kotha', actorMobile: '9491754784' }],
@@ -319,7 +336,7 @@ describe('NotificationsService — who viewed (subscribed partners)', () => {
     });
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
     const list = await service.listForAccount('account-1');
-    expect(list.items[0]).toMatchObject({ title: 'Profile Viewed', viewer: null });
+    expect(list.items[0]).toMatchObject({ title: 'Profile Viewed', viewer: null, locked: true });
   });
 
   it('a new job goes to a pop-up-capable phone as data, to an older build as a notification', async () => {

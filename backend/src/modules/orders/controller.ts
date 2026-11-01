@@ -93,6 +93,11 @@ export class OrdersController {
     return ok(res, await this.service.listShopOrders(requireAccountId(req)));
   });
 
+  /** This month's free Quick Order accepts (without the shop plan). */
+  getQuickAcceptStatus = asyncHandler(async (req: Request, res: Response) => {
+    return ok(res, await this.service.quickAcceptStatus(requireAccountId(req)));
+  });
+
   searchQuick = asyncHandler(async (req: Request, res: Response) => {
     return ok(res, await this.service.searchOpenQuickOrders(requireAccountId(req)));
   });

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import {
+  faArrowsLeftRight,
   faBullhorn,
   faCircleCheck,
   faCalendarDays,
@@ -35,7 +36,6 @@ import {
   faScrewdriverWrench,
   faImages,
 } from '@fortawesome/free-solid-svg-icons';
-import { AdShowOnPicker, showOnLabel } from '@/components/AdShowOnPicker';
 import { Topbar } from '@/components/Layout';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Dropdown, DropdownOption } from '@/components/Dropdown';
@@ -255,17 +255,13 @@ const AD_APPS: {
   },
 ];
 
+// How long each picture ad stays in the Home slider before the next one (a video stays until it ends).
 const AD_GAP_OPTIONS: DropdownOption<string>[] = [
-  { value: '0', label: 'No gap', description: 'Every switched-on action can show an ad' },
+  { value: '5', label: '5 seconds' },
+  { value: '10', label: '10 seconds' },
+  { value: '15', label: '15 seconds' },
+  { value: '20', label: '20 seconds' },
   { value: '30', label: '30 seconds' },
-  { value: '60', label: '1 minute' },
-  { value: '300', label: '5 minutes' },
-  { value: '900', label: '15 minutes' },
-  { value: '1800', label: '30 minutes' },
-  { value: '3600', label: '1 hour' },
-  { value: '10800', label: '3 hours' },
-  { value: '43200', label: '12 hours' },
-  { value: '86400', label: '1 day' },
 ];
 
 /** "On" / "Off" next to a switch, so it's clear what it's set to. */
@@ -295,7 +291,7 @@ function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange
   };
 
   const off = !settings.adsEnabled;
-  const gapValue = String(settings.actionGapSeconds ?? 0);
+  const gapValue = String(settings.actionGapSeconds || 5);
   const gapOptions = AD_GAP_OPTIONS.some((option) => option.value === gapValue)
     ? AD_GAP_OPTIONS
     : [...AD_GAP_OPTIONS, { value: gapValue, label: `${gapValue} seconds` }];
@@ -314,7 +310,7 @@ function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange
           <div className="ad-master-sub">
             {off
               ? 'No ads are shown anywhere. Turn on to choose where below.'
-              : 'Full screen, only before the actions switched on below — never when an app opens.'}
+              : 'Only in the Home slider of the apps switched on below — never full screen.'}
           </div>
         </div>
         {saving ? <Spinner small /> : null}
@@ -322,59 +318,20 @@ function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange
       </div>
 
       <div className={`ad-spots${off ? ' disabled' : ''}`}>
-        {AD_APPS.map((app) => {
-          const appOn = settings[app.setting];
-          return (
-            <div key={app.setting} className="ad-app">
-              <div className="ad-app-head">
-                <span className="ad-app-icon" style={{ background: app.gradient }}>
-                  <FontAwesomeIcon icon={app.icon} />
-                </span>
-                <span className="ad-app-text">
-                  <strong>{app.label}</strong>
-                  <small>{app.note}</small>
-                </span>
-                <StatePill on={appOn && !off} />
-                <Switch checked={appOn} disabled={off} onChange={(value) => save({ [app.setting]: value })} />
-              </div>
-              {/* The Home carousel: on its own (not one of the actions above). */}
-              <label className={`ad-spot-row ad-home-row${settings[app.home] && !off ? ' on' : ''}`}>
-                <span className="ad-spot-icon" style={{ background: 'linear-gradient(135deg,#ea580c,#f59e0b)' }}>
-                  <FontAwesomeIcon icon={faImages} />
-                </span>
-                <span className="ad-spot-text">
-                  <strong>Home carousel</strong>
-                  <small>Ads slide by at the top of Home (subscribers see none)</small>
-                </span>
-                <StatePill on={settings[app.home] && !off} onLabel="Showing" offLabel="Off" />
-                <Switch checked={settings[app.home]} disabled={off} onChange={(value) => save({ [app.home]: value })} />
-              </label>
-              <div className={`ad-spot-list${appOn ? '' : ' disabled'}`}>
-                {app.spots.map((item) => {
-                  const spotOn = settings.spots?.[item.spot] !== false;
-                  const showing = spotOn && appOn && !off;
-                  return (
-                    <label key={item.spot} className={`ad-spot-row${showing ? ' on' : ''}`}>
-                      <span className="ad-spot-icon" style={{ background: item.gradient }}>
-                        <FontAwesomeIcon icon={item.icon} />
-                      </span>
-                      <span className="ad-spot-text">
-                        <strong>{item.label}</strong>
-                        <small>{item.note}</small>
-                      </span>
-                      <StatePill on={showing} onLabel="Ad shows" offLabel="No ad" />
-                      <Switch
-                        checked={spotOn}
-                        disabled={off || !appOn}
-                        onChange={(value) => save({ spots: { [item.spot]: value } as Record<AdSpot, boolean> })}
-                      />
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+        {AD_APPS.map((app) => (
+          // Each app's Home slider: wide ads slide by at the top of Home.
+          <label key={app.home} className={`ad-spot-row ad-home-row${settings[app.home] && !off ? ' on' : ''}`}>
+            <span className="ad-spot-icon" style={{ background: app.gradient }}>
+              <FontAwesomeIcon icon={app.icon} />
+            </span>
+            <span className="ad-spot-text">
+              <strong>{app.label} — Home slider</strong>
+              <small>Wide ads slide by at the top of Home (subscribers see none)</small>
+            </span>
+            <StatePill on={settings[app.home] && !off} onLabel="Showing" offLabel="Off" />
+            <Switch checked={settings[app.home]} disabled={off} onChange={(value) => save({ [app.home]: value })} />
+          </label>
+        ))}
 
         <div className="ad-gap-box">
           <div className="ad-gap-head">
@@ -382,21 +339,18 @@ function AdSettingsCard({ settings, onChange }: { settings: AdSettings; onChange
               <FontAwesomeIcon icon={faClock} />
             </span>
             <span className="ad-spot-text">
-              <strong>Minimum gap between ads</strong>
-              <small>For the same person, in each app</small>
+              <strong>Time between ads</strong>
+              <small>How long each picture stays in the Home slider</small>
             </span>
           </div>
           <Dropdown
             value={gapValue}
             options={gapOptions}
             onChange={(value) => save({ actionGapSeconds: Number(value) })}
-            title="Minimum gap between ads"
+            title="Time between ads"
             disabled={off}
           />
-          <small className="muted ad-gap-note">
-            Someone who just saw an ad isn't shown another until this much time has passed. A flow started from an ad's own
-            Book Now / Order / Contact never shows another ad.
-          </small>
+          <small className="muted ad-gap-note">A video ad stays until it has played, then the slider moves on.</small>
         </div>
       </div>
     </div>
@@ -456,7 +410,7 @@ function AdPricesCard({
   return (
     <div className="glass card">
       <div className="card-title">
-        <FontAwesomeIcon icon={faReceipt} /> Prices
+        <FontAwesomeIcon icon={faReceipt} /> Home slider prices
       </div>
       <div className="ad-prices">
         {AD_PLANS.map((plan) => (
@@ -628,7 +582,7 @@ export function AdsPage() {
                 <div className="row-main">
                   <div className="row-title">{ad.title}</div>
                   <div className="row-sub">
-                    {ad.advertiserName} · {showOnLabel(ad.showOn)} · {adPlanText(ad)} · {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
+                    {ad.advertiserName} · {adPlanText(ad)} · {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}
                   </div>
                 </div>
                 <div className="row-side">
@@ -664,7 +618,7 @@ const EMPTY_FORM: AdFormValues = {
   advertiserName: '',
   description: '',
   orientation: 'vertical',
-  showOn: 'action',
+  showOn: 'home',
   displaySeconds: 15,
   planDays: 7,
   billing: 'days',
@@ -722,7 +676,7 @@ function AdForm({ ad }: { ad?: Ad }) {
           advertiserName: ad.advertiserName,
           description: ad.description ?? '',
           orientation: ad.orientation,
-          showOn: ad.showOn ?? 'action',
+          showOn: 'home',
           displaySeconds: ad.displaySeconds,
           planDays: ad.billing === 'views' ? 7 : (ad.planDays as AdPlanDays),
           billing: ad.billing ?? 'days',
@@ -811,16 +765,14 @@ function AdForm({ ad }: { ad?: Ad }) {
           `That video is ${Math.round(info.seconds ?? 0)} seconds. Ads can be at most ${AD_MAX_VIDEO_SECONDS} seconds.`,
         );
       }
+      // Only wide files: a tall (or square) one isn't taken at all.
+      if (info.width && info.height && info.height >= info.width) return setError('That picture or video is tall. Only horizontal (wide, 16:9) ones can be used — choose another.');
       setError('');
       if (media?.file) URL.revokeObjectURL(media.url);
       setMedia({ kind: info.kind, url: URL.createObjectURL(file), file, seconds: info.seconds });
       upload.current = null;
       setMediaStatus(null);
-      // Taller than wide → vertical, else horizontal (can still be changed below).
-      if (info.width && info.height) set('orientation', info.height > info.width ? 'vertical' : 'horizontal');
-      if (form.showOn === 'home' && info.width && info.height && info.height > info.width) {
-        setError('The Home slider needs a wide (horizontal, 16:9) image or video. This one is tall — fine for "Before actions".');
-      }
+      set('orientation', 'horizontal');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That file could not be read.');
     }
@@ -854,8 +806,8 @@ function AdForm({ ad }: { ad?: Ad }) {
     if (actionError) return setError(actionError);
     if (!promotesProfile(action) && form.advertiserName.trim().length < 2) return setError('Enter the business name.');
     if (!promotesProfile(action) && !media) return setError('Add the ad: one image or one video.');
-    if (form.showOn === 'home' && !promotesProfile(action) && form.orientation === 'vertical') {
-      return setError('The Home slider needs a wide (horizontal, 16:9) image or video. Choose a wide one, or "Before actions".');
+    if (!promotesProfile(action) && media?.file === undefined && form.orientation === 'vertical') {
+      return setError('This ad is tall. Choose a horizontal (wide, 16:9) image or video for the Home slider.');
     }
     if (!form.startDate) return setError('Choose a start date.');
     setError('');
@@ -871,7 +823,8 @@ function AdForm({ ad }: { ad?: Ad }) {
         advertiserName: promotesProfile(action) ? undefined : form.advertiserName,
         ...uploaded,
         ...actionBody(action),
-        orientation: form.showOn === 'home' ? 'horizontal' : form.orientation,
+        orientation: 'horizontal',
+        showOn: 'home',
       };
       const saved = ad ? await adsApi.update(ad.id, body) : await adsApi.create(body);
       showToast({
@@ -921,10 +874,6 @@ function AdForm({ ad }: { ad?: Ad }) {
         <div className="card-title" style={{ marginTop: 10 }}>
           <FontAwesomeIcon icon={faBullhorn} /> The ad
         </div>
-        <div className="field">
-          <span>Where it shows *</span>
-          <AdShowOnPicker value={form.showOn} onChange={(value) => set('showOn', value)} disabled={saving} />
-        </div>
         {promotesProfile(action) ? (
           <div className="profile-ad-note">
             <FontAwesomeIcon icon={faIdBadge} />
@@ -937,6 +886,14 @@ function AdForm({ ad }: { ad?: Ad }) {
         ) : (
         <div className="field">
           <span>Image or video * (one)</span>
+          {/* Said before choosing: the Home slider takes only wide pictures and videos. */}
+          <div className="wide-only">
+            <FontAwesomeIcon icon={faArrowsLeftRight} />
+            <span>
+              <strong>Horizontal only (16:9).</strong> Ads show as wide cards in the Home slider — tall pictures and videos
+              can't be chosen.
+            </span>
+          </div>
           <div className="ad-image-pick">
             {media ? (
               <div className={`ad-frame ${form.orientation}`}>
@@ -959,7 +916,7 @@ function AdForm({ ad }: { ad?: Ad }) {
             ) : null}
             {media ? (
               <span className="muted" style={{ fontSize: 12 }}>
-                {form.orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'} — from the file's shape
+                {form.orientation === 'vertical' ? 'Tall — choose a wide one instead' : 'Horizontal (16:9)'}
               </span>
             ) : null}
             {media?.file && !mediaStatus ? (
@@ -981,7 +938,7 @@ function AdForm({ ad }: { ad?: Ad }) {
             <span className="muted" style={{ fontSize: 12 }}>
               Image: JPG / PNG up to {AD_MAX_IMAGE_MB} MB. Video: up to {AD_MAX_VIDEO_SECONDS} seconds and {AD_MAX_VIDEO_MB} MB.
               Play it here first — nothing is uploaded until you save, and then it goes up exactly as it is (keep this tab open
-              until it finishes). Vertical or horizontal is worked out from its shape.
+              until it finishes).
             </span>
           </div>
         </div>
@@ -1326,10 +1283,8 @@ export function AdDetailPage() {
           ) : null}
           <h3 style={{ margin: '14px 0 4px' }}>{ad.advertiserName}</h3>
           <div className="muted" style={{ fontSize: 13 }}>
-            {showOnLabel(ad.showOn)} · {ad.orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'}
-            {ad.showOn === 'home'
-              ? ' · slides by itself at the top of Home'
-              : ` · ${ad.videoUrl ? `video, ${ad.durationSeconds} s` : `image, shown ${ad.displaySeconds} s`} before it can be closed`}
+            Home slider · {ad.orientation === 'vertical' ? 'Tall (not shown — only wide ads show now)' : 'Horizontal (16:9)'}
+            {ad.videoUrl ? ` · video, ${ad.durationSeconds} s` : ''}
           </div>
           <div className="info">
             {ad.description ? (

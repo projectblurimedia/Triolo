@@ -313,3 +313,17 @@ All schema changes via versioned migration files in `database/migrations/`, neve
 
 - `ads.show_on` TEXT NOT NULL DEFAULT 'action' (`action` = full screen before key actions, `home` = Home slider, always horizontal).
 - `ads.deleted_by` TEXT (`owner` = withdrawn by the business, `admin` = removed by Triolo); filled in for ads deleted before it.
+
+### Migration 0065 — fees per action, monthly limits, Home slider ads
+
+- `pay_passes.kind`: `quick_book`, `direct_book`, `quick_order`, `shop_order`, `post_problem`, `staff_contact`, `accept`, `job_post`, `job_post_viewer`, `profile_viewer` (old `book` → `quick_book`, `order` → `shop_order`).
+- `subscription_settings.customer_fees` / `partner_fees` rebuilt with one key per action; new `quick_book_limit`, `quick_order_limit` (INT, NULL = no limit).
+- `ads.show_on` is `home` for every ad (default `home`).
+
+### Migration 0066 — free uses for customers
+
+- `subscription_settings.customer_free_uses` INT (NULL = none): bookings / orders / problem posts free each month for customers without a plan. Free uses are ₹0 `pay_passes` with `razorpay_payment_id` starting `month-free-`.
+
+### Migration 0067 — customer free bookings / orders
+
+- `subscription_settings.customer_free_bookings`, `customer_free_orders` (INT, NULL = none), copied from `customer_free_uses` (now unused).

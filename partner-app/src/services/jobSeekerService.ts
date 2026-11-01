@@ -65,18 +65,22 @@ export interface JobPost {
 
 /** Someone who opened one of my job posts. */
 export interface JobPostViewer {
+  /** Paying to see this person unlocks it. */
   viewerKey: string;
-  /** Hidden (null) without the job post plan. */
+  /** Hidden (null) while locked. */
   name: string | null;
   mobile: string | null;
+  /** Without the job post plan, until paid for. */
+  locked?: boolean;
   lastViewedAt: string;
   times: number;
   isNew: boolean;
 }
 
 export interface JobPostViewers {
-  /** open: shown; ad: shown after an ad (subscriptions off); plan: on the job post plan only. */
+  /** open: everyone shown; plan: each one locked until paid for, or the job post plan. */
   access?: 'open' | 'ad' | 'plan';
+  /** Some are still locked. */
   locked: boolean;
   total: number;
   newCount: number;
@@ -113,6 +117,6 @@ export const jobSeekerService = {
   },
   removePhoto: (id: string) => apiClient.delete<JobPost>(`/job-seekers/me/posts/${id}/photo`, true),
   /** `revealed`: asked again once the app showed the ad (subscriptions off). */
-  viewers: (id: string, revealed = false) => apiClient.get<JobPostViewers>(`/job-seekers/me/posts/${id}/viewers${revealed ? '?revealed=1' : ''}`, true),
+  viewers: (id: string) => apiClient.get<JobPostViewers>(`/job-seekers/me/posts/${id}/viewers`, true),
   markViewsSeen: (id: string) => apiClient.post<null>(`/job-seekers/me/posts/${id}/viewers/seen`, undefined, true),
 };

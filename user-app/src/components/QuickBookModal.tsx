@@ -22,7 +22,7 @@ import { showToast } from '@/state/toastStore';
 import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { ensureLocation } from '@/state/locationStore';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { useAdGate, useBusyAction } from './Ads';
+import { useBusyAction } from './Ads';
 import { ServiceOrbit } from './ServiceOrbit';
 import { findWaitingQuickBook, waitingBookingIdFrom } from '@/utils/waitingBooking';
 
@@ -69,14 +69,13 @@ export async function addressFor(latitude: number, longitude: number): Promise<s
  */
 export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
   const { t } = useTranslation();
-  const bookFee = usePayHint('book');
+  const bookFee = usePayHint('quick_book');
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   // Asking for location / showing the ad: a second tap must not start a second booking.
   const preparing = useRef(false);
-  const { adLoading, waitForAd } = useAdGate(visible, 'quick_book');
   const { busy, run } = useBusyAction();
   const queryClient = useQueryClient();
 
@@ -106,13 +105,10 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
     }
     preparing.current = true;
     try {
-      // Location first — before anything else — so nothing starts that would only stop. Then a
-      // local business's ad (when one is running nearby), and only then the search.
+      // Location first — before anything else — so nothing starts that would only stop.
       if (!(await askForLocation())) return;
-      // The button shows its spinner while the ad loads.
-      if (!(await waitForAd())) return;
       // No plan: pay once (the admin's fee) at this last step — or subscribe.
-      if (!(await payIfNeeded('book'))) return;
+      if (!(await payIfNeeded('quick_book'))) return;
     } finally {
       preparing.current = false;
     }
@@ -256,7 +252,7 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
           <Button
             label={withFee(t('quickBook.bookNearby'), bookFee)}
             onPress={() => run(handleBookNearby)}
-            loading={submitting || adLoading || busy}
+            loading={submitting || busy}
             disabled={selectedSkills.length === 0}
           />
         </View>

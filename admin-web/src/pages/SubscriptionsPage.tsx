@@ -4,6 +4,8 @@ import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import {
   faBolt,
   faCrown,
+  faGaugeHigh,
+  faGift,
   faHandshake,
   faIndianRupeeSign,
   faMobileScreen,
@@ -40,6 +42,8 @@ const KIND_LABEL = { service: 'Worker (services)', business: 'Shop', job_post: '
 
 const HEAD_START_OPTIONS: DropdownOption<string>[] = [
   { value: '0', label: 'No head start', description: 'Everyone hears at the same time' },
+  { value: '5', label: '5 seconds' },
+  { value: '10', label: '10 seconds' },
   { value: '15', label: '15 seconds' },
   { value: '30', label: '30 seconds' },
   { value: '60', label: '1 minute' },
@@ -60,10 +64,117 @@ function StatePill({ on, onLabel = 'On', offLabel = 'Off' }: { on: boolean; onLa
 
 /** The four plan prices, saved together. */
 const PARTNER_PLAN_ROWS: { plan: PartnerPlan; label: string }[] = [
-  { plan: 'service', label: 'Services Plus' },
-  { plan: 'shop', label: 'Shop Plus' },
-  { plan: 'job_post', label: 'Job Post Plus' },
+  { plan: 'service', label: 'Service' },
+  { plan: 'shop', label: 'Shop' },
+  { plan: 'job_post', label: 'Job Post' },
 ];
+
+// Free Quick Book / Quick Order accepts a month without a plan ('' = no limit).
+const LIMIT_OPTIONS: DropdownOption<string>[] = [
+  { value: '', label: 'No limit', description: 'Every accept is free' },
+  { value: '0', label: 'None free', description: 'Every accept pays the fee' },
+  ...['1', '2', '3', '5', '10', '15', '20', '30', '50', '100'].map((value) => ({ value, label: `${value} per month` })),
+];
+
+// Customers' free bookings / orders / posts a month without a plan ('' = none: pay from the first).
+const FREE_USE_OPTIONS: DropdownOption<string>[] = [
+  { value: '', label: 'None', description: 'Pay from the first one' },
+  ...['1', '2', '3', '5', '10', '15', '20', '30'].map((value) => ({ value, label: `${value} per month` })),
+];
+
+/** How many bookings / orders / problem posts customers without a plan get free each month. */
+function FreeUsesEditor({
+  bookings,
+  orders,
+  onSave,
+}: {
+  bookings: number | null;
+  orders: number | null;
+  onSave: (changes: { customerFreeBookings?: number | null; customerFreeOrders?: number | null }) => Promise<void>;
+}) {
+  const asValue = (value: number | null) => (value == null ? '' : String(value));
+  const asCount = (value: string) => (value === '' ? null : Number(value));
+  return (
+    <div className="ad-gap-box">
+      <div className="ad-gap-head">
+        <span className="ad-spot-icon" style={{ background: 'linear-gradient(135deg,#16a34a,#22c55e)' }}>
+          <FontAwesomeIcon icon={faGift} />
+        </span>
+        <span className="ad-spot-text">
+          <strong>Customer app — free uses a month (without a plan)</strong>
+          <small>Bookings and orders each have their own limit. After these, each one pays its fee once — or the customer subscribes.</small>
+        </span>
+      </div>
+      <div className="fee-rows">
+        <div className="fee-row">
+          <span className="fee-row-text">
+            <strong>Bookings</strong>
+            <small className="muted">Quick Book, booking a particular worker and problem posts — per customer</small>
+          </span>
+          <div className="fee-row-input">
+            <Dropdown value={asValue(bookings)} options={FREE_USE_OPTIONS} onChange={(next) => onSave({ customerFreeBookings: asCount(next) })} title="Free bookings a month" />
+          </div>
+        </div>
+        <div className="fee-row">
+          <span className="fee-row-text">
+            <strong>Shop orders</strong>
+            <small className="muted">Quick Orders and orders sent to a particular shop — per customer</small>
+          </span>
+          <div className="fee-row-input">
+            <Dropdown value={asValue(orders)} options={FREE_USE_OPTIONS} onChange={(next) => onSave({ customerFreeOrders: asCount(next) })} title="Free orders a month" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** How many Quick Book / Quick Order accepts partners without a plan get free each month. */
+function LimitEditor({
+  quickBook,
+  quickOrder,
+  onSave,
+}: {
+  quickBook: number | null;
+  quickOrder: number | null;
+  onSave: (changes: { quickBookLimit?: number | null; quickOrderLimit?: number | null }) => Promise<void>;
+}) {
+  const asValue = (limit: number | null) => (limit == null ? '' : String(limit));
+  const asLimit = (value: string) => (value === '' ? null : Number(value));
+  return (
+    <div className="ad-gap-box">
+      <div className="ad-gap-head">
+        <span className="ad-spot-icon" style={{ background: 'linear-gradient(135deg,#7c3aed,#a78bfa)' }}>
+          <FontAwesomeIcon icon={faGaugeHigh} />
+        </span>
+        <span className="ad-spot-text">
+          <strong>Partner app — free accepts a month (without a plan)</strong>
+          <small>Every accept counts. After these, each accept pays the accept fee once — or the partner subscribes.</small>
+        </span>
+      </div>
+      <div className="fee-rows">
+        <div className="fee-row">
+          <span className="fee-row-text">
+            <strong>Service jobs</strong>
+            <small className="muted">Quick Book, personal bookings and nearby problems — per worker</small>
+          </span>
+          <div className="fee-row-input">
+            <Dropdown value={asValue(quickBook)} options={LIMIT_OPTIONS} onChange={(value) => onSave({ quickBookLimit: asLimit(value) })} title="Quick Book limit" />
+          </div>
+        </div>
+        <div className="fee-row">
+          <span className="fee-row-text">
+            <strong>Shop orders</strong>
+            <small className="muted">Quick Orders and orders sent to the shop — per shop owner</small>
+          </span>
+          <div className="fee-row-input">
+            <Dropdown value={asValue(quickOrder)} options={LIMIT_OPTIONS} onChange={(value) => onSave({ quickOrderLimit: asLimit(value) })} title="Quick Order limit" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 const PLAN_NAME: Record<PartnerPlan, string> = { service: 'Services', shop: 'Shop', job_post: 'Job posts' };
 
 function PriceEditor({ prices, onSave }: { prices: SubscriptionPrices; onSave: (prices: SubscriptionPrices) => Promise<void> }) {
@@ -134,11 +245,14 @@ function FeeEditor<K extends string>({
           <small>Paid once per action by people without a plan (₹0 makes it free)</small>
         </span>
       </div>
-      <div className="ad-prices">
+      <div className="fee-rows">
         {fields.map((field) => (
-          <label key={field.key} className="field">
-            <span>{field.label}</span>
-            <div className="ad-price-input">
+          <label key={field.key} className="fee-row">
+            <span className="fee-row-text">
+              <strong>{field.label}</strong>
+              <small className="muted">{field.note}</small>
+            </span>
+            <div className="ad-price-input fee-row-input">
               <span>₹</span>
               <input
                 value={draft[field.key]}
@@ -146,7 +260,6 @@ function FeeEditor<K extends string>({
                 onChange={(e) => setDraft((current) => ({ ...current, [field.key]: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
               />
             </div>
-            <small className="muted">{field.note}</small>
           </label>
         ))}
       </div>
@@ -168,11 +281,16 @@ function FeeEditor<K extends string>({
 }
 
 const PASS_LABEL: Record<PassKind, string> = {
-  book: 'Booking',
-  order: 'Shop order',
+  quick_book: 'Quick Book',
+  direct_book: 'Book a particular worker',
+  quick_order: 'Quick Order',
+  shop_order: 'Order from a particular shop',
+  post_problem: 'Post a problem',
   staff_contact: 'Staff phone number',
-  accept: 'Partner accept',
+  accept: 'Partner accept (personal booking)',
   job_post: 'Job post',
+  job_post_viewer: 'Job post viewer',
+  profile_viewer: 'Profile viewer',
 };
 
 /** One plan's banner: its switch, what subscribers get, prices and extra settings. */
@@ -368,19 +486,27 @@ export function SubscriptionsPage() {
             gradient="linear-gradient(135deg,#0055d3,#1d76fa)"
             on={settings.customerEnabled}
             master={master}
-            perks={['No ads', 'Quick Book and booking a particular worker', 'Ordering from shops (searching stays free)']}
+            perks={['No ads', 'No fees: Quick Book, booking a particular worker, Quick Order, ordering from a particular shop, posting a problem, staff phone numbers']}
             onToggle={(value) => save({ customerEnabled: value }, value ? 'Customer plans on' : 'Customer plans off')}
           >
             <PriceEditor prices={settings.customerPrices} onSave={(prices) => save({ customerPrices: prices }, 'Prices saved')} />
             <FeeEditor
               title="Without a plan: pay once"
               fields={[
-                { key: 'book', label: 'Book a worker', note: 'Quick Book or one in particular' },
-                { key: 'order', label: 'Order from a shop', note: 'Sending a list' },
+                { key: 'quickBook', label: 'Quick Book', note: 'Asks every worker nearby' },
+                { key: 'directBook', label: 'Book a particular worker', note: 'From the worker\'s profile' },
+                { key: 'quickOrder', label: 'Quick Order', note: 'Asks every shop nearby' },
+                { key: 'shopOrder', label: 'Order from a particular shop', note: 'Sending a list to one shop' },
+                { key: 'postProblem', label: 'Post a problem', note: 'Per post' },
                 { key: 'staffContact', label: 'Staff phone number', note: 'Per person, then always shown' },
               ]}
               values={settings.customerFees}
               onSave={(fees) => save({ customerFees: fees }, 'Fees saved')}
+            />
+            <FreeUsesEditor
+              bookings={settings.customerFreeBookings ?? null}
+              orders={settings.customerFreeOrders ?? null}
+              onSave={(changes) => save(changes, 'Free uses saved')}
             />
           </PlanSection>
 
@@ -392,13 +518,18 @@ export function SubscriptionsPage() {
             on={settings.partnerEnabled}
             master={master}
             perks={[
-              'Services Plus: Quick Book jobs and problems first, no accept fee, listed first, sees who viewed (names only)',
-              'Shop Plus: no accept fee on orders, listed first, sees who viewed (names only)',
-              'Job Post Plus: sees who viewed their job posts with their numbers, listed first in Hire Staff',
+              'Service: jobs first (the head start below), no Quick Book limit, no fee for personal bookings, listed first, sees who viewed with numbers',
+              'Shop: no Quick Order limit, no fee for orders sent to the shop, listed first, sees who viewed with numbers',
+              'Job Post: free job posts, sees who viewed with numbers, listed first in Hire Staff',
+              'All in One: everything above, for partners with more than one side',
               'Every plan: no ads',
             ]}
             onToggle={(value) => save({ partnerEnabled: value }, value ? 'Partner plans on' : 'Partner plans off')}
           >
+            <div className="sub-plan-prices">
+              <strong>All in One</strong>
+              <PriceEditor prices={settings.partnerPrices} onSave={(prices) => save({ partnerPrices: prices }, 'All in One prices saved')} />
+            </div>
             {PARTNER_PLAN_ROWS.map((row) => (
               <div key={row.plan} className="sub-plan-prices">
                 <strong>{row.label}</strong>
@@ -413,11 +544,18 @@ export function SubscriptionsPage() {
             <FeeEditor
               title="Without a plan: pay once"
               fields={[
-                { key: 'accept', label: 'Accept a job or order', note: 'Quick Book, problem or shop order' },
+                { key: 'accept', label: 'Accept a job or order', note: 'After the free accepts of the month' },
                 { key: 'jobPost', label: 'Publish a job post', note: 'Once per post' },
+                { key: 'jobPostViewer', label: 'See a job post viewer', note: 'Name and number, per person' },
+                { key: 'profileViewer', label: 'See a profile viewer', note: 'Name and number, per person' },
               ]}
               values={settings.partnerFees}
               onSave={(fees) => save({ partnerFees: fees }, 'Fees saved')}
+            />
+            <LimitEditor
+              quickBook={settings.quickBookLimit ?? null}
+              quickOrder={settings.quickOrderLimit ?? null}
+              onSave={(changes) => save(changes, 'Limit saved')}
             />
             <div className="ad-gap-box">
               <div className="ad-gap-head">
@@ -686,17 +824,11 @@ function PassesList({ kind, onKind }: { kind: '' | PassKind; onKind: (kind: '' |
   return (
     <div className="glass card">
       <div className="toolbar">
-        <Segment
+        <Dropdown
           value={kind}
           onChange={onKind}
-          options={[
-            { value: '', label: 'All' },
-            { value: 'book', label: 'Bookings' },
-            { value: 'order', label: 'Orders' },
-            { value: 'staff_contact', label: 'Phone numbers' },
-            { value: 'accept', label: 'Accepts' },
-            { value: 'job_post', label: 'Job posts' },
-          ]}
+          title="What was paid for"
+          options={[{ value: '' as const, label: 'All payments' }, ...(Object.keys(PASS_LABEL) as PassKind[]).map((value) => ({ value, label: PASS_LABEL[value] }))]}
         />
         <SearchBox value={q} onChange={setQ} placeholder="Search name or mobile" />
       </div>

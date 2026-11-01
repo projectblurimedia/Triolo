@@ -23,13 +23,29 @@ export interface SubscriptionSettings {
   badgeMinRating: number;
   badgeMinRatings: number;
   /** Pay per use (₹) for customers without a plan. */
-  customerFees: { book: number; order: number; staffContact: number };
+  customerFees: { quickBook: number; directBook: number; quickOrder: number; shopOrder: number; postProblem: number; staffContact: number };
   /** Pay per use (₹) for partners without a plan. */
-  partnerFees: { accept: number; jobPost: number };
+  partnerFees: { accept: number; jobPost: number; jobPostViewer: number; profileViewer: number };
+  /** Free Quick Book / Quick Order accepts a month for partners without a plan (null = no limit). */
+  quickBookLimit: number | null;
+  quickOrderLimit: number | null;
+  /** Customers without a plan: bookings / orders / problem posts free each month, any mix (null = none). */
+  customerFreeBookings: number | null;
+  customerFreeOrders: number | null;
   updatedAt: string;
 }
 
-export type PassKind = 'book' | 'order' | 'staff_contact' | 'accept' | 'job_post';
+export type PassKind =
+  | 'quick_book'
+  | 'direct_book'
+  | 'quick_order'
+  | 'shop_order'
+  | 'post_problem'
+  | 'staff_contact'
+  | 'accept'
+  | 'job_post'
+  | 'job_post_viewer'
+  | 'profile_viewer';
 
 export interface AdminPass {
   id: string;

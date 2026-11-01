@@ -2,7 +2,11 @@ import { apiClient } from './apiClient';
 
 export type SubscriptionPrices = Record<'1' | '3' | '6' | '12', number>;
 /** One paid use (partners): accepting a job / order, or publishing a job post. */
-export type PassKind = 'accept' | 'job_post';
+/**
+ * One paid use: accepting a job / order booked with this partner personally, publishing a job
+ * post, or seeing one person who viewed a job post / profile (with their number).
+ */
+export type PassKind = 'accept' | 'job_post' | 'job_post_viewer' | 'profile_viewer';
 export type BadgeKind = 'service' | 'business' | 'job_post';
 /** Partner plans are bought per side: services, a shop, or job posts — each with its own perks. */
 export type PartnerPlan = 'service' | 'shop' | 'job_post' | 'all';
@@ -31,6 +35,10 @@ export interface MySubscription {
   passes: Record<string, number>;
   /** Each plan on its own. */
   plans?: Record<PartnerPlan, PlanState>;
+  /** How many seconds earlier subscribed workers hear of new jobs. */
+  headStartSeconds?: number;
+  /** Free Quick Book / Quick Order accepts a month without a plan (null = no limit). */
+  limits?: { quickBook: number | null; quickOrder: number | null };
 }
 
 export interface PassCheckout {

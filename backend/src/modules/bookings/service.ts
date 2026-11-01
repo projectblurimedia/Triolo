@@ -73,8 +73,6 @@ export class BookingsService {
     private readonly notificationsService: NotificationsService,
     // Customer subscriptions (Quick Book / booking a worker) and subscribed workers' head start.
     private readonly subscriptionStatus?: SubscriptionStatusService,
-    // Whether a partner-app ad spot is on (an ad after accepting, instead of the fee).
-    private readonly adSpotOn?: (spot: string) => Promise<boolean>,
   ) {}
 
   /** The problems module, told when a trip started from one of its posts ends. */
@@ -129,10 +127,22 @@ export class BookingsService {
     return true;
   }
 
-  /** What accepting this job needs after it (see SubscriptionStatusService.unlockNeeded). */
-  async unlockNeededFor(workerAccountId: string, spot: 'job_accept' | 'problem_accept'): Promise<'ad' | 'pay' | null> {
-    if (!this.subscriptionStatus) return null;
-    return this.subscriptionStatus.unlockNeeded(workerAccountId, 'service', this.adSpotOn ? () => this.adSpotOn!(spot) : undefined);
+  /**
+   * This month's free accepts for a worker without the services plan (while partner plans are on
+   * and the admin set a limit) — every job counts: the limit, how many are used, how many are
+   * left. A null limit means no limit (every accept free).
+   */
+  async quickAcceptStatus(workerAccountId: string): Promise<{ limit: number | null; used: number; remaining: number | null }> {
+    const limit = (await this.subscriptionStatus?.acceptLimit(workerAccountId, 'service')) ?? null;
+    if (limit == null) return { limit: null, used: 0, remaining: null };
+    const used = await this.acceptsThisMonth(workerAccountId);
+    return { limit, used, remaining: Math.max(0, limit - used) };
+  }
+
+  /** Jobs this worker accepted this month (any kind) — the problems module counts its accepts with it. */
+  async acceptsThisMonth(workerAccountId: string): Promise<number> {
+    const worker = await this.workersService.getMyProfile(workerAccountId);
+    return worker ? this.repository.countAcceptsThisMonth(worker.id) : 0;
   }
 
   /**
@@ -187,7 +197,7 @@ export class BookingsService {
   ): Promise<{ bookingRequestId: string; matchedWorkerCount: number }> {
     const skills = splitSkills(dto.skillCategories);
     await this.refuseSameWorkWaiting(accountId, skills, null);
-    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'book')) ?? null;
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'quick_book')) ?? null;
     const request = await this.repository.createRequest({
       accountId,
       skillCategories: skills.fixed,
@@ -274,7 +284,7 @@ export class BookingsService {
         : null;
 
     await this.refuseSameWorkWaiting(accountId, skills, worker.id);
-    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'book')) ?? null;
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'direct_book')) ?? null;
     const request = await this.repository.createRequest({
       accountId,
       skillCategories: skills.fixed,
@@ -477,9 +487,12 @@ export class BookingsService {
 
   async acceptOffer(workerAccountId: string, bookingRequestId: string): Promise<void> {
     const profile = await this.requireWorker(workerAccountId);
-    // Accepting is instant and free; an ad or the fee comes after (unlockJob), so nobody else
-    // can take the job while this worker is still paying.
-    const unlockNeeded = await this.unlockNeededFor(workerAccountId, 'job_accept');
+    // Accepting is instant. Without the services plan, the month's free accepts come first (any
+    // job counts); after them the fee is paid before the details open (unlockJob) — never
+    // before accepting, so nobody else can take the job meanwhile.
+    const unlockNeeded = this.subscriptionStatus
+      ? await this.subscriptionStatus.acceptUnlock(workerAccountId, 'service', () => this.repository.countAcceptsThisMonth(profile.id))
+      : null;
     const result = await this.repository.acceptOffer(bookingRequestId, profile.id, generateArrivalPin(), unlockNeeded);
     if (!result.won) {
       throw AppError.conflict('This job has already been taken by another worker.', 'BOOKING_ALREADY_TAKEN');

@@ -25,6 +25,11 @@ import { colors as brandColors, fonts, typography, useThemeColors } from '@/them
 import { ListPhotoStrip } from './ListPhotoStrip';
 import { orderListText } from '@/utils/orderListText';
 import { GivenBackError } from '@/utils/afterAccept';
+import { FEW_ACCEPTS_LEFT, QUICK_LIMIT_QUERY_KEY, useQuickAcceptLimit } from '@/hooks/useQuickAcceptLimit';
+import { openSubscribe } from '@/state/subscribeStore';
+import { GOLD_DEEP } from './GoldCard';
+import { QuickLimitSheet } from './QuickLimitSheet';
+import { useMySubscription } from '@/hooks/useSubscription';
 
 type DeckItem = { key: string; createdAt: string } & ({ type: 'job'; offer: PendingOffer } | { type: 'order'; order: ShopOrder });
 
@@ -41,8 +46,8 @@ const FRESH_MS = 2 * 60 * 1000;
  * Live Requests: every request waiting for an answer — job requests and new shop orders together —
  * as a pile of cards in a fixed order. Cards already seen peek on the left, the next ones on the
  * right; swipe to move through them (each card keeps its own content and glides into place).
- * On Home a tap opens the Live Requests screen on that card; there (`bare`) the front card's
- * details sit under the pile. New requests join live.
+ * On Home a tap opens the Live Requests screen (`bare`), where every request is a row of one
+ * list, the tapped one first. New requests join live.
  */
 export function NewForYou({
   isWorker,
@@ -75,7 +80,6 @@ export function NewForYou({
   const measure = (key: string, height: number) => setHeights((prev) => (Math.abs((prev[key] ?? 0) - height) < 1 ? prev : { ...prev, [key]: height }));
   // Which card is in front, as a number that moves smoothly between cards (0 = the first).
   const progress = useRef(new Animated.Value(0)).current;
-  const pop = useRef(new Animated.Value(1)).current;
   const animating = useRef(false);
 
   const all: DeckItem[] = useMemo(
@@ -111,11 +115,6 @@ export function NewForYou({
     if (!animating.current) progress.setValue(index);
   }, [index, progress]);
 
-  // The counter gives a little pop each time the card in front changes.
-  useEffect(() => {
-    pop.setValue(1.25);
-    Animated.spring(pop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }).start();
-  }, [index, pop]);
 
   const goTo = (target: number) => {
     const { count, index: at } = latest.current;
@@ -169,6 +168,30 @@ export function NewForYou({
   ).current;
 
   if (all.length === 0) return null;
+
+  // Live Requests: a plain list, one row per request (the one tapped on Home first).
+  if (bare) {
+    const rows = focusKey ? [...all].sort((a, b) => Number(b.key === focusKey) - Number(a.key === focusKey)) : all;
+    return (
+      <View style={styles.wrap}>
+        <View style={styles.titleRow}>
+          <View style={[styles.liveDot, { backgroundColor: brandColors.success }]} />
+          <Text style={[styles.titleSmall, { color: colors.text }]}>{t('newForYou.swipeTitle')}</Text>
+          <View style={[styles.counter, { backgroundColor: `${colors.primary}14` }]}>
+            <Text style={[styles.counterText, { color: colors.primary }]}>{all.length}</Text>
+          </View>
+        </View>
+        <View style={[styles.list, { borderTopColor: colors.border }]}>
+          {rows.map((item) => (
+            <View key={item.key} style={[styles.listRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+              <RequestCard item={item} manyShops={manyShops} rich onOpened={onOpened} autoAccept={autoAcceptKey === item.key} />
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
   const front = all[index];
 
   const visible = all.map((item, position) => ({ item, position })).filter(({ position }) => Math.abs(position - index) <= 2);
@@ -214,9 +237,9 @@ export function NewForYou({
       <View style={styles.titleRow}>
         <View style={[styles.liveDot, { backgroundColor: brandColors.success }]} />
         <Text style={[bare ? styles.titleSmall : styles.title, { color: colors.text }]}>{t(bare ? 'newForYou.swipeTitle' : 'newForYou.title')}</Text>
-        <Animated.View style={[styles.counter, { backgroundColor: `${colors.primary}14`, transform: [{ scale: pop }] }]}>
+        <View style={[styles.counter, { backgroundColor: `${colors.primary}14` }]}>
           <Text style={[styles.counterText, { color: colors.primary }]}>{t('newForYou.counter', { at: index + 1, count: all.length })}</Text>
-        </Animated.View>
+        </View>
       </View>
 
       <View
@@ -258,6 +281,8 @@ export function NewForYou({
           );
         })}
       </View>
+      {/* The dots / 'last one' row only when there is something to swipe to (one request leaves no gap). */}
+      {all.length > 1 ? (
       <View style={styles.footer}>
         {edgeNote ? (
           <Text style={[styles.edgeNote, { color: colors.textMuted }]}>{t(index === 0 ? 'newForYou.firstOne' : 'newForYou.lastOne')}</Text>
@@ -272,11 +297,16 @@ export function NewForYou({
           </View>
         ) : null}
       </View>
+      ) : null}
     </View>
   );
 }
 
-/** Accept / decline for one request, shared by the card and the details panel. */
+/**
+ * Accept / decline for one request, shared by the card and the details panel. A Quick Book job
+ * or Quick Order counts against the month's free accepts without a plan: the last few ask
+ * first (QuickLimitSheet), and none left means the plan.
+ */
 function useRequestActions(item: DeckItem | null, onOpened?: () => void) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -285,9 +315,21 @@ function useRequestActions(item: DeckItem | null, onOpened?: () => void) {
   const acceptOrder = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.accept(id), 'accept');
   const declineOrder = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.decline(id));
   const [busy, setBusy] = useState<'accept' | 'decline' | null>(null);
+  // Every accept counts towards the month's free ones (Quick Book, personal bookings, orders…).
+  const quick = !!item;
+  const side: 'service' | 'shop' = item?.type === 'order' ? 'shop' : 'service';
+  const limitQuery = useQuickAcceptLimit(side, quick);
+  const limit = quick && limitQuery.data?.limit != null ? { limit: limitQuery.data.limit, remaining: limitQuery.data.remaining ?? 0 } : null;
+  const [askFew, setAskFew] = useState(false);
   const onError = (err: Error) => {
     // Backed out of paying after accepting: it was given back (a toast said so).
     if (err instanceof GivenBackError) return;
+    if (err instanceof ApiError && err.code === 'ACCEPT_LIMIT_REACHED') {
+      queryClient.invalidateQueries({ queryKey: QUICK_LIMIT_QUERY_KEY });
+      showToast({ variant: 'info', title: t('quickLimit.reachedTitle'), message: t(`quickLimit.reachedMessage.${side}`) });
+      openSubscribe(side);
+      return;
+    }
     const taken = err instanceof ApiError && ['BOOKING_ALREADY_TAKEN', 'ORDER_INVALID_STATE', 'ORDER_ALREADY_TAKEN'].includes(err.code ?? '');
     showToast({
       variant: taken ? 'info' : 'error',
@@ -296,38 +338,41 @@ function useRequestActions(item: DeckItem | null, onOpened?: () => void) {
     });
   };
 
-  const accept = () => {
-    if (!item) return;
-    setBusy('accept');
-    if (item.type === 'job') {
-      const id = item.offer.bookingRequestId;
-      acceptJob.mutate(id, {
-        onSuccess: async () => {
-          Notifications.dismissNotificationAsync(id).catch(() => {});
-          await queryClient.prefetchQuery({ queryKey: jobQueryKey(id), queryFn: () => jobsService.get(id), staleTime: 15000 }).catch(() => {});
-          showToast({ variant: 'success', title: t('bookings.acceptedToastTitle'), message: t('bookings.acceptedToastMessage') });
-          openJob(id);
-          onOpened?.();
-        },
-        onError,
-        onSettled: () => setBusy(null),
-      });
+  /**
+   * Awaited here (not mutate's own callbacks): accepting can take a while — a payment for a
+   * personal booking — and meanwhile the requests list refreshes and this card leaves it. React
+   * Query skips a finished mutate's callbacks once its card is gone, which left the job or
+   * order accepted but never opened.
+   */
+  const accept = async (confirmed = false) => {
+    if (!item || busy) return;
+    // None left: it still accepts — the one-time fee comes right after (completeAccept).
+    if (!confirmed && limit && limit.remaining <= FEW_ACCEPTS_LEFT) {
+      setAskFew(true);
       return;
     }
-    const id = item.order.id;
-    acceptOrder.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          showToast({ variant: 'success', title: t('shopOrders.acceptedTitle') });
-          // Straight on to packing it.
-          openShopOrder(id);
-          onOpened?.();
-        },
-        onError,
-        onSettled: () => setBusy(null),
-      },
-    );
+    setAskFew(false);
+    setBusy('accept');
+    try {
+      if (item.type === 'job') {
+        const id = item.offer.bookingRequestId;
+        await acceptJob.mutateAsync(id);
+        Notifications.dismissNotificationAsync(id).catch(() => {});
+        showToast({ variant: 'success', title: t('bookings.acceptedToastTitle'), message: t('bookings.acceptedToastMessage') });
+        openJob(id);
+      } else {
+        const id = item.order.id;
+        await acceptOrder.mutateAsync({ id });
+        showToast({ variant: 'success', title: t('shopOrders.acceptedTitle') });
+        // Straight on to packing it.
+        openShopOrder(id);
+      }
+      onOpened?.();
+    } catch (err) {
+      onError(err as Error);
+    } finally {
+      setBusy(null);
+    }
   };
 
   const decline = () => {
@@ -350,7 +395,7 @@ function useRequestActions(item: DeckItem | null, onOpened?: () => void) {
     }
   };
 
-  return { busy, accept, decline };
+  return { busy, accept, decline, limit, side, askFew, setAskFew };
 }
 
 function describe(item: DeckItem, manyShops: boolean, t: (key: string, options?: Record<string, unknown>) => string) {
@@ -404,7 +449,11 @@ function RequestCard({
 }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const { busy, accept, decline } = useRequestActions(item, onOpened);
+  const { busy, accept, decline, limit, side, askFew, setAskFew } = useRequestActions(item, onOpened);
+  // This month's free accepts (no plan): none left, or the last few.
+  const noneLeft = !!limit && limit.remaining <= 0;
+  const fee = useMySubscription().data?.fees?.accept ?? 0;
+  const fewLeft = !!limit && !noneLeft && limit.remaining <= FEW_ACCEPTS_LEFT;
   const [listOpen, setListOpen] = useState(false);
   const fresh = Date.now() - new Date(item.createdAt).getTime() < FRESH_MS;
   const info = describe(item, manyShops, t);
@@ -508,6 +557,17 @@ function RequestCard({
         </Text>
       )}
 
+      {noneLeft || fewLeft ? (
+        <Pressable disabled={preview} onPress={() => openSubscribe(side)} style={[styles.limitNote, { backgroundColor: `${GOLD_DEEP}14`, borderColor: `${GOLD_DEEP}40` }]}>
+          <FontAwesome6 name={noneLeft ? 'lock' : 'hourglass-half'} size={11} color={GOLD_DEEP} solid />
+          <Text style={[styles.limitNoteText, { color: colors.text }]} numberOfLines={2}>
+            {noneLeft
+              ? t(limit?.limit ? 'quickLimit.paidNow' : 'quickLimit.alwaysPay', { limit: limit?.limit, amount: fee })
+              : t('quickLimit.fewLeft', { count: limit?.remaining, limit: limit?.limit })}
+          </Text>
+          <FontAwesome6 name="crown" size={11} color={GOLD_DEEP} solid />
+        </Pressable>
+      ) : null}
       <View style={styles.actionsRow}>
         <Pressable
           disabled={preview || busy !== null}
@@ -520,19 +580,31 @@ function RequestCard({
             <Text style={[styles.declineText, { color: brandColors.error }]}>{t('bookings.decline')}</Text>
           )}
         </Pressable>
-        <Pressable disabled={preview || busy !== null} onPress={accept} style={styles.flex}>
+        <Pressable disabled={preview || busy !== null} onPress={() => accept()} style={styles.flex}>
           <View style={[styles.accept, rich ? styles.buttonTall : null, { backgroundColor: brandColors.success }]}>
             {busy === 'accept' ? (
               <LoadingIndicator color="#FFFFFF" size={20} dotSize={4} />
             ) : (
               <>
                 <FontAwesome6 name="check" size={13} color="#FFFFFF" solid />
-                <Text style={styles.acceptText}>{t('bookings.accept')}</Text>
+                <Text style={styles.acceptText}>
+                  {noneLeft && fee > 0 ? t('quickLimit.acceptFee', { amount: fee }) : t('bookings.accept')}
+                </Text>
               </>
             )}
           </View>
         </Pressable>
       </View>
+      {limit ? (
+        <QuickLimitSheet
+          visible={askFew}
+          side={side}
+          remaining={limit.remaining}
+          limit={limit.limit}
+          onAccept={() => accept(true)}
+          onClose={() => setAskFew(false)}
+        />
+      ) : null}
       {item.type === 'order' ? <ItemsSheet visible={listOpen} order={item.order} onClose={() => setListOpen(false)} /> : null}
     </Pressable>
   );
@@ -593,6 +665,9 @@ function ItemsSheet({ visible, order, onClose }: { visible: boolean; order: Shop
 }
 
 const styles = StyleSheet.create({
+  limitNote: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7, marginTop: 10 },
+  limitNoteText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12, lineHeight: 16, flex: 1 },
+  subscribe: { backgroundColor: '#3D2500' },
   flex: { flex: 1 },
   wrap: { marginBottom: 16 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
@@ -601,6 +676,9 @@ const styles = StyleSheet.create({
   titleSmall: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14, flex: 1 },
   counter: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   counterText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11.5 },
+  // Live Requests' list: full-width rows (past the screen's padding), divided by lines.
+  list: { marginHorizontal: -16, borderTopWidth: StyleSheet.hairlineWidth },
+  listRow: { borderBottomWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   // Room on both sides for the edges of the cards in the stack.
   card: { position: 'absolute', left: STACK_STEP * 2, right: STACK_STEP * 2, top: 0, borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
   frontCard: {

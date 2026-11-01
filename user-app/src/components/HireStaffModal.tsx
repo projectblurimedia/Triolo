@@ -27,7 +27,6 @@ import { formatDistanceValue } from '@/utils/nearbyResult';
 import { callStaff } from '@/utils/callStaff';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { askForLocation } from '@/utils/ensureLocationOn';
-import { useAdGate } from './Ads';
 import { placeName } from '@/utils/formatAddress';
 import { useTrustedIds } from '@/hooks/useSubscription';
 import { HighlightText } from './HighlightText';
@@ -73,7 +72,6 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
   const [started, setStarted] = useState(false);
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
-  const { waitForAd } = useAdGate(visible, 'hire_staff');
 
   // Every opening starts fresh and goes straight to the people nearby, grouped by work.
   useEffect(() => {
@@ -97,10 +95,9 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
     if (startingRef.current) return;
     startingRef.current = true;
     try {
-      // Spins from the tap: the location check can take a moment, then the ad.
+      // Spins from the tap: the location check can take a moment.
       setStarting(true);
       if (!(await askForLocation())) return;
-      if (!(await waitForAd())) return;
       setStarted(true);
     } finally {
       startingRef.current = false;

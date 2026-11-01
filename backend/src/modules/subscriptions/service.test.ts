@@ -34,8 +34,12 @@ const SETTINGS: SubscriptionSettings = {
   badgePrice: 199,
   badgeMinRating: 3,
   badgeMinRatings: 3,
-  customerFees: { book: 10, order: 10, staffContact: 10 },
-  partnerFees: { accept: 10, jobPost: 20 },
+  customerFees: { quickBook: 10, directBook: 15, quickOrder: 10, shopOrder: 12, postProblem: 8, staffContact: 10 },
+  partnerFees: { accept: 10, jobPost: 20, jobPostViewer: 5, profileViewer: 6 },
+  quickBookLimit: 15,
+  quickOrderLimit: null,
+  customerFreeBookings: null,
+  customerFreeOrders: null,
   updatedAt: '2026-10-21T00:00:00.000Z',
 };
 
@@ -66,6 +70,9 @@ function makeRepo() {
     countPaidPasses: jest.fn().mockResolvedValue({}),
     consumePass: jest.fn().mockResolvedValue(null),
     unlockedStaffPosts: jest.fn().mockResolvedValue([]),
+    unlockedTargets: jest.fn().mockResolvedValue([]),
+    countFreeUsesThisMonth: jest.fn().mockResolvedValue(0),
+    createFreeUse: jest.fn().mockResolvedValue('free-1'),
     findUsablePass: jest.fn().mockResolvedValue(null),
     createPass: jest.fn().mockResolvedValue({ id: 'pass-1' }),
     setPassLink: jest.fn(),
@@ -94,18 +101,24 @@ function makeService(repo = makeRepo()) {
 }
 
 describe('SubscriptionStatusService', () => {
-  it('locks booking / ordering for a customer without a subscription', async () => {
+  it('gives the month\'s free accepts first, then the fee; the plan makes every accept free', async () => {
     const { status, repo } = makeService();
-    await expect(status.requireCustomer('cust-1')).rejects.toMatchObject({ code: 'SUBSCRIPTION_REQUIRED', statusCode: 403 });
+    await expect(status.acceptLimit('p-1', 'service')).resolves.toBe(15);
+    await expect(status.acceptLimit('p-1', 'shop')).resolves.toBeNull();
+    await expect(status.acceptUnlock('p-1', 'service', async () => 14)).resolves.toBeNull();
+    await expect(status.acceptUnlock('p-1', 'service', async () => 15)).resolves.toBe('pay');
+    // No limit set: every accept free.
+    await expect(status.acceptUnlock('p-1', 'shop', async () => 99)).resolves.toBeNull();
     repo.findActive.mockResolvedValue({ id: 'sub-1' });
-    status.forget('cust-1');
-    await expect(status.requireCustomer('cust-1')).resolves.toBeUndefined();
+    status.forget('p-1');
+    await expect(status.acceptUnlock('p-1', 'service', async () => 99)).resolves.toBeNull();
   });
 
-  it('locks nothing while customer subscriptions are off', async () => {
+  it('asks nothing with partner plans off', async () => {
     const { status, repo } = makeService();
-    repo.getSettings.mockResolvedValue({ ...SETTINGS, customerEnabled: false });
-    await expect(status.requireCustomer('cust-1')).resolves.toBeUndefined();
+    repo.getSettings.mockResolvedValue({ ...SETTINGS, partnerEnabled: false });
+    status.forget();
+    await expect(status.acceptUnlock('p-1', 'service', async () => 99)).resolves.toBeNull();
   });
 
   it('gives subscribed partners the head start, and none when partner subscriptions are off', async () => {
@@ -212,15 +225,31 @@ describe('pay per use', () => {
 
   it('without a plan, booking needs a paid pass — PAYMENT_REQUIRED with the admin\'s price', async () => {
     const { status, repo } = makeService();
-    await expect(status.useCustomerPass('cust-1', 'book')).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED', details: { kind: 'book', amount: 10 } });
+    await expect(status.useCustomerPass('cust-1', 'direct_book')).rejects.toMatchObject({
+      code: 'PAYMENT_REQUIRED',
+      details: { kind: 'direct_book', amount: 15 },
+    });
+    await expect(status.useCustomerPass('cust-1', 'post_problem')).rejects.toMatchObject({ details: { kind: 'post_problem', amount: 8 } });
     repo.consumePass.mockResolvedValue('pass-1');
-    await expect(status.useCustomerPass('cust-1', 'order')).resolves.toBe('pass-1');
+    await expect(status.useCustomerPass('cust-1', 'shop_order')).resolves.toBe('pass-1');
+  });
+
+  it('a customer gets the free uses of the month first, then pays', async () => {
+    const { status, repo } = makeService();
+    repo.getSettings.mockResolvedValue({ ...SETTINGS, customerFreeBookings: 2, customerFreeOrders: 1 });
+    repo.countFreeUsesThisMonth.mockResolvedValue(1);
+    await expect(status.useCustomerPass('cust-1', 'quick_book')).resolves.toBe('free-1');
+    expect(repo.createFreeUse).toHaveBeenCalledWith('cust-1', 'quick_book', null);
+    expect(repo.countFreeUsesThisMonth).toHaveBeenCalledWith('cust-1', ['quick_book', 'direct_book', 'post_problem']);
+    // Orders have their own limit.
+    await expect(status.useCustomerPass('cust-1', 'quick_order')).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED' });
+    expect(repo.countFreeUsesThisMonth).toHaveBeenLastCalledWith('cust-1', ['quick_order', 'shop_order']);
   });
 
   it('with a plan, or plans off, nothing is charged', async () => {
     const { status, repo } = makeService();
     repo.findActive.mockResolvedValue({ id: 'sub-1' });
-    await expect(status.useCustomerPass('cust-1', 'book')).resolves.toBeNull();
+    await expect(status.useCustomerPass('cust-1', 'quick_book')).resolves.toBeNull();
     expect(repo.consumePass).not.toHaveBeenCalled();
     repo.getSettings.mockResolvedValue({ ...SETTINGS, partnerEnabled: false });
     status.forget();
@@ -236,7 +265,7 @@ describe('pay per use', () => {
 
   it('a phone number already paid for is not charged again', async () => {
     const { service, repo } = makeService();
-    repo.unlockedStaffPosts.mockResolvedValue(['post-1']);
+    repo.unlockedTargets.mockResolvedValue(['post-1']);
     await expect(service.passCheckout('cust-1', 'staff_contact', 'post-1')).resolves.toMatchObject({ paid: true });
     expect(repo.createPass).not.toHaveBeenCalled();
   });

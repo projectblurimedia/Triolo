@@ -200,13 +200,17 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         }}
         deleteLabel={t('notifications.delete')}
         enabled={!selectionMode}
+        gap={0}
+        borderRadius={0}
+        actionGap={0}
       >
         <Pressable
           style={[
             styles.card,
             {
-              backgroundColor: selected ? selectedBackground : colors.surface,
-              borderColor: selected ? colors.primary : item.isRead ? colors.border : `${colors.primary}66`,
+              // A list: full-width rows divided by a line; unread ones lightly tinted.
+              backgroundColor: selected ? selectedBackground : item.isRead ? colors.background : `${colors.primary}0D`,
+              borderBottomColor: colors.border,
             },
           ]}
           onPress={() => handleRowPress(item)}
@@ -314,7 +318,8 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     : selectionMode
       ? t('notifications.selectedCount', { count: selectedIds.size })
       : t('notifications.title');
-  const headerSubtitle = detail || selectionMode ? null : t('notifications.subtitle');
+  // How to use the list (swipe / long-press) sits under the title instead of in the body.
+  const headerSubtitle = detail || selectionMode ? null : t(items.length > 0 ? 'notifications.gestureHint' : 'notifications.subtitle');
 
   const renderDetail = (item: AppNotification) => (
     <ScrollView contentContainerStyle={styles.detailBody}>
@@ -379,7 +384,6 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     }
     return (
       <>
-        {!selectionMode ? <Text style={[styles.hint, { color: colors.textMuted }]}>{t('notifications.gestureHint')}</Text> : null}
         <PullToRefresh
           refreshing={manualRefreshing}
           onRefresh={async () => {
@@ -530,9 +534,15 @@ const styles = StyleSheet.create({
   emptyMessage: { ...typography.body, textAlign: 'center', lineHeight: 20 },
   retryButton: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
   retryButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  hint: { ...typography.caption, fontSize: 11, textAlign: 'center', marginTop: 12 },
-  listContent: { padding: 20, paddingTop: 12, paddingBottom: 40 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14 },
+  listContent: { paddingTop: 4, paddingBottom: 40 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   // alignSelf: center — the row itself is top-aligned (multi-line text), the checkbox is centred.
   cardSquareRight: { borderTopRightRadius: 0, borderBottomRightRadius: 0 },
   checkbox: {

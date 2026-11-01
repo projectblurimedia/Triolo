@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocationGatedMutation } from './useLocationGatedMutation';
 import { ACTIVE_SHOP_STATUSES, NEW_ORDER_STATUSES, ShopOrder, shopOrdersService } from '@/services/shopOrdersService';
 import { useAuthStore } from '@/state/authStore';
+import { QUICK_LIMIT_QUERY_KEY } from './useQuickAcceptLimit';
 import { completeAccept, GivenBackError } from '@/utils/afterAccept';
 
 export const SHOP_ORDERS_QUERY_KEY = ['shop-orders', 'mine'];
@@ -48,7 +49,7 @@ export function useShopOrderAction<TArgs extends { id: string }, TResult = unkno
   return useLocationGatedMutation({
     mutationFn: async (args: TArgs) => {
       const result = await action(args);
-      if (step === 'accept' && !(await completeAccept('order', args.id, 'order_accept'))) throw new GivenBackError();
+      if (step === 'accept' && !(await completeAccept('order', args.id))) throw new GivenBackError();
       return result;
     },
     onSettled: (_data, _error, args) => {
@@ -57,7 +58,11 @@ export function useShopOrderAction<TArgs extends { id: string }, TResult = unkno
         queryClient.invalidateQueries({ queryKey: SHOP_ORDERS_QUERY_KEY }),
       ]);
       // After accepting, the order opens at once (it's already loaded); the lists refresh behind it.
-      return step === 'accept' ? undefined : refresh;
+      if (step === 'accept') {
+        queryClient.invalidateQueries({ queryKey: QUICK_LIMIT_QUERY_KEY });
+        return undefined;
+      }
+      return refresh;
     },
   });
 }

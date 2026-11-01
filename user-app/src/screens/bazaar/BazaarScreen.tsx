@@ -30,6 +30,7 @@ import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { HomeSearchModal } from '@/components/HomeSearchModal';
+import { customKindGroups, shopKindLabels } from '@/utils/kindLabels';
 
 const SHOP_LIMIT = 50;
 // "Every shop nearby" in the single-list view (the blue card's See all).
@@ -105,11 +106,6 @@ export function BazaarScreen() {
     if (category && !showAll) categoryShops.refetch();
   };
 
-  const categoryLabel = (keys: string[]) =>
-    keys
-      .filter((key) => key !== 'other')
-      .map((key) => t(`businessProfile.categories.${key}`))
-      .join(', ');
 
   const renderWideCard = (shop: BusinessNearbyResult) => (
     <Pressable
@@ -128,7 +124,7 @@ export function BazaarScreen() {
           {shop.shopName}
         </Text>
         <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
-          {categoryLabel(shop.shopCategories)}
+          {shopKindLabels(t, shop).join(', ')}
         </Text>
         <View style={styles.wideMetaRow}>
           <RatingStars average={shop.ratingAverage} count={shop.ratingCount} />
@@ -262,6 +258,17 @@ export function BazaarScreen() {
             </ScrollView>
           </>
         ) : null}
+        {/* Shops of the partners' own kinds ("Fancy") get a row each too. */}
+        {customKindGroups(shops, (shop) => shop.otherCategoryDescription).map((group) => (
+          <View key={`custom-${group.name}`}>
+            {renderSectionHeader(group.name, 'tag', { count: group.items.length })}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+              {group.items.map((shop) => (
+                <ShopMiniCard key={shop.id} shop={shop} onPress={() => openShop(shop)} />
+              ))}
+            </ScrollView>
+          </View>
+        ))}
         {SHOP_CATEGORIES.map((entry) => {
           const inCategory = shops.filter((shop) => shop.shopCategories.includes(entry.key));
           if (inCategory.length === 0) return null;

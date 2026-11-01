@@ -34,6 +34,7 @@ import { callPhone, distanceBetween } from '@/utils/tripLinks';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { BlurScope } from './Glass';
+import { KeptPaymentNotice } from './KeptPaymentNotice';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { payIfNeeded } from '@/state/payGateStore';
 import { bookingStatusTitle } from '@/utils/bookingStatusText';
@@ -149,7 +150,7 @@ export function BookingTrackingModal() {
   const handleBookAgain = async () => {
     if (!booking || rebooking) return;
     if (!(await askForLocation())) return;
-    if (!(await payIfNeeded('book'))) return;
+    if (!(await payIfNeeded('quick_book'))) return;
     setRebooking(true);
     try {
       const here = await ensureLocation();
@@ -466,6 +467,8 @@ export function BookingTrackingModal() {
               : t('tracking.status.expired.message')}
           </Text>
           <Text style={[styles.searchSkills, { color: colors.primary }]}>{skillLabels}</Text>
+          {/* Paid for and nobody took it: the payment waits for the next one. */}
+          <KeptPaymentNotice kind={booking.directWorker ? 'direct_book' : 'quick_book'} style={styles.keptGap} />
           <View style={styles.retryWrap}>
             <Button label={t('tracking.bookAgain')} onPress={handleBookAgain} loading={rebooking} />
           </View>
@@ -482,6 +485,9 @@ export function BookingTrackingModal() {
         {onTrip ? <LiveMap customer={jobPoint} worker={workerPoint} height={MAP_HEIGHT} /> : null}
         <ScrollView contentContainerStyle={[styles.panel, { paddingBottom: insets.bottom + 24 }]}>
           {renderStatusBanner(booking)}
+          {booking.status === 'cancelled' && !booking.problemPostId ? (
+            <KeptPaymentNotice kind={booking.directWorker ? 'direct_book' : 'quick_book'} />
+          ) : null}
           {isLate(booking) ? (
             <LateNotice
               title={t('late.workerTitle', { name: workerName })}
@@ -583,6 +589,7 @@ export function BookingTrackingModal() {
 }
 
 const styles = StyleSheet.create({
+  keptGap: { marginTop: 18 },
   container: { flex: 1 },
   header: { paddingBottom: 18, paddingHorizontal: 20 },
   headerRow: { flexDirection: 'row', alignItems: 'center' },

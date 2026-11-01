@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { PassKind, subscriptionsService } from '@/services/subscriptionsService';
+import { freeUseFor, PassKind, subscriptionsService } from '@/services/subscriptionsService';
 import { showToast } from '@/state/toastStore';
 import i18n from '@/localization/i18n';
 
@@ -49,6 +49,13 @@ export async function payIfNeeded(kind: PassKind, targetId: string | null = null
     if (!perPerson && (mine.passes?.[kind] ?? 0) > 0) {
       // Paid before for one that didn't go ahead: say so, so it doesn't look free by mistake.
       showToast({ variant: 'info', title: i18n.t('payGate.paidEarlierTitle'), message: i18n.t(`payGate.paidEarlierMessage.${kind}`) });
+      return true;
+    }
+    // Still within this month's free ones: nothing to pay — say how many are left.
+    const free = freeUseFor(mine, kind);
+    if (!perPerson && free && free.used < free.limit) {
+      const left = free.limit - free.used - 1;
+      showToast({ variant: 'info', title: i18n.t('payGate.freeUseTitle'), message: i18n.t('payGate.freeUseMessage', { count: left }) });
       return true;
     }
     const amount = mine.fees?.[kind] ?? 0;

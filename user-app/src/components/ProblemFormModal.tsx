@@ -17,7 +17,8 @@ import { ProblemPost, problemsService } from '@/services/problemsService';
 import { MY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
-import { useAdGate, useBusyAction } from './Ads';
+import { useBusyAction } from './Ads';
+import { payIfNeeded } from '@/state/payGateStore';
 
 interface ProblemFormModalProps {
   visible: boolean;
@@ -90,7 +91,6 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
 
   // Asking for location / showing the ad: a second tap must not post twice.
   const preparing = useRef(false);
-  const { adLoading, waitForAd } = useAdGate(visible, 'post_problem');
   const { busy, run } = useBusyAction();
 
   const handleSubmit = async () => {
@@ -103,9 +103,8 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
     }
     preparing.current = true;
     try {
-      // A new post shows a local business's ad (when one is running) before it goes out; the
-      // button shows its spinner while the ad loads. Edits don't.
-      if (!isEditMode && !(await waitForAd())) return;
+      // A new post: without a plan, pay once (the admin's fee) — or subscribe. Edits are free.
+      if (!isEditMode && !(await payIfNeeded('post_problem'))) return;
     } finally {
       preparing.current = false;
     }
@@ -255,7 +254,7 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
           <Button
             label={t(isEditMode ? 'common.saveChanges' : 'problemForm.submit')}
             onPress={() => run(handleSubmit)}
-            loading={submitting || adLoading || busy}
+            loading={submitting || busy}
             disabled={!canSubmit}
           />
         </View>

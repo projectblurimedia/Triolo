@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { GlassBackdrop, GlassCard } from './Glass';
+import { GlassBackdrop } from './Glass';
 import { LoadingIndicator } from './LoadingIndicator';
 import { GoldCard, GOLD_BUTTON, GOLD_DEEP, GOLD_GRADIENT, GOLD_INK, GOLD_INK_SOFT } from './GoldCard';
 import { subscriptionsService } from '@/services/subscriptionsService';
@@ -25,11 +25,12 @@ const PLUS_PERKS: { icon: React.ComponentProps<typeof FontAwesome6>['name']; key
 ];
 
 const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> = {
-  book: 'screwdriver-wrench',
-  order: 'basket-shopping',
+  quick_book: 'bolt',
+  direct_book: 'user-check',
+  quick_order: 'basket-shopping',
+  shop_order: 'store',
+  post_problem: 'clipboard-list',
   staff_contact: 'phone',
-  accept: 'handshake',
-  job_post: 'briefcase',
 };
 
 /**
@@ -124,7 +125,8 @@ export function PayGateSheet() {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => done(false)} statusBarTranslucent>
       <GlassBackdrop onPress={busy ? undefined : () => done(false)} style={styles.center}>
-        <GlassCard style={styles.card}>
+        {/* A solid card: glass over a full-screen screen could paint over the Pay button on Android. */}
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <LinearGradient colors={GOLD_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.icon}>
             <FontAwesome6 name={ICONS[kind] ?? 'indian-rupee-sign'} size={24} color="#FFFFFF" solid />
           </LinearGradient>
@@ -150,7 +152,9 @@ export function PayGateSheet() {
             </Pressable>
           ) : (
             <Pressable onPress={pay} disabled={busy} accessibilityRole="button" style={styles.payWrap}>
-              <LinearGradient colors={GOLD_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.pay}>
+              {/* The gradient is a layer under the label (not its parent), so the label always draws. */}
+              <LinearGradient colors={GOLD_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              <View style={styles.pay}>
                 {step === 'starting' ? (
                   <LoadingIndicator size={20} />
                 ) : (
@@ -159,7 +163,7 @@ export function PayGateSheet() {
                     <Text style={styles.payText}>{t('payGate.pay', { amount: request.amount })}</Text>
                   </>
                 )}
-              </LinearGradient>
+              </View>
             </Pressable>
           )}
 
@@ -208,7 +212,7 @@ export function PayGateSheet() {
           <Pressable onPress={() => done(false)} disabled={busy} hitSlop={6}>
             <Text style={[styles.cancel, { color: colors.textMuted }]}>{t('common.cancel')}</Text>
           </Pressable>
-        </GlassCard>
+        </View>
       </GlassBackdrop>
     </Modal>
   );
@@ -216,14 +220,14 @@ export function PayGateSheet() {
 
 const styles = StyleSheet.create({
   center: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28 },
-  card: { width: '100%', maxWidth: 400, borderRadius: 24, padding: 24, alignItems: 'center', gap: 4 },
+  card: { width: '100%', maxWidth: 400, borderRadius: 24, borderWidth: 1, padding: 24, alignItems: 'center', gap: 4 },
   icon: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   title: { ...typography.subheading, fontFamily: fonts.semiBold, textAlign: 'center' },
   message: { ...typography.body, textAlign: 'center', lineHeight: 21, marginTop: 4, marginBottom: 16 },
   // Solid gold under the gradient: the button can never come out see-through.
   payWrap: { alignSelf: 'stretch', height: 50, borderRadius: 14, overflow: 'hidden', backgroundColor: GOLD_BUTTON[1] },
   pay: { height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  payText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  payText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF', includeFontPadding: false },
   outline: { alignSelf: 'stretch', height: 50, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   outlineText: { ...typography.body, fontFamily: fonts.semiBold },
   orRow: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, marginBottom: 12 },

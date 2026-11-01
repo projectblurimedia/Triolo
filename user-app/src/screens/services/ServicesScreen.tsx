@@ -24,6 +24,7 @@ import { HomeSearchModal } from '@/components/HomeSearchModal';
 import { NearbyHero } from '@/components/NearbyHero';
 import { SectionHeader } from '@/components/SectionHeader';
 import { useTrustedIds } from '@/hooks/useSubscription';
+import { customKindGroups } from '@/utils/kindLabels';
 
 const TOP_RATED_LIMIT = 10;
 // "Every worker nearby" in the single-list view (the blue card's See all).
@@ -279,6 +280,15 @@ export function ServicesScreen() {
           </>
         ) : null}
 
+        {/* Workers of their own kinds of work get a row each too. */}
+        {customKindGroups(workers, (worker) => worker.otherSkillDescription).map((group) => (
+          <View key={`custom-${group.name}`}>
+            {renderSectionHeader(group.name, 'tag', { count: group.items.length })}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+              {group.items.map(renderCompactCard)}
+            </ScrollView>
+          </View>
+        ))}
         {SKILL_CATEGORIES.map((skill) => {
           const inCategory = workers.filter((worker) => worker.skillCategories.includes(skill.key));
           if (inCategory.length === 0) return null;

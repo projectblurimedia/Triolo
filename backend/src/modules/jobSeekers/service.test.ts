@@ -158,7 +158,11 @@ describe('JobSeekersService', () => {
 
   it('tells the poster once a day per viewer, and hides viewers without the job post plan', async () => {
     const notifications = { notifyJobPostViewed: jest.fn().mockResolvedValue(undefined), markReadByRef: jest.fn().mockResolvedValue(undefined) };
-    const status = { viewerAccess: jest.fn().mockResolvedValue('plan'), priorityPartnerIds: jest.fn().mockResolvedValue([]) };
+    const status = {
+      viewerAccess: jest.fn().mockResolvedValue('plan'),
+      priorityPartnerIds: jest.fn().mockResolvedValue([]),
+      unlockedTargets: jest.fn().mockResolvedValue(new Set<string>()),
+    };
     const viewing = new JobSeekersService(repository as unknown as JobSeekersRepository, status as never, notifications as never);
     repository.recordView.mockResolvedValueOnce({ ownerAccountId: 'acc-1', title: 'Teacher', firstToday: true });
     await viewing.recordView('post-1', 'acc-2');
@@ -175,11 +179,11 @@ describe('JobSeekersService', () => {
     expect(locked.viewers[0]).toMatchObject({ name: null, mobile: null });
     status.viewerAccess.mockResolvedValue('open');
     expect((await viewing.listViewers('acc-1', 'post-1')).viewers[0]).toMatchObject({ name: 'Ravi', mobile: '9700000002' });
-    expect(status.viewerAccess).toHaveBeenCalledWith('acc-1', 'job_post', undefined);
-    // Plans off with ads on: shown once the app has shown the ad.
-    status.viewerAccess.mockResolvedValue('ad');
-    expect(await viewing.listViewers('acc-1', 'post-1')).toMatchObject({ access: 'ad', locked: true });
-    expect((await viewing.listViewers('acc-1', 'post-1', true)).viewers[0]).toMatchObject({ name: 'Ravi' });
+    expect(status.viewerAccess).toHaveBeenCalledWith('acc-1', 'job_post');
+    // Without the plan: only the people paid for show.
+    status.viewerAccess.mockResolvedValue('plan');
+    status.unlockedTargets.mockResolvedValue(new Set(['acc-2']));
+    expect((await viewing.listViewers('acc-1', 'post-1')).viewers[0]).toMatchObject({ name: 'Ravi', locked: false });
   });
 
   it('searches on behalf of the caller, so their own post is excluded', async () => {

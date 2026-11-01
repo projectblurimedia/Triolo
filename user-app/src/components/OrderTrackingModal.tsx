@@ -31,6 +31,7 @@ import { colors as brandColors, fonts, headerGradient, typography, useThemeColor
 import { BlurScope } from './Glass';
 import { PullToRefresh } from './PullToRefresh';
 import { WaitCountdown } from './WaitCountdown';
+import { KeptPaymentNotice } from './KeptPaymentNotice';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -476,6 +477,8 @@ export function OrderTrackingModal() {
           ) : (
             renderBanner(order)
           )}
+          {/* Paid for and no shop took it: the payment waits for the next one. */}
+          {ENDED_BADLY.includes(order.status) ? <KeptPaymentNotice kind={order.quick ? 'quick_order' : 'shop_order'} /> : null}
           {/* Waiting for an answer: how long until it ends by itself (changeable). A Quick Order
               waits like a Quick Book. */}
           {order.status === 'placed' ? (

@@ -36,9 +36,12 @@ export function SubscriptionCard() {
               {active ? t('subscribe.activeUntil', { date: formatDay(active.endsAt) }) : t('subscribe.cardText')}
             </Text>
           </View>
-          <View style={styles.cta}>
-            <Text style={styles.ctaText}>{active ? t('subscribe.manage') : t('subscribe.get')}</Text>
-          </View>
+          {/* A running plan has nothing to change: no button, just its end date. */}
+          {active ? null : (
+            <View style={styles.cta}>
+              <Text style={styles.ctaText}>{t('subscribe.get')}</Text>
+            </View>
+          )}
         </View>
       </GoldCard>
     </Pressable>

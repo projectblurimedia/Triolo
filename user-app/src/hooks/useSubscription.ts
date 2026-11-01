@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { subscriptionsService } from '@/services/subscriptionsService';
+import { subscriptionsService, PassKind, freeUseFor } from '@/services/subscriptionsService';
 import { useAuthStore } from '@/state/authStore';
 
 export const SUBSCRIPTION_QUERY_KEY = ['subscription', 'customer'] as const;
@@ -20,10 +20,13 @@ export function useMySubscription() {
  * on and they have no plan and no paid pass left, else null (free). Shown on final buttons;
  * payIfNeeded() takes the payment.
  */
-export function usePayHint(kind: 'book' | 'order' | 'staff_contact'): number | null {
+export function usePayHint(kind: PassKind): number | null {
   const { data } = useMySubscription();
   if (!data?.enabled || data.active) return null;
   if (kind !== 'staff_contact' && (data.passes?.[kind] ?? 0) > 0) return null;
+  // Still free this month.
+  const free = freeUseFor(data, kind);
+  if (free && free.used < free.limit) return null;
   const fee = data.fees?.[kind] ?? 0;
   return fee > 0 ? fee : null;
 }

@@ -18,6 +18,10 @@ import { colors as brandColors, fonts, headerGradient, typography, useThemeColor
 import { payInApp } from '@/utils/inAppPay';
 
 const TRUST_GRADIENT = ['#047857', '#10B981'] as const;
+// The two posters' heroes and the boost's button.
+const TRUST_HERO = ['#065F46', '#059669', '#2DD4A0'] as const;
+const BOOST_HERO = ['#2E3192', '#2563EB', '#22B4F0'] as const;
+const BOOST_BUTTON = ['#1D4ED8', '#0EA5E9'] as const;
 const KIND_ICON: Record<BadgeKind, React.ComponentProps<typeof FontAwesome6>['name']> = {
   service: 'screwdriver-wrench',
   business: 'store',
@@ -234,81 +238,223 @@ export function ProfileGrowth({
     );
   };
 
-  // The Plans tab: the badge card (green) and the boost card (blue), each saying what it does.
-  const renderSplit = (profile: MyProfileBadge, index: number) => (
-    <React.Fragment key={profile.profileId}>
-      <View style={[styles.splitCard, { backgroundColor: colors.surface, borderColor: `${brandColors.success}66` }]}>
-        <LinearGradient colors={TRUST_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.band}>
-          <FontAwesome6 name="shield-halved" size={70} color="rgba(255,255,255,0.13)" solid style={styles.bandMark} />
-          <View style={styles.bandIcon}>
-            <FontAwesome6 name="shield-halved" size={17} color="#FFFFFF" solid />
-          </View>
-          <View style={styles.flex}>
-            <Text style={styles.bandTitle}>{t('badge.tileTitle')}</Text>
-            <Text style={styles.bandFor} numberOfLines={1}>
-              {profile.name}
-            </Text>
-          </View>
-        </LinearGradient>
-        <Text style={[styles.splitText, { color: colors.textMuted }]}>{t('growth.trustDesc')}</Text>
-        <View style={styles.points}>
-          {(['a', 'b', 'c'] as const).map((point) => (
-            <View key={point} style={[styles.point, { backgroundColor: `${brandColors.success}14`, borderColor: `${brandColors.success}33` }]}>
-              <FontAwesome6 name="check" size={9} color={brandColors.success} solid />
-              <Text style={[styles.pointText, { color: colors.text }]} numberOfLines={1}>
-                {t(`growth.trustPoints.${point === 'c' ? `c_${profile.kind}` : point}`)}
-              </Text>
+  // The Plans tab: the Trusted card (green) and the Boost card (blue), each a small poster —
+  // a gradient hero, what it does, and one big button.
+  const renderSplit = (profile: MyProfileBadge, _index: number) => {
+    const active = profile.status === 'active';
+    const pending = profile.status === 'pending';
+    const current = currentBoost(profile);
+    const badgePrice = badges.data?.price ?? 0;
+    const trustCta = active
+      ? t('growth.trustedActive')
+      : !profile.eligible
+        ? t('plans.badgeNotYet')
+        : pending
+          ? t('plans.badgeFinish')
+          : t('growth.getTrusted', { amount: badgePrice });
+    return (
+      <React.Fragment key={profile.profileId}>
+        {/* --- Trusted by Triolo --- */}
+        <View style={[styles.poster, { backgroundColor: colors.surface, borderColor: `${brandColors.success}55` }]}>
+          <LinearGradient colors={TRUST_HERO} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.posterHero}>
+            <View style={[styles.bubble, styles.bubbleA]} />
+            <View style={[styles.bubble, styles.bubbleB]} />
+            <View style={styles.posterTop}>
+              <View style={styles.sealRing}>
+                <LinearGradient colors={['#34D399', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.seal}>
+                  <FontAwesome6 name={active ? 'circle-check' : 'shield-halved'} size={24} color="#FFFFFF" solid />
+                </LinearGradient>
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.posterKicker}>{t(`growth.kind.${profile.kind}`)}</Text>
+                <Text style={styles.posterTitle}>{t('badge.tileTitle')}</Text>
+                <Text style={styles.posterFor} numberOfLines={1}>
+                  {profile.name}
+                </Text>
+              </View>
+              <View style={[styles.posterPill, active ? styles.posterPillOn : null]}>
+                <FontAwesome6 name={active ? 'check' : 'tag'} size={10} color={active ? '#047857' : '#FFFFFF'} solid />
+                <Text style={[styles.posterPillText, active ? { color: '#047857' } : null]}>
+                  {active ? t('plans.active') : `₹${badgePrice}`}
+                </Text>
+              </View>
             </View>
-          ))}
-        </View>
-        {profile.status === 'removed' && profile.removedReason ? (
-          <View style={[styles.notice, { backgroundColor: `${brandColors.error}12`, borderColor: `${brandColors.error}40` }]}>
-            <FontAwesome6 name="triangle-exclamation" size={12} color={brandColors.error} solid />
-            <Text style={[styles.noticeText, { color: colors.text }]}>{t('badge.removed', { reason: profile.removedReason })}</Text>
-          </View>
-        ) : null}
-        {badgeButton(profile) ?? (
-          <Text style={[styles.splitText, { color: colors.textMuted }]}>{t('growth.badgeOff')}</Text>
-        )}
-        {profile.status === 'pending' && profile.badgeId ? (
-          <Pressable onPress={() => checkBadge(profile.badgeId!, false)} disabled={checking !== null} hitSlop={6} style={styles.checkLink}>
-            {checking === profile.badgeId ? (
-              <LoadingIndicator size={16} color={colors.primary} />
-            ) : (
-              <Text style={[styles.link, { color: colors.primary }]}>{t('subscribe.checkPaid')}</Text>
-            )}
-          </Pressable>
-        ) : null}
-      </View>
+            <Text style={styles.posterLead}>{t('growth.trustDesc')}</Text>
+          </LinearGradient>
 
-      <View style={[styles.splitCard, { backgroundColor: colors.surface, borderColor: `${colors.primary}66` }]}>
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.band}>
-          <FontAwesome6 name="rocket" size={70} color="rgba(255,255,255,0.13)" solid style={styles.bandMark} />
-          <View style={styles.bandIcon}>
-            <FontAwesome6 name="rocket" size={17} color="#FFFFFF" solid />
-          </View>
-          <View style={styles.flex}>
-            <Text style={styles.bandTitle}>{t('growth.boost')}</Text>
-            <Text style={styles.bandFor} numberOfLines={1}>
-              {profile.name}
-            </Text>
-          </View>
-        </LinearGradient>
-        <Text style={[styles.splitText, { color: colors.textMuted }]}>{t('growth.boostDesc')}</Text>
-        <View style={styles.points}>
-          {(['a', 'b', 'c'] as const).map((point) => (
-            <View key={point} style={[styles.point, { backgroundColor: `${colors.primary}14`, borderColor: `${colors.primary}33` }]}>
-              <FontAwesome6 name="check" size={9} color={colors.primary} solid />
-              <Text style={[styles.pointText, { color: colors.text }]} numberOfLines={1}>
-                {t(`growth.boostPoints.${point}`)}
+          {/* How customers see the profile with the seal. */}
+          <View style={[styles.preview, { backgroundColor: `${brandColors.success}0D`, borderColor: `${brandColors.success}33` }]}>
+            <Text style={[styles.previewLabel, { color: colors.textMuted }]}>{t('growth.trustPreview')}</Text>
+            <View style={styles.previewRow}>
+              <View style={styles.previewAvatarWrap}>
+                <LinearGradient colors={headerGradient} style={styles.previewAvatar}>
+                  <FontAwesome6 name={KIND_ICON[profile.kind]} size={13} color="#FFFFFF" solid />
+                </LinearGradient>
+                <View style={styles.previewSeal}>
+                  <FontAwesome6 name="circle-check" size={13} color={brandColors.success} solid />
+                </View>
+              </View>
+              <Text style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
+                {profile.name}
               </Text>
+              <View style={[styles.previewTag, { backgroundColor: `${brandColors.success}1F` }]}>
+                <FontAwesome6 name="shield-halved" size={9} color={brandColors.success} solid />
+                <Text style={[styles.previewTagText, { color: brandColors.success }]}>{t('growth.trustedTag')}</Text>
+              </View>
             </View>
-          ))}
+          </View>
+
+          <View style={styles.benefits}>
+            {(['a', 'b', 'c'] as const).map((point) => (
+              <View key={point} style={styles.benefit}>
+                <View style={[styles.benefitIcon, { backgroundColor: `${brandColors.success}1A` }]}>
+                  <FontAwesome6 name="check" size={10} color={brandColors.success} solid />
+                </View>
+                <Text style={[styles.benefitText, { color: colors.text }]}>{t(`growth.trustPoints.${point === 'c' ? `c_${profile.kind}` : point}`)}</Text>
+              </View>
+            ))}
+          </View>
+
+          {profile.status === 'removed' && profile.removedReason ? (
+            <View style={[styles.notice, { backgroundColor: `${brandColors.error}12`, borderColor: `${brandColors.error}40` }]}>
+              <FontAwesome6 name="triangle-exclamation" size={12} color={brandColors.error} solid />
+              <Text style={[styles.noticeText, { color: colors.text }]}>{t('badge.removed', { reason: profile.removedReason })}</Text>
+            </View>
+          ) : null}
+
+          {!badgesOn && !active ? (
+            <Text style={[styles.splitText, { color: colors.textMuted }]}>{t('growth.badgeOff')}</Text>
+          ) : (
+            <Pressable
+              onPress={() => {
+                if (profile.eligible && !active) {
+                  buyBadge(profile);
+                  return;
+                }
+                showToast(
+                  active
+                    ? { variant: 'success', title: t('growth.alreadyTrustedTitle'), message: t('growth.alreadyTrustedMessage') }
+                    : { variant: 'info', title: t('plans.badgeNotYet'), message: t(`badge.notEligible.${profile.kind}`) },
+                );
+              }}
+              disabled={busy !== null}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.ctaWrap, { opacity: pressed ? 0.9 : 1 }]}
+            >
+              {active ? (
+                <View style={[styles.cta, { backgroundColor: `${brandColors.success}18`, borderWidth: 1.5, borderColor: `${brandColors.success}66` }]}>
+                  <FontAwesome6 name="circle-check" size={14} color={brandColors.success} solid />
+                  <Text style={[styles.ctaText, { color: brandColors.success }]}>{trustCta}</Text>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={profile.eligible ? TRUST_GRADIENT : ['#94A3B8', '#94A3B8']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.cta}
+                >
+                  {busy === profile.profileId ? (
+                    <LoadingIndicator size={18} dotSize={3} />
+                  ) : (
+                    <>
+                      <FontAwesome6 name="shield-halved" size={14} color="#FFFFFF" solid />
+                      <Text style={styles.ctaText}>{trustCta}</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              )}
+            </Pressable>
+          )}
+          {pending && profile.badgeId ? (
+            <Pressable onPress={() => checkBadge(profile.badgeId!, false)} disabled={checking !== null} hitSlop={6} style={styles.checkLink}>
+              {checking === profile.badgeId ? (
+                <LoadingIndicator size={16} color={colors.primary} />
+              ) : (
+                <Text style={[styles.link, { color: colors.primary }]}>{t('subscribe.checkPaid')}</Text>
+              )}
+            </Pressable>
+          ) : null}
         </View>
-        {boostButton(profile)}
-      </View>
-    </React.Fragment>
-  );
+
+        {/* --- Boost --- */}
+        <View style={[styles.poster, { backgroundColor: colors.surface, borderColor: `${colors.primary}55` }]}>
+          <LinearGradient colors={BOOST_HERO} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.posterHero}>
+            <View style={[styles.bubble, styles.bubbleA]} />
+            <View style={[styles.bubble, styles.bubbleB]} />
+            <FontAwesome6 name="rocket" size={84} color="rgba(255,255,255,0.12)" solid style={styles.posterMark} />
+            <View style={styles.posterTop}>
+              <View style={styles.sealRing}>
+                <LinearGradient colors={['#60A5FA', '#1D4ED8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.seal}>
+                  <FontAwesome6 name="rocket" size={22} color="#FFFFFF" solid />
+                </LinearGradient>
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.posterKicker}>{t('growth.boostKicker')}</Text>
+                <Text style={styles.posterTitle}>{t('growth.boost')}</Text>
+                <Text style={styles.posterFor} numberOfLines={1}>
+                  {profile.name}
+                </Text>
+              </View>
+              {current ? (
+                <View style={[styles.posterPill, styles.posterPillOn]}>
+                  <View style={styles.liveDot} />
+                  <Text style={[styles.posterPillText, { color: '#1D4ED8' }]}>{t(`boost.status.${current.status}`)}</Text>
+                </View>
+              ) : boostFrom !== null ? (
+                <View style={styles.posterPill}>
+                  <FontAwesome6 name="tag" size={10} color="#FFFFFF" solid />
+                  <Text style={styles.posterPillText}>{t('growth.boostFromShort', { amount: boostFrom })}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.posterLead}>{t('growth.boostDesc')}</Text>
+          </LinearGradient>
+
+          {current ? (
+            // Running (or on its way): its numbers, a tap from the full details.
+            <Pressable onPress={() => setDetails(current)} style={[styles.boostStats, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}33` }]}>
+              {[
+                { icon: 'eye' as const, value: current.impressions, label: t('plans.boostViews') },
+                { icon: 'hand-pointer' as const, value: current.clicks, label: t('plans.boostClicks') },
+              ].map((stat) => (
+                <View key={stat.label} style={styles.boostStat}>
+                  <FontAwesome6 name={stat.icon} size={12} color={colors.primary} solid />
+                  <Text style={[styles.boostValue, { color: colors.text }]}>{stat.value.toLocaleString('en-IN')}</Text>
+                  <Text style={[styles.boostLabel, { color: colors.textMuted }]}>{stat.label}</Text>
+                </View>
+              ))}
+              <FontAwesome6 name="chevron-right" size={12} color={colors.primary} solid />
+            </Pressable>
+          ) : (
+            <View style={styles.benefits}>
+              {(['a', 'b', 'c'] as const).map((point) => (
+                <View key={point} style={styles.benefit}>
+                  <View style={[styles.benefitIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                    <FontAwesome6 name="check" size={10} color={colors.primary} solid />
+                  </View>
+                  <Text style={[styles.benefitText, { color: colors.text }]}>{t(`growth.boostPoints.${point}`)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <Pressable
+            onPress={() => (current ? setDetails(current) : setBoosting({ kind: profile.kind, name: profile.name, profileId: profile.profileId }))}
+            disabled={!current && !profile.eligible}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.ctaWrap, { opacity: !current && !profile.eligible ? 0.55 : pressed ? 0.9 : 1 }]}
+          >
+            <LinearGradient colors={BOOST_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
+              <FontAwesome6 name={current ? 'chart-line' : 'rocket'} size={14} color="#FFFFFF" solid />
+              <Text style={styles.ctaText}>
+                {current ? t('growth.boostSeeNumbers') : boostFrom !== null ? t('growth.boostNow', { amount: boostFrom }) : t('growth.boostCta')}
+              </Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </React.Fragment>
+    );
+  };
 
   return (
     <>
@@ -436,6 +582,61 @@ const styles = StyleSheet.create({
   notice: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, padding: 8 },
   noticeText: { ...typography.caption, flex: 1, lineHeight: 16 },
   actions: { flexDirection: 'row', gap: 10 },
+  poster: { borderWidth: 1.5, borderRadius: 24, padding: 14, gap: 12, marginBottom: 14, overflow: 'hidden' },
+  posterHero: { marginHorizontal: -14, marginTop: -14, padding: 16, gap: 12, overflow: 'hidden' },
+  bubble: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' },
+  bubbleA: { width: 180, height: 180, right: -60, top: -90 },
+  bubbleB: { width: 120, height: 120, left: -40, bottom: -70 },
+  posterMark: { position: 'absolute', right: -8, bottom: -14, transform: [{ rotate: '-12deg' }] },
+  posterTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sealRing: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    padding: 4,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  seal: { flex: 1, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  posterKicker: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10.5, letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)' },
+  posterTitle: { fontFamily: fonts.semiBold, fontSize: 19, lineHeight: 24, color: '#FFFFFF' },
+  posterFor: { ...typography.caption, fontSize: 12, color: 'rgba(255,255,255,0.88)' },
+  posterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 28,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.45)',
+  },
+  posterPillOn: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+  posterPillText: { fontFamily: fonts.semiBold, fontSize: 12, color: '#FFFFFF', includeFontPadding: false },
+  posterLead: { ...typography.caption, fontSize: 13, lineHeight: 18, color: 'rgba(255,255,255,0.92)' },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22C55E' },
+  preview: { borderRadius: 16, borderWidth: 1, padding: 10, gap: 8 },
+  previewLabel: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10.5, letterSpacing: 0.6, textTransform: 'uppercase' },
+  previewRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  previewAvatarWrap: { width: 38, height: 38 },
+  previewAvatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  previewSeal: { position: 'absolute', right: -3, bottom: -3, width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  previewName: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14, flex: 1 },
+  previewTag: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 24, borderRadius: 12, paddingHorizontal: 9 },
+  previewTagText: { fontFamily: fonts.semiBold, fontSize: 11, includeFontPadding: false },
+  benefits: { gap: 9 },
+  benefit: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  benefitIcon: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  benefitText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 13, lineHeight: 18, flex: 1 },
+  boostStats: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
+  boostStat: { flex: 1, gap: 2 },
+  boostValue: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 23 },
+  boostLabel: { ...typography.caption, fontSize: 11 },
+  ctaWrap: { borderRadius: 26, overflow: 'hidden' },
+  cta: { height: 50, borderRadius: 26, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 18 },
+  ctaText: { fontFamily: fonts.semiBold, fontSize: 14.5, color: '#FFFFFF', includeFontPadding: false },
   splitCard: { borderWidth: 1.5, borderRadius: 22, padding: 14, gap: 11, marginBottom: 12, overflow: 'hidden' },
   band: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: -14, marginTop: -14, paddingHorizontal: 14, paddingVertical: 14, overflow: 'hidden' },
   bandMark: { position: 'absolute', right: -6, bottom: -18 },

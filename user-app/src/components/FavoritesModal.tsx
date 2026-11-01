@@ -16,6 +16,7 @@ import { BusinessNearbyResult } from '@/services/businessesService';
 import { distanceBetween } from '@/utils/tripLinks';
 import { NearbyResult } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { shopKindLabels, workerKindLabels } from '@/utils/kindLabels';
 
 interface FavoritesModalProps {
   visible: boolean;
@@ -62,11 +63,7 @@ export function FavoritesModal({ visible, onClose, type }: FavoritesModalProps) 
     const photo = worker
       ? (worker.profilePhotoUrl)
       : ((shop as BusinessNearbyResult).profilePhotoUrl);
-    const tags = worker
-      ? worker.skillCategories.filter((key) => key !== 'other').map((key) => t(`workerProfile.skills.${key}`))
-      : (shop as BusinessNearbyResult).shopCategories
-          .filter((key) => key !== 'other')
-          .map((key) => t(`businessProfile.categories.${key}`));
+    const tags = worker ? workerKindLabels(t, worker) : shopKindLabels(t, shop as BusinessNearbyResult);
     return (
       <Pressable
         style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}

@@ -56,7 +56,7 @@ async function handleOfferAction(actionIdentifier: string, bookingRequestId: str
     await updateOfferNotification(bookingRequestId, outcome);
     if (outcome === 'accepted') {
       // The ad or the fee (without a plan) first; backed out of, the job goes back.
-      if (!(await completeAccept('job', bookingRequestId, 'job_accept'))) return;
+      if (!(await completeAccept('job', bookingRequestId))) return;
       // The job screen is the first thing the worker sees once they open the app.
       openJob(bookingRequestId);
       showToast({ variant: 'success', title: labels.accepted, message: labels.acceptedMessage });

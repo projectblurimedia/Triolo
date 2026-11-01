@@ -10,8 +10,6 @@ import { NotificationsRepository } from '@/modules/notifications/repository';
 import { NotificationsService } from '@/modules/notifications/service';
 import { ProblemsRepository } from '@/modules/problems/repository';
 import { ProblemsService } from '@/modules/problems/service';
-import { AdsRepository } from '@/modules/ads/repository';
-import { AdsService } from '@/modules/ads/service';
 import { BookingsController } from './controller';
 import { BookingsService } from './service';
 import { BookingsRepository } from './repository';
@@ -34,11 +32,7 @@ const notificationsService = new NotificationsService(new NotificationsRepositor
 const workersService = new WorkersService(new WorkersRepository(pool), notificationsService);
 const repository = new BookingsRepository(pool);
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
-// After accepting, an ad may come instead of the fee (the admin's partner ad spots).
-const adsService = new AdsService(new AdsRepository(pool));
-const service = new BookingsService(repository, workersService, notificationsService, subscriptionStatus, (spot) =>
-  adsService.partnerSpotOn(spot),
-);
+const service = new BookingsService(repository, workersService, notificationsService, subscriptionStatus);
 // Trips started from a Your Problems post report back when they finish or are cancelled.
 service.setLifecycleListener(new ProblemsService(new ProblemsRepository(pool), workersService, notificationsService, service));
 const controller = new BookingsController(service);
@@ -51,6 +45,7 @@ bookingsRouter.post('/direct', authenticate, validateBody(createDirectBookingSch
 bookingsRouter.get('/mine', authenticate, controller.listMine);
 bookingsRouter.get('/offers/mine', authenticate, controller.getMyOffers);
 bookingsRouter.get('/offers/stats', authenticate, controller.getMyOfferStats);
+bookingsRouter.get('/offers/limit', authenticate, controller.getQuickAcceptStatus);
 bookingsRouter.post('/offers/search', authenticate, validateBody(searchOffersSchema), controller.searchOffers);
 bookingsRouter.get('/jobs/mine', authenticate, controller.listMyJobs);
 bookingsRouter.get('/jobs/:id', authenticate, controller.getMyJob);

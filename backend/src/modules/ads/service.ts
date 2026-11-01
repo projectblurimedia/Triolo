@@ -1,18 +1,6 @@
 import { AppError } from '@/common/errors/AppError';
 import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
-import type { PartnerPlan } from '@/modules/subscriptions/interfaces';
-import {
-  deletePhotosFromCloudinary,
-  deleteVideosFromCloudinary,
-  deleteCloudinaryIds,
-  extractPublicIdFromUrl,
-  isOwnCloudinaryUrl,
-  listCloudinaryFiles,
-  playbackUrl,
-  signDirectUpload,
-  videoDurationSeconds,
-  SignedUpload,
-} from '@/common/services/cloudinaryService';
+import { deletePhotosFromCloudinary, deleteVideosFromCloudinary, deleteCloudinaryIds, extractPublicIdFromUrl, isOwnCloudinaryUrl, listCloudinaryFiles, playbackUrl, signDirectUpload, videoDurationSeconds, SignedUpload, mediaSize } from '@/common/services/cloudinaryService';
 import { logger } from '@/common/utils/logger';
 import { razorpayService } from '@/common/services/razorpayService';
 import { AdsRepository, StoredAdParams } from './repository';
@@ -28,7 +16,6 @@ import {
   AD_RADIUS_KM,
   AD_SELF_OPEN_LIMIT,
   AD_HOME_MAX,
-  AD_RETIRED_SPOTS,
   AD_VIEWS_MAX,
   AD_VIEWS_MIN,
   AD_VIEWS_VALID_DAYS,
@@ -36,7 +23,6 @@ import {
   AdListFilter,
   AdPlacement,
   AdSpot,
-  AD_SPOTS_BY_APP,
   AdSettings,
   PublicAd,
   SaveAdParams,
@@ -94,9 +80,9 @@ function clean(params: SaveAdParams): SaveAdParams {
     ...params,
     // A views ad runs until its views are used up, within AD_VIEWS_VALID_DAYS of its start.
     billing: views ? 'views' : 'days',
-    // Home's slider is a row of wide cards: its ads are always horizontal.
-    showOn: params.showOn === 'home' ? 'home' : 'action',
-    orientation: params.showOn === 'home' ? 'horizontal' : params.orientation,
+    // Every ad is a Home slider ad: a wide card.
+    showOn: 'home',
+    orientation: 'horizontal',
     viewLimit: views ? params.viewLimit ?? null : null,
     planDays: views ? AD_VIEWS_VALID_DAYS : params.planDays,
     advertiserName: params.advertiserName?.trim() ?? '',
@@ -121,30 +107,11 @@ export function adPrice(settings: Pick<AdSettings, 'prices' | 'pricePerView'>, p
 }
 
 /**
- * The partner plan whose "no ads" perk covers each partner-app spot: a Job Post plan takes the
- * ads off the job post's screens only, not off service jobs or shop orders. Home's slider and
- * anything without a spot are covered only by All in One.
+ * Whether full-screen ads run at this place. Never any more: ads show only in Home's slider
+ * (serveHome). Kept so older app builds asking for one simply get none.
  */
-const PARTNER_SPOT_PLAN: Partial<Record<AdSpot, PartnerPlan>> = {
-  find_jobs: 'service',
-  problem_accept: 'service',
-  job_accept: 'service',
-  continue_card: 'service',
-  find_orders: 'shop',
-  order_accept: 'shop',
-  viewer_reveal: 'job_post',
-};
-
-/** Whether ads are switched on for this app and place (the master switch first). */
-export function placementOn(settings: AdSettings, app: AdApp, placement: AdPlacement, spot?: AdSpot | null): boolean {
-  if (!settings.adsEnabled) return false;
-  // The full-screen ad when an app opens was removed: ads come only before key actions.
-  if (placement === 'launch') return false;
-  if (!(app === 'user' ? settings.actionUser : settings.actionPartner)) return false;
-  // A spot from the other app is never shown here.
-  if (spot && (AD_RETIRED_SPOTS as readonly string[]).includes(spot)) return false;
-  if (spot && !(AD_SPOTS_BY_APP[app] as readonly string[]).includes(spot)) return false;
-  return spot ? settings.spots[spot] !== false : true;
+export function placementOn(_settings: AdSettings, _app: AdApp, _placement: AdPlacement, _spot?: AdSpot | null): boolean {
+  return false;
 }
 
 /**
@@ -289,9 +256,11 @@ export class AdsService {
     if (accountId && (await this.adFree(accountId, app, null))) return [];
     const ads = await this.repository.pickManyAndCount(viewer.latitude, viewer.longitude, app === 'user', AD_HOME_MAX);
     const trusted = ads.some((ad) => ad.promoted) && this.subscriptionStatus ? await this.subscriptionStatus.trustedIds().catch(() => null) : null;
+    // How long each picture stays before the slider moves on (the admin's "time between ads").
+    const slideSeconds = settings.actionGapSeconds > 0 ? Math.min(60, settings.actionGapSeconds) : 5;
     return Promise.all(
       ads.map(async (ad) => {
-        const served = toPublic(ad);
+        const served: PublicAd = { ...toPublic(ad), slideSeconds };
         if (ad.promoted && this.promotions) {
           served.promotedCard = await this.promotions.card(ad.promoted.kind, ad.promoted.id).catch(() => null);
           if (served.promotedCard) served.promotedCard.trusted = !!trusted?.[ad.promoted.kind]?.includes(ad.promoted.id);
@@ -301,16 +270,14 @@ export class AdsService {
     );
   }
 
-  /** Whether this person's plan takes the ads off here. */
-  private async adFree(accountId: string, app: AdApp, spot: AdSpot | null): Promise<boolean> {
+  /**
+   * Whether this person's plan takes the ads off: the customer plan, or — for partners — the All
+   * in One plan only (a side's plan covers that side's work, not the Home slider).
+   */
+  private async adFree(accountId: string, app: AdApp, _spot: AdSpot | null): Promise<boolean> {
     if (!this.subscriptionStatus) return false;
     if (app === 'user') return this.subscriptionStatus.isActive(accountId, 'customer');
-    return this.subscriptionStatus.isActive(accountId, 'partner', (spot && PARTNER_SPOT_PLAN[spot]) || 'all');
-  }
-
-  /** Whether ads run at this partner-app spot now (an ad after accepting, instead of the fee). */
-  async partnerSpotOn(spot: string): Promise<boolean> {
-    return placementOn(await this.repository.getSettings(), 'partner', 'action', spot as AdSpot);
+    return this.subscriptionStatus.isActive(accountId, 'partner', 'all');
   }
 
   async recordClick(id: string): Promise<void> {
@@ -639,7 +606,10 @@ export class AdsService {
     return result.ad;
   }
 
-  /** One image or one video, ours, and a video no longer than 30 seconds (a longer one is deleted). */
+  /**
+   * One image or one video, ours, wide (the Home slider is a row of 16:9 cards — a tall file is
+   * deleted and refused), and a video no longer than 30 seconds (a longer one is deleted).
+   */
   private async checkMedia(
     imageUrl: string | null,
     videoUrl: string | null,
@@ -650,6 +620,12 @@ export class AdsService {
     }
     if (videoUrl && !isOwnCloudinaryUrl(videoUrl, AD_MEDIA_FOLDER, 'video')) {
       throw AppError.badRequest('The video was not uploaded through Triolo.', 'AD_MEDIA_INVALID');
+    }
+    const size = await mediaSize((imageUrl ?? videoUrl) as string, imageUrl ? 'image' : 'video');
+    if (size && size.height >= size.width) {
+      if (videoUrl) await deleteVideosFromCloudinary([videoUrl]);
+      else await deletePhotosFromCloudinary([imageUrl as string]);
+      throw AppError.badRequest('Only horizontal (wide, 16:9) pictures and videos can be used.', 'AD_MUST_BE_HORIZONTAL');
     }
     let videoSeconds: number | null = null;
     if (videoUrl) {

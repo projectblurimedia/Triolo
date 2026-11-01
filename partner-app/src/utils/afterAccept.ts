@@ -1,4 +1,3 @@
-import { adThen } from '@/components/Ads';
 import { jobsService } from '@/services/jobsService';
 import { shopOrdersService } from '@/services/shopOrdersService';
 import { payIfNeeded } from '@/state/payGateStore';
@@ -12,12 +11,12 @@ import { queryClient } from '@/state/queryClient';
 type Need = 'ad' | 'pay' | null;
 
 /**
- * Right after a job or an order was accepted — never before, so nobody else can take it while
- * the partner pays: what the server says it still needs. Nothing (on the plan for that side);
- * an ad, after which it opens; or the one-time fee — paid, it opens; backed out of, it's given
- * back to other partners. Resolves true when it's open (its screen can be shown).
+ * Right after a job or an order was accepted: what the server says it still needs. Nothing (a
+ * Quick Book / Quick Order, or on the plan for that side), or — for one booked with this
+ * partner personally — the one-time fee: paid, it opens; backed out of, it goes back to the
+ * customer's waiting list. Resolves true when it's open (its screen can be shown).
  */
-export async function completeAccept(kind: 'job' | 'order', id: string, spot: 'job_accept' | 'problem_accept' | 'order_accept'): Promise<boolean> {
+export async function completeAccept(kind: 'job' | 'order', id: string): Promise<boolean> {
   let need: Need;
   // What was fetched goes straight into the cache, so the job / order screen opens with it
   // at once instead of loading it again.
@@ -35,8 +34,7 @@ export async function completeAccept(kind: 'job' | 'order', id: string, spot: 'j
   const giveBack = () => (kind === 'job' ? jobsService.release(id) : shopOrdersService.release(id)).catch(() => undefined);
   try {
     if (need === 'ad') {
-      // The ad plays to its end (it can't be skipped); then the job / order opens.
-      await adThen(spot);
+      // Accepted on an older version, when an ad was asked for: there are no such ads now.
       await unlock('ad');
       return true;
     }

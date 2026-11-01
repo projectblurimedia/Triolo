@@ -153,7 +153,9 @@
     "unreadCount_other": "{{count}} unread",
     "allCaughtUp": "All caught up",
     "callViewer": "Call {{name}}",
-    "seeWhoViewed": "Subscribe to see who viewed you"
+    "seeWhoViewed": "Subscribe to see who viewed you",
+    "unlockFor": "See who · ₹{{amount}}",
+    "seeAllWithPlan": "See all with a plan"
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -518,7 +520,8 @@
     "DELIVERY_NOT_FOUND": "This delivery is no longer yours.",
     "STAFF_INVITE_NOT_FOUND": "This invitation is no longer open.",
     "DELIVERY_NOT_ACTIVE": "This delivery is not on its way.",
-    "DELIVERY_NOT_ACCEPTED": "Accept this delivery first."
+    "DELIVERY_NOT_ACCEPTED": "Accept this delivery first.",
+    "ACCEPT_LIMIT_REACHED": "You've used this month's free accepts. Subscribe for no limit."
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -950,7 +953,7 @@
   "continueSteps": {
     "title": "Continue Where You Left Off",
     "continue": "Continue",
-    "seeAll": "See all {{count}}",
+    "seeAll": "See all",
     "itemCount_one": "{{count}} item",
     "itemCount_other": "{{count}} items",
     "pending": "Pending",
@@ -961,7 +964,7 @@
   "findJobs": {
     "button": "Find Jobs Now",
     "searching": "Searching nearby…",
-    "hint": "See every job request open near you right now — even one you closed or declined, or whose notification never came.",
+    "hint": "Every open job near you, right now",
     "foundTitle_one": "{{count}} job request open",
     "foundTitle_other": "{{count}} job requests open",
     "foundMessage": "Accept one before another worker does.",
@@ -1127,25 +1130,33 @@
     "boostFrom": "Show it to customers nearby · from ₹{{amount}}",
     "boostCaption": "Show it to customers nearby",
     "boostCta": "Boost now",
-    "trustDesc": "A green Trusted by Triolo mark on this profile, so customers choose you with confidence.",
-    "boostDesc": "Show this profile to customers near you as an ad, for the days you choose.",
+    "trustDesc": "A green Trusted seal on this profile, so customers choose you with confidence.",
+    "boostDesc": "Show this profile at the top of customers' Home nearby, for the days you choose.",
     "badgeOff": "Badges are not available right now.",
     "profileNumber": "{{kind}} {{n}}",
     "trustPoints": {
-      "a": "Green badge",
-      "b": "More trust",
+      "a": "A green Trusted seal on your profile and cards",
+      "b": "Customers choose trusted partners first",
       "c": "More calls",
-      "c_service": "More bookings",
-      "c_business": "More orders",
-      "c_job_post": "More calls"
+      "c_service": "More bookings from new customers",
+      "c_business": "More orders from new customers",
+      "c_job_post": "More calls from people hiring"
     },
     "boostPoints": {
-      "a": "Shown as an ad",
-      "b": "To people near you",
-      "c": "Promote your profile"
+      "a": "In the slider at the top of Home",
+      "b": "To customers near you",
+      "c": "With a Book Now / Order / Contact button"
     },
     "alreadyTrustedTitle": "Already Trusted",
-    "alreadyTrustedMessage": "This profile already has the Trusted by Triolo badge."
+    "alreadyTrustedMessage": "This profile already has the Trusted by Triolo badge.",
+    "trustedActive": "Active — customers see your seal",
+    "getTrusted": "Get Trusted · ₹{{amount}}",
+    "trustPreview": "How customers see you",
+    "trustedTag": "Trusted",
+    "boostKicker": "Reach more customers",
+    "boostFromShort": "From ₹{{amount}}",
+    "boostSeeNumbers": "See boost numbers",
+    "boostNow": "Boost now · from ₹{{amount}}"
   },
   "badge": {
     "trusted": "Trusted by Triolo",
@@ -1222,11 +1233,15 @@
   "payGate": {
     "title": {
       "accept": "Accept this",
-      "job_post": "Publish your job post"
+      "job_post": "Publish your job post",
+      "job_post_viewer": "See who viewed",
+      "profile_viewer": "See who viewed"
     },
     "message": {
-      "accept": "Pay ₹{{amount}} once to accept this job or order. With Partner Plus every accept is free.",
-      "job_post": "Pay ₹{{amount}} once to publish your job post. With Partner Plus it's free."
+      "accept": "You have used this month's free accepts. Pay ₹{{amount}} once to accept this one. With the plan every accept is free.",
+      "job_post": "Pay ₹{{amount}} once to publish your job post. With the Job Post plan it's free.",
+      "job_post_viewer": "Pay ₹{{amount}} once to see this person's name and number. With the Job Post plan you see everyone.",
+      "profile_viewer": "Pay ₹{{amount}} once to see this person's name and number. With the plan you see everyone."
     },
     "pay": "Pay ₹{{amount}}",
     "waiting": "Finish the payment on Razorpay, then come back — it carries on by itself.",
@@ -1234,7 +1249,9 @@
     "paidTitle": "Paid!",
     "paidMessage": {
       "accept": "Accepting now.",
-      "job_post": "Publishing your post."
+      "job_post": "Publishing your post.",
+      "job_post_viewer": "Showing who it was.",
+      "profile_viewer": "Showing who it was."
     },
     "notificationTitle": "Pay to accept",
     "notificationBody": "Open Triolo Partner to accept this job.",
@@ -1245,8 +1262,8 @@
     },
     "or": "or",
     "plus": {
-      "title": "Go Partner Plus",
-      "subtitle": "One plan — never pay per accept again",
+      "title": "Get a plan",
+      "subtitle": "One plan — no fees, no monthly limit",
       "noFees": "No fees",
       "noAds": "No ads",
       "headStart": "30s head start",
@@ -1289,7 +1306,7 @@
   "findOrders": {
     "button": "Find Orders Now",
     "searching": "Searching nearby…",
-    "hint": "See every Quick Order near your shop that you can take — even one whose notification never came.",
+    "hint": "Every open Quick Order near you, right now",
     "foundTitle_one": "{{count}} Quick Order waiting",
     "foundTitle_other": "{{count}} Quick Orders waiting",
     "foundMessage": "They are in New orders — accept one before another shop does.",
@@ -1327,9 +1344,9 @@
       "job_post": "Job Posts"
     },
     "names": {
-      "service": "Services Plus",
-      "shop": "Shop Plus",
-      "job_post": "Job Post Plus",
+      "service": "Service",
+      "shop": "Shop",
+      "job_post": "Job Post",
       "all": "All in One"
     },
     "short": {
@@ -1338,33 +1355,39 @@
       "job_post": "See who viewed your posts and call them"
     },
     "hero": {
-      "service": "For your services: get jobs before others and accept them free.",
-      "shop": "For your shop: accept orders free and show first to customers.",
-      "job_post": "For your job posts: see everyone who viewed them, with their number.",
-      "all": "Services, shop and job posts in one plan: everything below, for one price."
+      "service": "For your services: jobs first, no monthly limit and no fees.",
+      "shop": "For your shop: no monthly limit, no fees and shown first.",
+      "job_post": "For your job posts: free posts and every visitor with their number.",
+      "all": "Service, Shop and Job Post in one plan — everything below, for one price."
     },
     "perks": {
       "noAds": "No ads in the app",
       "service": {
-        "first": "New jobs and problems reach you 30 seconds before others",
-        "freeAccept": "Accept jobs with no fee",
+        "first": "New jobs and problems reach you {{seconds}} seconds before others",
+        "freeAccept": "No fee for jobs booked with you personally",
         "top": "Your services show first to customers",
-        "viewers": "See who viewed your services profile"
+        "viewers": "See who viewed your services, with their number",
+        "noLimit": "No monthly limit — every job accept is free"
       },
       "shop": {
-        "freeAccept": "Accept orders with no fee",
+        "freeAccept": "No fee for orders sent to your shop",
         "top": "Your shop shows first in searches",
-        "viewers": "See who viewed your shop"
+        "viewers": "See who viewed your shop, with their number",
+        "noLimit": "No monthly limit — every order accept is free"
       },
       "job_post": {
-        "viewers": "See who viewed your job posts, with their phone number",
-        "top": "Your job posts show first in Hire Staff"
+        "viewers": "See who viewed your job posts, with their number",
+        "top": "Your job posts show first in Hire Staff",
+        "freePosts": "Publish job posts free"
       },
       "noMiniPayments": "No small payments for each accept or job post views",
       "all": {
-        "everything": "Everything in Services Plus, Shop Plus and Job Post Plus",
+        "everything": "Everything in Service, Shop and Job Post",
         "freeAccept": "Accept jobs, problems and orders with no fee",
-        "top": "Your services, shop and job posts show first"
+        "top": "Your services, shop and job posts show first",
+        "noLimit": "No limits or accept fees on any side",
+        "noFees": "No fees — accepts, job posts or viewers",
+        "viewers": "See everyone who viewed your profiles, with numbers"
       }
     },
     "extra_one": "{{count}} benefit · from ₹{{amount}}/month",
@@ -1379,7 +1402,25 @@
     "growTitle": "Badge and boost",
     "yourPlan": "Your plan",
     "upgrade": "Upgrade to",
-    "active": "Active"
+    "active": "Active",
+    "withoutPlan": "Without a plan",
+    "noPlan": {
+      "jobPostFee": "₹{{amount}} for each job post",
+      "jobPostViewer": "₹{{amount}} to see each person who viewed a job post",
+      "profileViewer": "₹{{amount}} to see each person who viewed your profile",
+      "limit": {
+        "service_one": "{{count}} free job accept a month (any job)",
+        "service_other": "{{count}} free job accepts a month (any job)",
+        "shop_one": "{{count}} free order accept a month (any order)",
+        "shop_other": "{{count}} free order accepts a month (any order)"
+      },
+      "personal": {
+        "service": "₹{{amount}} for each job booked with you personally",
+        "shop": "₹{{amount}} for each order sent to your shop"
+      },
+      "after": "Then ₹{{amount}} for each accept",
+      "every": "₹{{amount}} for each accept"
+    }
   },
   "activity": {
     "filter": "Filter",
@@ -1443,9 +1484,9 @@
     "total_other": "{{count}} visits",
     "none": "Nobody has opened this post yet.",
     "someone": "Someone",
-    "lockedTitle": "Who viewed your post?",
-    "lockedText": "Get Job Post Plus to see who viewed your job post and their number.",
-    "getPlan": "Get Job Post Plus",
+    "lockedTitle": "See everyone who viewed",
+    "lockedText": "The Job Post plan shows every visitor's name and number — or unlock one person below.",
+    "getPlan": "Get the Job Post plan",
     "times_one": "{{count}} time",
     "times_other": "{{count}} times",
     "new": "New",
@@ -1458,7 +1499,9 @@
     "visits_one": "{{count}} visit",
     "visits_other": "{{count}} visits",
     "adText": "Watch a short ad to see who viewed your post, with their number.",
-    "adButton": "Watch Ad"
+    "adButton": "Watch Ad",
+    "hiddenNumber": "+91 ••••• •••••",
+    "unlock": "See who"
   },
   "homeLocation": {
     "current": "Current location",
@@ -1628,7 +1671,7 @@
     "swipeHint": "Swipe left or right for the next one",
     "openOrder": "Open order",
     "new": "New",
-    "swipeTitle": "Swipe through every request",
+    "swipeTitle": "Every request waiting for you",
     "tapForDetails": "Tap to open in Live Requests",
     "awayLine": "{{distance}} away",
     "deliveryCharge": "Delivery charge {{amount}}",
@@ -1637,7 +1680,8 @@
     "lastOne": "That's the last one",
     "moreItems_one": "+{{count}} more item",
     "moreItems_other": "+{{count}} more items",
-    "viewListLabel": "View the list"
+    "viewListLabel": "View the list",
+    "more": "+{{count}} more · Swipe to see"
   },
   "livePopup": {
     "permissionTitle": "Allow pop-ups for new requests",
@@ -1679,5 +1723,40 @@
   "afterAccept": {
     "givenBackTitle": "Given back",
     "givenBackMessage": "You didn’t pay, so it went back to other partners."
+  },
+  "quickLimit": {
+    "leftTitle_one": "{{count}} free accept left",
+    "leftTitle_other": "{{count}} free accepts left",
+    "kind": {
+      "service": "Free job accepts this month",
+      "shop": "Free order accepts this month"
+    },
+    "used": "{{used}} of {{limit}} used",
+    "message": {
+      "service": "Without a plan you get {{limit}} free accepts a month — any job counts. After that each accept costs a small fee. The Service plan has no limit.",
+      "shop": "Without a plan you get {{limit}} free accepts a month — any order counts. After that each accept costs a small fee. The Shop plan has no limit."
+    },
+    "acceptAnyway_one": "Accept ({{count}} left)",
+    "acceptAnyway_other": "Accept ({{count}} left)",
+    "subscribe": "Subscribe — no limit",
+    "subscribeShort": "Subscribe",
+    "fewLeft_one": "{{count}} of {{limit}} free accepts left this month",
+    "fewLeft_other": "{{count}} of {{limit}} free accepts left this month",
+    "noneLeft": {
+      "service": "You've used your {{limit}} free Quick Book jobs this month. Subscribe for no limit.",
+      "shop": "You've used your {{limit}} free Quick Orders this month. Subscribe for no limit."
+    },
+    "reachedTitle": "Monthly limit reached",
+    "reachedMessage": {
+      "service": "You've used this month's free Quick Book jobs. Subscribe for no limit.",
+      "shop": "You've used this month's free Quick Orders. Subscribe for no limit."
+    },
+    "needPlan": {
+      "service": "Quick Book jobs need the Service plan. Subscribe to accept them.",
+      "shop": "Quick Orders need the Shop plan. Subscribe to accept them."
+    },
+    "paidNow": "You've used your {{limit}} free accepts this month — each accept now costs ₹{{amount}}. Tap to subscribe for free accepts.",
+    "alwaysPay": "Each accept costs ₹{{amount}}. Tap to subscribe for free accepts.",
+    "acceptFee": "Accept · ₹{{amount}}"
   }
 }

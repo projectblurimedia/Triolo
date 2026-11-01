@@ -93,6 +93,7 @@ export function CategoryPicker({
   const [custom, setCustom] = useState<string[]>([]);
   const [loadingCustom, setLoadingCustom] = useState(false);
   const searchId = useRef(0);
+  const searchRef = useRef<TextInput>(null);
 
   const byKey = useMemo(() => new Map(options.map((option) => [option.key, option])), [options]);
   const optionFor = (key: string): PickerOption => byKey.get(key) ?? { key, label: key, icon: customIcon };
@@ -336,7 +337,15 @@ export function CategoryPicker({
         </View>
       ) : null}
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => (single ? setOpen(false) : finish())} statusBarTranslucent>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => (single ? setOpen(false) : finish())}
+        // The search box is ready to type in as soon as the list opens (a short wait: Android ignores focus before the modal is up).
+        onShow={() => setTimeout(() => searchRef.current?.focus(), 80)}
+        statusBarTranslucent
+      >
         <View style={[styles.container, { backgroundColor: colors.background }]}>
           <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: insets.top + 14 }]}>
             <View style={styles.headerRow}>
@@ -362,6 +371,7 @@ export function CategoryPicker({
           <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <FontAwesome6 name="magnifying-glass" size={14} color={colors.primary} solid />
             <TextInput
+              ref={searchRef}
               style={[styles.searchInput, { color: colors.text }]}
               value={query}
               onChangeText={setQuery}

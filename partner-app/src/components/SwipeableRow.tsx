@@ -24,6 +24,10 @@ interface SwipeableRowProps {
   /** Off while the list is in selection mode. */
   enabled?: boolean;
   borderRadius?: number;
+  /** Space below the row (0 for rows of a list, which are divided by lines instead). */
+  gap?: number;
+  /** Space between the row and its Delete button (0: the button sits right against the row). */
+  actionGap?: number;
 }
 
 /**
@@ -43,6 +47,8 @@ export function SwipeableRow({
   deleteLabel,
   enabled = true,
   borderRadius = 16,
+  gap = 12,
+  actionGap = ACTION_GAP,
   children,
 }: PropsWithChildren<SwipeableRowProps>) {
   const translateX = useRef(new Animated.Value(0)).current;
@@ -113,9 +119,9 @@ export function SwipeableRow({
   const actionOpacity = translateX.interpolate({ inputRange: [-ACTION_WIDTH * 0.6, -4, 0], outputRange: [1, 0, 0], extrapolate: 'clamp' });
 
   return (
-    <View style={styles.container}>
+    <View style={{ marginBottom: gap }}>
       <Animated.View
-        style={[styles.actionArea, { opacity: actionOpacity, transform: [{ translateX: actionX }] }]}
+        style={[styles.actionArea, { paddingLeft: actionGap, opacity: actionOpacity, transform: [{ translateX: actionX }] }]}
         pointerEvents={isOpen ? 'auto' : 'none'}
       >
         <Pressable
@@ -136,14 +142,12 @@ export function SwipeableRow({
 }
 
 const styles = StyleSheet.create({
-  container: { marginBottom: 12 },
   actionArea: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     right: 0,
     width: ACTION_WIDTH,
-    paddingLeft: ACTION_GAP,
   },
   deleteButton: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: brandColors.error },
   deleteText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, color: '#FFFFFF' },

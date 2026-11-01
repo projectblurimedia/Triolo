@@ -719,3 +719,16 @@ The older `GET/PUT/DELETE /me`, `PATCH /me/active` and `/me/photo` act on the fi
 - `POST /subscriptions/pay/order` — body `{ type: 'pass' | 'subscription' | 'badge', id }` → `{ keyId, orderId, amount, currency, description, prefill }` for Razorpay's in-app screen. `POST /subscriptions/pay/confirm` — the same plus `razorpayOrderId`, `razorpayPaymentId`, `razorpaySignature`; checks the signature and the order, captures, marks it paid → `{ paid: true }`.
 - `POST /subscriptions/checkout` takes `plan: 'all'` (the All in One partner plan); partner `GET /subscriptions/mine` `plans` includes `all`.
 - `GET /job-seekers/me/posts/:id/viewers?revealed=1` — `access: 'open' | 'ad' | 'plan'`; with 'ad', people show once the app has shown the ad.
+
+## Fees per action, monthly limits (migration 0065)
+
+- Pass kinds (`POST /subscriptions/passes/checkout` `kind`): customers `quick_book`, `direct_book`, `quick_order`, `shop_order`, `post_problem`, `staff_contact` (`targetId` = job post); partners `accept`, `job_post`, `job_post_viewer` (`targetId` = the viewer's `viewerKey`), `profile_viewer` (`targetId` = the notification id). `GET /subscriptions/me` `fees` is keyed by these; partner responses add `headStartSeconds` and `limits: { quickBook, quickOrder }`.
+- `POST /problems` needs a `post_problem` pass without a customer plan (403 `PAYMENT_REQUIRED`).
+- `GET /bookings/offers/limit`, `GET /orders/shop/quick/limit` → `{ limit, used, remaining }` (null limit = no limit). Accepting a Quick Book / Quick Order past it → 403 `ACCEPT_LIMIT_REACHED` `{ limit, used, plan }`. Personal bookings / orders still return `unlockNeeded: 'pay'` without the plan; Quick Book / Quick Order / problems never need unlocking.
+- `GET /job-seekers/me/posts/:id/viewers` (no `?revealed` any more): `access: 'open' | 'plan'`, each viewer has `locked`; profile-view notifications carry `viewer: { name, mobile }` and `locked`.
+- Settings: `customerFees` (`quickBook`, `directBook`, `quickOrder`, `shopOrder`, `postProblem`, `staffContact`), `partnerFees` (`accept`, `jobPost`, `jobPostViewer`, `profileViewer`), `quickBookLimit`, `quickOrderLimit`.
+- Ads: `/ads/serve` always returns null (no full-screen ads); `/ads/home` items carry `slideSeconds`; ads must be horizontal (`AD_MUST_BE_HORIZONTAL`).
+
+- `GET /subscriptions/me?audience=customer` adds `freeUses: { limit, used } | null`; settings take `customerFreeUses` (number or null).
+
+- `GET /bookings/offers/limit` / `GET /orders/shop/quick/limit` now count every accept on that side this month (not only Quick Book / Quick Order). Past the limit an accept still succeeds with `unlockNeeded: 'pay'`; `ACCEPT_LIMIT_REACHED` is no longer returned.

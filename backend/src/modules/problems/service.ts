@@ -45,24 +45,31 @@ export class ProblemsService implements BookingLifecycleListener {
     private readonly workersService: WorkersService,
     private readonly notificationsService: NotificationsService,
     private readonly bookingsService: BookingsService,
-    // Subscribed workers see new problems first (the head start).
+    // Subscribed workers see new problems first (the head start); posting is paid without a plan.
     private readonly subscriptionStatus?: SubscriptionStatusService,
-    // Whether a partner-app ad spot is on (an ad after accepting, instead of the fee).
-    private readonly adSpotOn?: (spot: string) => Promise<boolean>,
   ) {}
 
   // --- Customer side ---
 
+  /** Posting without a customer plan (while those are on) uses one paid pass. */
   async createPost(accountId: string, dto: CreateProblemPostDto): Promise<ProblemPost> {
-    return this.repository.create({
-      accountId,
-      skillCategories: dto.skillCategories,
-      description: dto.description || null,
-      quotationAmount: dto.quotationAmount,
-      locationAddress: dto.locationAddress,
-      latitude: dto.latitude ?? null,
-      longitude: dto.longitude ?? null,
-    });
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'post_problem')) ?? null;
+    try {
+      const post = await this.repository.create({
+        accountId,
+        skillCategories: dto.skillCategories,
+        description: dto.description || null,
+        quotationAmount: dto.quotationAmount,
+        locationAddress: dto.locationAddress,
+        latitude: dto.latitude ?? null,
+        longitude: dto.longitude ?? null,
+      });
+      await this.subscriptionStatus?.attachPass(passId, `problem-${post.id}`);
+      return post;
+    } catch (error) {
+      await this.subscriptionStatus?.restorePasses([], [passId]);
+      throw error;
+    }
   }
 
   async updatePost(accountId: string, postId: string, dto: UpdateProblemPostDto): Promise<ProblemPost> {
@@ -122,6 +129,8 @@ export class ProblemsService implements BookingLifecycleListener {
     }
     await this.repository.delete(postId, accountId);
     await deletePhotosFromCloudinary(existing.photoUrls);
+    // Taken down before any worker took it (e.g. its photos failed to upload): the payment is kept for the next one.
+    if (existing.status === 'open') await this.subscriptionStatus?.restorePasses([`problem-${postId}`]);
   }
 
   async listMyPosts(accountId: string): Promise<OwnProblemPost[]> {
@@ -176,9 +185,9 @@ export class ProblemsService implements BookingLifecycleListener {
    */
   async acceptProblem(accountId: string, postId: string): Promise<ProblemPost> {
     const worker = await this.getVerifiedWorker(accountId);
-    // Accepting is instant and free; an ad or the fee comes after (on the trip it starts).
+    // Counts as one of the month's free accepts; after them the fee comes before the trip opens.
     const unlockNeeded = this.subscriptionStatus
-      ? await this.subscriptionStatus.unlockNeeded(accountId, 'service', this.adSpotOn ? () => this.adSpotOn!('problem_accept') : undefined)
+      ? await this.subscriptionStatus.acceptUnlock(accountId, 'service', () => this.bookingsService.acceptsThisMonth(accountId))
       : null;
     const result = await this.repository.accept(postId, worker.id, accountId);
     if (!result) {

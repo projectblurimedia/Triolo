@@ -188,7 +188,7 @@ export class JobSeekersRepository {
     const owned = await this.pool.query(`SELECT 1 FROM job_seeker_posts WHERE id = $1 AND account_id = $2`, [postId, ownerAccountId]);
     if (!owned.rowCount) return null;
     const result = await this.pool.query(
-      `SELECT v.viewer_account_id, max(v.created_at) AS last_viewed_at, count(*)::int AS times,
+      `SELECT (array_agg(v.id ORDER BY v.created_at))[1] AS view_id, max(v.created_at) AS last_viewed_at, count(*)::int AS times,
               bool_or(v.seen_at IS NULL) AS is_new, a.full_name, a.mobile_number
        FROM job_post_views v JOIN accounts a ON a.id = v.viewer_account_id
        WHERE v.post_id = $1
@@ -197,7 +197,8 @@ export class JobSeekersRepository {
       [postId, limit],
     );
     return result.rows.map((row) => ({
-      viewerKey: row.viewer_account_id,
+      // The person's first view of this post: what paying to see them unlocks.
+      viewerKey: row.view_id,
       name: row.full_name,
       mobile: row.mobile_number,
       lastViewedAt: new Date(row.last_viewed_at).toISOString(),

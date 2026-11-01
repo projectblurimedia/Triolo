@@ -114,12 +114,15 @@ function StepCard({
   slim,
   accent = brandColors.pending,
   loading = false,
+  row = false,
 }: {
   step: StackStep;
   onPress: () => void;
   compact?: boolean;
   slim?: boolean;
   accent?: string;
+  /** A row of a list (the "see all" screen): full width, divided by a line, no card. */
+  row?: boolean;
   /** Opening (an ad is being fetched / shown first): sweep, pulsing icon, spinner button. */
   loading?: boolean;
 }) {
@@ -134,29 +137,29 @@ function StepCard({
       style={({ pressed }) => [
         styles.card,
         slim ? styles.cardSlim : null,
-        { backgroundColor: colors.surface, borderColor: `${accent}99`, opacity: pressed ? 0.92 : 1 },
+        row
+          ? [styles.listRow, { backgroundColor: pressed ? `${colors.primary}0D` : colors.background, borderBottomColor: colors.border }]
+          : { backgroundColor: colors.surface, borderColor: `${accent}99`, opacity: pressed ? 0.92 : 1 },
       ]}
       accessibilityRole="button"
     >
-      <View style={[StyleSheet.absoluteFill, styles.cardTint, { backgroundColor: loading ? `${headerGradient[0]}0D` : `${accent}0A` }]} />
+      {row ? null : (
+        <View style={[StyleSheet.absoluteFill, styles.cardTint, { backgroundColor: loading ? `${headerGradient[0]}0D` : `${accent}0A` }]} />
+      )}
       {loading ? <CardSweep /> : null}
       <Animated.View style={{ transform: [{ scale: iconScale }] }}>
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.icon, slim ? styles.iconSlim : null]}>
-          <FontAwesome6 name={step.icon} size={slim ? 14 : 17} color="#FFFFFF" solid />
-        </LinearGradient>
+        {/* Red for things still under way (a done-jobs stack keeps its own colour). */}
+        <View style={[styles.icon, { backgroundColor: accent === brandColors.pending ? brandColors.error : accent }]}>
+          <FontAwesome6 name={step.icon} size={17} color="#FFFFFF" solid />
+        </View>
       </Animated.View>
       <View style={styles.text}>
         <View style={styles.nameRow}>
           <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
             {step.name}
           </Text>
-          <View style={[styles.pendingTag, { backgroundColor: `${tag.color}1A` }]}>
-            <Text style={[styles.pendingText, { color: tag.color }]} numberOfLines={1}>
-              {tag.label}
-            </Text>
-          </View>
         </View>
-        <Text style={[styles.step, { color: headerGradient[0] }]} numberOfLines={1}>
+        <Text style={[styles.step, { color: colors.text }]} numberOfLines={1}>
           {step.stepTitle}
         </Text>
         {step.hint && !slim ? (
@@ -165,19 +168,27 @@ function StepCard({
           </Text>
         ) : null}
       </View>
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.go, slim ? styles.goSlim : null]}>
-        {loading ? (
-          <>
-            <LoadingIndicator size={14} dotSize={3} color="#FFFFFF" />
-            <Text style={[styles.goText, slim ? styles.goTextSlim : null]}>{t('continueSteps.opening')}</Text>
-          </>
-        ) : (
-          <>
-            <Text style={[styles.goText, slim ? styles.goTextSlim : null]}>{step.action}</Text>
-            <FontAwesome6 name="chevron-right" size={10} color="#FFFFFF" solid />
-          </>
-        )}
-      </LinearGradient>
+      {/* Where it stands (Pending, On the way…) on the right, where a "Continue" button used to be. */}
+      {loading ? (
+        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.go, slim ? styles.goSlim : null]}>
+          <LoadingIndicator size={14} dotSize={3} color="#FFFFFF" />
+          <Text style={[styles.goText, slim ? styles.goTextSlim : null]}>{t('continueSteps.opening')}</Text>
+        </LinearGradient>
+      ) : (
+        // Solid colour with white text, so the status reads clearly. A done-jobs / orders stack
+        // (its own accent) uses one blue gradient for every status instead of many colours.
+        <LinearGradient
+          colors={accent === brandColors.pending ? [tag.color, tag.color] : headerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.go, styles.goSlim]}
+        >
+          <Text style={[styles.goText, styles.goTextSlim]} numberOfLines={1}>
+            {tag.label}
+          </Text>
+          <FontAwesome6 name="chevron-right" size={10} color="#FFFFFF" solid />
+        </LinearGradient>
+      )}
     </Pressable>
   );
 }
@@ -198,6 +209,7 @@ export function StepStack({
   icon = 'clock-rotate-left',
   hideMore = false,
   expanded = false,
+  onSeeAll,
 }: {
   title: string;
   steps: StackStep[];
@@ -214,6 +226,8 @@ export function StepStack({
   hideMore?: boolean;
   /** Every card one under another (a screen of its own), not a stack. */
   expanded?: boolean;
+  /** A "See all" link at the right of the heading (e.g. to the whole history). */
+  onSeeAll?: () => void;
 }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
@@ -257,10 +271,17 @@ export function StepStack({
       <View style={[styles.headerRow, minimized ? styles.headerRowSlim : null]}>
         {live ? <LiveDot color={accent} /> : <FontAwesome6 name={icon} size={13} color={accent} solid />}
         <Text style={[styles.sectionTitle, minimized ? styles.sectionTitleSlim : null, { color: colors.text }]}>{title}</Text>
+        {/* How many there are, at the right of the heading (tapping the stack lists them all). */}
         {stacked ? (
           <View style={[styles.countPill, { backgroundColor: `${colors.primary}14` }]}>
             <Text style={[styles.countText, { color: colors.primary }]}>{steps.length}</Text>
           </View>
+        ) : null}
+        {onSeeAll ? (
+          <Pressable onPress={onSeeAll} hitSlop={8} style={styles.seeAll} accessibilityRole="button">
+            <Text style={[styles.seeAllText, { color: colors.primary }]}>{t('continueSteps.seeAll')}</Text>
+            <FontAwesome6 name="chevron-right" size={10} color={colors.primary} solid />
+          </Pressable>
         ) : null}
       </View>
 
@@ -300,18 +321,11 @@ export function StepStack({
           />
         </View>
       </View>
-      {stacked && !hideMore ? (
-        <Pressable onPress={() => setListOpen(true)} hitSlop={6} style={styles.moreRow}>
-          <Text style={[styles.moreText, { color: colors.textMuted }]}>
-            {t('continueSteps.more', { count: steps.length - 1 })}
-          </Text>
-        </Pressable>
-      ) : null}
 
       <Modal visible={listOpen} transparent animationType="fade" onRequestClose={() => setListOpen(false)} statusBarTranslucent>
         <View style={[styles.screen, { backgroundColor: colors.background }]}>
           <LinearGradient
-            colors={headerGradient}
+            colors={live ? RED_GRADIENT : headerGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.header, { paddingTop: insets.top + 14 }]}
@@ -336,7 +350,7 @@ export function StepStack({
             showsVerticalScrollIndicator={false}
           >
             {steps.map((step) => (
-              <StepCard key={step.key} step={step} onPress={() => openStep(step)} accent={accent} />
+              <StepCard key={step.key} step={step} onPress={() => openStep(step)} accent={accent} row />
             ))}
           </ScrollView>
         </View>
@@ -345,7 +359,11 @@ export function StepStack({
   );
 }
 
+const RED_GRADIENT = ['#DC2626', '#EF4444'] as const;
+
 const styles = StyleSheet.create({
+  seeAll: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto' },
+  seeAllText: { fontFamily: fonts.semiBold, fontSize: 13 },
   flex: { flex: 1 },
   expanded: { gap: 12 },
   section: { marginTop: 18, marginBottom: 4 },
@@ -367,7 +385,6 @@ const styles = StyleSheet.create({
   },
   cardTint: { borderRadius: 18 },
   cardSlim: { paddingVertical: 9, paddingHorizontal: 10, gap: 10, borderRadius: 16 },
-  iconSlim: { width: 36, height: 36, borderRadius: 12 },
   goSlim: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12 },
   goTextSlim: { fontSize: 11 },
   headerRowSlim: { marginBottom: 8 },
@@ -378,8 +395,6 @@ const styles = StyleSheet.create({
   text: { flex: 1, gap: 1 },
   name: { ...typography.body, fontFamily: fonts.semiBold, flexShrink: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pendingTag: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
-  pendingText: { fontFamily: fonts.semiBold, fontSize: 10 },
   step: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
   hint: { ...typography.caption, fontSize: 11, lineHeight: 15 },
   go: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 14, paddingHorizontal: 11, paddingVertical: 8 },
@@ -400,5 +415,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF' },
   headerSubtitle: { ...typography.caption, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  list: { padding: 16, gap: 12 },
+  list: { paddingTop: 4 },
+  // A list row: square, no border but the line under it.
+  listRow: { borderRadius: 0, borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 20, paddingVertical: 14 },
 });

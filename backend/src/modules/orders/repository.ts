@@ -211,6 +211,16 @@ export class OrdersRepository {
     });
   }
 
+  /** Orders any of this owner's shops accepted this month (India time): Quick Orders and orders sent to the shop. */
+  async countAcceptsThisMonth(ownerAccountId: string): Promise<number> {
+    const result = await this.pool.query(
+      `SELECT count(*)::int AS n FROM shop_orders o JOIN business_profiles b ON b.id = o.business_id
+       WHERE b.account_id = $1 AND o.accepted_at >= (date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata')`,
+      [ownerAccountId],
+    );
+    return result.rows[0].n;
+  }
+
   /** This shop's still-open offer of a Quick Order nobody has taken: its distance, or null. */
   async findQuickOffer(orderId: string, businessId: string): Promise<number | null> {
     const result = await this.pool.query(

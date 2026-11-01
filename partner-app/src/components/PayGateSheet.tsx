@@ -30,6 +30,8 @@ const ICONS: Record<string, React.ComponentProps<typeof FontAwesome6>['name']> =
   staff_contact: 'phone',
   accept: 'handshake',
   job_post: 'briefcase',
+  job_post_viewer: 'user-lock',
+  profile_viewer: 'user-lock',
 };
 
 /**
@@ -152,7 +154,9 @@ export function PayGateSheet() {
             </Pressable>
           ) : (
             <Pressable onPress={pay} disabled={busy} accessibilityRole="button" style={styles.payWrap}>
-              <LinearGradient colors={GOLD_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.pay}>
+              {/* The gradient is a layer under the label (not its parent), so the label always draws. */}
+              <LinearGradient colors={GOLD_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              <View style={styles.pay}>
                 {step === 'starting' ? (
                   <LoadingIndicator size={20} />
                 ) : (
@@ -161,7 +165,7 @@ export function PayGateSheet() {
                     <Text style={styles.payText}>{t('payGate.pay', { amount: request.amount })}</Text>
                   </>
                 )}
-              </LinearGradient>
+              </View>
             </Pressable>
           )}
 
@@ -173,8 +177,8 @@ export function PayGateSheet() {
           </View>
           <Pressable
             onPress={() => {
-              // The plan for this side: job posts, or services / shop for accepting.
-              const plan = request.kind === 'job_post' ? 'job_post' : request.plan;
+              // The plan for this side: job posts, or services / shop.
+              const plan = request.kind === 'job_post' || request.kind === 'job_post_viewer' ? 'job_post' : request.plan;
               done(false);
               openSubscribe(plan);
             }}
@@ -227,7 +231,7 @@ const styles = StyleSheet.create({
   // Solid gold under the gradient: the button can never come out see-through.
   payWrap: { alignSelf: 'stretch', height: 50, borderRadius: 14, overflow: 'hidden', backgroundColor: GOLD_BUTTON[1] },
   pay: { height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  payText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  payText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF', includeFontPadding: false },
   outline: { alignSelf: 'stretch', height: 50, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   outlineText: { ...typography.body, fontFamily: fonts.semiBold },
   orRow: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, marginBottom: 12 },

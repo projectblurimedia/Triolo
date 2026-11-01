@@ -5,24 +5,37 @@ import { AUDIENCE_BY_TYPE, NotificationListResult, NotificationType, PushApp, Pu
 const DEFAULT_LIST_LIMIT = 50;
 
 /**
- * Whether a partner may see who viewed their profile (a subscription perk). Set once at
- * startup by the app (app.ts) from the subscriptions module, so this module needs no
- * dependency on it; until set, nobody does.
+ * Whether a partner may see who viewed their profile / job post: everyone (plans off, or on
+ * the plan for it), or — one by one — the profile views they paid to see (by notification id).
+ * Set once at startup by the app (app.ts) from the subscriptions module, so this module needs
+ * no dependency on it; until set, nobody is shown.
  */
 type ViewerPlan = 'service' | 'shop' | 'job_post';
-type Reveal = (accountId: string, plan?: ViewerPlan) => Promise<boolean>;
-let profileViewerReveal: Reveal | null = null;
+export interface ViewerAccess {
+  reveals: (accountId: string, plan?: ViewerPlan) => Promise<boolean>;
+  /** Profile-view notification ids this partner paid to see. */
+  unlocked: (accountId: string) => Promise<Set<string>>;
+}
+let viewerAccess: ViewerAccess | null = null;
 
-export function setProfileViewerReveal(reveal: Reveal): void {
-  profileViewerReveal = reveal;
+export function setProfileViewerAccess(access: ViewerAccess): void {
+  viewerAccess = access;
 }
 
-/** Whether the partner's plan for that profile shows who viewed it. */
+/** Whether the partner's plan for that profile (or plans being off) shows who viewed it. */
 async function revealsViewers(accountId: string, plan?: ViewerPlan): Promise<boolean> {
   try {
-    return profileViewerReveal ? await profileViewerReveal(accountId, plan) : false;
+    return viewerAccess ? await viewerAccess.reveals(accountId, plan) : false;
   } catch {
     return false;
+  }
+}
+
+async function unlockedProfileViews(accountId: string): Promise<Set<string>> {
+  try {
+    return viewerAccess ? await viewerAccess.unlocked(accountId) : new Set();
+  } catch {
+    return new Set();
   }
 }
 
@@ -52,7 +65,8 @@ export class NotificationsService {
     }
     const title = 'Profile Viewed';
     const body = 'Someone viewed your profile.';
-    // The viewer is remembered; a subscribed partner sees who it was (here and in the list).
+    // The viewer is remembered; a partner on the plan (or with plans off) sees who it was,
+    // others can pay to see this one (here and in the list).
     const saved = await this.repository.create({
       accountId: recipientAccountId,
       type: 'profile_view',
@@ -188,6 +202,7 @@ export class NotificationsService {
     const result = await this.repository.findForAccount(accountId, DEFAULT_LIST_LIMIT);
     // Asked once per plan: each profile's views are shown on that profile's own plan.
     const reveals = new Map<string, boolean>();
+    const paidFor = result.items.some((item) => item.type === 'profile_view') ? await unlockedProfileViews(accountId) : new Set<string>();
     const reveal = async (plan?: ViewerPlan) => {
       const key = plan ?? '*';
       if (!reveals.has(key)) reveals.set(key, await revealsViewers(accountId, plan));
@@ -201,9 +216,9 @@ export class NotificationsService {
       if (rest.type === 'profile_view') {
         const plan = rest.ref?.kind === 'service' || rest.ref?.kind === 'shop' ? rest.ref.kind : undefined;
         items.push(
-          actorName && (await reveal(plan))
-            ? { ...rest, title: `${actorName} viewed your profile`, viewer: { name: actorName } }
-            : { ...rest, viewer: null },
+          actorName && ((await reveal(plan)) || paidFor.has(rest.id))
+            ? { ...rest, title: `${actorName} viewed your profile`, viewer: { name: actorName, mobile: actorMobile ?? null }, locked: false }
+            : { ...rest, viewer: null, locked: true },
         );
       } else if (rest.type === 'job_post_view') {
         items.push(

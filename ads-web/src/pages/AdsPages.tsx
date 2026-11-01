@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faArrowsLeftRight,
   faBullhorn,
   faCalendarDays,
   faCircleCheck,
@@ -37,7 +38,6 @@ import {
   promotesProfile,
 } from '@/components/AdActionField';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { AdShowOn, AdShowOnPicker, showOnLabel } from '@/components/AdShowOnPicker';
 import { BackLink, Badge, ErrorState, InfoRow, Loading, Notice, Spinner } from '@/components/ui';
 import { useApi } from '@/hooks/useApi';
 import {
@@ -151,7 +151,7 @@ export function MyAdsPage() {
           <div className="welcome">
             <h2>Hi {account?.fullName?.split(' ')[0] ?? 'there'} — reach customers near your shop</h2>
             <p>
-              Your picture or short video shows full screen in the Triolo apps — to everyone, or with directions, to people near your place.
+              Your wide picture or short video slides by at the top of Home in the Triolo apps — to everyone, or with directions, to people near your place.
               Book it here in a few minutes; Triolo checks it and it goes live on your start date.
             </p>
             <Link to="/new" className="btn">
@@ -215,7 +215,7 @@ function HowItWorksSteps() {
     },
     {
       title: 'It goes live nearby',
-      text: 'People around your place see it full screen in the Triolo apps. Watch the views and opens here.',
+      text: 'People see it in the Home slider of the Triolo apps. Watch the views and opens here.',
     },
   ];
   return (
@@ -319,9 +319,7 @@ function AdForm({ ad }: { ad?: Ad }) {
   const [action, setAction] = useState<AdActionValue>(() => (ad ? actionFromAd(ad) : EMPTY_ACTION));
   const [description, setDescription] = useState(ad?.description ?? '');
   const [orientation, setOrientation] = useState<AdOrientation>(ad?.orientation ?? 'vertical');
-  // Full screen before actions, or a wide card in Home's slider.
-  const [showOn, setShowOn] = useState<AdShowOn>(ad?.showOn ?? 'action');
-  const forHome = showOn === 'home';
+
   // A picture shows for 15 seconds (a video for its own length); not asked any more.
   const displaySeconds = ad?.displaySeconds ?? 15;
   const [planDays, setPlanDays] = useState<AdPlanDays>(ad && ad.billing !== 'views' ? (ad.planDays as AdPlanDays) : 7);
@@ -392,16 +390,14 @@ function AdForm({ ad }: { ad?: Ad }) {
       if (picked.kind === 'video' && (picked.seconds ?? 0) > AD_MAX_VIDEO_SECONDS + 1) {
         return setError(`That video is ${Math.round(picked.seconds ?? 0)} seconds — ads can be at most ${AD_MAX_VIDEO_SECONDS}.`);
       }
+      // Only wide files: a tall (or square) one isn't taken at all.
+      if (picked.width && picked.height && picked.height >= picked.width) return setError('That picture or video is tall. Only horizontal (wide, 16:9) ones can be used — choose another.');
       setError('');
       if (media?.file) URL.revokeObjectURL(media.url);
       setMedia({ kind: picked.kind, url: URL.createObjectURL(file), file, seconds: picked.seconds });
       upload.current = null;
       setUploadStatus(null);
-      // Taller than wide → vertical (reel / poster), else horizontal.
-      if (picked.width && picked.height) setOrientation(picked.height > picked.width ? 'vertical' : 'horizontal');
-      if (forHome && picked.width && picked.height && picked.height > picked.width) {
-        setError('The Home slider needs a wide (horizontal, 16:9) picture or video. This one is tall — fine for "Before actions".');
-      }
+      setOrientation('horizontal');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That file could not be read.');
     }
@@ -413,8 +409,8 @@ function AdForm({ ad }: { ad?: Ad }) {
     if (actionError) return setError(actionError);
     if (!promotesProfile(action) && advertiserName.trim().length < 2) return setError('Enter your business name.');
     if (!promotesProfile(action) && !media) return setError('Add your ad: one picture or one video.');
-    if (forHome && !promotesProfile(action) && orientation === 'vertical') {
-      return setError('The Home slider needs a wide (horizontal, 16:9) picture or video. Choose a wide one, or "Before actions".');
+    if (!promotesProfile(action) && !media?.file && orientation === 'vertical') {
+      return setError('This ad is tall. Choose a horizontal (wide, 16:9) picture or video for the Home slider.');
     }
     if (!startDate || startDate < todayInIndia()) return setError('Choose a start date from today on.');
     setError('');
@@ -436,8 +432,8 @@ function AdForm({ ad }: { ad?: Ad }) {
         advertiserName: promotesProfile(action) ? undefined : advertiserName.trim(),
         description: description.trim() || undefined,
         ...actionBody(action),
-        orientation: forHome ? 'horizontal' : orientation,
-        showOn,
+        orientation: 'horizontal' as const,
+        showOn: 'home' as const,
         displaySeconds,
         planDays,
         billing,
@@ -482,10 +478,6 @@ function AdForm({ ad }: { ad?: Ad }) {
         <div className="card-title" style={{ marginTop: 10 }}>
           <FontAwesomeIcon icon={faBullhorn} /> The ad
         </div>
-        <div className="field">
-          <span>Where it shows *</span>
-          <AdShowOnPicker value={showOn} onChange={setShowOn} disabled={saving} />
-        </div>
         {promotesProfile(action) ? (
           <div className="profile-ad-note">
             <FontAwesomeIcon icon={faIdBadge} />
@@ -498,6 +490,14 @@ function AdForm({ ad }: { ad?: Ad }) {
         ) : (
         <div className="field">
           <span>Picture or video * (one)</span>
+          {/* Said before choosing: the Home slider takes only wide pictures and videos. */}
+          <div className="wide-only">
+            <FontAwesomeIcon icon={faArrowsLeftRight} />
+            <span>
+              <strong>Horizontal only (16:9).</strong> Ads show as wide cards in the Home slider — tall pictures and videos
+              can't be chosen.
+            </span>
+          </div>
           <div className="ad-image-pick">
             {media ? (
               <div className={`ad-frame ${orientation}`}>
@@ -520,7 +520,7 @@ function AdForm({ ad }: { ad?: Ad }) {
             ) : null}
             {media ? (
               <span className="muted" style={{ fontSize: 12 }}>
-                {orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'} — from its shape
+                {orientation === 'vertical' ? 'Tall — choose a wide one instead' : 'Horizontal (16:9)'}
                 {media.file ? ` · ${(media.file.size / 1024 / 1024).toFixed(1)} MB, uploaded when you send the ad` : ''}
               </span>
             ) : null}
@@ -531,7 +531,7 @@ function AdForm({ ad }: { ad?: Ad }) {
             </label>
             <span className="muted" style={{ fontSize: 12 }}>
               Picture: JPG / PNG up to {AD_MAX_IMAGE_MB} MB. Video: up to {AD_MAX_VIDEO_SECONDS} seconds and {AD_MAX_VIDEO_MB} MB.
-              {forHome ? 'Wide (16:9) only — it fills the Home slider card.' : 'Vertical (like a reel or poster) fills the phone screen best.'}
+              Wide (16:9) fills the Home slider card best.
             </span>
           </div>
         </div>
@@ -859,10 +859,8 @@ export function AdDetailPage() {
             <span className="ad-preview-tag">Ad</span>
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 10 }}>
-            {showOnLabel(ad.showOn)} · {ad.orientation === 'vertical' ? 'Vertical (9:16)' : 'Horizontal (16:9)'}
-            {ad.showOn === 'home'
-              ? ' · slides by itself at the top of Home'
-              : ` · ${ad.videoUrl ? `video, ${ad.durationSeconds} s` : `picture, shown ${ad.displaySeconds} s`} before it can be closed`}
+            Home slider · {ad.orientation === 'vertical' ? 'Tall (not shown — only wide ads show now)' : 'Horizontal (16:9)'}
+            {ad.videoUrl ? ` · video, ${ad.durationSeconds} s` : ''}
           </div>
           <div className="info">
             {ad.description ? (

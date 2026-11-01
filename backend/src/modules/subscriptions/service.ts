@@ -22,6 +22,10 @@ import {
   SubscriptionSettings,
   TrustedIds,
   CUSTOMER_PASS_KINDS,
+  FREE_USE_KINDS,
+  PARTNER_PASS_KINDS,
+  PER_TARGET_KINDS,
+  passFee,
   PassKind,
   PARTNER_PLANS,
   PartnerPlan,
@@ -62,11 +66,16 @@ interface Deps {
  */
 /** What a pay-per-use payment is for (shown on the Razorpay page). */
 const PASS_LABEL: Record<PassKind, string> = {
-  book: 'Triolo — book a worker (one booking)',
-  order: 'Triolo — order from a shop (one order)',
+  quick_book: 'Triolo — one Quick Book',
+  direct_book: 'Triolo — book a particular worker',
+  quick_order: 'Triolo — one Quick Order',
+  shop_order: 'Triolo — order from a particular shop',
+  post_problem: 'Triolo — post a problem',
   staff_contact: "Triolo — a job seeker's phone number",
-  accept: 'Triolo Partner — accept one job or order',
+  accept: 'Triolo Partner — accept a personal booking or order',
   job_post: 'Triolo Partner — publish a job post',
+  job_post_viewer: 'Triolo Partner — see who viewed your job post',
+  profile_viewer: 'Triolo Partner — see who viewed your profile',
 };
 
 /** Which partner plan a payment is for (shown on the Razorpay page). */
@@ -117,11 +126,26 @@ export class SubscriptionsService {
       pending: pending?.paymentUrl
         ? { id: pending.id, months: pending.months, amount: pending.amount, paymentUrl: pending.paymentUrl }
         : null,
-      fees:
-        audience === 'customer'
-          ? { book: settings.customerFees.book, order: settings.customerFees.order, staff_contact: settings.customerFees.staffContact }
-          : { accept: settings.partnerFees.accept, job_post: settings.partnerFees.jobPost },
+      // Keyed by pass kind.
+      fees: Object.fromEntries(
+        (audience === 'customer' ? CUSTOMER_PASS_KINDS : PARTNER_PASS_KINDS).map((kind) => [kind, passFee(settings, kind)]),
+      ),
       passes: await this.repository.countPaidPasses(accountId),
+      ...(audience === 'partner'
+        ? {
+            headStartSeconds: settings.headStartSeconds,
+            limits: { quickBook: settings.quickBookLimit, quickOrder: settings.quickOrderLimit },
+          }
+        : {
+            freeUses: {
+              bookings: settings.customerFreeBookings
+                ? { limit: settings.customerFreeBookings, used: await this.repository.countFreeUsesThisMonth(accountId, FREE_USE_KINDS.bookings) }
+                : null,
+              orders: settings.customerFreeOrders
+                ? { limit: settings.customerFreeOrders, used: await this.repository.countFreeUsesThisMonth(accountId, FREE_USE_KINDS.orders) }
+                : null,
+            },
+          }),
       ...(audience === 'partner'
         ? {
             plans: Object.fromEntries(
@@ -140,31 +164,32 @@ export class SubscriptionsService {
    */
   async passCheckout(accountId: string, kind: PassKind, targetId: string | null, plan?: PartnerPlan) {
     const settings = await this.repository.getSettings();
-    const audience = CUSTOMER_PASS_KINDS.includes(kind) ? 'customer' : 'partner';
+    const audience = (CUSTOMER_PASS_KINDS as readonly PassKind[]).includes(kind) ? 'customer' : 'partner';
     const plansOn = audience === 'customer' ? customerPlansOn(settings) : partnerPlansOn(settings);
-    // A job post is paid for even on a plan; accepting is free on that side's plan.
-    const covered = kind !== 'job_post' && (await this.status.isActive(accountId, audience, audience === 'partner' ? plan : undefined));
+    // The plan that makes it free: the customer plan, or the partner plan for that side.
+    const partnerPlan: PartnerPlan | undefined = kind === 'job_post' || kind === 'job_post_viewer' ? 'job_post' : plan;
+    const covered = await this.status.isActive(accountId, audience, audience === 'partner' ? partnerPlan : undefined);
     if (!plansOn || covered) return { id: null, paid: true, amount: 0, paymentUrl: null };
-    if (kind === 'staff_contact') {
-      if (!targetId) throw AppError.badRequest('Which job post?', 'VALIDATION_ERROR');
-      if ((await this.repository.unlockedStaffPosts(accountId)).includes(targetId)) {
+    // One particular thing (a phone number, a viewer): paid once, then always shown.
+    const perTarget = PER_TARGET_KINDS.includes(kind);
+    // A customer booking / order / post still within the month's free ones: nothing to pay.
+    if (audience === 'customer' && !perTarget && (await this.status.customerFreeLeft(accountId, kind, settings)) > 0) {
+      return { id: null, paid: true, amount: 0, paymentUrl: null };
+    }
+    if (perTarget) {
+      if (!targetId) throw AppError.badRequest('Which one?', 'VALIDATION_ERROR');
+      if ((await this.repository.unlockedTargets(accountId, kind)).includes(targetId)) {
         return { id: null, paid: true, amount: 0, paymentUrl: null };
       }
     }
-    const existing = await this.repository.findUsablePass(accountId, kind, kind === 'staff_contact' ? targetId : null);
+    const existing = await this.repository.findUsablePass(accountId, kind, perTarget ? targetId : null);
     if (existing?.status === 'paid') return { id: existing.id, paid: true, amount: existing.amount, paymentUrl: null };
     if (existing?.paymentUrl) return { id: existing.id, paid: false, amount: existing.amount, paymentUrl: existing.paymentUrl };
 
-    const amount = {
-      book: settings.customerFees.book,
-      order: settings.customerFees.order,
-      staff_contact: settings.customerFees.staffContact,
-      accept: settings.partnerFees.accept,
-      job_post: settings.partnerFees.jobPost,
-    }[kind];
+    const amount = passFee(settings, kind);
     const contact = await this.repository.accountContact(accountId);
     if (!contact) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
-    const pass = await this.repository.createPass(accountId, kind, amount, kind === 'staff_contact' ? targetId : null);
+    const pass = await this.repository.createPass(accountId, kind, amount, perTarget ? targetId : null);
     if (amount <= 0) {
       // A free use (the admin set ₹0): paid at once.
       await this.repository.markPassPaid(pass.id, `free-${pass.id}`);

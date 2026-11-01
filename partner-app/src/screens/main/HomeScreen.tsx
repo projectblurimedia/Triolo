@@ -342,32 +342,6 @@ export function HomeScreen() {
     onPress: () => openShopOrder(order.id),
   }));
 
-  // "All bookings" / "All shop orders": a bright card leading to Activity.
-  // A light card on the page (not a solid blue block), its icon and arrow in the brand blue.
-  const renderAllButton = (icon: React.ComponentProps<typeof FontAwesome6>['name'], title: string, hint: string, onPress: () => void) => (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.allWrap,
-        styles.allCard,
-        { backgroundColor: `${colors.primary}0F`, borderColor: `${colors.primary}33`, transform: [{ scale: pressed ? 0.985 : 1 }] },
-      ]}
-    >
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.allIcon}>
-        <FontAwesome6 name={icon} size={15} color="#FFFFFF" solid />
-      </LinearGradient>
-      <View style={styles.flex}>
-        <Text style={[styles.allTitle, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.allHint, { color: colors.textMuted }]} numberOfLines={1}>
-          {hint}
-        </Text>
-      </View>
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.allGo}>
-        <FontAwesome6 name="arrow-right" size={12} color="#FFFFFF" solid />
-      </LinearGradient>
-    </Pressable>
-  );
-
   const renderSectionTitle = (icon: React.ComponentProps<typeof FontAwesome6>['name'], title: string, count?: number, tone?: string) => (
     <View style={styles.sectionRow}>
       <LinearGradient colors={tone ? [tone, `${tone}B3`] : headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sectionIcon}>
@@ -421,7 +395,6 @@ export function HomeScreen() {
 
     return (
       <>
-        {renderSectionTitle('magnifying-glass-location', t('findJobs.sectionTitle'))}
         <FindJobsButton variant="card" />
 
         {activeJobs.length > 0 ? (
@@ -440,8 +413,16 @@ export function HomeScreen() {
 
         {recentJobs.length > 0 ? (
           <>
-            <StepStack title={t('home.recentJobs')} steps={recentJobSteps} minimized live={false} hideMore accent={colors.primary} style={styles.recentStack} />
-            {renderAllButton('calendar-check', t('problems.allBookings'), t('home.allBookingsHint'), () => navigateToBookings('jobs'))}
+            <StepStack
+              title={t('home.recentJobs')}
+              steps={recentJobSteps}
+              minimized
+              live={false}
+              hideMore
+              accent={colors.primary}
+              style={styles.recentStack}
+              onSeeAll={() => navigateToBookings('jobs')}
+            />
           </>
         ) : null}
       </>
@@ -520,7 +501,6 @@ export function HomeScreen() {
           ) : side === 'shop' && isVerifiedShop && businessProfile.data ? (
             <>
               <ContinueSteps isShop only="orders" />
-              {renderSectionTitle('magnifying-glass-location', t('findOrders.sectionTitle'))}
               <FindOrdersButton />
               {recentOrders.length > 0 ? (
                 <>
@@ -532,12 +512,12 @@ export function HomeScreen() {
                     hideMore
                     accent={colors.primary}
                     style={styles.recentStack}
+                    onSeeAll={() => navigateToBookings('orders')}
                   />
                 </>
               ) : (
                 renderEmpty('bell', t('shopHome.noOrdersTitle'), t('shopHome.noOrdersMessage'))
               )}
-              {renderAllButton('receipt', t('shopHome.allOrders'), t('home.allOrdersHint'), () => navigateToBookings('orders'))}
             </>
           ) : isVerifiedWorker ? (
             <>
@@ -637,21 +617,6 @@ const styles = StyleSheet.create({
   waitingText: { ...typography.body, fontFamily: fonts.medium, textAlign: 'center', paddingVertical: 8 },
   flex: { flex: 1 },
   greetingTight: { marginBottom: 10 },
-  allWrap: { borderRadius: 18, borderWidth: 1.5, overflow: 'hidden', marginTop: 4, marginBottom: 6 },
-  allCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
-  allIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  allTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15, color: '#FFFFFF', lineHeight: 20 },
-  allHint: { ...typography.caption, fontSize: 12, color: 'rgba(255,255,255,0.86)' },
-  allGo: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   recentStack: { marginTop: 18, marginBottom: 8 },
   recentRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1.5, padding: 10, marginBottom: 8 },
   recentIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },

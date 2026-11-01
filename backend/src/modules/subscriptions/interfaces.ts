@@ -37,24 +37,78 @@ export interface SubscriptionSettings {
   customerFees: CustomerFees;
   /** Pay-per-use prices (₹) for partners without a plan. */
   partnerFees: PartnerFees;
+  /** Free Quick Book accepts a month for workers without a plan (null = no limit). */
+  quickBookLimit: number | null;
+  /** Free Quick Order accepts a month for shops without a plan (null = no limit). */
+  quickOrderLimit: number | null;
+  /** Customers without a plan: bookings (Quick Book, a particular worker, problem posts) free each month (null = none). */
+  customerFreeBookings: number | null;
+  /** Customers without a plan: orders (Quick Order, a particular shop) free each month (null = none). */
+  customerFreeOrders: number | null;
   updatedAt: string;
 }
 
+/** What customers without a plan pay once, per action. */
 export interface CustomerFees {
-  book: number;
-  order: number;
+  quickBook: number;
+  directBook: number;
+  quickOrder: number;
+  shopOrder: number;
+  postProblem: number;
   staffContact: number;
 }
 
+/** What partners without a plan pay once, per action. */
 export interface PartnerFees {
+  /** Accepting a job / order someone booked them for personally (Quick Book / Quick Order are free, within the limit). */
   accept: number;
   jobPost: number;
+  /** Seeing one person who viewed a job post, with their number. */
+  jobPostViewer: number;
+  /** Seeing one person who viewed a services / shop profile, with their number. */
+  profileViewer: number;
 }
 
-export const PASS_KINDS = ['book', 'order', 'staff_contact', 'accept', 'job_post'] as const;
-/** One paid use: book / order / see a staff number (customers), accept / publish a job post (partners). */
+export const CUSTOMER_PASS_KINDS = ['quick_book', 'direct_book', 'quick_order', 'shop_order', 'post_problem', 'staff_contact'] as const;
+/** Which monthly free uses a customer action takes from: bookings or orders. */
+export const FREE_USE_GROUP: Record<string, 'bookings' | 'orders'> = {
+  quick_book: 'bookings',
+  direct_book: 'bookings',
+  post_problem: 'bookings',
+  quick_order: 'orders',
+  shop_order: 'orders',
+};
+export const FREE_USE_KINDS: Record<'bookings' | 'orders', PassKindName[]> = {
+  bookings: ['quick_book', 'direct_book', 'post_problem'],
+  orders: ['quick_order', 'shop_order'],
+};
+type PassKindName = (typeof CUSTOMER_PASS_KINDS)[number];
+
+export const PARTNER_PASS_KINDS = ['accept', 'job_post', 'job_post_viewer', 'profile_viewer'] as const;
+export const PASS_KINDS = [...CUSTOMER_PASS_KINDS, ...PARTNER_PASS_KINDS] as const;
+/** One paid use of one action (see CustomerFees / PartnerFees). */
 export type PassKind = (typeof PASS_KINDS)[number];
-export const CUSTOMER_PASS_KINDS: PassKind[] = ['book', 'order', 'staff_contact'];
+export type CustomerPassKind = (typeof CUSTOMER_PASS_KINDS)[number];
+/** Paid for one particular thing (a phone number, a viewer) — unlocked for good once paid, never a spare pass. */
+export const PER_TARGET_KINDS: PassKind[] = ['staff_contact', 'job_post_viewer', 'profile_viewer'];
+
+/** Each pass kind's price. */
+export function passFee(settings: SubscriptionSettings, kind: PassKind): number {
+  const c = settings.customerFees;
+  const p = settings.partnerFees;
+  return {
+    quick_book: c.quickBook,
+    direct_book: c.directBook,
+    quick_order: c.quickOrder,
+    shop_order: c.shopOrder,
+    post_problem: c.postProblem,
+    staff_contact: c.staffContact,
+    accept: p.accept,
+    job_post: p.jobPost,
+    job_post_viewer: p.jobPostViewer,
+    profile_viewer: p.profileViewer,
+  }[kind];
+}
 
 export interface PayPass {
   id: string;
@@ -110,6 +164,12 @@ export interface MySubscription {
   fees: Record<string, number>;
   /** Paid uses not used yet, per kind. */
   passes: Record<string, number>;
+  /** Partner app: how many seconds earlier subscribed workers hear of new jobs. */
+  headStartSeconds?: number;
+  /** Partner app: free Quick Book / Quick Order accepts a month without a plan (null = no limit). */
+  limits?: { quickBook: number | null; quickOrder: number | null };
+  /** Customer app: free uses this month without a plan, for bookings and for orders (null when none are given). */
+  freeUses?: { bookings: { limit: number; used: number } | null; orders: { limit: number; used: number } | null };
   /** Partner app: each plan on its own (services, shop, job posts). */
   // Per side, plus 'all' (the all-in-one plan).
   plans?: Record<PartnerPlan | 'all', PlanState>;

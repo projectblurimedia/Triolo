@@ -1178,13 +1178,15 @@
     "numberHiddenTitle": "Number hidden",
     "payToSee": "Pay once to see it",
     "tapToSee": "Tap Call to see it",
-    "payAmount": "Pay to see the number"
+    "payAmount": "Pay to see the number",
+    "unlockFor": "Unlock · ₹{{amount}}",
+    "showNumber": "Show number"
   },
   "continueSteps": {
     "title": "Continue Where You Left Off",
     "continue": "Continue",
     "rate": "Rate",
-    "seeAll": "See all {{count}}",
+    "seeAll": "See all",
     "searching": "Finding a worker…",
     "pending": "Pending",
     "more": "+{{count}} more · Tap to see all",
@@ -1448,39 +1450,55 @@
   },
   "payGate": {
     "title": {
-      "book": "Book this worker",
-      "order": "Send your list",
-      "staff_contact": "See their phone number"
+      "staff_contact": "See their phone number",
+      "quick_book": "Quick Book",
+      "direct_book": "Book this worker",
+      "quick_order": "Quick Order",
+      "shop_order": "Send your list",
+      "post_problem": "Post your problem"
     },
     "message": {
-      "book": "Pay ₹{{amount}} once to book. With Triolo Plus every booking is free.",
-      "order": "Pay ₹{{amount}} once to send this order. With Triolo Plus every order is free.",
-      "staff_contact": "Pay ₹{{amount}} once to see and call this number — it stays unlocked. With Triolo Plus every number is free."
+      "staff_contact": "Pay ₹{{amount}} once to see and call this number — it stays unlocked. With Triolo Plus every number is free.",
+      "quick_book": "Pay ₹{{amount}} once to ask workers nearby. With Triolo Plus it's free.",
+      "direct_book": "Pay ₹{{amount}} once to book this worker. With Triolo Plus it's free.",
+      "quick_order": "Pay ₹{{amount}} once to ask shops nearby. With Triolo Plus it's free.",
+      "shop_order": "Pay ₹{{amount}} once to send your list to this shop. With Triolo Plus it's free.",
+      "post_problem": "Pay ₹{{amount}} once to post your problem to workers nearby. With Triolo Plus it's free."
     },
     "pay": "Pay ₹{{amount}}",
     "waiting": "Finish the payment on Razorpay, then come back — it carries on by itself.",
     "subscribeInstead": "Subscribe instead — no fees",
     "paidTitle": "Paid!",
     "paidMessage": {
-      "book": "Your booking is going out.",
-      "order": "Your order is being sent.",
-      "staff_contact": "Their number is unlocked."
+      "staff_contact": "Their number is unlocked.",
+      "quick_book": "Asking workers nearby now.",
+      "direct_book": "Your booking is going out.",
+      "quick_order": "Asking shops nearby now.",
+      "shop_order": "Your order is being sent.",
+      "post_problem": "Your problem is being posted."
     },
     "paidEarlierTitle": "Using your earlier payment",
     "paidEarlierMessage": {
-      "book": "You paid for a booking that didn't go ahead, so this one is free.",
-      "order": "You paid for an order that didn't go ahead, so this one is free."
+      "quick_book": "You paid for one that didn't go ahead, so this one is free.",
+      "direct_book": "You paid for one that didn't go ahead, so this one is free.",
+      "quick_order": "You paid for one that didn't go ahead, so this one is free.",
+      "shop_order": "You paid for one that didn't go ahead, so this one is free.",
+      "post_problem": "You paid for one that didn't go ahead, so this one is free."
     },
     "or": "or",
     "plus": {
       "title": "Go Triolo Plus",
-      "subtitle": "One plan — never pay per booking again",
+      "subtitle": "One plan — no fees for anything",
       "noFees": "No fees",
       "noAds": "No ads",
       "headStart": "30s head start",
       "unlimited": "Unlimited use",
       "cta": "See plans"
-    }
+    },
+    "freeUseTitle": "Free this month",
+    "freeUseMessage_zero": "That was your last free one this month.",
+    "freeUseMessage_one": "{{count}} free one left this month.",
+    "freeUseMessage_other": "{{count}} free ones left this month."
   },
   "waiting": {
     "stepSent": "Request sent",
@@ -1585,5 +1603,16 @@
     "moveOnMap": "Move it on the map",
     "save": "Save address",
     "changeShort": "Change"
+  },
+  "keptPayment": {
+    "title": "Your payment is kept",
+    "message": {
+      "quick_book": "This one didn't go ahead, so your next Quick Book is already paid for — you won't be asked to pay again.",
+      "direct_book": "This one didn't go ahead, so your next booking is already paid for — you won't be asked to pay again.",
+      "quick_order": "This one didn't go ahead, so your next Quick Order is already paid for — you won't be asked to pay again.",
+      "shop_order": "This one didn't go ahead, so your next order is already paid for — you won't be asked to pay again.",
+      "post_problem": "Your next problem post is already paid for — you won't be asked to pay again.",
+      "staff_contact": ""
+    }
   }
 }

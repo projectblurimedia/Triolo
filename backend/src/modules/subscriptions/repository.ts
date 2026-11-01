@@ -41,14 +41,23 @@ function mapSettings(row: QueryResultRow): SubscriptionSettings {
     badgeMinRating: Number(row.badge_min_rating),
     badgeMinRatings: Number(row.badge_min_ratings),
     customerFees: {
-      book: Number(row.customer_fees?.book ?? 10),
-      order: Number(row.customer_fees?.order ?? 10),
+      quickBook: Number(row.customer_fees?.quickBook ?? 10),
+      directBook: Number(row.customer_fees?.directBook ?? 10),
+      quickOrder: Number(row.customer_fees?.quickOrder ?? 10),
+      shopOrder: Number(row.customer_fees?.shopOrder ?? 10),
+      postProblem: Number(row.customer_fees?.postProblem ?? 10),
       staffContact: Number(row.customer_fees?.staffContact ?? 10),
     },
     partnerFees: {
       accept: Number(row.partner_fees?.accept ?? 10),
       jobPost: Number(row.partner_fees?.jobPost ?? 20),
+      jobPostViewer: Number(row.partner_fees?.jobPostViewer ?? 10),
+      profileViewer: Number(row.partner_fees?.profileViewer ?? 10),
     },
+    quickBookLimit: row.quick_book_limit == null ? null : Number(row.quick_book_limit),
+    quickOrderLimit: row.quick_order_limit == null ? null : Number(row.quick_order_limit),
+    customerFreeBookings: row.customer_free_bookings == null ? null : Number(row.customer_free_bookings),
+    customerFreeOrders: row.customer_free_orders == null ? null : Number(row.customer_free_orders),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
 }
@@ -95,6 +104,10 @@ const SETTINGS_COLUMNS: Partial<Record<keyof SubscriptionSettings, string>> = {
   customerEnabled: 'customer_enabled',
   partnerEnabled: 'partner_enabled',
   headStartSeconds: 'head_start_seconds',
+  quickBookLimit: 'quick_book_limit',
+  quickOrderLimit: 'quick_order_limit',
+  customerFreeBookings: 'customer_free_bookings',
+  customerFreeOrders: 'customer_free_orders',
   badgeEnabled: 'badge_enabled',
   badgePrice: 'badge_price',
   badgeMinRating: 'badge_min_rating',
@@ -436,13 +449,16 @@ export class SubscriptionsRepository {
     return result.rows[0] ? mapPass(result.rows[0]) : null;
   }
 
-  /** Marks a pass paid — only from 'unpaid', so checking twice never pays twice. A phone number is unlocked straight away. */
+  /**
+   * Marks a pass paid — only from 'unpaid', so checking twice never pays twice. One for a
+   * particular thing (a phone number, a viewer) unlocks it straight away.
+   */
   async markPassPaid(id: string, paymentId: string): Promise<PayPass | null> {
     const result = await this.pool.query(
       `UPDATE pay_passes SET razorpay_payment_id = $2, paid_at = now(),
-         status = CASE WHEN kind = 'staff_contact' THEN 'used' ELSE 'paid' END,
-         used_at = CASE WHEN kind = 'staff_contact' THEN now() ELSE NULL END,
-         used_ref = CASE WHEN kind = 'staff_contact' THEN target_id ELSE NULL END
+         status = CASE WHEN kind IN ('staff_contact', 'job_post_viewer', 'profile_viewer') THEN 'used' ELSE 'paid' END,
+         used_at = CASE WHEN kind IN ('staff_contact', 'job_post_viewer', 'profile_viewer') THEN now() ELSE NULL END,
+         used_ref = CASE WHEN kind IN ('staff_contact', 'job_post_viewer', 'profile_viewer') THEN target_id ELSE NULL END
        WHERE id = $1 AND status = 'unpaid'
        RETURNING *`,
       [id, paymentId],
@@ -457,6 +473,27 @@ export class SubscriptionsRepository {
       [accountId],
     );
     return Object.fromEntries(result.rows.map((row) => [row.kind, row.n]));
+  }
+
+  /** A free monthly use: a ₹0 pass marked used at once (it can be given back like a paid one). */
+  async createFreeUse(accountId: string, kind: PassKind, ref: string | null): Promise<string> {
+    const result = await this.pool.query(
+      `INSERT INTO pay_passes (account_id, kind, amount, status, razorpay_payment_id, paid_at, used_at, used_ref)
+       VALUES ($1, $2, 0, 'used', 'month-free-' || gen_random_uuid(), now(), now(), $3)
+       RETURNING id`,
+      [accountId, kind, ref],
+    );
+    return result.rows[0].id;
+  }
+
+  /** Free monthly uses this account had this month (India time), of these kinds. */
+  async countFreeUsesThisMonth(accountId: string, kinds: string[]): Promise<number> {
+    const result = await this.pool.query(
+      `SELECT count(*)::int AS n FROM pay_passes
+       WHERE account_id = $1 AND kind = ANY($2::text[]) AND razorpay_payment_id LIKE 'month-free-%' AND created_at >= (date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata')`,
+      [accountId, kinds],
+    );
+    return result.rows[0].n;
   }
 
   /** Uses one paid pass (the oldest) — atomically, so two requests can't share one. */
@@ -482,16 +519,21 @@ export class SubscriptionsRepository {
     if (refs.length === 0 && ids.length === 0) return;
     await this.pool.query(
       `UPDATE pay_passes SET status = 'paid', used_at = NULL, used_ref = NULL
-       WHERE status = 'used' AND kind <> 'staff_contact' AND (used_ref = ANY($1::text[]) OR id::text = ANY($2::text[]))`,
+       WHERE status = 'used' AND kind NOT IN ('staff_contact', 'job_post_viewer', 'profile_viewer') AND (used_ref = ANY($1::text[]) OR id::text = ANY($2::text[]))`,
       [refs, ids],
     );
   }
 
   /** Job posts whose phone number this account paid to see. */
-  async unlockedStaffPosts(accountId: string): Promise<string[]> {
+  unlockedStaffPosts(accountId: string): Promise<string[]> {
+    return this.unlockedTargets(accountId, 'staff_contact');
+  }
+
+  /** What this account paid to see, of one per-thing kind (phone numbers, viewers). */
+  async unlockedTargets(accountId: string, kind: PassKind): Promise<string[]> {
     const result = await this.pool.query(
-      `SELECT DISTINCT target_id FROM pay_passes WHERE account_id = $1 AND kind = 'staff_contact' AND status = 'used' AND target_id IS NOT NULL`,
-      [accountId],
+      `SELECT DISTINCT target_id FROM pay_passes WHERE account_id = $1 AND kind = $2 AND status = 'used' AND target_id IS NOT NULL`,
+      [accountId, kind],
     );
     return result.rows.map((row) => row.target_id);
   }

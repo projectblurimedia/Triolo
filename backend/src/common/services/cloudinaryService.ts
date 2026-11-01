@@ -194,6 +194,20 @@ export async function videoDurationSeconds(url: string): Promise<number | null> 
   }
 }
 
+/** An uploaded image's or video's width and height, read from Cloudinary (null if it can't be found). */
+export async function mediaSize(url: string, resourceType: 'image' | 'video'): Promise<{ width: number; height: number } | null> {
+  ensureConfigured();
+  const publicId = extractPublicIdFromUrl(url);
+  if (!publicId) return null;
+  try {
+    const resource = await cloudinary.api.resource(publicId, { resource_type: resourceType });
+    return typeof resource.width === 'number' && typeof resource.height === 'number' ? { width: resource.width, height: resource.height } : null;
+  } catch (err) {
+    logger.warn({ err, publicId }, 'Could not read the media size');
+    return null;
+  }
+}
+
 /** Whether `url` is a file of ours, of this kind, inside `folder` (never trust a client's URL blindly). */
 export function isOwnCloudinaryUrl(url: string, folder: string, resourceType: 'image' | 'video'): boolean {
   const prefix = `https://res.cloudinary.com/${env.cloudinary.cloudName}/${resourceType}/upload/`;

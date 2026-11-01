@@ -19,18 +19,16 @@ import { adsRouter } from '@/modules/ads/routes';
 import { subscriptionsRouter } from '@/modules/subscriptions/routes';
 import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
 import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
-import { setProfileViewerReveal } from '@/modules/notifications/service';
-import { AdsRepository } from '@/modules/ads/repository';
-import { AdsService } from '@/modules/ads/service';
+import { setProfileViewerAccess } from '@/modules/notifications/service';
 import { pool } from '@/config/database';
 
-// Who viewed a partner's profile: shown on the plan, or (with plans off) after an ad / straight
-// away (notifications asks, without depending on subscriptions or ads).
+// Who viewed a partner's profile: shown with plans off or on the plan, else each one once paid
+// for (notifications asks, without depending on subscriptions).
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
-const adsForViewers = new AdsService(new AdsRepository(pool));
-setProfileViewerReveal((accountId, plan) =>
-  subscriptionStatus.revealsProfileViewers(accountId, plan, () => adsForViewers.partnerSpotOn('viewer_reveal')),
-);
+setProfileViewerAccess({
+  reveals: (accountId, plan) => subscriptionStatus.revealsProfileViewers(accountId, plan),
+  unlocked: (accountId) => subscriptionStatus.unlockedTargets(accountId, 'profile_viewer'),
+});
 
 export function createApp(): Express {
   const app = express();

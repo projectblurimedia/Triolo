@@ -9,6 +9,7 @@ import { WorkerNearbyResult } from '@/services/workersService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { SmartImage } from './SmartImage';
+import { workerKindLabels } from '@/utils/kindLabels';
 
 export const MINI_CARD_WIDTH = 168;
 
@@ -57,10 +58,7 @@ export function Avatar({ photoUrl, name, size, seal }: { photoUrl?: string | nul
 export function WorkerMiniCard({ worker, onPress }: { worker: WorkerNearbyResult; onPress: () => void }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
-  const skills = worker.skillCategories
-    .filter((key) => key !== 'other')
-    .map((key) => t(`workerProfile.skills.${key}`))
-    .join(', ');
+  const skills = workerKindLabels(t, worker).join(', ');
 
   return (
     <Pressable onPress={onPress} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

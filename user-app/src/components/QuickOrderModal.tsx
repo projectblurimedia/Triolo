@@ -12,7 +12,6 @@ import { ListPickerRow } from './ListPickerRow';
 import { uploadListPhotos } from '@/utils/listPhotos';
 import { ToastHost } from './ToastHost';
 import { addressFor } from './QuickBookModal';
-import { useAdGate } from './Ads';
 import { SHOP_CATEGORIES } from '@/constants/categories';
 import { useListStore } from '@/state/listStore';
 import { ApiError } from '@/services/apiClient';
@@ -48,13 +47,12 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const orderFee = usePayHint('order');
+  const orderFee = usePayHint('quick_order');
   const lists = useListStore((state) => state.lists);
   const [listId, setListId] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   // Home delivery first: it's what people want most from a quick order.
   const [fulfillment, setFulfillment] = useState<OrderFulfillment>('delivery');
-  const { waitForAd } = useAdGate(visible, 'quick_order');
 
   useEffect(() => {
     if (!visible) return;
@@ -69,10 +67,9 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
 
   const order = async () => {
     if (!list || !hasList || categories.length === 0) return;
-    // Location first, then the ad, then the fee (no plan) — and only then the order goes.
+    // Location first, then the fee (no plan) — and only then the order goes.
     if (!(await askForLocation())) return;
-    if (!(await waitForAd())) return;
-    if (!(await payIfNeeded('order'))) return;
+    if (!(await payIfNeeded('quick_order'))) return;
     const here = await ensureLocation();
     if (!here) {
       showToast({ variant: 'error', title: t('location.requiredTitle'), message: t('location.requiredMessage') });

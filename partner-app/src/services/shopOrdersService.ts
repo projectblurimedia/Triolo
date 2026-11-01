@@ -96,6 +96,8 @@ export const shopOrdersService = {
   listMine: () => apiClient.get<ShopOrder[]>('/orders/shop/mine', true),
   /** Find Orders Now: open Quick Orders nearby this shop can take join its list (returned). */
   searchQuick: () => apiClient.post<ShopOrder[]>('/orders/shop/quick/search', undefined, true),
+  /** This month's free Quick Order accepts without the shop plan (null limit = no limit). */
+  quickLimit: () => apiClient.get<{ limit: number | null; used: number; remaining: number | null }>('/orders/shop/quick/limit', true),
   get: (id: string) => apiClient.get<ShopOrder>(`/orders/shop/${id}`, true),
   accept: (id: string) => apiClient.post<null>(`/orders/${id}/accept`, undefined, true),
   /** After accepting: watched the ad, or pays (PAYMENT_REQUIRED until a pass is bought). */

@@ -9,7 +9,7 @@ import { usePayHint, withFee } from '@/hooks/useSubscription';
 import { payIfNeeded } from '@/state/payGateStore';
 import { GlassBackdrop, GlassCard } from './Glass';
 import { ToastHost } from './ToastHost';
-import { useAdGate, useBusyAction } from './Ads';
+import { useBusyAction } from './Ads';
 import { addressFor } from './QuickBookModal';
 import { SKILL_CATEGORIES } from '@/constants/categories';
 import { bookingsService } from '@/services/bookingsService';
@@ -39,13 +39,12 @@ interface BookWorkerModalProps {
  */
 export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalProps) {
   const { t } = useTranslation();
-  const bookFee = usePayHint('book');
+  const bookFee = usePayHint('direct_book');
   const { colors } = useThemeColors();
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const preparing = useRef(false);
-  const { adLoading, waitForAd } = useAdGate(!!worker, 'book_worker');
   const { busy, run } = useBusyAction();
 
   // The work this worker does; one kind is chosen for you.
@@ -69,11 +68,10 @@ export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalPr
     if (selected.length === 0 || sending || preparing.current) return;
     preparing.current = true;
     try {
-      // Location first (the worker comes here), then the ad while the button spins.
+      // Location first (the worker comes here).
       if (!(await askForLocation())) return;
-      if (!(await waitForAd())) return;
       // No plan: pay once at this last step — or subscribe.
-      if (!(await payIfNeeded('book'))) return;
+      if (!(await payIfNeeded('direct_book'))) return;
     } finally {
       preparing.current = false;
     }
@@ -160,7 +158,7 @@ export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalPr
           <Button
             label={withFee(t('directBook.send'), bookFee)}
             onPress={() => run(send)}
-            loading={sending || adLoading || busy}
+            loading={sending || busy}
             disabled={selected.length === 0}
           />
           <Pressable onPress={onClose} disabled={sending} style={styles.cancel} hitSlop={6}>

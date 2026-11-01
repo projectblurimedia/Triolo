@@ -22,6 +22,9 @@ import { openSubscribe } from '@/state/subscribeStore';
 import { useMySubscription } from '@/hooks/useSubscription';
 import { useNotificationFocusStore } from '@/state/notificationFocusStore';
 import { JobPostViewersSheet } from './JobPostViewersSheet';
+import { GOLD_BUTTON, GOLD_DEEP } from './GoldCard';
+import { payIfNeeded } from '@/state/payGateStore';
+import type { PartnerPlan } from '@/services/subscriptionsService';
 import { Linking } from 'react-native';
 
 interface NotificationsModalProps {
@@ -118,6 +121,82 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   const [viewsPostId, setViewsPostId] = useState<string | null>(null);
   const subscription = useMySubscription();
   const [confirmBulk, setConfirmBulk] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+
+  // Pays to see one person who viewed this profile, then shows them (name, number, Call).
+  const unlockViewer = async (item: AppNotification) => {
+    if (unlocking) return;
+    setUnlocking(true);
+    try {
+      const plan: PartnerPlan = item.ref?.kind === 'shop' ? 'shop' : 'service';
+      if (!(await payIfNeeded('profile_viewer', item.id, plan))) return;
+      const fresh = (await refetch()).data?.items.find((entry) => entry.id === item.id);
+      if (fresh) setDetail(fresh);
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
+  /** Who viewed, once shown: name, number and a Call button. */
+  const viewerRow = (viewer: NonNullable<AppNotification['viewer']>) => (
+    <View style={[styles.viewerRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
+      <FontAwesome6 name="user" size={14} color={colors.primary} solid />
+      <View style={styles.flexOne}>
+        <Text style={[styles.viewerName, { color: colors.text }]}>{viewer.name}</Text>
+        {viewer.mobile ? <Text style={[styles.viewerMobile, { color: colors.textMuted }]}>{viewer.mobile}</Text> : null}
+      </View>
+      {viewer.mobile ? (
+        <Pressable
+          onPress={() => Linking.openURL(`tel:${viewer.mobile}`).catch(() => undefined)}
+          style={[styles.viewerCall, { backgroundColor: brandColors.success }]}
+          accessibilityLabel={t('jobViews.call')}
+        >
+          <FontAwesome6 name="phone" size={13} color="#FFFFFF" solid />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  /**
+   * Who viewed, still locked (no plan for it): a hidden name and number, the one-time unlock
+   * for this person (when `onUnlock`), and the plan that shows everyone.
+   */
+  const lockedViewer = (plan: PartnerPlan, fee: number, onUnlock?: () => void) => (
+    <View style={[styles.lockedCard, { borderColor: `${GOLD_DEEP}66`, backgroundColor: `${GOLD_DEEP}0F` }]}>
+      <View style={styles.lockedTop}>
+        <LinearGradient colors={GOLD_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.lockedAvatar}>
+          <FontAwesome6 name="lock" size={14} color="#FFFFFF" solid />
+        </LinearGradient>
+        <View style={styles.flexOne}>
+          <View style={styles.blurLine}>
+            <View style={[styles.blurBar, { width: 96, backgroundColor: `${GOLD_DEEP}40` }]} />
+            <View style={[styles.blurBar, { width: 60, backgroundColor: `${GOLD_DEEP}2E` }]} />
+          </View>
+          <Text style={[styles.viewerMobile, { color: colors.textMuted }]}>{t('jobViews.hiddenNumber')}</Text>
+        </View>
+      </View>
+      <View style={styles.lockedButtons}>
+        {onUnlock ? (
+          <Pressable onPress={onUnlock} disabled={unlocking} style={({ pressed }) => [styles.lockedUnlockWrap, { opacity: pressed ? 0.9 : 1 }]}>
+            <LinearGradient colors={GOLD_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.lockedUnlock}>
+              {unlocking ? (
+                <LoadingIndicator size={16} dotSize={3} color="#FFFFFF" />
+              ) : (
+                <>
+                  <FontAwesome6 name="unlock" size={12} color="#FFFFFF" solid />
+                  <Text style={styles.lockedUnlockText}>{fee > 0 ? t('notifications.unlockFor', { amount: fee }) : t('jobViews.unlock')}</Text>
+                </>
+              )}
+            </LinearGradient>
+          </Pressable>
+        ) : null}
+        <Pressable onPress={() => openSubscribe(plan)} style={[styles.lockedPlan, { borderColor: GOLD_DEEP }]}>
+          <FontAwesome6 name="crown" size={11} color={GOLD_DEEP} solid />
+          <Text style={[styles.lockedPlanText, { color: GOLD_DEEP }]}>{t('notifications.seeAllWithPlan')}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 
   const items = data?.items ?? [];
   const unreadCount = data?.unreadCount ?? 0;
@@ -221,13 +300,17 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         }}
         deleteLabel={t('notifications.delete')}
         enabled={!selectionMode}
+        gap={0}
+        borderRadius={0}
+        actionGap={0}
       >
         <Pressable
           style={[
             styles.card,
             {
-              backgroundColor: selected ? selectedBackground : colors.surface,
-              borderColor: selected ? colors.primary : item.isRead ? colors.border : `${colors.primary}66`,
+              // A list: full-width rows divided by a line; unread ones lightly tinted.
+              backgroundColor: selected ? selectedBackground : item.isRead ? colors.background : `${colors.primary}0D`,
+              borderBottomColor: colors.border,
             },
           ]}
           onPress={() => handleRowPress(item)}
@@ -335,7 +418,8 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     : selectionMode
       ? t('notifications.selectedCount', { count: selectedIds.size })
       : t('notifications.title');
-  const headerSubtitle = detail || selectionMode ? null : t('notifications.subtitle');
+  // How to use the list (swipe / long-press) sits under the title instead of in the body.
+  const headerSubtitle = detail || selectionMode ? null : t(items.length > 0 ? 'notifications.gestureHint' : 'notifications.subtitle');
 
   const renderDetail = (item: AppNotification) => (
     <ScrollView
@@ -354,43 +438,19 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         </View>
         <View style={[styles.detailDivider, { backgroundColor: colors.border }]} />
         <Text style={[styles.detailMessage, { color: colors.text }]}>{item.body}</Text>
-        {item.type === 'profile_view' && !item.viewer && subscription.data?.enabled ? (
-          <Pressable
-            onPress={() => openSubscribe(item.ref?.kind === 'shop' ? 'shop' : 'service')}
-            hitSlop={6}
-            style={styles.callWrap}
-          >
-            <Text style={[styles.subscribeLink, { color: colors.primary }]}>{t('notifications.seeWhoViewed')}</Text>
-          </Pressable>
+        {item.type === 'profile_view' ? (
+          <View style={styles.jobView}>
+            {item.viewer
+              ? viewerRow(item.viewer)
+              : subscription.data?.enabled
+                ? lockedViewer(item.ref?.kind === 'shop' ? 'shop' : 'service', subscription.data.fees?.profile_viewer ?? 0, () => unlockViewer(item))
+                : null}
+          </View>
         ) : null}
         {item.type === 'job_post_view' ? (
           <View style={styles.jobView}>
-            {item.viewer ? (
-              <View style={[styles.viewerRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                <FontAwesome6 name="user" size={14} color={colors.primary} solid />
-                <View style={styles.flexOne}>
-                  <Text style={[styles.viewerName, { color: colors.text }]}>{item.viewer.name}</Text>
-                  {item.viewer.mobile ? <Text style={[styles.viewerMobile, { color: colors.textMuted }]}>{item.viewer.mobile}</Text> : null}
-                </View>
-                {item.viewer.mobile ? (
-                  <Pressable
-                    onPress={() => Linking.openURL(`tel:${item.viewer?.mobile}`).catch(() => undefined)}
-                    style={[styles.viewerCall, { backgroundColor: brandColors.success }]}
-                    accessibilityLabel={t('jobViews.call')}
-                  >
-                    <FontAwesome6 name="phone" size={13} color="#FFFFFF" solid />
-                  </Pressable>
-                ) : null}
-              </View>
-            ) : subscription.data?.enabled ? (
-              <View style={[styles.lockedBox, { borderColor: '#C08A1266', backgroundColor: '#F5B3011A' }]}>
-                <FontAwesome6 name="crown" size={14} color="#C08A12" solid />
-                <Text style={[styles.lockedText, { color: colors.text }]}>{t('jobViews.lockedText')}</Text>
-                <Pressable onPress={() => openSubscribe('job_post')} hitSlop={6}>
-                  <Text style={[styles.subscribeLink, { color: '#C08A12' }]}>{t('jobViews.getPlan')}</Text>
-                </Pressable>
-              </View>
-            ) : null}
+            {/* Each job post viewer is unlocked from the post's views (See all views). */}
+            {item.viewer ? viewerRow(item.viewer) : subscription.data?.enabled ? lockedViewer('job_post', 0) : null}
             {item.ref?.id ? (
               <Pressable
                 onPress={() => setViewsPostId(item.ref?.id ?? null)}
@@ -452,7 +512,6 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     }
     return (
       <>
-        {!selectionMode ? <Text style={[styles.hint, { color: colors.textMuted }]}>{t('notifications.gestureHint')}</Text> : null}
         <PullToRefresh
           refreshing={manualRefreshing}
           onRefresh={async () => {
@@ -565,6 +624,17 @@ const styles = StyleSheet.create({
   viewerName: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
   viewerMobile: { ...typography.caption, fontSize: 12 },
   viewerCall: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  lockedCard: { borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', padding: 12, gap: 12 },
+  lockedTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  lockedAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  blurLine: { flexDirection: 'row', gap: 6, marginBottom: 6 },
+  blurBar: { height: 12, borderRadius: 6 },
+  lockedButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  lockedUnlockWrap: { flexGrow: 1, borderRadius: 20, overflow: 'hidden', backgroundColor: GOLD_BUTTON[1] },
+  lockedUnlock: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, height: 40, paddingHorizontal: 16 },
+  lockedUnlockText: { fontFamily: fonts.semiBold, fontSize: 13.5, color: '#FFFFFF', includeFontPadding: false },
+  lockedPlan: { flexGrow: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, height: 40, borderRadius: 20, borderWidth: 1.5, paddingHorizontal: 14 },
+  lockedPlanText: { fontFamily: fonts.semiBold, fontSize: 13, includeFontPadding: false },
   lockedBox: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, borderRadius: 14, borderWidth: 1, padding: 10 },
   lockedText: { ...typography.caption, fontSize: 12.5, lineHeight: 17, flex: 1, minWidth: 160 },
   allViews: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 42, borderRadius: 13, borderWidth: 1.5 },
@@ -614,9 +684,15 @@ const styles = StyleSheet.create({
   emptyMessage: { ...typography.body, textAlign: 'center', lineHeight: 20 },
   retryButton: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
   retryButtonText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  hint: { ...typography.caption, fontSize: 11, textAlign: 'center', marginTop: 12 },
-  listContent: { padding: 20, paddingTop: 12, paddingBottom: 40 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14 },
+  listContent: { paddingTop: 4, paddingBottom: 40 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   // alignSelf: center — the row itself is top-aligned (multi-line text), the checkbox is centred.
   cardSquareRight: { borderTopRightRadius: 0, borderBottomRightRadius: 0 },
   checkbox: {

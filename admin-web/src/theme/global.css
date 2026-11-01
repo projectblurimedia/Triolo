@@ -3319,68 +3319,96 @@ a.row:hover {
   margin-top: 12px;
 }
 
-/* ---------- Where an ad shows ---------- */
+/* ---------- Wide ads only ---------- */
 
-.show-on {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.show-on-card {
+.wide-only {
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: var(--input);
-  color: var(--text);
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-}
-
-.show-on-card strong {
-  font-size: 15px;
-}
-
-.show-on-card > span:last-child {
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 2px 0 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 85, 211, 0.25);
+  background: rgba(0, 85, 211, 0.07);
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--muted);
 }
 
-.show-on-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 4px;
-  background: rgba(0, 85, 211, 0.1);
+.wide-only svg {
   color: #0055d3;
+  margin-top: 2px;
 }
 
-.show-on-card.active {
-  background: var(--gradient);
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 8px 22px rgba(0, 85, 211, 0.25);
+/* ---------- Fee / limit rows (Subscriptions) ---------- */
+
+.fee-rows {
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
 }
 
-.show-on-card.active > span:last-child {
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.show-on-card.active .show-on-icon {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-}
-
-.show-on-card:disabled {
+.fee-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  margin: 0;
   cursor: default;
-  opacity: 0.7;
+}
+
+.fee-row + .fee-row {
+  border-top: 1px solid var(--border);
+}
+
+.fee-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fee-row-text strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.fee-row-text small {
+  font-size: 12px;
+}
+
+.fee-row-input {
+  width: 150px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+  .fee-row-input {
+    width: 120px;
+  }
+}
+
+.fee-row-input input {
+  width: 100%;
+  height: 40px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--input);
+  padding: 0 14px 0 30px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.fee-row-input input:focus {
+  border-color: #0055d3;
+  box-shadow: 0 0 0 3px rgba(0, 85, 211, 0.15);
 }

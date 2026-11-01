@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
  * Triolo Plus's own look: a gold gradient with a gold border and a light streak that sweeps
  * across now and then. Only plan cards use it, so it never looks like anything else.
  */
-export const GOLD_GRADIENT = ['#8A5300', '#C2860F', '#F2C14E', '#FFE29A'] as const;
+export const GOLD_GRADIENT = ['#A86C0C', '#D29A26', '#F5CC60', '#FFE9AE'] as const;
 export const GOLD_BORDER = '#F7CF5A';
 /** Text and icons on gold. */
 export const GOLD_INK = '#3D2500';

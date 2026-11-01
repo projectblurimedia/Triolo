@@ -36,6 +36,7 @@ function createMockRepository(): MockRepository {
     findStatuses: jest.fn(),
     expireStaleBroadcasts: jest.fn().mockResolvedValue([]),
     findUnpaidAccepts: jest.fn().mockResolvedValue([]),
+    countAcceptsThisMonth: jest.fn().mockResolvedValue(0),
     releaseAccept: jest.fn().mockResolvedValue(null),
     unlock: jest.fn().mockResolvedValue(null),
     customerTarget: jest.fn().mockResolvedValue(null),
@@ -774,7 +775,7 @@ describe('subscriptions', () => {
   });
 });
 
-describe('accepting, then the ad or the fee', () => {
+describe('accepting: Quick Book free within the limit, personal bookings paid', () => {
   const win = () =>
     repo.acceptOffer.mockResolvedValue({
       won: true,
@@ -783,9 +784,24 @@ describe('accepting, then the ad or the fee', () => {
       losingWorkers: [],
     });
 
-  it('accepts at once without a pass; the customer hears only after the fee is paid', async () => {
+  it('free within the month\'s free accepts, then the fee after accepting', async () => {
     const status = {
-      unlockNeeded: jest.fn().mockResolvedValue('pay'),
+      acceptUnlock: jest.fn(async (_id: string, _side: string, used: () => Promise<number>) => ((await used()) < 2 ? null : 'pay')),
+    };
+    const counted = new BookingsService(repo as unknown as BookingsRepository, workers, notifications, status as never);
+    asWorker();
+    win();
+    repo.countAcceptsThisMonth.mockResolvedValue(1);
+    await counted.acceptOffer('worker-account-1', 'request-1');
+    expect(repo.acceptOffer).toHaveBeenLastCalledWith('request-1', 'worker-1', expect.any(String), null);
+    repo.countAcceptsThisMonth.mockResolvedValue(2);
+    await counted.acceptOffer('worker-account-1', 'request-1');
+    expect(repo.acceptOffer).toHaveBeenLastCalledWith('request-1', 'worker-1', expect.any(String), 'pay');
+  });
+
+  it('a paid accept is instant; the customer hears only after the fee is paid', async () => {
+    const status = {
+      acceptUnlock: jest.fn().mockResolvedValue('pay'),
       usePartnerPass: jest.fn().mockResolvedValue('pass-1'),
       attachPass: jest.fn(),
       restorePasses: jest.fn(),

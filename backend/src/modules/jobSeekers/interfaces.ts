@@ -121,10 +121,13 @@ export interface JobSeekerSearchParams {
 
 /** Someone who opened one of the partner's job posts. */
 export interface JobPostViewer {
+  /** Stable per person and post; paying to see this person unlocks it. */
   viewerKey: string;
-  /** Hidden (null) without the job post plan. */
+  /** Hidden (null) while locked. */
   name: string | null;
   mobile: string | null;
+  /** Without the job post plan, until paid for (see listViewers). */
+  locked?: boolean;
   lastViewedAt: string;
   times: number;
   isNew: boolean;
@@ -132,8 +135,9 @@ export interface JobPostViewer {
 
 export interface JobPostViewers {
   /** Who viewed is hidden: the partner isn't on the job post plan. */
-  /** open: shown; ad: shown after an ad (with plans off); plan: on the job post plan only. */
-  access: 'open' | 'ad' | 'plan';
+  /** open: everyone shown; plan: each one locked until paid for, or the job post plan. */
+  access: 'open' | 'plan';
+  /** Some are still locked. */
   locked: boolean;
   total: number;
   newCount: number;

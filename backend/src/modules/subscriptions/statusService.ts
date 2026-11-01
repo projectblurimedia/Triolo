@@ -1,8 +1,24 @@
 import { AppError } from '@/common/errors/AppError';
 import { SubscriptionsRepository } from './repository';
-import { customerPlansOn, PartnerPlan, partnerPlansOn, SubscriptionAudience, SubscriptionPlan, SubscriptionSettings, TrustedIds } from './interfaces';
+import {
+  customerPlansOn,
+  CustomerPassKind,
+  FREE_USE_GROUP,
+  FREE_USE_KINDS,
+  PartnerPlan,
+  partnerPlansOn,
+  passFee,
+  PassKind,
+  SubscriptionAudience,
+  SubscriptionPlan,
+  SubscriptionSettings,
+  TrustedIds,
+} from './interfaces';
 
-/** What a partner owes after accepting: an ad, the one-time fee, or nothing. */
+/**
+ * What a partner owes after accepting: the one-time fee, or nothing. ('ad' is kept only for
+ * older app builds — there are no ads before actions any more.)
+ */
 export type UnlockNeed = 'ad' | 'pay' | null;
 /** How long an accept may stay unpaid before it goes back to other partners. */
 export const UNLOCK_WINDOW_MINUTES = 3;
@@ -53,17 +69,6 @@ export class SubscriptionStatusService {
   }
 
   /**
-   * Quick Book, booking a particular worker and ordering from a shop need a subscription
-   * while customer subscriptions are on.
-   */
-  async requireCustomer(accountId: string): Promise<void> {
-    const settings = await this.settings();
-    if (!customerPlansOn(settings)) return;
-    if (await this.isActive(accountId, 'customer')) return;
-    throw new AppError(403, 'SUBSCRIPTION_REQUIRED', 'Subscribe to book workers and order from shops.');
-  }
-
-  /**
    * Partners subscribed to this plan (while partner subscriptions are on): their services /
    * shop / job posts come first in customers' searches.
    */
@@ -88,64 +93,94 @@ export class SubscriptionStatusService {
   }
 
   /**
-   * How a partner gets to see who viewed their profile / job post. While partner plans are on:
-   * on the plan for it ('open'), else 'plan' (offered the plan). With plans off: after an ad
-   * while ads run at that spot ('ad'), else straight away ('open').
+   * How a partner gets to see who viewed their profile / job post: straight away with partner
+   * plans off or on the plan for it ('open'); otherwise each viewer is locked until paid for or
+   * the plan is bought ('plan').
    */
-  async viewerAccess(accountId: string, plan?: PartnerPlan, adOn?: () => Promise<boolean>): Promise<'open' | 'ad' | 'plan'> {
-    if (partnerPlansOn(await this.settings())) return (await this.isActive(accountId, 'partner', plan)) ? 'open' : 'plan';
-    if (adOn && (await adOn().catch(() => false))) return 'ad';
-    return 'open';
+  async viewerAccess(accountId: string, plan?: PartnerPlan): Promise<'open' | 'plan'> {
+    if (!partnerPlansOn(await this.settings())) return 'open';
+    return (await this.isActive(accountId, 'partner', plan)) ? 'open' : 'plan';
   }
 
-  /** Whether the partner sees who viewed their profile without anything more (see viewerAccess). */
-  async revealsProfileViewers(accountId: string, plan?: PartnerPlan, adOn?: () => Promise<boolean>): Promise<boolean> {
-    return (await this.viewerAccess(accountId, plan, adOn)) === 'open';
+  /** Whether the partner sees every viewer of that profile without paying (see viewerAccess). */
+  async revealsProfileViewers(accountId: string, plan?: PartnerPlan): Promise<boolean> {
+    return (await this.viewerAccess(accountId, plan)) === 'open';
+  }
+
+  /** The viewers (or job posts' phone numbers) this account paid to see, one by one. */
+  async unlockedTargets(accountId: string, kind: 'staff_contact' | 'job_post_viewer' | 'profile_viewer'): Promise<Set<string>> {
+    return new Set(await this.repository.unlockedTargets(accountId, kind));
   }
 
   /**
-   * Booking or ordering without a plan (while customer plans are on) uses one paid pass; with a
-   * plan (or plans off) it's free and this returns null. No pass: PAYMENT_REQUIRED with the price.
+   * A customer action without a plan (while customer plans are on) uses one paid pass of its
+   * kind; with a plan (or plans off) it's free and this returns null. No pass: PAYMENT_REQUIRED
+   * with the price.
    */
-  async useCustomerPass(accountId: string, kind: 'book' | 'order'): Promise<string | null> {
+  async useCustomerPass(accountId: string, kind: Exclude<CustomerPassKind, 'staff_contact'>): Promise<string | null> {
     const settings = await this.settings();
     if (!customerPlansOn(settings)) return null;
     if (await this.isActive(accountId, 'customer')) return null;
-    const id = await this.repository.consumePass(accountId, kind, null);
-    if (id) return id;
-    throw new AppError(403, 'PAYMENT_REQUIRED', 'Pay once or subscribe to continue.', {
-      kind,
-      amount: kind === 'book' ? settings.customerFees.book : settings.customerFees.order,
-    });
+    // One already paid for (or given back) first, then the month's free ones, then the fee.
+    const paid = await this.repository.consumePass(accountId, kind, null);
+    if (paid) return paid;
+    if (await this.customerFreeLeft(accountId, kind, settings)) return this.repository.createFreeUse(accountId, kind, null);
+    return this.consumeOrAsk(accountId, kind, settings);
   }
 
   /**
-   * Accepting work without a plan, or publishing any job post (each post is paid for, even with a
-   * plan), while partner plans are on, uses one paid pass.
+   * How many free uses this customer has left this month for this kind of action — bookings and
+   * orders each have their own (0 when none are given).
+   */
+  async customerFreeLeft(accountId: string, kind: PassKind, settings?: SubscriptionSettings): Promise<number> {
+    const group = FREE_USE_GROUP[kind];
+    if (!group) return 0;
+    const s = settings ?? (await this.settings());
+    const limit = group === 'bookings' ? s.customerFreeBookings : s.customerFreeOrders;
+    if (!limit) return 0;
+    return Math.max(0, limit - (await this.repository.countFreeUsesThisMonth(accountId, FREE_USE_KINDS[group])));
+  }
+
+  /**
+   * Accepting a job / order someone booked this partner for personally, or publishing a job
+   * post, without the plan for that side (while partner plans are on) uses one paid pass.
    */
   async usePartnerPass(accountId: string, kind: 'accept' | 'job_post', plan?: PartnerPlan): Promise<string | null> {
     const settings = await this.settings();
     if (!partnerPlansOn(settings)) return null;
-    // Accepting is free on the plan for that side (services for jobs, shop for orders).
-    if (kind !== 'job_post' && (await this.isActive(accountId, 'partner', plan))) return null;
+    if (await this.isActive(accountId, 'partner', kind === 'job_post' ? 'job_post' : plan)) return null;
+    return this.consumeOrAsk(accountId, kind, settings);
+  }
+
+  private async consumeOrAsk(accountId: string, kind: PassKind, settings: SubscriptionSettings): Promise<string> {
     const id = await this.repository.consumePass(accountId, kind, null);
     if (id) return id;
-    throw new AppError(403, 'PAYMENT_REQUIRED', 'Pay once or subscribe to continue.', {
-      kind,
-      amount: kind === 'accept' ? settings.partnerFees.accept : settings.partnerFees.jobPost,
-    });
+    throw new AppError(403, 'PAYMENT_REQUIRED', 'Pay once or subscribe to continue.', { kind, amount: passFee(settings, kind) });
   }
 
   /**
-   * After accepting a job or an order (never before — someone else could take it meanwhile):
-   * what the partner still owes. Nothing on the plan for that side; else an ad while ads run at
-   * that spot (`adOn`); else, while partner plans are on, the one-time fee.
+   * How many accepts this partner gets free a month on one side — every kind counts: services
+   * (Quick Book, personal bookings, nearby problems) or shop (Quick Orders, orders sent to the
+   * shop). Null means no limit — every accept free (partner plans off, on that side's plan, or
+   * no limit set).
    */
-  async unlockNeeded(accountId: string, plan: PartnerPlan, adOn?: () => Promise<boolean>): Promise<UnlockNeed> {
-    const plansOn = partnerPlansOn(await this.settings());
-    if (plansOn && (await this.isActive(accountId, 'partner', plan))) return null;
-    if (adOn && (await adOn().catch(() => false))) return 'ad';
-    return plansOn ? 'pay' : null;
+  async acceptLimit(accountId: string, side: 'service' | 'shop'): Promise<number | null> {
+    const settings = await this.settings();
+    if (!partnerPlansOn(settings)) return null;
+    const limit = side === 'service' ? settings.quickBookLimit : settings.quickOrderLimit;
+    if (limit == null) return null;
+    return (await this.isActive(accountId, 'partner', side)) ? null : limit;
+  }
+
+  /**
+   * After accepting (never before — someone else could take it meanwhile): free while this
+   * month's free accepts last, then the one-time fee (paid before the details open) — or
+   * nothing on the plan. `used` counts this month's accepts on that side so far.
+   */
+  async acceptUnlock(accountId: string, side: 'service' | 'shop', used: () => Promise<number>): Promise<UnlockNeed> {
+    const limit = await this.acceptLimit(accountId, side);
+    if (limit == null) return null;
+    return (await used()) < limit ? null : 'pay';
   }
 
   attachPass(id: string | null, ref: string): Promise<void> {

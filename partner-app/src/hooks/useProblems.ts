@@ -45,7 +45,7 @@ export function useAcceptProblem() {
     // Instant: the ad or the fee (without a plan) comes after, on the trip it starts.
     mutationFn: async (problemId: string) => {
       const post = await problemsService.accept(problemId);
-      if (post?.bookingRequestId && !(await completeAccept('job', post.bookingRequestId, 'problem_accept'))) throw new GivenBackError();
+      if (post?.bookingRequestId && !(await completeAccept('job', post.bookingRequestId))) throw new GivenBackError();
       return post;
     },
     // Settled, not success — a lost race (409) also means the list is stale. Not awaited: the

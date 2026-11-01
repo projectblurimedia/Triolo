@@ -29,27 +29,15 @@ import { sealSizeFor, TrustedSeal } from './TrustedSeal';
 /*
  * (Copied between user-app and partner-app — keep in sync. Only `AD_APP` in adsService differs.)
  *
- * Two kinds of ad, chosen when it's booked: full-screen ads before key actions (below), and
- * wide ads in Home's slider (HomeAdCarousel, at the end).
+ * Ads from local businesses, booked on the Triolo Ads website or by the admin: one wide (16:9)
+ * picture or video each. They show only in the slider at the top of Home (HomeAdCarousel, at the
+ * end) — never full screen before an action. Tapping one does what the ad does (a link,
+ * directions, a Triolo profile), or opens it full screen (AdPlayer) when it only promotes.
  *
- * Local businesses' ads, booked by the Triolo admin: one image or one video, vertical (a reel
- * or poster, 9:16) or horizontal (16:9), with an optional link. Shown full screen only before
- * key actions (`showAdBefore` / `adThen` / `useAdGate` with the action's spot — the
- * customer app's Book Nearby, booking a worker, sending a list, posting a problem, Hire Staff
- * search; the partner app's Mark Work Done and order PIN), the action going ahead once the ad
- * is closed. The admin switches each spot on or off and sets a minimum gap between ads. There
- * is no ad when an app opens any more, and none during a flow started from an ad's own button.
- * An ad can only be closed after its time — an image's set seconds, or the whole video — and
- * a progress bar shows how long is left. Tapping it (or Visit) opens its link, if it has one. Ads are local,
- * so nothing is asked for until the device location is known; each is admin-switchable.
- *
- * The time only runs while the app is on screen: in the background (or while the ad's link is
- * open) the timer, the bar and the video all pause, and carry on when the person comes back —
- * so leaving the app is never a way round watching it.
+ * The time only runs while the app is on screen: in the background the full-screen timer, its
+ * bar and the video all pause, and carry on when the person comes back.
  */
 
-// How long a key action waits for an ad before going ahead without one.
-const ACTION_AD_WAIT_MS = 2500;
 // If the picture / video hasn't started by then, the timer starts anyway.
 const MEDIA_START_FALLBACK_MS = 8000;
 // A picture gets this long to load before the ad shows, so it doesn't open on a blank card.
@@ -258,7 +246,7 @@ function AdPlayer({
   onLeave,
 }: {
   ad: Ad;
-  mode: 'action';
+  mode: 'view';
   onClose: () => void;
   /** Closes the ad without going on to the action (its button opened a profile instead). */
   onLeave: () => void;
@@ -535,8 +523,7 @@ function AdPlayer({
           <View style={[styles.after, { width: cardWidth }]}>
             {done ? (
               <Pressable onPress={onClose} accessibilityRole="button" style={styles.continueButton}>
-                <Text style={styles.continueText}>{mode === 'action' ? t('ads.continue') : t('common.close')}</Text>
-                {mode === 'action' ? <FontAwesome6 name="arrow-right" size={13} color="#FFFFFF" solid /> : null}
+                <Text style={styles.continueText}>{t('common.close')}</Text>
               </Pressable>
             ) : (
               <Text style={styles.waitText}>{t('ads.closeAfter', { count: secondsLeft })}</Text>
@@ -713,141 +700,13 @@ function ProfileAdCard({
   );
 }
 
-interface ActionAdState {
-  ad: Ad | null;
-  /** An ad is being looked for, from a tap with no spinner of its own: a loading screen shows. */
-  looking: boolean;
-  /** Runs the action (go = true) or drops it (the ad's button opened a profile instead). */
-  then: ((go: boolean) => void) | null;
-}
+/** The ad opened full screen from the slider (it only promotes, so it has nothing else to open). */
+const useActionAd = create<{ ad: Ad | null }>(() => ({ ad: null }));
 
-const useActionAd = create<ActionAdState>(() => ({ ad: null, then: null, looking: false }));
+// A profile opened from an ad's own Book Now / Order / Contact (kept for the screens that call these).
+export function startAdFreeFlow(): void {}
 
-// --- Ads before key actions ---
-
-let actionPending = false;
-
-// A flow started from an ad's own Book Now / Order / Contact shows no ads until it ends
-// (`endAdFreeFlow`), or after this long at the most.
-const AD_FREE_FLOW_MAX_MS = 30 * 60 * 1000;
-let adFreeUntil = 0;
-
-export function startAdFreeFlow(): void {
-  adFreeUntil = Date.now() + AD_FREE_FLOW_MAX_MS;
-}
-
-export function endAdFreeFlow(): void {
-  adFreeUntil = 0;
-}
-// Whether the latest showAdBefore actually showed an ad (read by adThen).
-let lastActionShowedAd = false;
-
-/**
- * Runs `action` after an ad, when one is running nearby and ads before key actions are on;
- * otherwise straight away. Never holds the action up for long: if no ad arrives quickly, the
- * action just goes ahead.
- */
-export function showAdBefore(action: (go?: boolean) => void, spot?: AdSpot, options: { loadingScreen?: boolean } = {}): void {
-  // A tap whose button has no spinner (a card): show a loading screen until the ad or the
-  // action itself is on its way, so the tap never looks ignored.
-  if (options.loadingScreen) {
-    useActionAd.setState({ looking: true });
-    const inner = action;
-    action = (go?: boolean) => {
-      useActionAd.setState({ looking: false });
-      inner(go);
-    };
-  }
-  lastActionShowedAd = false;
-  if (actionPending || useActionAd.getState().ad || Date.now() < adFreeUntil) {
-    action();
-    return;
-  }
-  const here = readyCoords(useLocationStore.getState());
-  if (!here) {
-    // Location was only just turned on: give the shared position a moment (within the same
-    // short budget) instead of skipping the ad.
-    actionPending = true;
-    const store = useLocationStore.getState();
-    Promise.race([store.refresh(), new Promise((resolve) => setTimeout(resolve, ACTION_AD_WAIT_MS))])
-      .catch(() => undefined)
-      .then(() => {
-        actionPending = false;
-        const now = readyCoords(useLocationStore.getState());
-        if (now) showAdBefore(action, spot);
-        else action();
-      });
-    return;
-  }
-  actionPending = true;
-  let settled = false;
-  const goAhead = () => {
-    if (settled) return;
-    settled = true;
-    actionPending = false;
-    action();
-  };
-  const waited = setTimeout(goAhead, ACTION_AD_WAIT_MS);
-  adsService
-    .serve('action', here, spot)
-    .then(async (ad) => {
-      if (settled) return;
-      if (!ad) {
-        clearTimeout(waited);
-        goAhead();
-        return;
-      }
-      // Its picture (or profile photo) first, within the same wait, so it opens already drawn.
-      await preload(ad);
-      if (settled) return;
-      clearTimeout(waited);
-      settled = true;
-      actionPending = false;
-      lastActionShowedAd = true;
-      useActionAd.setState({ ad, then: action, looking: false });
-    })
-    .catch(() => {
-      clearTimeout(waited);
-      goAhead();
-    });
-}
-
-/** `showAdBefore` as a promise: resolves once the ad (if there was one) is closed — true if one was shown. */
-export function adThen(spot?: AdSpot): Promise<{ shown: boolean; go: boolean }> {
-  return new Promise((resolve) => showAdBefore((go = true) => resolve({ shown: lastActionShowedAd, go }), spot));
-}
-
-/**
- * For a final button: `await waitForAd()` before the action (false if it's already waiting),
- * and `adLoading` to show the button's spinner while the ad is being fetched, so the tap
- * answers at once instead of seeming to do nothing. One ad per opening of the screen: pass
- * the screen's `open` — once an ad has been shown, later taps go straight through until the
- * screen is closed and opened again.
- */
-export function useAdGate(open: boolean, spot: AdSpot): { adLoading: boolean; waitForAd: () => Promise<boolean> } {
-  const [adLoading, setAdLoading] = useState(false);
-  const busy = useRef(false);
-  const shownThisOpening = useRef(false);
-  useEffect(() => {
-    if (!open) shownThisOpening.current = false;
-  }, [open]);
-  const waitForAd = useCallback(async () => {
-    if (busy.current) return false;
-    if (shownThisOpening.current) return true;
-    busy.current = true;
-    setAdLoading(true);
-    try {
-      const { shown, go } = await adThen(spot);
-      if (shown) shownThisOpening.current = true;
-      // False when the ad's own button took the person somewhere else instead.
-      return go;
-    } finally {
-      busy.current = false;
-      setAdLoading(false);
-    }
-  }, [spot]);
-  return { adLoading, waitForAd };
-}
+export function endAdFreeFlow(): void {}
 
 /**
  * Keeps a button spinning from the tap until its whole action is done — the location check,
@@ -872,44 +731,12 @@ export function useBusyAction(): { busy: boolean; run: (action: () => Promise<un
   return { busy, run };
 }
 
-/** Mounted once at the app root: shows the ad `showAdBefore` found, then runs the action. */
+/** Mounted once at the app root: an ad from the slider opened full screen. */
 export function AdActionHost() {
   const ad = useActionAd((state) => state.ad);
-  const looking = useActionAd((state) => state.looking);
-  if (!ad) return looking ? <AdLookingScreen /> : null;
-  return (
-    <AdPlayer
-      key={ad.id}
-      ad={ad}
-      mode="action"
-      onClose={() => {
-        const { then } = useActionAd.getState();
-        useActionAd.setState({ ad: null, then: null });
-        // Let the ad fade out before the next screen or popup opens.
-        setTimeout(() => then?.(true), 250);
-      }}
-      onLeave={() => {
-        const { then } = useActionAd.getState();
-        useActionAd.setState({ ad: null, then: null });
-        then?.(false);
-      }}
-    />
-  );
-}
-
-/** A dimmed screen with a spinner while an ad is being fetched for a tap. */
-function AdLookingScreen() {
-  const { t } = useTranslation();
-  return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => undefined}>
-      <View style={[styles.lookingScreen, styles.center]}>
-        <View style={styles.lookingCard}>
-          <LoadingIndicator size={36} dotSize={6} />
-          <Text style={styles.lookingText}>{t('ads.opening')}</Text>
-        </View>
-      </View>
-    </Modal>
-  );
+  if (!ad) return null;
+  const close = () => useActionAd.setState({ ad: null });
+  return <AdPlayer key={ad.id} ad={ad} mode="view" onClose={close} onLeave={close} />;
 }
 
 // --- Home carousel ---
@@ -989,9 +816,11 @@ export function HomeAdCarousel() {
   const current = ads[index];
   useEffect(() => {
     if (ads.length < 2 || !active || !current) return;
+    // A picture stays the admin's "time between ads"; a video until it has played.
+    const pictureMs = (current.slideSeconds ?? 5) * 1000 || CAROUSEL_SLIDE_MS;
     const wait = current.videoUrl
-      ? Math.min(CAROUSEL_VIDEO_MAX_MS, Math.max(CAROUSEL_SLIDE_MS, current.durationSeconds * 1000 + 1500))
-      : CAROUSEL_SLIDE_MS;
+      ? Math.min(CAROUSEL_VIDEO_MAX_MS, Math.max(pictureMs, current.durationSeconds * 1000 + 1500))
+      : pictureMs;
     const timer = setTimeout(() => {
       if (touching.current) return;
       const next = (index + 1) % ads.length;
@@ -1007,7 +836,7 @@ export function HomeAdCarousel() {
     const cta = adCta(ad);
     if (cta) cta.run();
     // Only promotes: show it full screen.
-    else useActionAd.setState({ ad, then: null });
+    else useActionAd.setState({ ad });
   };
 
   return (
@@ -1124,18 +953,6 @@ const styles = StyleSheet.create({
   carouselDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 8 },
   carouselDot: { height: 6, borderRadius: 3 },
   center: { alignItems: 'center', justifyContent: 'center' },
-  lookingScreen: { flex: 1, backgroundColor: 'rgba(5,7,11,0.55)' },
-  lookingCard: {
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 28,
-    paddingVertical: 22,
-    borderRadius: 22,
-    backgroundColor: 'rgba(15,20,30,0.85)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  lookingText: { ...typography.body, fontFamily: fonts.medium, color: '#FFFFFF' },
   dim: { backgroundColor: 'rgba(0,0,0,0.15)' },
   screen: { flex: 1, backgroundColor: '#05070B' },
   backdropDim: { backgroundColor: 'rgba(5,7,11,0.72)' },

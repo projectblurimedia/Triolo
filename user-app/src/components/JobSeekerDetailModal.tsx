@@ -141,17 +141,15 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                   </Text>
                 </View>
               ) : (
-                <View style={[styles.flex, styles.hiddenRow]}>
-                  <View style={[styles.lockIcon, { backgroundColor: `${colors.primary}14` }]}>
-                    <FontAwesome6 name="lock" size={13} color={colors.primary} solid />
-                  </View>
-                  <View style={styles.flex}>
-                    <Text style={[styles.hiddenTitle, { color: colors.text }]} numberOfLines={1}>
-                      {t('hireStaff.numberHiddenTitle')}
+                <View style={styles.flex}>
+                  <Text style={[styles.phoneLabel, { color: colors.textMuted }]}>{t('hireStaff.phoneLabel')}</Text>
+                  <View style={styles.hiddenRow}>
+                    <Text style={[styles.phone, styles.masked, { color: colors.text }]} numberOfLines={1}>
+                      +91 ••••• •••••
                     </Text>
-                    <Text style={[styles.phoneLabel, { color: colors.textMuted }]} numberOfLines={1}>
-                      {fee ? t('hireStaff.payToSee') : t('hireStaff.tapToSee')}
-                    </Text>
+                    <View style={[styles.lockBadge, { backgroundColor: `${colors.primary}16` }]}>
+                      <FontAwesome6 name="lock" size={10} color={colors.primary} solid />
+                    </View>
                   </View>
                 </View>
               )}
@@ -160,9 +158,9 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                 accessibilityLabel={`${t('hireStaff.call')} ${person.fullName}`}
               >
                 <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>
-                  <FontAwesome6 name="phone" size={15} color="#FFFFFF" solid />
+                  <FontAwesome6 name={number ? 'phone' : 'lock-open'} size={15} color="#FFFFFF" solid />
                   <Text style={styles.callText} numberOfLines={1}>
-                    {!number && fee ? t('hireStaff.payAmount') : t('hireStaff.callNow')}
+                    {number ? t('hireStaff.callNow') : fee ? t('hireStaff.unlockFor', { amount: fee }) : t('hireStaff.showNumber')}
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -241,10 +239,12 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   phoneLabel: { ...typography.caption, fontSize: 11 },
-  hiddenRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  hiddenRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  masked: { letterSpacing: 1.5, flexShrink: 1 },
+  lockBadge: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   lockIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   hiddenTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
   phone: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 17, letterSpacing: 0.4 },
   callButton: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 48, paddingHorizontal: 20, borderRadius: 24 },
-  callText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF' },
+  callText: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF', includeFontPadding: false },
 });

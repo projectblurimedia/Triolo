@@ -1,6 +1,4 @@
 import { Router } from 'express';
-import { AdsRepository } from '@/modules/ads/repository';
-import { AdsService } from '@/modules/ads/service';
 import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
 import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { pool } from '@/config/database';
@@ -21,13 +19,7 @@ import { createOrderSchema, createQuickOrderSchema, customerCancelSchema, rateOr
 const notificationsService = new NotificationsService(new NotificationsRepository(pool));
 const businessesService = new BusinessesService(new BusinessesRepository(pool), notificationsService);
 const subscriptionStatus = new SubscriptionStatusService(new SubscriptionsRepository(pool));
-// After accepting, an ad may come instead of the fee (the admin's partner ad spots).
-const adsService = new AdsService(new AdsRepository(pool));
-const controller = new OrdersController(
-  new OrdersService(new OrdersRepository(pool), businessesService, notificationsService, subscriptionStatus, (spot) =>
-    adsService.partnerSpotOn(spot),
-  ),
-);
+const controller = new OrdersController(new OrdersService(new OrdersRepository(pool), businessesService, notificationsService, subscriptionStatus));
 
 export const ordersRouter = Router();
 
@@ -47,6 +39,7 @@ ordersRouter.post('/staff/deliveries/:id/decline', authenticate, controller.staf
 ordersRouter.put('/staff/deliveries/:id/location', authenticate, validateBody(staffLocationSchema), controller.staffLocation);
 ordersRouter.post('/staff/deliveries/:id/verify-pin', authenticate, validateBody(verifyOrderPinSchema), controller.staffVerifyPin);
 ordersRouter.post('/shop/quick/search', authenticate, controller.searchQuick);
+ordersRouter.get('/shop/quick/limit', authenticate, controller.getQuickAcceptStatus);
 ordersRouter.get('/shop/:id', authenticate, controller.getShop);
 
 // Customer side. A photo of a written list is uploaded first, one per request (Vercel caps a

@@ -63,8 +63,6 @@ export class OrdersService {
     private readonly notificationsService: NotificationsService,
     // Ordering needs a customer subscription while those are on.
     private readonly subscriptionStatus?: SubscriptionStatusService,
-    // Whether a partner-app ad spot is on (an ad after accepting, instead of the fee).
-    private readonly adSpotOn?: (spot: string) => Promise<boolean>,
   ) {}
 
   // --- Customer side ---
@@ -91,7 +89,7 @@ export class OrdersService {
 
     const distance =
       shop.latitude != null && shop.longitude != null ? distanceMeters(dto.latitude, dto.longitude, shop.latitude, shop.longitude) : 0;
-    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'order')) ?? null;
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'shop_order')) ?? null;
     const order = await this.repository.create({
       accountId,
       businessId: shop.id,
@@ -144,7 +142,7 @@ export class OrdersService {
     if (shops.length === 0) {
       throw AppError.notFound('No matching shop nearby.', 'QUICK_ORDER_NO_SHOPS');
     }
-    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'order')) ?? null;
+    const passId = (await this.subscriptionStatus?.useCustomerPass(accountId, 'quick_order')) ?? null;
     const kinds = splitShopCategories(dto.shopCategories);
     const order = await this.repository.createQuick({
       accountId,
@@ -349,6 +347,14 @@ export class OrdersService {
     return this.listAcross(shops);
   }
 
+  /** This month's free Quick Order accepts (without the shop plan): limit, used, left (null limit = no limit). */
+  async quickAcceptStatus(ownerAccountId: string): Promise<{ limit: number | null; used: number; remaining: number | null }> {
+    const limit = (await this.subscriptionStatus?.acceptLimit(ownerAccountId, 'shop')) ?? null;
+    if (limit == null) return { limit: null, used: 0, remaining: null };
+    const used = await this.repository.countAcceptsThisMonth(ownerAccountId);
+    return { limit, used, remaining: Math.max(0, limit - used) };
+  }
+
   async getShopOrder(ownerAccountId: string, orderId: string): Promise<ShopSideOrder> {
     await this.releaseUnpaidAccepts();
     await this.repository.expireStale();
@@ -357,13 +363,13 @@ export class OrdersService {
 
   async acceptOrder(ownerAccountId: string, orderId: string): Promise<void> {
     const { shop } = await this.shopForOrder(ownerAccountId, orderId);
-    // Accepting is instant and free; an ad or the fee comes after (unlockOrder), so no other
-    // shop can take it while this one is still paying.
-    const unlockNeeded = this.subscriptionStatus
-      ? await this.subscriptionStatus.unlockNeeded(ownerAccountId, 'shop', this.adSpotOn ? () => this.adSpotOn!('order_accept') : undefined)
-      : null;
     // A Quick Order offered to this shop: the first accept takes it (delivery charge from here).
+    // Without the shop plan, the month's free accepts come first (any order counts); after them
+    // the fee is paid before the order opens (unlockOrder).
     const offerDistance = await this.repository.findQuickOffer(orderId, shop.id);
+    const unlockNeeded = this.subscriptionStatus
+      ? await this.subscriptionStatus.acceptUnlock(ownerAccountId, 'shop', () => this.repository.countAcceptsThisMonth(ownerAccountId))
+      : null;
     const result =
       offerDistance != null
         ? await this.repository.claimQuick(orderId, shop.id, offerDistance, deliveryCharge(shop, offerDistance), unlockNeeded)

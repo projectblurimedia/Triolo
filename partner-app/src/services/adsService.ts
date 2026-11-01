@@ -61,6 +61,8 @@ export interface Ad {
   orientation: 'vertical' | 'horizontal';
   /** Seconds it shows before it can be closed (an image's set time, or the video's length). */
   durationSeconds: number;
+  /** Home slider: how long a picture stays before the next ad. */
+  slideSeconds?: number;
   /** Last day it runs, YYYY-MM-DD. */
   endDate: string;
 }

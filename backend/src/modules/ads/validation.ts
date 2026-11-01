@@ -15,8 +15,9 @@ const adFields = z.object({
   advertiserPhone: phone,
   title: optionalText(80),
   description: optionalText(600),
-  orientation: z.enum(AD_ORIENTATIONS),
-  showOn: z.enum(AD_SHOW_ON).default('action'),
+  // Only wide ads: the Home slider is a row of 16:9 cards.
+  orientation: z.enum(AD_ORIENTATIONS).refine((value) => value === 'horizontal', 'Only horizontal (16:9) pictures and videos'),
+  showOn: z.enum(AD_SHOW_ON).default('home'),
   displaySeconds: z.number().int().min(3, 'At least 3 seconds').max(30, 'At most 30 seconds').default(15),
   // Older forms sent the ad's place here; it now comes only from 'Show directions' (below).
   latitude: z.number().min(-90).max(90).nullish(),

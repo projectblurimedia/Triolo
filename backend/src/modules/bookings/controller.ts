@@ -48,6 +48,11 @@ export class BookingsController {
 
   // --- Worker side ---
 
+  /** This month's free Quick Book accepts (without the services plan): limit, used, left. */
+  getQuickAcceptStatus = asyncHandler(async (req: Request, res: Response) => {
+    return ok(res, await this.service.quickAcceptStatus(requireAccountId(req)));
+  });
+
   getMyOfferStats = asyncHandler(async (req: Request, res: Response) => {
     const when = (value: unknown) => {
       if (typeof value !== 'string' || !value) return undefined;

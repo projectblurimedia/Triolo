@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { bookingOffersService } from '@/services/bookingOffersService';
 import { useAuthStore } from '@/state/authStore';
 import { useLocationGatedMutation } from './useLocationGatedMutation';
+import { QUICK_LIMIT_QUERY_KEY } from './useQuickAcceptLimit';
 import { completeAccept, GivenBackError } from '@/utils/afterAccept';
 
 export const BOOKING_OFFERS_QUERY_KEY = ['bookingOffers'];
@@ -48,11 +49,12 @@ export function useAcceptBookingOffer() {
     // Instant: the ad or the fee (without a plan) comes after accepting — see completeAccept.
     mutationFn: async (bookingRequestId: string) => {
       await bookingOffersService.accept(bookingRequestId);
-      if (!(await completeAccept('job', bookingRequestId, 'job_accept'))) throw new GivenBackError();
+      if (!(await completeAccept('job', bookingRequestId))) throw new GivenBackError();
     },
-    // Not awaited: the job opens at once, the lists refresh behind it.
+    // Not awaited: the job opens at once, the lists (and the month's free accepts) refresh behind it.
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: QUICK_LIMIT_QUERY_KEY });
     },
   });
 }

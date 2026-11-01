@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import { useQueryClient } from '@tanstack/react-query';
 import { LoadingIndicator } from './LoadingIndicator';
+import { FindNowCard } from './FindNowCard';
 import { bookingOffersService, PendingOffer } from '@/services/bookingOffersService';
 import { BOOKING_OFFERS_QUERY_KEY } from '@/hooks/useBookingOffers';
 import { NEARBY_PROBLEMS_QUERY_KEY } from '@/hooks/useProblems';
@@ -16,7 +17,6 @@ import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { useLocationGatedMutation } from '@/hooks/useLocationGatedMutation';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { adThen } from './Ads';
 
 const POSITION_TIMEOUT_MS = 6000;
 const FAB = 62;
@@ -73,8 +73,7 @@ export function FindJobsButton({
   // Location is asked for before the spinner starts.
   const search = useLocationGatedMutation({
     mutationFn: async (_: void) => {
-      // Location first (above), then a local business's ad, then the search.
-      await adThen('find_jobs');
+      // Location first (above), then the search.
       return bookingOffersService.search(await currentPosition());
     },
     onSuccess: (offers) => {
@@ -139,29 +138,13 @@ export function FindJobsButton({
   }
 
   return (
-    <Pressable
+    <FindNowCard
+      eyebrow={t('findJobs.sectionTitle')}
+      title={t(search.isPending ? 'findJobs.searching' : 'findJobs.button')}
+      hint={t('findJobs.hint')}
+      busy={search.isPending}
       onPress={() => search.mutate()}
-      disabled={search.isPending}
-      style={({ pressed }) => [styles.cardWrap, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}
-    >
-      <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
-        <FontAwesome6 name="magnifying-glass-location" size={70} color="rgba(255,255,255,0.14)" solid style={styles.watermark} />
-        <View style={styles.cardIcon}>
-          {search.isPending ? (
-            <LoadingIndicator size={22} dotSize={4} color="#FFFFFF" />
-          ) : (
-            <FontAwesome6 name="magnifying-glass-location" size={19} color="#FFFFFF" solid />
-          )}
-        </View>
-        <View style={styles.cardText}>
-          <Text style={styles.cardTitle}>{t(search.isPending ? 'findJobs.searching' : 'findJobs.button')}</Text>
-          <Text style={styles.cardHint} numberOfLines={2}>
-            {t('findJobs.hint')}
-          </Text>
-        </View>
-        <FontAwesome6 name="chevron-right" size={14} color="#FFFFFF" solid />
-      </LinearGradient>
-    </Pressable>
+    />
   );
 }
 
@@ -198,18 +181,4 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.35)',
   },
-  cardWrap: { marginBottom: 6 },
-  card: { borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, overflow: 'hidden' },
-  watermark: { position: 'absolute', right: -8, bottom: -14 },
-  cardIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardText: { flex: 1, gap: 2 },
-  cardTitle: { ...typography.subheading, fontFamily: fonts.semiBold, color: '#FFFFFF' },
-  cardHint: { ...typography.caption, color: 'rgba(255,255,255,0.88)', fontSize: 12, lineHeight: 16 },
 });

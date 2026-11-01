@@ -21,45 +21,40 @@ type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 export const PLAN_PERKS: Record<PartnerPlan, { icon: IconName; key: string }[]> = {
   service: [
     { icon: 'bolt', key: 'plans.perks.service.first' },
-    { icon: 'handshake', key: 'plans.perks.service.freeAccept' },
-    { icon: 'wallet', key: 'plans.perks.noMiniPayments' },
+    { icon: 'infinity', key: 'plans.perks.service.noLimit' },
     { icon: 'arrow-up-wide-short', key: 'plans.perks.service.top' },
-    { icon: 'eye', key: 'plans.perks.service.viewers' },
-    { icon: 'ban', key: 'plans.perks.noAds' },
+    { icon: 'address-book', key: 'plans.perks.service.viewers' },
   ],
   shop: [
-    { icon: 'handshake', key: 'plans.perks.shop.freeAccept' },
-    { icon: 'wallet', key: 'plans.perks.noMiniPayments' },
+    { icon: 'infinity', key: 'plans.perks.shop.noLimit' },
     { icon: 'arrow-up-wide-short', key: 'plans.perks.shop.top' },
-    { icon: 'eye', key: 'plans.perks.shop.viewers' },
-    { icon: 'ban', key: 'plans.perks.noAds' },
+    { icon: 'address-book', key: 'plans.perks.shop.viewers' },
   ],
   job_post: [
+    { icon: 'briefcase', key: 'plans.perks.job_post.freePosts' },
     { icon: 'address-book', key: 'plans.perks.job_post.viewers' },
     { icon: 'arrow-up-wide-short', key: 'plans.perks.job_post.top' },
-    { icon: 'ban', key: 'plans.perks.noAds' },
   ],
   // Everything above, in one plan.
   all: [
     { icon: 'layer-group', key: 'plans.perks.all.everything' },
     { icon: 'bolt', key: 'plans.perks.service.first' },
-    { icon: 'handshake', key: 'plans.perks.all.freeAccept' },
-    { icon: 'address-book', key: 'plans.perks.job_post.viewers' },
-    { icon: 'arrow-up-wide-short', key: 'plans.perks.all.top' },
+    { icon: 'infinity', key: 'plans.perks.all.noLimit' },
+    { icon: 'wallet', key: 'plans.perks.all.noFees' },
+    { icon: 'address-book', key: 'plans.perks.all.viewers' },
     { icon: 'ban', key: 'plans.perks.noAds' },
   ],
 };
 
 export const PLAN_ICON: Record<PartnerPlan, IconName> = { service: 'screwdriver-wrench', shop: 'store', job_post: 'briefcase', all: 'layer-group' };
 const KIND_ORDER: BadgeKind[] = ['service', 'business', 'job_post'];
-// The switch's labels — the same names Home and Activity use.
-const SIDE_LABEL: Record<BadgeKind, string> = { service: 'homeSides.services', business: 'homeSides.shop', job_post: 'homeSides.jobPost' };
+const KIND_FOR_PLAN: Record<Exclude<PartnerPlan, 'all'>, BadgeKind> = { service: 'service', shop: 'business', job_post: 'job_post' };
 
 /**
- * Plans tab (route "Grow"): one side at a time (Services / Shop / Job Post, only the ones the
- * partner has). Each side shows its plan in a gold card, then separate cards for what it gives,
- * its prices, what costs money without it, and the profile's Trusted by Triolo badge and Boost.
- * Waits for everything before drawing, so nothing pops in late.
+ * Plans tab (route "Grow"): one row of plans — Service, Shop, Job Post (only the sides the
+ * partner has) and All in One (with more than one side). The chosen plan shows in a gold card,
+ * then what it gives, its prices, what costs money without it, and that side's Trusted by
+ * Triolo badge and Boost. Waits for everything before drawing, so nothing pops in late.
  */
 export function GrowScreen() {
   const { t } = useTranslation();
@@ -70,16 +65,17 @@ export function GrowScreen() {
   const profiles = badges.data?.profiles ?? [];
   const boostInfo = useBoostInfo(profiles.length > 0);
   const [refreshing, setRefreshing] = useState(false);
-  const [pickedKind, setPickedKind] = useState<BadgeKind | null>(null);
-  // This side's own plan, or the all-in-one plan (services, shop and job posts together).
-  const [allInOne, setAllInOne] = useState(false);
+  const [pickedPlan, setPickedPlan] = useState<PartnerPlan | null>(null);
   const [pickedPostId, setPickedPostId] = useState<string | null>(null);
 
   const loading = subscription.isLoading || badges.isLoading || (profiles.length > 0 && boostInfo.isLoading);
   const sub = subscription.data;
   const kinds = KIND_ORDER.filter((value) => profiles.some((profile) => profile.kind === value));
-  // One side at a time, like Home and Activity; the switch only when there's more than one.
-  const kind: BadgeKind | null = pickedKind && kinds.includes(pickedKind) ? pickedKind : (kinds[0] ?? null);
+  // The plans to choose from: each side the partner has, then All in One (two sides or more).
+  const plans: PartnerPlan[] = [...kinds.map((value) => planForKind(value)), ...(kinds.length > 1 ? (['all'] as const) : [])];
+  const plan: PartnerPlan | null = pickedPlan && plans.includes(pickedPlan) ? pickedPlan : (plans[0] ?? null);
+  // The side whose badge and boost show (All in One: every side).
+  const kind: BadgeKind | null = plan && plan !== 'all' ? KIND_FOR_PLAN[plan] : null;
   // Several job posts / shops: one at a time, picked by its work (Teacher, Cook…) or shop name.
   const posts = profiles.filter((profile) => profile.kind === kind && (kind === 'job_post' || kind === 'business'));
   const post = posts.find((profile) => profile.profileId === pickedPostId) ?? posts[0] ?? null;
@@ -115,16 +111,17 @@ export function GrowScreen() {
     ]).finally(() => setRefreshing(false));
   };
 
-  const sideSwitch =
-    kinds.length > 1 ? (
-      <View style={[styles.modeSwitch, { borderColor: colors.border }]}>
-        {kinds.map((value) => {
-          const active = kind === value;
+  // One chip per plan; only when there's more than one to choose from.
+  const planChips =
+    plans.length > 1 ? (
+      <View style={[styles.planChoice, { borderColor: `${GOLD_DEEP}40` }]}>
+        {plans.map((value) => {
+          const active = plan === value;
           return (
-            <Pressable key={value} onPress={() => setPickedKind(value)} style={[styles.modeOption, active ? { backgroundColor: colors.primary } : null]}>
-              <FontAwesome6 name={PLAN_ICON[planForKind(value)]} size={12} color={active ? '#FFFFFF' : colors.textMuted} solid />
-              <Text style={[styles.modeText, { color: active ? '#FFFFFF' : colors.textMuted }]} numberOfLines={1}>
-                {t(SIDE_LABEL[value])}
+            <Pressable key={value} onPress={() => setPickedPlan(value)} style={[styles.planChoiceOption, active ? { backgroundColor: GOLD_DEEP } : null]}>
+              <FontAwesome6 name={PLAN_ICON[value]} size={11} color={active ? '#FFFFFF' : GOLD_DEEP} solid />
+              <Text style={[styles.planChoiceText, { color: active ? '#FFFFFF' : GOLD_DEEP }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                {t(`plans.names.${value}`)}
               </Text>
             </Pressable>
           );
@@ -141,6 +138,33 @@ export function GrowScreen() {
     </View>
   );
 
+  const headStart = sub?.headStartSeconds ?? 30;
+  const fees = sub?.fees ?? {};
+  const limits = sub?.limits ?? { quickBook: null, quickOrder: null };
+
+  /** Without this plan: the month's free Quick Book / Quick Order accepts and the small fees. */
+  const withoutPlan = (plan: PartnerPlan): { icon: IconName; text: string }[] => {
+    const lines: { icon: IconName; text: string }[] = [];
+    const sides: ('service' | 'shop' | 'job_post')[] = plan === 'all' ? ['service', 'shop', 'job_post'] : [plan];
+    for (const side of sides) {
+      if (side === 'job_post') {
+        if (fees.job_post > 0) lines.push({ icon: 'briefcase', text: t('plans.noPlan.jobPostFee', { amount: fees.job_post }) });
+        if (fees.job_post_viewer > 0) lines.push({ icon: 'user-lock', text: t('plans.noPlan.jobPostViewer', { amount: fees.job_post_viewer }) });
+        continue;
+      }
+      // Every accept counts; after the free ones each pays the fee (no limit: all free).
+      const limit = side === 'service' ? limits.quickBook : limits.quickOrder;
+      if (limit != null) {
+        if (limit > 0) lines.push({ icon: 'hourglass-half', text: t(`plans.noPlan.limit.${side}`, { count: limit }) });
+        if (fees.accept > 0) lines.push({ icon: 'handshake', text: t(limit > 0 ? 'plans.noPlan.after' : 'plans.noPlan.every', { amount: fees.accept }) });
+      }
+      if (fees.profile_viewer > 0 && (plan !== 'all' || side === 'service')) {
+        lines.push({ icon: 'user-lock', text: t('plans.noPlan.profileViewer', { amount: fees.profile_viewer }) });
+      }
+    }
+    return lines;
+  };
+
   const renderPlan = (plan: PartnerPlan) => {
     if (!sub?.enabled) return null;
     const state = sub.plans?.[plan];
@@ -148,8 +172,6 @@ export function GrowScreen() {
     const active = state?.active ?? null;
     const pending = state?.pending ?? null;
     const best = Math.max(...SUBSCRIPTION_MONTHS);
-    // The pay-once price for this side when there's no plan.
-    const fee = plan === 'job_post' ? sub.fees?.job_post : sub.fees?.accept;
     const daysLeft = active ? Math.max(1, Math.ceil((new Date(active.endsAt).getTime() - Date.now()) / 86400000)) : 0;
     return (
       <>
@@ -180,10 +202,12 @@ export function GrowScreen() {
                   : t('plans.extra', { count: PLAN_PERKS[plan].length, amount: Math.round(prices['12'] / 12) })}
               </Text>
             </View>
-            <Pressable onPress={() => openSubscribe(plan)} style={({ pressed }) => [styles.heroButton, { opacity: pressed ? 0.9 : 1 }]}>
-              <Text style={styles.heroButtonText}>{active ? t('subscribe.manage') : t('subscribe.get')}</Text>
-              <FontAwesome6 name="arrow-right" size={11} color="#FFE29A" solid />
-            </Pressable>
+            {active ? null : (
+              <Pressable onPress={() => openSubscribe(plan)} style={({ pressed }) => [styles.heroButton, { opacity: pressed ? 0.9 : 1 }]}>
+                <Text style={styles.heroButtonText}>{t('subscribe.get')}</Text>
+                <FontAwesome6 name="arrow-right" size={11} color="#FFE29A" solid />
+              </Pressable>
+            )}
           </View>
         </GoldCard>
 
@@ -191,12 +215,15 @@ export function GrowScreen() {
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: `${GOLD_DEEP}40` }]}>
           {cardHead('star', t('plans.whatYouGet'), GOLD_DEEP)}
           <View style={styles.perks}>
-            {PLAN_PERKS[plan].map((perk) => (
+            {PLAN_PERKS[plan]
+              // No head start set: that perk isn't offered.
+              .filter((perk) => headStart > 0 || perk.key !== 'plans.perks.service.first')
+              .map((perk) => (
               <View key={perk.key} style={[styles.perk, { backgroundColor: `${GOLD_DEEP}0F`, borderColor: `${GOLD_DEEP}2E` }]}>
                 <LinearGradient colors={GOLD_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.perkIcon}>
                   <FontAwesome6 name={perk.icon} size={12} color="#FFFFFF" solid />
                 </LinearGradient>
-                <Text style={[styles.perkText, { color: colors.text }]}>{t(perk.key)}</Text>
+                <Text style={[styles.perkText, { color: colors.text }]}>{t(perk.key, { seconds: headStart })}</Text>
               </View>
             ))}
           </View>
@@ -250,13 +277,18 @@ export function GrowScreen() {
           </View>
         )}
 
-        {/* What costs money without the plan (a job post is paid for even with it). */}
-        {plan !== 'all' && fee && fee > 0 && (plan === 'job_post' || !active) ? (
-          <View style={[styles.note, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}2E` }]}>
-            <View style={[styles.noteIcon, { backgroundColor: `${colors.primary}1A` }]}>
-              <FontAwesome6 name={plan === 'job_post' ? 'briefcase' : 'handshake'} size={13} color={colors.primary} solid />
-            </View>
-            <Text style={[styles.noteText, { color: colors.text }]}>{t(`plans.noPlanFee.${plan}`, { amount: fee })}</Text>
+        {/* What it's like without the plan: the month's free accepts and the small fees. */}
+        {!active && withoutPlan(plan).length > 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {cardHead('circle-info', t('plans.withoutPlan'), colors.primary)}
+            {withoutPlan(plan).map((line) => (
+              <View key={line.text} style={styles.noPlanRow}>
+                <View style={[styles.noteIcon, { backgroundColor: `${colors.primary}14` }]}>
+                  <FontAwesome6 name={line.icon} size={12} color={colors.primary} solid />
+                </View>
+                <Text style={[styles.noteText, { color: colors.text }]}>{line.text}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
       </>
@@ -271,7 +303,7 @@ export function GrowScreen() {
             <View style={styles.loading}>
               <LoadingIndicator size={36} dotSize={5} color={colors.primary} />
             </View>
-          ) : !kind ? (
+          ) : !plan ? (
             <View style={styles.empty}>
               <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}14` }]}>
                 <FontAwesome6 name="crown" size={22} color={colors.primary} solid />
@@ -281,34 +313,14 @@ export function GrowScreen() {
             </View>
           ) : (
             <>
-              {sideSwitch}
-              {sub?.enabled ? (
-                <View style={[styles.planChoice, { borderColor: `${GOLD_DEEP}40` }]}>
-                  {([false, true] as const).map((all) => {
-                    const active = allInOne === all;
-                    const plan = all ? 'all' : planForKind(kind);
-                    return (
-                      <Pressable
-                        key={String(all)}
-                        onPress={() => setAllInOne(all)}
-                        style={[styles.planChoiceOption, active ? { backgroundColor: GOLD_DEEP } : null]}
-                      >
-                        <FontAwesome6 name={PLAN_ICON[plan]} size={11} color={active ? '#FFFFFF' : GOLD_DEEP} solid />
-                        <Text style={[styles.planChoiceText, { color: active ? '#FFFFFF' : GOLD_DEEP }]} numberOfLines={1}>
-                          {t(`plans.names.${plan}`)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-              {renderPlan(allInOne ? 'all' : planForKind(kind))}
-              {/* The badge and the boost: two cards of their own. */}
+              {sub?.enabled ? planChips : null}
+              {renderPlan(plan)}
+              {/* The badge and the boost: two cards of their own (All in One: every side's). */}
               {postPicker}
               <ProfileGrowth
                 boostInfo={boostInfo.data ?? null}
-                kinds={[kind]}
-                profileIds={posts.length > 1 && post ? [post.profileId] : undefined}
+                kinds={kind ? [kind] : kinds}
+                profileIds={kind && posts.length > 1 && post ? [post.profileId] : undefined}
                 split
               />
             </>
@@ -321,8 +333,10 @@ export function GrowScreen() {
 
 const styles = StyleSheet.create({
   planChoice: { flexDirection: 'row', borderWidth: 1, borderRadius: 14, padding: 4, gap: 4, marginBottom: 12 },
-  planChoiceOption: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 10 },
-  planChoiceText: { fontFamily: fonts.semiBold, fontSize: 12.5 },
+  planChoiceOption: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, height: 36, borderRadius: 10, paddingHorizontal: 4 },
+  noPlanRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  // No font padding, so the name sits in the middle of the chip (Poppins draws high on Android).
+  planChoiceText: { fontFamily: fonts.semiBold, fontSize: 12.5, lineHeight: 16, includeFontPadding: false, textAlignVertical: 'center' },
   flex: { flex: 1 },
   body: { paddingBottom: 120 },
   loading: { paddingVertical: 80, alignItems: 'center' },

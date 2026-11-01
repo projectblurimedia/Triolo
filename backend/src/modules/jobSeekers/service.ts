@@ -31,8 +31,6 @@ export class JobSeekersService {
     private readonly subscriptionStatus?: SubscriptionStatusService,
     // Tells the poster someone viewed their post (optional for the same reason).
     private readonly notifications?: NotificationsService,
-    // Whether a partner-app ad spot is on (seeing who viewed a post after an ad).
-    private readonly adSpotOn?: (spot: string) => Promise<boolean>,
   ) {}
 
   /** One live post (e.g. an ad's "Contact"). The phone number shows only with a plan or once paid for. */
@@ -70,7 +68,7 @@ export class JobSeekersService {
     return { ...params, skills, description };
   }
 
-  /** A new post: each one takes its own paid pass (while partner plans are on). */
+  /** A new post: without the job post plan (while partner plans are on) each one takes its own paid pass. */
   async createMine(accountId: string, params: SaveJobSeekerPostParams): Promise<JobSeekerPost> {
     if ((await this.repository.countByAccount(accountId)) >= MAX_JOB_POSTS) {
       throw AppError.conflict(`You can keep up to ${MAX_JOB_POSTS} job posts.`, 'JOB_POST_LIMIT');
@@ -155,25 +153,30 @@ export class JobSeekersService {
   }
 
   /**
-   * Who opened one of my posts. Hidden (the count and times still show) until the partner may
-   * see them: on the job post plan, or — with plans off — after an ad (`revealed`, asked for
-   * once the app showed it) or straight away when there's no ad. `access` says which.
+   * Who opened one of my posts. With partner plans off, or on the job post plan, everyone
+   * shows with their number. Otherwise each person stays locked (the count and times still
+   * show) until the partner pays to see that one, or buys the plan.
    */
-  async listViewers(accountId: string, postId: string, revealed = false): Promise<JobPostViewers> {
+  async listViewers(accountId: string, postId: string): Promise<JobPostViewers> {
     const viewers = await this.repository.listViewers(accountId, postId);
     if (!viewers) throw AppError.notFound('Job post not found.', 'JOB_POST_NOT_FOUND');
-    const access = this.subscriptionStatus
-      ? await this.subscriptionStatus.viewerAccess(accountId, 'job_post', this.adSpotOn ? () => this.adSpotOn!('viewer_reveal') : undefined)
-      : 'open';
-    const locked = !(access === 'open' || (access === 'ad' && revealed));
+    const access = this.subscriptionStatus ? await this.subscriptionStatus.viewerAccess(accountId, 'job_post') : 'open';
+    const paidFor =
+      access === 'open' || !this.subscriptionStatus ? new Set<string>() : await this.subscriptionStatus.unlockedTargets(accountId, 'job_post_viewer');
+    const shown = viewers.map((viewer) =>
+      access === 'open' || paidFor.has(viewer.viewerKey)
+        ? { ...viewer, locked: false }
+        : { ...viewer, name: null, mobile: null, locked: true },
+    );
     return {
       access,
-      locked,
+      locked: shown.some((viewer) => viewer.locked),
       total: viewers.reduce((sum, viewer) => sum + viewer.times, 0),
       newCount: viewers.filter((viewer) => viewer.isNew).length,
-      viewers: viewers.map((viewer, index) => (locked ? { ...viewer, viewerKey: String(index), name: null, mobile: null } : viewer)),
+      viewers: shown,
     };
   }
+
 
   /** The poster looked at a post's views: they're no longer new, and its notifications are read. */
   async markViewsSeen(accountId: string, postId: string): Promise<void> {
