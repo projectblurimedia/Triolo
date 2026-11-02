@@ -49,6 +49,11 @@ export class ProblemsService implements BookingLifecycleListener {
     private readonly subscriptionStatus?: SubscriptionStatusService,
   ) {}
 
+  /** A deleted account: the photos of its problem posts are deleted. */
+  async clearPhotosForAccount(accountId: string): Promise<void> {
+    await deletePhotosFromCloudinary(await this.repository.clearPhotosForAccount(accountId));
+  }
+
   // --- Customer side ---
 
   /** Posting without a customer plan (while those are on) uses one paid pass. */

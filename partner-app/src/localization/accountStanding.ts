@@ -3,7 +3,7 @@ import { TFunction } from 'i18next';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** The two codes the server sends for a suspended or banned account (on login and on any request). */
-export const STANDING_CODES = ['ACCOUNT_SUSPENDED', 'ACCOUNT_BLOCKED'];
+export const STANDING_CODES = ['ACCOUNT_SUSPENDED', 'ACCOUNT_BLOCKED', 'ACCOUNT_DELETED'];
 
 /**
  * "Your account is suspended until 15 Oct 2026. Reason: …" — from the error's code and details.

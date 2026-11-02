@@ -562,7 +562,8 @@
     "WORKER_NOT_FOUND": "This worker was not found.",
     "VOICE_REQUIRED": "Record a voice message first.",
     "ORDER_VOICE_INVALID": "This voice message could not be used. Please record it again.",
-    "ORDER_VOICE_TOO_LONG": "The voice message is too long. Keep it under 3 minutes."
+    "ORDER_VOICE_TOO_LONG": "The voice message is too long. Keep it under 3 minutes.",
+    "ACCOUNT_DELETED": "This account was deleted. The number can sign up again 30 days after it was deleted."
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -600,7 +601,13 @@
   "liveMap": {
     "unavailable": "Map unavailable right now",
     "loading": "Loading map…",
-    "recenter": "Re-centre"
+    "recenter": "Re-centre",
+    "you": "You",
+    "away": "{{name}} is {{distance}} away",
+    "youAway": "You are {{distance}} away",
+    "almostHere": "{{name}} is almost here",
+    "youAlmostThere": "You are almost there",
+    "someone": "They"
   },
   "job": {
     "title": "Job",
@@ -854,7 +861,8 @@
     "itemNamePlaceholder": "Item name",
     "addedByYou": "Added by you",
     "photoListLine_one": "{{count}} photo of the list",
-    "photoListLine_other": "{{count}} photos of the list"
+    "photoListLine_other": "{{count}} photos of the list",
+    "mediaRemoved": "Photos and voice messages are removed 30 days after an order ends, to protect your privacy."
   },
   "shopHome": {
     "myShop": "My Shop",
@@ -1855,5 +1863,41 @@
     "order": "Accepting the order…",
     "job": "Accepting the job…",
     "wait": "Opening it in a moment."
+  },
+  "legal": {
+    "section": "Privacy & legal",
+    "privacy": "Privacy Policy",
+    "privacySub": "What we collect and why",
+    "terms": "Terms of Use",
+    "termsSub": "The rules for using Triolo",
+    "refunds": "Refund Policy",
+    "refundsSub": "When money comes back"
+  },
+  "deleteAccount": {
+    "menuTitle": "Delete account",
+    "menuSubtitle": "Remove your account and data",
+    "title": "Delete account",
+    "subtitle": "This can't be undone",
+    "warning": "Deleting your account works for both Triolo apps — one account covers both.",
+    "whatHappens": "What happens",
+    "points": {
+      "active": "Bookings, orders and problem posts still under way are cancelled, and the other side is told.",
+      "profiles": "Your worker, shop and job-post profiles are removed.",
+      "media": "All your photos and voice messages are deleted right away.",
+      "signedOut": "You are signed out of every phone.",
+      "kept": "Your name, number, email and place are kept for 30 days for disputes and safety.",
+      "wiped": "After 30 days they are wiped for good, and the number can sign up again."
+    },
+    "understand": "I understand. Paid plans, badges and credits end and are not refunded.",
+    "confirm": "Delete my account",
+    "keep": "Keep my account",
+    "doneTitle": "Account deleted",
+    "doneMessage": "Your details will be wiped in 30 days. Thank you for using Triolo."
+  },
+  "orders": {},
+  "ownerDelivery": {
+    "notificationTitle": "Delivering an order",
+    "notificationBody": "The customer sees you coming on the map.",
+    "mapTitle": "Your delivery"
   }
 }

@@ -8,6 +8,7 @@ const CACHE_MS = 30_000;
 
 interface Standing {
   status: string;
+  deletionRequestedAt: Date | null;
   suspendedUntil: Date | null;
   reason: string | null;
   checkedAt: number;
@@ -15,13 +16,27 @@ interface Standing {
 
 const cache = new Map<string, Standing>();
 
+/** How long a deleted account is kept before its personal details are wiped. */
+export const ACCOUNT_KEEP_DAYS = 30;
+
 /** Drop a cached standing (after the admin changes it on this instance). */
 export function forgetAccountStanding(accountId: string): void {
   cache.delete(accountId);
 }
 
 /** The error a suspended or banned account gets — on login and on every request. */
-export function standingError(status: string, suspendedUntil: Date | null, reason: string | null): AppError | null {
+export function standingError(
+  status: string,
+  suspendedUntil: Date | null,
+  reason: string | null,
+  deletionRequestedAt: Date | null = null,
+): AppError | null {
+  if (deletionRequestedAt) {
+    return new AppError(403, 'ACCOUNT_DELETED', 'This account was deleted.', {
+      // After this the number is free to sign up again.
+      reusableFrom: new Date(deletionRequestedAt.getTime() + ACCOUNT_KEEP_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+    });
+  }
   if (status === 'blocked') {
     return new AppError(403, 'ACCOUNT_BLOCKED', 'This account has been banned.', { reason });
   }
@@ -41,11 +56,13 @@ async function load(accountId: string): Promise<Standing | null> {
     [accountId],
   );
   void result;
-  const row = (await pool.query(`SELECT status, suspended_until, status_reason FROM accounts WHERE id = $1`, [accountId]))
-    .rows[0];
+  const row = (
+    await pool.query(`SELECT status, suspended_until, status_reason, deletion_requested_at FROM accounts WHERE id = $1`, [accountId])
+  ).rows[0];
   if (!row) return null;
   return {
     status: row.status,
+    deletionRequestedAt: row.deletion_requested_at ?? null,
     suspendedUntil: row.suspended_until ?? null,
     reason: row.status_reason ?? null,
     checkedAt: Date.now(),
@@ -61,6 +78,6 @@ export async function assertAccountInGoodStanding(accountId: string): Promise<vo
     standing = loaded;
     cache.set(accountId, standing);
   }
-  const error = standingError(standing.status, standing.suspendedUntil, standing.reason);
+  const error = standingError(standing.status, standing.suspendedUntil, standing.reason, standing.deletionRequestedAt);
   if (error) throw error;
 }

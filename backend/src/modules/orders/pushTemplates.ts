@@ -153,3 +153,10 @@ const DELIVERY_TEMPLATES: Record<PreferredLanguage, Record<DeliveryEvent, (value
 export function deliveryTemplate(event: DeliveryEvent, language: PreferredLanguage, values: DeliveryTemplateValues) {
   return (DELIVERY_TEMPLATES[language] ?? DELIVERY_TEMPLATES.en)[event](values);
 }
+
+/** The delivery is within 100 m (sent once per order). `name` = delivery person or shop. */
+export function orderNearbyTemplate(language: PreferredLanguage, name: string): { title: string; body: string } {
+  return language === 'te'
+    ? { title: 'మీ ఆర్డర్ దగ్గరలో ఉంది', body: `${name || 'డెలివరీ'} 100 మీటర్ల దూరంలో ఉన్నారు. మీ PIN సిద్ధంగా ఉంచండి.` }
+    : { title: 'Your order is almost there', body: `${name || 'The delivery'} is about 100 m away. Keep your PIN ready.` };
+}

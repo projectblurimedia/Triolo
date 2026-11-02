@@ -204,3 +204,11 @@ export function tripTemplate(event: TripEvent, language: PreferredLanguage, work
   if (named && workerName) return named(workerName);
   return TRIP_TEMPLATES[event][language] ?? TRIP_TEMPLATES[event].en;
 }
+
+/** The worker is within 100 m (sent once per trip). */
+export function nearbyTemplate(language: PreferredLanguage, workerName?: string | null): { title: string; body: string } {
+  const name = workerName || (language === 'te' ? 'మీ వర్కర్' : 'Your worker');
+  return language === 'te'
+    ? { title: `${name} దగ్గరలో ఉన్నారు`, body: `${name} 100 మీటర్ల దూరంలో ఉన్నారు. మీ PIN సిద్ధంగా ఉంచండి.` }
+    : { title: `${name} is almost there`, body: `${name} is about 100 m away. Keep your PIN ready.` };
+}

@@ -119,7 +119,9 @@ function signOutIfBanned(error: ApiError): ApiError {
       bannedNoticeShownAt = Date.now();
       showToast({
         variant: 'error',
-        title: i18n.t(error.code === 'ACCOUNT_BLOCKED' ? 'errors.bannedTitle' : 'errors.suspendedTitle'),
+        title: i18n.t(
+          error.code === 'ACCOUNT_BLOCKED' ? 'errors.bannedTitle' : error.code === 'ACCOUNT_DELETED' ? 'deleteAccount.doneTitle' : 'errors.suspendedTitle',
+        ),
         message: accountStandingMessage(error.code, error.details, i18n.t),
       });
     }

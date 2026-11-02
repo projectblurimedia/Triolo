@@ -21,7 +21,7 @@ import {
   AdminAccountListResult,
   AdminAccountStats,
 } from './interfaces';
-import { forgetAccountStanding, standingError } from './accountAccess';
+import { ACCOUNT_KEEP_DAYS, forgetAccountStanding, standingError } from './accountAccess';
 import {
   LogoutDto,
   UpdateProfileDto,
@@ -100,8 +100,8 @@ export class AuthService {
     if (!account) {
       throw AppError.notFound('No account found for this mobile number.', 'ACCOUNT_NOT_FOUND');
     }
-    // A suspended or banned account is told why before any OTP is sent.
-    const standing = standingError(account.status, account.suspendedUntil, account.statusReason);
+    // A suspended, banned or deleted account is told why before any OTP is sent.
+    const standing = standingError(account.status, account.suspendedUntil, account.statusReason, account.deletionRequestedAt ?? null);
     if (standing) throw standing;
 
     const otp = generateOtp();
@@ -123,7 +123,7 @@ export class AuthService {
     if (!account) {
       throw AppError.notFound('No account found for this mobile number.', 'ACCOUNT_NOT_FOUND');
     }
-    const standing = standingError(account.status, account.suspendedUntil, account.statusReason);
+    const standing = standingError(account.status, account.suspendedUntil, account.statusReason, account.deletionRequestedAt ?? null);
     if (standing) throw standing;
 
     const tokens = await this.issueTokens(account);
@@ -205,6 +205,25 @@ export class AuthService {
     if (!result) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
     if (result.previousUrl) await deletePhotosFromCloudinary([result.previousUrl]);
     return result.account;
+  }
+
+  /**
+   * The person deletes their own account: it stops at once (signed out everywhere, photo deleted)
+   * and is wiped ACCOUNT_KEEP_DAYS later (purgeDeleted). The caller (accountDeletion) has already
+   * cancelled their activity and removed their profiles.
+   */
+  async markDeleted(accountId: string): Promise<void> {
+    const account = await this.getAccount(accountId);
+    if (account.role === 'admin') throw AppError.forbidden('Admin accounts cannot be deleted here.', 'ADMIN_ACCOUNT_PROTECTED');
+    const marked = await this.repository.markDeleted(accountId);
+    await this.repository.revokeAllRefreshTokens(accountId);
+    forgetAccountStanding(accountId);
+    if (marked?.photoUrl) await deletePhotosFromCloudinary([marked.photoUrl]);
+  }
+
+  /** Daily: wipes accounts deleted over ACCOUNT_KEEP_DAYS ago. */
+  purgeDeleted(): Promise<number> {
+    return this.repository.purgeDeleted(ACCOUNT_KEEP_DAYS);
   }
 
   /** Profile → Waiting Time. Saving applies at once, also to requests already waiting. */

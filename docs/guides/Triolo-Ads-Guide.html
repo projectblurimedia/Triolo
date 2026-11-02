@@ -1,0 +1,114 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Triolo Ads — Guide</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:14mm 12mm}
+*{box-sizing:border-box}body{font-family:Poppins,Arial,sans-serif;color:#0f172a;margin:0;font-size:12.5px;line-height:1.55}
+.cover{height:265mm;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:0 14mm;background:linear-gradient(140deg,#7C2D12,#EA580C);color:#fff;border-radius:18px;page-break-after:always;position:relative;overflow:hidden}
+.cover .big{position:absolute;right:-30px;bottom:-40px;font-size:340px;opacity:.12}
+.cover h1{font-size:40px;margin:0 0 8px;line-height:1.15}.cover p{font-size:16px;opacity:.95;max-width:120mm;margin:0 0 6px}
+.cover .badge{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);padding:6px 14px;border-radius:999px;margin-bottom:22px;font-weight:600}
+.toc{page-break-after:always}.toc h2{font-size:22px}.toc ol{list-style:none;padding:0;columns:2;font-size:14px}.toc li{padding:7px 0;border-bottom:1px solid #e2e8f0;break-inside:avoid}
+.chapter{page-break-before:always}.chapter h2{font-size:22px;display:flex;align-items:center;gap:12px;margin:0 0 6px}
+.chapter h2 span{background:linear-gradient(135deg,#7C2D12,#EA580C);color:#fff;border-radius:12px;width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;font-size:18px}
+.intro{color:#475569;margin:0 0 14px;font-size:13px}
+.step{display:flex;gap:18px;align-items:flex-start;padding:14px 0;border-top:1px solid #e2e8f0;break-inside:avoid}
+.step .text{flex:1}.num{color:#7C2D12;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.step h3{margin:2px 0 6px;font-size:15.5px}.pt{margin:0 0 5px;padding-left:16px;position:relative}.pt:before{content:'•';position:absolute;left:3px;color:#7C2D12;font-weight:700}
+.tip{margin-top:8px;background:#fef9c3;border:1px solid #fde68a;border-radius:10px;padding:8px 10px;font-size:12px}.tip i{color:#ca8a04}
+.phone{width:58mm;flex-shrink:0;border:6px solid #0f172a;border-radius:22px;background:#f9fcff;overflow:hidden;position:relative;box-shadow:0 6px 18px rgba(15,23,42,.18)}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:18mm;height:9px;background:#0f172a;border-radius:0 0 8px 8px;z-index:2}
+.screen{padding-bottom:8px;font-size:9px;min-height:80mm}
+.m-head{color:#fff;padding:14px 8px 9px;display:flex;gap:6px;align-items:center}.m-title{font-weight:600;font-size:10.5px}.m-sub{font-size:7.5px;opacity:.9}
+.m-back,.m-logo{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);display:inline-flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0}
+.m-card{margin:6px 7px 0;background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:6px;display:flex;gap:6px;align-items:center}
+.m-ic{width:18px;height:18px;border-radius:50%;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0}
+.m-card>div{flex:1}.m-muted{color:#64748b;font-size:7.5px}.m-pill{color:#fff;border-radius:999px;padding:2px 6px;font-size:7px;font-weight:600}
+.m-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:6px 7px 0}
+.m-way{border-radius:9px;color:#fff;padding:6px;height:52px;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.m-way-ic{position:absolute;top:5px;left:5px;width:15px;height:15px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:7px}
+.m-way-big{position:absolute;right:-4px;bottom:-6px;font-size:30px;opacity:.18;transform:rotate(-12deg)}.m-way b{font-size:8px}.m-way small{font-size:6.5px;opacity:.9}
+.m-btn{margin:7px 7px 0;color:#fff;border-radius:8px;text-align:center;padding:6px;font-weight:600;font-size:8.5px}
+.m-btns{display:flex;gap:5px;margin:0 7px}.m-btns .m-btn{flex:1;margin:7px 0 0}
+.m-chips{margin:6px 7px 0;display:flex;flex-wrap:wrap;gap:4px}.m-chips span{border:1px solid #cbd5e1;border-radius:999px;padding:2px 6px;font-size:7.5px;background:#fff}.m-chips .on{background:#0055D3;color:#fff;border-color:#0055D3}
+.m-input{margin:6px 7px 0;border:1px solid #0055D340;background:#fff;border-radius:8px;padding:6px;color:#64748b;font-size:8px}
+.m-row{margin:5px 7px 0;display:flex;gap:6px;align-items:center;font-size:8px;border-bottom:1px solid #eef2f7;padding-bottom:4px}.m-row i{color:#0055D3;width:10px}.m-row span{flex:1}
+.m-note{margin:6px 7px 0;border:1px solid #cbd5e1;background:#f1f5f9;border-radius:8px;padding:5px;font-size:7.5px;display:flex;gap:5px}
+.m-pin{display:flex;gap:5px;justify-content:center;margin:8px 0}.m-pin span{width:18px;height:22px;border:1.5px solid #0055D3;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;background:#fff}
+.m-map{margin:6px 7px 0;height:60px;border-radius:9px;background:repeating-linear-gradient(45deg,#e0ecff,#e0ecff 8px,#eef4ff 8px,#eef4ff 16px);position:relative}
+.m-map small{position:absolute;bottom:3px;left:5px;font-size:7px;color:#334155}.m-dot{position:absolute;width:9px;height:9px;border-radius:50%;border:2px solid #fff}
+.m-dot.a{background:#16A34A;left:20%;top:30%}.m-dot.b{background:#0055D3;right:22%;top:55%}.m-line{position:absolute;left:24%;top:38%;width:52%;height:2px;background:#0055D3;transform:rotate(14deg);transform-origin:left}
+.m-voice{margin:6px 7px 0;border:1px solid #0055D333;background:#0055D30D;border-radius:9px;padding:5px;display:flex;align-items:center;gap:5px}
+.m-play{width:18px;height:18px;border-radius:50%;background:#0055D3;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:7px}
+.m-wave{flex:1;display:flex;align-items:center;gap:2px}.m-wave i{width:2px;background:#0055D388;border-radius:1px;display:block}.m-voice small{font-size:7px;color:#64748b}
+.m-photos{display:flex;gap:4px;margin:6px 7px 0}.m-photos span{width:24px;height:24px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:9px}
+.m-stars{margin:6px 7px 0;color:#FBBF24;font-size:13px;text-align:center}.m-stars span{color:#cbd5e1}
+.m-tabs{margin:9px 7px 0;background:#fff;border:1px solid #e2e8f0;border-radius:999px;display:flex;justify-content:space-around;padding:5px;color:#94a3b8;font-size:9px}.m-tabs .on{color:#0055D3}
+.m-slider{margin:6px 7px 0;aspect-ratio:16/9;border-radius:9px;background:linear-gradient(135deg,#fde68a,#fb923c);color:#7c2d12;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:600;font-size:8px}
+.m-popup{margin:8px 7px 0;background:#fff;border-radius:10px;padding:7px;box-shadow:0 4px 12px rgba(0,0,0,.2);border:1px solid #e2e8f0}
+.foot{margin-top:20px;color:#64748b;font-size:11px;text-align:center}
+</style></head><body>
+<div class="cover"><i class="fa-solid fa-rectangle-ad big"></i><span class="badge">triolo-ads.vercel.app</span><h1>Triolo Ads — Guide</h1>
+<p>Show your business to people near you on the Triolo apps' Home screen.</p><p>Book online, pay with UPI or card, and see your views and taps.</p></div>
+<div class="toc"><h2>What's inside</h2><ol><li><b>1.</b> How Triolo ads work</li><li><b>2.</b> Book an ad</li><li><b>3.</b> Review, results and refunds</li><li><b>4.</b> Rules</li></ol><p class="intro">Ads appear in the Home slider of both apps for people without a plan. Only wide (16:9) pictures and videos are accepted.</p></div>
+<section class="chapter">
+      <h2><span>1</span>How Triolo ads work</h2>
+      <div class="step">
+          <div class="text"><div class="num">Step 1</div><h3>Where your ad shows</h3>
+            <p class="pt">A wide card at the top of the Home screen that slides between ads.</p><p class="pt">Every running ad gets a fair share of views each day.</p><p class="pt">An ad with "Directions" is shown only within 5 km of your place; others are shown everywhere.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-logo"><i class="fa-solid fa-shapes"></i></span>
+        <div><div class="m-title">Hi, Ravi</div><div class="m-sub">Eluru</div></div></div><div class="m-input"><i class="fa-solid fa-magnifying-glass"></i> <span>Search workers or shops</span></div><div class="m-slider"><div><i class="fa-solid fa-rectangle-ad"></i> Sponsored · Your shop here</div><small>16 : 9</small></div><div class="m-grid"><div class="m-way" style="background:linear-gradient(135deg,#0055D3,#1D76FA)"><span class="m-way-ic"><i class="fa-solid fa-bolt"></i></span><i class="fa-solid fa-bolt m-way-big"></i><b>Quick Book</b><small></small></div><div class="m-way" style="background:linear-gradient(135deg,#0F9D58,#34C77B)"><span class="m-way-ic"><i class="fa-solid fa-basket-shopping"></i></span><i class="fa-solid fa-basket-shopping m-way-big"></i><b>Quick Order</b><small></small></div></div></div></div></div>
+    </section><section class="chapter">
+      <h2><span>2</span>Book an ad</h2>
+      <div class="step">
+          <div class="text"><div class="num">Step 1</div><h3>Sign in</h3>
+            <p class="pt">Open triolo-ads.vercel.app on a phone or computer.</p><p class="pt">Sign in with your mobile number and the SMS code.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-logo"><i class="fa-solid fa-shapes"></i></span>
+        <div><div class="m-title">Triolo Ads</div><div class="m-sub">For local businesses</div></div></div><div class="m-input"><i class="fa-solid fa-phone"></i> <span>Mobile number</span></div><div class="m-btn" style="background:linear-gradient(90deg,#0055D3,#1D76FA)">Send code</div></div></div></div><div class="step">
+          <div class="text"><div class="num">Step 2</div><h3>Create the ad</h3>
+            <p class="pt">Business name, a short title and text.</p><p class="pt">One wide picture (16:9) or one wide video (up to about 30 seconds).</p><p class="pt">When people tap: nothing, open a link, directions to your place, or open your Triolo profile.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-back"><i class="fa-solid fa-chevron-left"></i></span>
+        <div><div class="m-title">New ad</div></div></div><div class="m-input"><span>Business name</span></div><div class="m-slider"><div><i class="fa-solid fa-rectangle-ad"></i> Upload 16:9 picture or video</div><small>16 : 9</small></div><div class="m-chips"><span class="">Link</span><span class="on">Directions</span><span class="">My profile</span></div></div></div></div><div class="step">
+          <div class="text"><div class="num">Step 3</div><h3>Choose days or views, and pay</h3>
+            <p class="pt">By days (1, 3, 7, 30) or by views (500 to 10,000).</p><p class="pt">Pay with UPI or card through Razorpay. The ad then waits for Triolo's review.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-back"><i class="fa-solid fa-chevron-left"></i></span>
+        <div><div class="m-title">Plan</div></div></div><div class="m-chips"><span class="on">Days</span><span class="">Views</span></div><div class="m-chips"><span class="">1 day</span><span class="">3 days</span><span class="on">7 days</span><span class="">30 days</span></div><div class="m-btn" style="background:#EA580C">Pay &amp; submit</div></div></div></div>
+    </section><section class="chapter">
+      <h2><span>3</span>Review, results and refunds</h2>
+      <div class="step">
+          <div class="text"><div class="num">Step 1</div><h3>Review</h3>
+            <p class="pt">Triolo checks every ad. Approved: it starts on its date. Rejected: you see the reason and your money is refunded automatically to the same UPI / card (5–7 working days).</p><p class="pt">You can withdraw an ad before it is approved — refunded the same way.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-logo"><i class="fa-solid fa-shapes"></i></span>
+        <div><div class="m-title">My ads</div></div></div><div class="m-card" style="border-color:#C08A1255;background:#C08A120F">
+        <span class="m-ic" style="background:#C08A12"><i class="fa-solid fa-clock"></i></span>
+        <div><b>Diwali Sale</b><div class="m-muted">Waiting for review</div></div></div><div class="m-card" style="border-color:#16A34A55;background:#16A34A0F">
+        <span class="m-ic" style="background:#16A34A"><i class="fa-solid fa-circle-check"></i></span>
+        <div><b>New Arrivals</b><div class="m-muted">Running · 1,240 views</div></div></div><div class="m-card" style="border-color:#dc262655;background:#dc26260F">
+        <span class="m-ic" style="background:#dc2626"><i class="fa-solid fa-rotate-left"></i></span>
+        <div><b>Old Offer</b><div class="m-muted">Rejected · refunded</div></div></div></div></div></div><div class="step">
+          <div class="text"><div class="num">Step 2</div><h3>Results</h3>
+            <p class="pt">Open an ad to see views and taps per day, and download its bill.</p><p class="pt">Approved and running ads are not refunded. Ads removed for breaking the rules are not refunded.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-back"><i class="fa-solid fa-chevron-left"></i></span>
+        <div><div class="m-title">New Arrivals</div></div></div><div class="m-row"><i class="fa-solid fa-eye"></i><span>Views</span><b>1,240</b></div><div class="m-row"><i class="fa-solid fa-hand-pointer"></i><span>Taps</span><b>86</b></div><div class="m-btn" style="background:linear-gradient(90deg,#0055D3,#1D76FA)">Download bill</div></div></div></div>
+    </section><section class="chapter">
+      <h2><span>4</span>Rules</h2>
+      <div class="step">
+          <div class="text"><div class="num">Step 1</div><h3>What is not allowed</h3>
+            <p class="pt">Nothing false, illegal, adult, political, alcohol, tobacco, gambling or betting.</p><p class="pt">No other people's photos or logos without permission.</p><p class="pt">Your ad must match what you sell. Triolo may reject or remove ads that break these rules.</p>
+            
+          </div></div>
+    </section>
+<p class="foot">Triolo · Help: support@triolo.in · Privacy, Terms and Refunds: triolo-web.vercel.app</p>
+</body></html>

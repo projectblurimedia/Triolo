@@ -31,7 +31,7 @@ import {
   jobTakenBody,
   jobTakenTitle,
   TripEvent,
-  tripTemplate,
+  tripTemplate, nearbyTemplate,
 } from './pushTemplates';
 import { displaySkills, splitSkills } from './skills';
 
@@ -64,6 +64,9 @@ function generateArrivalPin(): string {
  * WorkersService and NotificationsService, never their tables — same module-boundary shape as
  * `admin`/`problems`.
  */
+/** "Almost there" distance for the customer's alert (worker or delivery). */
+const NEARBY_METRES = 100;
+
 export class BookingsService {
   private lifecycleListener: BookingLifecycleListener | null = null;
 
@@ -568,6 +571,17 @@ export class BookingsService {
     const updated = await this.repository.updateWorkerLocation(bookingRequestId, worker.id, dto.latitude, dto.longitude);
     if (!updated) {
       throw AppError.conflict('This trip is no longer active.', 'BOOKING_TRIP_NOT_ACTIVE');
+    }
+    // Almost there: the customer hears once, when the worker comes within NEARBY_METRES.
+    const near = await this.repository.markNearIfClose(bookingRequestId, worker.id, NEARBY_METRES);
+    if (near) {
+      const name = await this.repository.findAcceptedWorkerName(bookingRequestId).catch(() => null);
+      const text = nearbyTemplate(near.language, name);
+      await this.notificationsService.notify(near.accountId, 'booking_nearby', text.title, text.body, {
+        audience: 'user',
+        data: { kind: 'booking_nearby', bookingId: bookingRequestId },
+        channelId: 'default',
+      });
     }
   }
 

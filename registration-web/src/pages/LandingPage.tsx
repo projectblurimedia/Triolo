@@ -6,6 +6,7 @@ import { VerificationBadge } from '@/components/VerificationBadge';
 import { workersService, WorkerProfile } from '@/services/workersService';
 import { businessesService, BusinessProfile } from '@/services/businessesService';
 import { useAuthStore } from '@/state/authStore';
+import { LegalLinks } from './LegalPage';
 
 /**
  * This site only ever does two things — register a Worker, or register a Shop. No admin
@@ -96,6 +97,7 @@ export function LandingPage() {
             </Link>
           </>
         )}
+        <LegalLinks />
       </div>
     </div>
   );

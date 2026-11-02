@@ -141,6 +141,8 @@ export interface ShopOrder {
   billVoiceUrl: string | null;
   billVoiceSeconds: number | null;
   billAmount: number | null;
+  /** When the photos / voice messages above were removed (30 days after the order ended). */
+  mediaDeletedAt?: Date | null;
 }
 
 /** The bill's photos / voice message / typed total, saved with the packing checklist. */
@@ -168,6 +170,8 @@ export interface CustomerOrder extends ShopOrder {
   shop: OrderShop;
   /** Who is bringing it, once a shop's staff member has taken the delivery. */
   deliveryPersonName: string | null;
+  /** Where the delivery is now (out for delivery, with a position from the delivery person's phone). */
+  deliveryLocation?: { latitude: number; longitude: number } | null;
   /** Pickup/Delivery PIN — only while ready_for_pickup / out_for_delivery. */
   pin: string | null;
 }

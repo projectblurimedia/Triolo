@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'crypto';
+import type { PreferredLanguage } from '@/modules/auth/interfaces';
 import { Pool, PoolClient, QueryResultRow } from 'pg';
 import { parsePgArray } from '@/common/utils/pgArray';
 import {
@@ -739,6 +740,24 @@ export class BookingsRepository {
       [id, workerId, latitude, longitude, TRIP_STATUSES],
     );
     return (result.rowCount ?? 0) > 0;
+  }
+
+  /** NEARBY_METRES: marks the trip "near" once (the worker within that distance) and says whom to tell. */
+  async markNearIfClose(id: string, workerId: string, metres: number): Promise<{ accountId: string; language: PreferredLanguage } | null> {
+    const result = await this.pool.query(
+      `UPDATE booking_requests b SET near_notified_at = now()
+       FROM accounts a
+       WHERE b.id = $1 AND b.accepted_worker_id = $2 AND b.near_notified_at IS NULL
+         AND b.status IN ('accepted', 'on_the_way') AND a.id = b.account_id
+         AND b.worker_latitude IS NOT NULL
+         AND 6371000 * acos(LEAST(1.0, GREATEST(-1.0,
+           cos(radians(b.latitude)) * cos(radians(b.worker_latitude)) * cos(radians(b.worker_longitude) - radians(b.longitude))
+           + sin(radians(b.latitude)) * sin(radians(b.worker_latitude))))) <= $3
+       RETURNING b.account_id, a.preferred_language`,
+      [id, workerId, metres],
+    );
+    const row = result.rows[0];
+    return row ? { accountId: row.account_id, language: row.preferred_language } : null;
   }
 
   /** accepted / on_the_way → arrived (a worker already nearby can skip Start Trip). */

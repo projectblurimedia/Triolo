@@ -37,6 +37,8 @@ ordersRouter.get('/staff/deliveries/:id', authenticate, controller.getDelivery);
 ordersRouter.post('/staff/deliveries/:id/accept', authenticate, controller.staffAnswer(true));
 ordersRouter.post('/staff/deliveries/:id/decline', authenticate, controller.staffAnswer(false));
 ordersRouter.put('/staff/deliveries/:id/location', authenticate, validateBody(staffLocationSchema), controller.staffLocation);
+// The owner delivering it himself shares his position the same way.
+ordersRouter.put('/:id/delivery-location', authenticate, validateBody(staffLocationSchema), controller.ownerLocation);
 ordersRouter.post('/staff/deliveries/:id/verify-pin', authenticate, validateBody(verifyOrderPinSchema), controller.staffVerifyPin);
 ordersRouter.post('/shop/quick/search', authenticate, controller.searchQuick);
 ordersRouter.get('/shop/quick/limit', authenticate, controller.getQuickAcceptStatus);

@@ -55,6 +55,8 @@ export const TYPE_ICONS: Record<NotificationType, React.ComponentProps<typeof Fo
   order_packed: 'receipt',
   order_ready: 'bag-shopping',
   order_out_for_delivery: 'truck-fast',
+  booking_nearby: 'location-crosshairs',
+  order_nearby: 'location-crosshairs',
   order_completed: 'circle-check',
   order_cancelled: 'ban',
   badge_removed: 'shield-halved',

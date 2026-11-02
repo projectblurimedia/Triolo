@@ -10,6 +10,8 @@ import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
 import { EditProfileModal } from './EditProfileModal';
 import { WaitingTimeModal } from './WaitingTimeModal';
+import { DeleteAccountModal } from './DeleteAccountModal';
+import { openLegalPage } from '@/constants/legal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
@@ -19,6 +21,8 @@ const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
 const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
 const TEAL_GRADIENT = ['#0891B2', '#22D3EE'] as const;
+const SLATE_GRADIENT = ['#475569', '#94A3B8'] as const;
+const DELETE_GRADIENT = ['#ef4444', '#f87171'] as const;
 
 interface ProfileMenuModalProps {
   visible: boolean;
@@ -38,6 +42,7 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [waitVisible, setWaitVisible] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
 
   const handleLogoutConfirm = () => {
     setLogoutConfirmVisible(false);
@@ -94,6 +99,22 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
           onPress={() => setThemePickerVisible(true)}
         />
 
+
+        <Text style={[styles.sectionTitle, styles.sectionGap, { color: colors.textMuted }]}>{t('legal.section')}</Text>
+        <DrawerMenuItem icon="shield-halved" gradient={SLATE_GRADIENT} title={t('legal.privacy')} subtitle={t('legal.privacySub')} onPress={() => openLegalPage('privacy')} />
+        <DrawerMenuItem icon="file-contract" gradient={SLATE_GRADIENT} title={t('legal.terms')} subtitle={t('legal.termsSub')} onPress={() => openLegalPage('terms')} />
+        <DrawerMenuItem icon="rotate-left" gradient={SLATE_GRADIENT} title={t('legal.refunds')} subtitle={t('legal.refundsSub')} onPress={() => openLegalPage('refunds')} />
+        <DrawerMenuItem
+          icon="user-xmark"
+          gradient={DELETE_GRADIENT}
+          title={t('deleteAccount.menuTitle')}
+          subtitle={t('deleteAccount.menuSubtitle')}
+          onPress={() => {
+            onClose();
+            setDeleteVisible(true);
+          }}
+        />
+
         <Pressable style={styles.logout} onPress={() => setLogoutConfirmVisible(true)}>
           <LinearGradient colors={LOGOUT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.logoutGradient}>
             <FontAwesome6 name="right-from-bracket" size={16} color="#FFFFFF" solid />
@@ -104,6 +125,7 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
 
       <EditProfileModal visible={editVisible} onClose={() => setEditVisible(false)} />
       <WaitingTimeModal visible={waitVisible} onClose={() => setWaitVisible(false)} />
+      <DeleteAccountModal visible={deleteVisible} onClose={() => setDeleteVisible(false)} />
       <ThemePickerModal visible={themePickerVisible} onClose={() => setThemePickerVisible(false)} />
       <LanguagePickerModal
         visible={languagePickerVisible}

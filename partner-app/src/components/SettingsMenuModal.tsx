@@ -8,6 +8,8 @@ import { LanguagePickerModal } from './LanguagePickerModal';
 import { ConfirmModal } from './ConfirmModal';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
+import { DeleteAccountModal } from './DeleteAccountModal';
+import { openLegalPage } from '@/constants/legal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
@@ -31,6 +33,8 @@ const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
 const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
 const INDIGO_GRADIENT = ['#4338CA', '#7C3AED'] as const;
+const SLATE_GRADIENT = ['#475569', '#94A3B8'] as const;
+const DELETE_GRADIENT = ['#ef4444', '#f87171'] as const;
 
 interface SettingsMenuModalProps {
   visible: boolean;
@@ -52,6 +56,7 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
   const [postsOpen, setPostsOpen] = useState(false);
   const worker = useMyWorkerProfile().data;
   const shops = useMyShops().data ?? [];
@@ -223,6 +228,22 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
           onPress={() => setThemePickerVisible(true)}
         />
 
+
+        <Text style={[styles.sectionTitle, styles.sectionGap, { color: colors.textMuted }]}>{t('legal.section')}</Text>
+        <DrawerMenuItem icon="shield-halved" gradient={SLATE_GRADIENT} title={t('legal.privacy')} subtitle={t('legal.privacySub')} onPress={() => openLegalPage('privacy')} />
+        <DrawerMenuItem icon="file-contract" gradient={SLATE_GRADIENT} title={t('legal.terms')} subtitle={t('legal.termsSub')} onPress={() => openLegalPage('terms')} />
+        <DrawerMenuItem icon="rotate-left" gradient={SLATE_GRADIENT} title={t('legal.refunds')} subtitle={t('legal.refundsSub')} onPress={() => openLegalPage('refunds')} />
+        <DrawerMenuItem
+          icon="user-xmark"
+          gradient={DELETE_GRADIENT}
+          title={t('deleteAccount.menuTitle')}
+          subtitle={t('deleteAccount.menuSubtitle')}
+          onPress={() => {
+            onClose();
+            setDeleteVisible(true);
+          }}
+        />
+
         <Pressable style={styles.logout} onPress={() => setLogoutConfirmVisible(true)}>
           <LinearGradient colors={LOGOUT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.logoutGradient}>
             <FontAwesome6 name="right-from-bracket" size={16} color="#FFFFFF" solid />
@@ -232,6 +253,7 @@ export function SettingsMenuModal({ visible, onClose }: SettingsMenuModalProps) 
       </SideMenuDrawer>
 
       <ThemePickerModal visible={themePickerVisible} onClose={() => setThemePickerVisible(false)} />
+      <DeleteAccountModal visible={deleteVisible} onClose={() => setDeleteVisible(false)} />
       <LanguagePickerModal
         visible={languagePickerVisible}
         onClose={() => setLanguagePickerVisible(false)}

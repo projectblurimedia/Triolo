@@ -87,6 +87,8 @@ export interface CustomerOrder {
   billVoiceUrl?: string | null;
   billVoiceSeconds?: number | null;
   billAmount?: number | null;
+  /** When its photos / voice messages were removed (30 days after the order ended). */
+  mediaDeletedAt?: string | null;
   shop: {
     name: string;
     photoUrl: string | null;
@@ -102,6 +104,8 @@ export interface CustomerOrder {
   pin: string | null;
   /** Who is bringing it, once a shop's delivery staff member took the delivery. */
   deliveryPersonName?: string | null;
+  /** Where the delivery is now, while it is out for delivery. */
+  deliveryLocation?: { latitude: number; longitude: number } | null;
 }
 
 export interface CreateOrderParams {

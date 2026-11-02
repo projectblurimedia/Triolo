@@ -737,3 +737,11 @@ The older `GET/PUT/DELETE /me`, `PATCH /me/active` and `/me/photo` act on the fi
 
 - **In-app checkout without payment links:** `POST /subscriptions/passes/checkout`, `/subscriptions/checkout` and `/subscriptions/badges/checkout` take an optional `inApp: true`. With it no Razorpay payment link is made (`paymentUrl: null`) — the app pays through `POST /subscriptions/pay/order` + `/pay/confirm`; an unpaid pass is reused. Links are made only for installs without the in-app module (Razorpay test mode allows only 30 links).
 - `GET /subscriptions/me` (customer) `freeUses.bookings|orders`: `null` = none free; `{ limit: null, used }` = no limit (every one free); otherwise `{ limit, used }`.
+
+
+## Account deletion
+
+- `DELETE /api/v1/account` (auth) — deletes the caller's account: cancels active bookings / orders / problem posts (other side told), deletes worker / shop / job-post profiles, every photo and voice message, notifications and push tokens, signs out everywhere. The account then gets 403 `ACCOUNT_DELETED` (details `reusableFrom`) on every request and at login. Admin accounts: 403 `ADMIN_ACCOUNT_PROTECTED`.
+- `GET /api/v1/account/cron/daily` (Vercel Cron, `Authorization: Bearer CRON_SECRET`) — wipes accounts deleted 30+ days ago (name "Deleted user", number freed, email / place / photo cleared) and clears photos / voice messages of orders that ended 30+ days ago (`mediaDeletedAt` on orders).
+
+- `PUT /api/v1/orders/:id/delivery-location` (shop owner) — body `{ latitude, longitude }`; only while the order is `out_for_delivery` with no delivery staff (else 409 `DELIVERY_NOT_ACTIVE`). Stored like a staff position; customers get it as `deliveryLocation`.

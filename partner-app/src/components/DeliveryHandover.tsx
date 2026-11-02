@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { GlassBackdrop, GlassCard } from './Glass';
 import { LoadingIndicator } from './LoadingIndicator';
 import { LiveMap } from './LiveMap';
+import { firstName } from '@/utils/firstName';
 import { useShopOrderAction } from '@/hooks/useShopOrders';
 import { useShopStaff } from '@/hooks/useBusinessMutations';
 import { formatRupees, ShopOrder, shopOrdersService } from '@/services/shopOrdersService';
@@ -214,6 +215,9 @@ export function DeliveryHandover({
           {/* The customer's place (blue) and where the staff member is now (green). */}
           <View style={styles.map}>
             <LiveMap
+              mover="delivery"
+              customerLabel={firstName(order.customerFullName)}
+              moverLabel={firstName(person.fullName)}
               customer={{ latitude: order.latitude, longitude: order.longitude }}
               worker={order.staffLocation ? { latitude: order.staffLocation.latitude, longitude: order.staffLocation.longitude } : null}
               height={200}

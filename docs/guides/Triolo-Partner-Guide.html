@@ -1,0 +1,147 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Triolo Partner — Guide</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:14mm 12mm}
+*{box-sizing:border-box}body{font-family:Poppins,Arial,sans-serif;color:#0f172a;margin:0;font-size:12.5px;line-height:1.55}
+.cover{height:265mm;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:0 14mm;background:linear-gradient(140deg,#0F172A,#0055D3);color:#fff;border-radius:18px;page-break-after:always;position:relative;overflow:hidden}
+.cover .big{position:absolute;right:-30px;bottom:-40px;font-size:340px;opacity:.12}
+.cover h1{font-size:40px;margin:0 0 8px;line-height:1.15}.cover p{font-size:16px;opacity:.95;max-width:120mm;margin:0 0 6px}
+.cover .badge{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);padding:6px 14px;border-radius:999px;margin-bottom:22px;font-weight:600}
+.toc{page-break-after:always}.toc h2{font-size:22px}.toc ol{list-style:none;padding:0;columns:2;font-size:14px}.toc li{padding:7px 0;border-bottom:1px solid #e2e8f0;break-inside:avoid}
+.chapter{page-break-before:always}.chapter h2{font-size:22px;display:flex;align-items:center;gap:12px;margin:0 0 6px}
+.chapter h2 span{background:linear-gradient(135deg,#0F172A,#0055D3);color:#fff;border-radius:12px;width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;font-size:18px}
+.intro{color:#475569;margin:0 0 14px;font-size:13px}
+.step{display:flex;gap:18px;align-items:flex-start;padding:14px 0;border-top:1px solid #e2e8f0;break-inside:avoid}
+.step .text{flex:1}.num{color:#0F172A;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.step h3{margin:2px 0 6px;font-size:15.5px}.pt{margin:0 0 5px;padding-left:16px;position:relative}.pt:before{content:'•';position:absolute;left:3px;color:#0F172A;font-weight:700}
+.tip{margin-top:8px;background:#fef9c3;border:1px solid #fde68a;border-radius:10px;padding:8px 10px;font-size:12px}.tip i{color:#ca8a04}
+.phone{width:58mm;flex-shrink:0;border:6px solid #0f172a;border-radius:22px;background:#f9fcff;overflow:hidden;position:relative;box-shadow:0 6px 18px rgba(15,23,42,.18)}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:18mm;height:9px;background:#0f172a;border-radius:0 0 8px 8px;z-index:2}
+.screen{padding-bottom:8px;font-size:9px;min-height:80mm}
+.m-head{color:#fff;padding:14px 8px 9px;display:flex;gap:6px;align-items:center}.m-title{font-weight:600;font-size:10.5px}.m-sub{font-size:7.5px;opacity:.9}
+.m-back,.m-logo{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);display:inline-flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0}
+.m-card{margin:6px 7px 0;background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:6px;display:flex;gap:6px;align-items:center}
+.m-ic{width:18px;height:18px;border-radius:50%;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0}
+.m-card>div{flex:1}.m-muted{color:#64748b;font-size:7.5px}.m-pill{color:#fff;border-radius:999px;padding:2px 6px;font-size:7px;font-weight:600}
+.m-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:6px 7px 0}
+.m-way{border-radius:9px;color:#fff;padding:6px;height:52px;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.m-way-ic{position:absolute;top:5px;left:5px;width:15px;height:15px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:7px}
+.m-way-big{position:absolute;right:-4px;bottom:-6px;font-size:30px;opacity:.18;transform:rotate(-12deg)}.m-way b{font-size:8px}.m-way small{font-size:6.5px;opacity:.9}
+.m-btn{margin:7px 7px 0;color:#fff;border-radius:8px;text-align:center;padding:6px;font-weight:600;font-size:8.5px}
+.m-btns{display:flex;gap:5px;margin:0 7px}.m-btns .m-btn{flex:1;margin:7px 0 0}
+.m-chips{margin:6px 7px 0;display:flex;flex-wrap:wrap;gap:4px}.m-chips span{border:1px solid #cbd5e1;border-radius:999px;padding:2px 6px;font-size:7.5px;background:#fff}.m-chips .on{background:#0055D3;color:#fff;border-color:#0055D3}
+.m-input{margin:6px 7px 0;border:1px solid #0055D340;background:#fff;border-radius:8px;padding:6px;color:#64748b;font-size:8px}
+.m-row{margin:5px 7px 0;display:flex;gap:6px;align-items:center;font-size:8px;border-bottom:1px solid #eef2f7;padding-bottom:4px}.m-row i{color:#0055D3;width:10px}.m-row span{flex:1}
+.m-note{margin:6px 7px 0;border:1px solid #cbd5e1;background:#f1f5f9;border-radius:8px;padding:5px;font-size:7.5px;display:flex;gap:5px}
+.m-pin{display:flex;gap:5px;justify-content:center;margin:8px 0}.m-pin span{width:18px;height:22px;border:1.5px solid #0055D3;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;background:#fff}
+.m-map{margin:6px 7px 0;height:60px;border-radius:9px;background:repeating-linear-gradient(45deg,#e0ecff,#e0ecff 8px,#eef4ff 8px,#eef4ff 16px);position:relative}
+.m-map small{position:absolute;bottom:3px;left:5px;font-size:7px;color:#334155}.m-dot{position:absolute;width:9px;height:9px;border-radius:50%;border:2px solid #fff}
+.m-dot.a{background:#16A34A;left:20%;top:30%}.m-dot.b{background:#0055D3;right:22%;top:55%}.m-line{position:absolute;left:24%;top:38%;width:52%;height:2px;background:#0055D3;transform:rotate(14deg);transform-origin:left}
+.m-voice{margin:6px 7px 0;border:1px solid #0055D333;background:#0055D30D;border-radius:9px;padding:5px;display:flex;align-items:center;gap:5px}
+.m-play{width:18px;height:18px;border-radius:50%;background:#0055D3;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:7px}
+.m-wave{flex:1;display:flex;align-items:center;gap:2px}.m-wave i{width:2px;background:#0055D388;border-radius:1px;display:block}.m-voice small{font-size:7px;color:#64748b}
+.m-photos{display:flex;gap:4px;margin:6px 7px 0}.m-photos span{width:24px;height:24px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:9px}
+.m-stars{margin:6px 7px 0;color:#FBBF24;font-size:13px;text-align:center}.m-stars span{color:#cbd5e1}
+.m-tabs{margin:9px 7px 0;background:#fff;border:1px solid #e2e8f0;border-radius:999px;display:flex;justify-content:space-around;padding:5px;color:#94a3b8;font-size:9px}.m-tabs .on{color:#0055D3}
+.m-slider{margin:6px 7px 0;aspect-ratio:16/9;border-radius:9px;background:linear-gradient(135deg,#fde68a,#fb923c);color:#7c2d12;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:600;font-size:8px}
+.m-popup{margin:8px 7px 0;background:#fff;border-radius:10px;padding:7px;box-shadow:0 4px 12px rgba(0,0,0,.2);border:1px solid #e2e8f0}
+.foot{margin-top:20px;color:#64748b;font-size:11px;text-align:center}
+</style></head><body>
+<div class="cover"><i class="fa-solid fa-handshake big"></i><span class="badge">Triolo Partner app</span><h1>Triolo Partner — Guide</h1>
+<p>For workers, shops and people looking for a job.</p><p>Get requests near you, accept, do the work and get paid directly by the customer.</p></div>
+<div class="toc"><h2>What's inside</h2><ol><li><b>1.</b> Register</li><li><b>2.</b> Jobs (workers)</li><li><b>3.</b> Orders (shops)</li><li><b>4.</b> Job posts (looking for a job)</li><li><b>5.</b> Plans, badge and boost</li></ol><p class="intro">Keep location and notifications on — requests reach you only when Triolo knows where you are.</p></div>
+<section class="chapter">
+      <h2><span>1</span>Register</h2>
+      <div class="step">
+          <div class="text"><div class="num">Step 1</div><h3>Choose what you are</h3>
+            <p class="pt">Open Triolo Partner and pick: Are you a worker? · Do you have a shop? · Looking for a job?</p><p class="pt">Fill the form: photo, name, mobile (verify with the SMS code), your work or shop kind, place on the map, photos.</p><p class="pt">Tap Register. Workers and shops are checked by Triolo first (you see Pending, then Verified).</p>
+            <div class="tip"><i class="fa-solid fa-lightbulb"></i> One account can be a worker, own up to 5 shops and have several job posts.</div>
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-logo"><i class="fa-solid fa-shapes"></i></span>
+        <div><div class="m-title">Triolo Partner</div><div class="m-sub">Join and get work</div></div></div><div class="m-card" >
+        <span class="m-ic" style="background:#0055D3"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+        <div><b>Are you a worker?</b><div class="m-muted">Get jobs near you</div></div></div><div class="m-card" style="border-color:#16A34A55;background:#16A34A0F">
+        <span class="m-ic" style="background:#16A34A"><i class="fa-solid fa-store"></i></span>
+        <div><b>Do you have a shop?</b><div class="m-muted">Get orders near you</div></div></div><div class="m-card" style="border-color:#7C3AED55;background:#7C3AED0F">
+        <span class="m-ic" style="background:#7C3AED"><i class="fa-solid fa-user-tie"></i></span>
+        <div><b>Looking for a job?</b><div class="m-muted">Families and shops hire you</div></div></div></div></div></div><div class="step">
+          <div class="text"><div class="num">Step 2</div><h3>Allow the pop-up</h3>
+            <p class="pt">On Home, allow "Display over other apps" and notifications. New requests then pop up even when you are in another app.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-logo"><i class="fa-solid fa-shapes"></i></span>
+        <div><div class="m-title">Home</div></div></div><div class="m-popup"><b>New job · 900 m</b><div class="m-muted">Electrician · Kannapuram</div><div class="m-btns"><div class="m-btn" style="background:#fff;color:#dc2626;border:1.5px solid #dc2626">Later</div><div class="m-btn" style="background:#16A34A">Accept</div></div></div></div></div></div>
+    </section><section class="chapter">
+      <h2><span>2</span>Jobs (workers)</h2>
+      <div class="step">
+          <div class="text"><div class="num">Step 1</div><h3>Live Requests and Find Jobs Now</h3>
+            <p class="pt">New requests appear as cards on Home — swipe through them, Accept or Decline.</p><p class="pt">Find Jobs Now pulls in every open request near you.</p><p class="pt">Requests booked with you personally say "Booked you".</p>
+            <div class="tip"><i class="fa-solid fa-lightbulb"></i> You get some free accepts each month. When they are used up, the button becomes "Subscribe to accept" — take the Service plan to keep accepting.</div>
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-logo"><i class="fa-solid fa-shapes"></i></span>
+        <div><div class="m-title">Home</div><div class="m-sub">My Services</div></div></div><div class="m-card" >
+        <span class="m-ic" style="background:#0055D3"><i class="fa-solid fa-bolt"></i></span>
+        <div><b>Quick Book · 1.2 km</b><div class="m-muted">Ravi · Electrician</div></div></div><div class="m-btns"><div class="m-btn" style="background:linear-gradient(90deg,#0055D3,#1D76FA);background:#fff;color:#dc2626;border:1.5px solid #dc2626">Decline</div><div class="m-btn" style="background:#16A34A;">Accept</div></div><div class="m-note" style="border-color:#C08A1266;background:#C08A1214"><i class="fa-solid fa-hourglass-half"></i> <span>2 free accepts left this month — 1 of 3 used</span></div></div></div></div><div class="step">
+          <div class="text"><div class="num">Step 2</div><h3>Go, arrive, start with the PIN</h3>
+            <p class="pt">Tap Start Trip — the customer sees you coming on the map.</p><p class="pt">At the place tap Arrived, ask the customer for their 4-digit PIN and enter it.</p><p class="pt">Do the work, tap Mark Work Done. The customer pays you directly.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-back"><i class="fa-solid fa-chevron-left"></i></span>
+        <div><div class="m-title">Job</div><div class="m-sub">Ravi · Electrician</div></div></div><div class="m-map"><span class="m-dot a"></span><span class="m-dot b"></span><span class="m-line"></span><small>To customer · 1.2 km</small></div><div class="m-pin"><span>4</span><span>8</span><span>2</span><span>1</span></div><div class="m-btn" style="background:#16A34A">Mark Work Done</div></div></div></div>
+    </section><section class="chapter">
+      <h2><span>3</span>Orders (shops)</h2>
+      <div class="step">
+          <div class="text"><div class="num">Step 1</div><h3>Accept and read the list</h3>
+            <p class="pt">A new order shows the customer's items, photos of their written list, or their voice message.</p><p class="pt">Accept to start packing.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-back"><i class="fa-solid fa-chevron-left"></i></span>
+        <div><div class="m-title">New order</div><div class="m-sub">Delivery · 1.1 km</div></div></div><div class="m-voice"><span class="m-play"><i class="fa-solid fa-play"></i></span><div class="m-wave"><i style="height:6px"></i><i style="height:11px"></i><i style="height:16px"></i><i style="height:21px"></i><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:9px"></i><i style="height:14px"></i><i style="height:19px"></i><i style="height:8px"></i><i style="height:13px"></i><i style="height:18px"></i><i style="height:7px"></i><i style="height:12px"></i><i style="height:17px"></i><i style="height:6px"></i><i style="height:11px"></i><i style="height:16px"></i><i style="height:21px"></i><i style="height:10px"></i><i style="height:15px"></i></div><small>0:24</small></div><div class="m-photos"><span><i class="fa-solid fa-image"></i></span><span><i class="fa-solid fa-image"></i></span></div><div class="m-btns"><div class="m-btn" style="background:linear-gradient(90deg,#0055D3,#1D76FA);background:#fff;color:#dc2626;border:1.5px solid #dc2626">Decline</div><div class="m-btn" style="background:#16A34A;">Accept</div></div></div></div></div><div class="step">
+          <div class="text"><div class="num">Step 2</div><h3>Pack and make the bill</h3>
+            <p class="pt">Tick each item packed and type its price; untick what you don't have.</p><p class="pt">Add to the bill one way: Add items (type), Record items (say them), Capture items (camera or gallery). Only the way you pick stays.</p><p class="pt">With a photo or recording you can type one Bill total instead of every price.</p><p class="pt">Tap Send Bill.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-back"><i class="fa-solid fa-chevron-left"></i></span>
+        <div><div class="m-title">Packing</div></div></div><div class="m-row"><i class="fa-solid fa-square-check"></i><span>Rice 5 kg</span><b>₹320</b></div><div class="m-row"><i class="fa-solid fa-square"></i><span>Ghee 1 kg</span><b>—</b></div><div class="m-grid"><div class="m-way" style="background:linear-gradient(135deg,#0F9D58,#34C77B)"><span class="m-way-ic"><i class="fa-solid fa-keyboard"></i></span><i class="fa-solid fa-keyboard m-way-big"></i><b>Add items</b><small></small></div><div class="m-way" style="background:linear-gradient(135deg,#DB2777,#F472B6)"><span class="m-way-ic"><i class="fa-solid fa-microphone"></i></span><i class="fa-solid fa-microphone m-way-big"></i><b>Record items</b><small></small></div></div><div class="m-card" style="border-color:#16A34A55;background:#16A34A0F">
+        <span class="m-ic" style="background:#16A34A"><i class="fa-solid fa-receipt"></i></span>
+        <div><b>Bill total ₹ 450</b></div></div><div class="m-btn" style="background:linear-gradient(90deg,#0055D3,#1D76FA)">Send Bill</div></div></div></div><div class="step">
+          <div class="text"><div class="num">Step 3</div><h3>Hand over with the PIN</h3>
+            <p class="pt">Mark Ready for pickup, or Out for delivery (you or your delivery staff).</p><p class="pt">At handover enter the customer's PIN and collect the money.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-back"><i class="fa-solid fa-chevron-left"></i></span>
+        <div><div class="m-title">Out for delivery</div></div></div><div class="m-pin"><span>7</span><span>3</span><span>0</span><span>5</span></div><div class="m-btn" style="background:#16A34A">Verify PIN</div></div></div></div>
+    </section><section class="chapter">
+      <h2><span>4</span>Job posts (looking for a job)</h2>
+      <div class="step">
+          <div class="text"><div class="num">Step 1</div><h3>Post the work you want</h3>
+            <p class="pt">Pick the work (cook, teacher…), your pay per day or month, skills and experience.</p><p class="pt">Switch Live / Hidden any time. Customers near you can call you.</p><p class="pt">See who viewed your post.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-back"><i class="fa-solid fa-chevron-left"></i></span>
+        <div><div class="m-title">My Job Post</div></div></div><div class="m-card" >
+        <span class="m-ic" style="background:#0055D3"><i class="fa-solid fa-user-tie"></i></span>
+        <div><b>Cook</b><div class="m-muted">₹9,000 / month</div></div><span class="m-pill" style="background:#16A34A">Live</span></div><div class="m-row"><i class="fa-solid fa-eye"></i><span>Viewed by 12 people</span></div></div></div></div>
+    </section><section class="chapter">
+      <h2><span>5</span>Plans, badge and boost</h2>
+      <div class="step">
+          <div class="text"><div class="num">Step 1</div><h3>Grow with a plan</h3>
+            <p class="pt">Plans tab: Service, Shop, Job Post or All in One plan — no accept limits and a head start on new requests.</p><p class="pt">Trusted by Triolo badge: customers see a green seal on your profile.</p><p class="pt">Boost: show your profile in the Home slider (reviewed by Triolo; refunded if rejected).</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#A86C0C,#D29A26,#F5CC60)">
+        <span class="m-logo"><i class="fa-solid fa-shapes"></i></span>
+        <div><div class="m-title">Plans</div></div></div><div class="m-chips"><span class="on">Service</span><span class="">Shop</span><span class="">Job Post</span><span class="">All in One</span></div><div class="m-card" style="border-color:#C08A1255;background:#C08A120F">
+        <span class="m-ic" style="background:#C08A12"><i class="fa-solid fa-crown"></i></span>
+        <div><b>Service plan</b><div class="m-muted">Unlimited accepts · head start</div></div></div><div class="m-card" style="border-color:#16A34A55;background:#16A34A0F">
+        <span class="m-ic" style="background:#16A34A"><i class="fa-solid fa-circle-check"></i></span>
+        <div><b>Trusted by Triolo</b></div></div></div></div></div><div class="step">
+          <div class="text"><div class="num">Step 2</div><h3>Your account</h3>
+            <p class="pt">Menu: My Profiles (edit services, shops, job posts), Language, Theme, Privacy, Terms, Refunds, Delete account.</p><p class="pt">Delete account removes your profiles, photos and voice messages at once and wipes your details after 30 days.</p>
+            
+          </div><div class="phone"><div class="notch"></div><div class="screen"><div class="m-head" style="background:linear-gradient(135deg,#0055D3,#1D76FA)">
+        <span class="m-back"><i class="fa-solid fa-chevron-left"></i></span>
+        <div><div class="m-title">Menu</div></div></div><div class="m-row"><i class="fa-solid fa-id-card"></i><span>My Profiles</span></div><div class="m-row"><i class="fa-solid fa-shield-halved"></i><span>Privacy Policy</span></div><div class="m-btn" style="background:#ef4444">Delete account</div></div></div></div>
+    </section>
+<p class="foot">Triolo · Help: support@triolo.in · Privacy, Terms and Refunds: triolo-web.vercel.app</p>
+</body></html>

@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'crypto';
+import type { PreferredLanguage } from '@/modules/auth/interfaces';
 import { Pool, PoolClient, QueryResultRow } from 'pg';
 import {
   BillMedia,
@@ -85,6 +86,7 @@ function mapOrder(row: QueryResultRow, items: ShopOrderItem[]): ShopOrder {
     listPhotoUrls: Array.isArray(row.list_photo_urls) ? row.list_photo_urls : [],
     listVoiceUrl: row.list_voice_url ?? null,
     listVoiceSeconds: row.list_voice_seconds ?? null,
+    mediaDeletedAt: row.media_deleted_at ?? null,
     billPhotoUrls: Array.isArray(row.bill_photo_urls) ? row.bill_photo_urls : [],
     billVoiceUrl: row.bill_voice_url ?? null,
     billVoiceSeconds: row.bill_voice_seconds ?? null,
@@ -434,6 +436,35 @@ export class OrdersRepository {
     );
     const row = result.rows[0];
     return row ? { businessId: row.business_id, status: row.status } : null;
+  }
+
+  /** Marks a delivery "near" once (within `metres` of the customer) and says whom to tell. */
+  async markNearIfClose(orderId: string, metres: number): Promise<{ accountId: string; language: PreferredLanguage; name: string } | null> {
+    const result = await this.pool.query(
+      `UPDATE shop_orders o SET near_notified_at = now()
+       FROM accounts a
+       WHERE o.id = $1 AND o.near_notified_at IS NULL AND o.status = 'out_for_delivery' AND a.id = o.account_id
+         AND o.staff_latitude IS NOT NULL
+         AND 6371000 * acos(LEAST(1.0, GREATEST(-1.0,
+           cos(radians(o.latitude)) * cos(radians(o.staff_latitude)) * cos(radians(o.staff_longitude) - radians(o.longitude))
+           + sin(radians(o.latitude)) * sin(radians(o.staff_latitude))))) <= $2
+       RETURNING o.account_id, a.preferred_language,
+         COALESCE((SELECT s.full_name FROM accounts s WHERE s.id = o.delivery_staff_account_id),
+                  (SELECT b.shop_name FROM business_profiles b WHERE b.id = o.business_id), '') AS name`,
+      [orderId, metres],
+    );
+    const row = result.rows[0];
+    return row ? { accountId: row.account_id, language: row.preferred_language, name: row.name } : null;
+  }
+
+  /** The owner delivering it himself (no staff): his position, for the customer's map. */
+  async setOwnerLocation(orderId: string, businessId: string, latitude: number, longitude: number): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE shop_orders SET staff_latitude = $3, staff_longitude = $4, staff_location_at = now()
+       WHERE id = $1 AND business_id = $2 AND status = 'out_for_delivery' AND delivery_staff_account_id IS NULL`,
+      [orderId, businessId, latitude, longitude],
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   /** The staff member's position while they have the delivery; false when it isn't theirs / out. */
@@ -870,6 +901,11 @@ export class OrdersRepository {
         },
         pin: HANDOVER_STATUSES.includes(row.status) ? (row.pin ?? null) : null,
         deliveryPersonName: row.delivery_person_name ?? null,
+        // Only while it's on its way, and only once the delivery person's phone has sent a position.
+        deliveryLocation:
+          row.status === 'out_for_delivery' && row.staff_latitude != null && row.staff_longitude != null
+            ? { latitude: Number(row.staff_latitude), longitude: Number(row.staff_longitude) }
+            : null,
       };
     });
   }
@@ -893,8 +929,9 @@ export class OrdersRepository {
           }
         : null,
       deliveredByName: row.delivered_by_name ?? null,
+      // The staff member's position — or the owner's, when the owner is delivering it himself.
       staffLocation:
-        row.delivery_staff_account_id && row.staff_latitude != null && row.staff_longitude != null
+        row.staff_latitude != null && row.staff_longitude != null
           ? { latitude: Number(row.staff_latitude), longitude: Number(row.staff_longitude), at: new Date(row.staff_location_at).toISOString() }
           : null,
     }));
@@ -1042,6 +1079,40 @@ export class OrdersRepository {
         mobileNumber: row.owner_mobile_number,
       },
     }));
+  }
+
+  /**
+   * Clears the list / bill photos and voice messages of orders — those that ended more than
+   * `days` ago, or (with `accountId`) every order that customer sent — and returns the links to
+   * delete. At most `limit` orders a run.
+   */
+  async clearMedia(options: { days?: number; accountId?: string; limit?: number }): Promise<{ photos: string[]; voices: string[]; count: number }> {
+    // One customer's orders (any state), or every order that ended over $1 days ago.
+    const params: unknown[] = [options.days ?? 30, options.accountId ?? null, options.limit ?? 500];
+    const result = await this.pool.query(
+      `WITH old AS (
+         SELECT id, list_photo_urls, list_voice_url, bill_photo_urls, bill_voice_url FROM shop_orders
+         WHERE (
+           ($2::uuid IS NOT NULL AND account_id = $2::uuid)
+           OR ($2::uuid IS NULL
+               AND status IN ('completed', 'cancelled', 'declined', 'expired')
+               AND COALESCE(completed_at, cancelled_at, declined_at, expired_at, updated_at) < now() - make_interval(days => $1::int))
+         )
+           AND (cardinality(list_photo_urls) > 0 OR list_voice_url IS NOT NULL OR cardinality(bill_photo_urls) > 0 OR bill_voice_url IS NOT NULL)
+         LIMIT $3 FOR UPDATE SKIP LOCKED
+       )
+       UPDATE shop_orders o
+       SET list_photo_urls = '{}', list_voice_url = NULL, list_voice_seconds = NULL,
+           bill_photo_urls = '{}', bill_voice_url = NULL, bill_voice_seconds = NULL, media_deleted_at = now()
+       FROM old WHERE o.id = old.id
+       RETURNING old.list_photo_urls, old.list_voice_url, old.bill_photo_urls, old.bill_voice_url`,
+      params,
+    );
+    return {
+      photos: result.rows.flatMap((row) => [...(row.list_photo_urls ?? []), ...(row.bill_photo_urls ?? [])]),
+      voices: result.rows.flatMap((row) => [row.list_voice_url, row.bill_voice_url].filter(Boolean)),
+      count: result.rowCount ?? 0,
+    };
   }
 }
 

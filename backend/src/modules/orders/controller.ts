@@ -39,6 +39,11 @@ export class OrdersController {
     return ok(res, null);
   });
 
+  ownerLocation = asyncHandler(async (req: Request, res: Response) => {
+    await this.service.updateOwnerLocation(requireAccountId(req), req.params.id, req.body.latitude, req.body.longitude);
+    return ok(res, null);
+  });
+
   staffVerifyPin = asyncHandler(async (req: Request, res: Response) => {
     return ok(res, await this.service.staffVerifyPin(requireAccountId(req), req.params.id, req.body.pin), 'Delivered');
   });

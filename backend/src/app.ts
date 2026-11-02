@@ -17,6 +17,7 @@ import { favoritesRouter } from '@/modules/favorites/routes';
 import { jobSeekersRouter } from '@/modules/jobSeekers/routes';
 import { adsRouter } from '@/modules/ads/routes';
 import { subscriptionsRouter } from '@/modules/subscriptions/routes';
+import { accountDeletionRouter } from '@/modules/accountDeletion/routes';
 import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
 import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { setProfileViewerAccess } from '@/modules/notifications/service';
@@ -78,6 +79,7 @@ export function createApp(): Express {
   app.use('/api/v1/job-seekers', jobSeekersRouter);
   app.use('/api/v1/ads', adsRouter);
   app.use('/api/v1/subscriptions', subscriptionsRouter);
+  app.use('/api/v1/account', accountDeletionRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

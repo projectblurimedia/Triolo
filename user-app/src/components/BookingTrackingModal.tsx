@@ -11,6 +11,7 @@ import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { FinishJobModal } from './FinishJobModal';
 import { LiveMap } from './LiveMap';
+import { firstName } from '@/utils/firstName';
 import { LoadingIndicator } from './LoadingIndicator';
 import { RadarPulse } from './RadarPulse';
 import { RatingStars, STAR_COLOR } from './RatingStars';
@@ -486,7 +487,13 @@ export function BookingTrackingModal() {
 
     return (
       <>
-        {onTrip ? <LiveMap customer={jobPoint} worker={workerPoint} height={MAP_HEIGHT} /> : null}
+        {onTrip ? <LiveMap
+            customer={jobPoint}
+            worker={workerPoint}
+            height={MAP_HEIGHT}
+            customerLabel={t('liveMap.you')}
+            moverLabel={firstName(booking.worker?.fullName)}
+          /> : null}
         <ScrollView contentContainerStyle={[styles.panel, { paddingBottom: insets.bottom + 24 }]}>
           {renderStatusBanner(booking)}
           {booking.status === 'cancelled' && !booking.problemPostId ? (

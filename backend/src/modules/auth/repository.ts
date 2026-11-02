@@ -52,6 +52,7 @@ function mapAccount(row: QueryResultRow): Account {
     profilePhotoUrl: row.profile_photo_url ?? null,
     suspendedUntil: row.suspended_until ?? null,
     statusReason: row.status_reason ?? null,
+    deletionRequestedAt: row.deletion_requested_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -273,6 +274,40 @@ export class AuthRepository {
   }
 
   /** Signs the account out everywhere (used when the admin suspends or bans it). */
+  /** Marks the account deleted (stops it at once) and drops its photo; returns the photo to delete. */
+  async markDeleted(accountId: string): Promise<{ photoUrl: string | null } | null> {
+    const result = await this.pool.query(
+      `UPDATE accounts a SET deletion_requested_at = now(), profile_photo_url = NULL, updated_at = now()
+       FROM (SELECT profile_photo_url AS photo_url FROM accounts WHERE id = $1 FOR UPDATE) old
+       WHERE a.id = $1 AND a.deletion_requested_at IS NULL
+       RETURNING old.photo_url`,
+      [accountId],
+    );
+    return result.rows[0] ? { photoUrl: result.rows[0].photo_url ?? null } : null;
+  }
+
+  /**
+   * Wipes the personal details of accounts deleted more than `days` ago: name, number (freed for a
+   * new sign-up), email, place and photo. Rows stay so other people's orders and jobs still read
+   * "Deleted user". Returns how many were wiped.
+   */
+  async purgeDeleted(days: number): Promise<number> {
+    const result = await this.pool.query(
+      `UPDATE accounts
+       SET full_name = 'Deleted user',
+           mobile_number = 'x' || substr(replace(id::text, '-', ''), 1, 14),
+           email = NULL, latitude = NULL, longitude = NULL, location_address = NULL, profile_photo_url = NULL,
+           deleted_at = now(), updated_at = now()
+       WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL
+         AND deletion_requested_at < now() - make_interval(days => $1)`,
+      [days],
+    );
+    await this.pool.query(
+      `DELETE FROM refresh_tokens WHERE account_id IN (SELECT id FROM accounts WHERE deleted_at IS NOT NULL)`,
+    );
+    return result.rowCount ?? 0;
+  }
+
   async revokeAllRefreshTokens(accountId: string): Promise<void> {
     await this.pool.query('UPDATE refresh_tokens SET revoked_at = now() WHERE account_id = $1 AND revoked_at IS NULL', [
       accountId,

@@ -1324,3 +1324,62 @@ body::before {
   padding: 0 0 0 4px;
   font-size: 11px;
 }
+
+/* Privacy / Terms / Refunds / Delete account pages. */
+.legal {
+  max-width: 720px;
+  line-height: 1.6;
+}
+.legal__lang {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.legal__intro {
+  font-size: 15px;
+  margin: 0 0 18px;
+}
+.legal__section {
+  margin-bottom: 18px;
+}
+.legal__section h2 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+.legal__section p {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.legal__bullet {
+  position: relative;
+  padding-left: 18px;
+}
+.legal__bullet::before {
+  content: '•';
+  position: absolute;
+  left: 4px;
+  color: var(--color-primary, #0055d3);
+}
+.legal__tick {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 8px 0 14px;
+  font-size: 14px;
+}
+.legal__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border, #e3e8ef);
+  font-size: 13px;
+}
+.legal__links a {
+  color: var(--color-primary, #0055d3);
+  text-decoration: none;
+}
+.button--danger {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}

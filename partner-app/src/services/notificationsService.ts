@@ -17,6 +17,8 @@ export type NotificationType =
   | 'order_packed'
   | 'order_ready'
   | 'order_out_for_delivery'
+  | 'booking_nearby'
+  | 'order_nearby'
   | 'order_completed'
   | 'order_cancelled'
   | 'badge_removed'

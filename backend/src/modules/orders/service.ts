@@ -1,6 +1,11 @@
 import { splitShopCategories } from '@/modules/businesses/categories';
 import { randomInt } from 'crypto';
-import { uploadAudioToCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
+import {
+  deletePhotosFromCloudinary,
+  deleteVideosFromCloudinary,
+  uploadAudioToCloudinary,
+  uploadToCloudinary,
+} from '@/common/services/cloudinaryService';
 import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { UNLOCK_WINDOW_MINUTES } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
@@ -24,7 +29,7 @@ import {
   AdminOrderListFilter,
   StaffDelivery,
 } from './interfaces';
-import { OrderEvent, orderTemplate, deliveryTemplate } from './pushTemplates';
+import { OrderEvent, orderTemplate, deliveryTemplate, orderNearbyTemplate } from './pushTemplates';
 
 const LIST_LIMIT = 50;
 
@@ -572,6 +577,27 @@ export class OrdersService {
     if (!(await this.repository.setStaffLocation(orderId, staffAccountId, latitude, longitude))) {
       throw AppError.conflict('This delivery is not on its way.', 'DELIVERY_NOT_ACTIVE');
     }
+    await this.tellIfNear(orderId);
+  }
+
+  /** Almost there: the customer hears once, when the delivery comes within NEARBY_METRES. */
+  private async tellIfNear(orderId: string): Promise<void> {
+    const near = await this.repository.markNearIfClose(orderId, NEARBY_METRES);
+    if (!near) return;
+    const text = orderNearbyTemplate(near.language, near.name);
+    await this.notificationsService.notify(near.accountId, 'order_nearby', text.title, text.body, {
+      data: { kind: 'order_nearby', orderId },
+      channelId: 'default',
+    });
+  }
+
+  /** The owner delivering an order himself: where he is now (the customer sees it on a map). */
+  async updateOwnerLocation(ownerAccountId: string, orderId: string, latitude: number, longitude: number): Promise<void> {
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
+    if (!(await this.repository.setOwnerLocation(orderId, shop.id, latitude, longitude))) {
+      throw AppError.conflict('This delivery is not on its way with you.', 'DELIVERY_NOT_ACTIVE');
+    }
+    await this.tellIfNear(orderId);
   }
 
   /** The deliveries given to me (as a shop's staff). */
@@ -696,7 +722,31 @@ export class OrdersService {
   adminCounts() {
     return this.repository.adminCounts();
   }
+
+  /**
+   * Daily: the photos and voice messages of orders that ended over ORDER_MEDIA_KEEP_DAYS ago are
+   * deleted (privacy, and storage). The order itself stays, saying they were removed.
+   */
+  async purgeOldMedia(): Promise<number> {
+    const cleared = await this.repository.clearMedia({ days: ORDER_MEDIA_KEEP_DAYS });
+    await deletePhotosFromCloudinary(cleared.photos);
+    await deleteVideosFromCloudinary(cleared.voices);
+    return cleared.count;
+  }
+
+  /** A deleted account: the photos and voice messages of every order it sent go at once. */
+  async purgeMediaForAccount(accountId: string): Promise<void> {
+    const cleared = await this.repository.clearMedia({ accountId, limit: 10000 });
+    await deletePhotosFromCloudinary(cleared.photos);
+    await deleteVideosFromCloudinary(cleared.voices);
+  }
 }
+
+/** "Almost there" distance for the customer's delivery alert. */
+const NEARBY_METRES = 100;
+
+/** Days an ended order keeps its photos and voice messages. */
+export const ORDER_MEDIA_KEEP_DAYS = 30;
 
 /**
  * Delivery: the shop's price per km × distance in whole rupees, but never less than the price of

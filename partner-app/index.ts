@@ -5,6 +5,8 @@ import './backgroundNotificationTask';
 // Same reason: delivers the worker's live location while a Quick Book trip is on the way, even
 // when the app is minimised. See src/services/tripTracking.ts.
 import '@/services/tripTracking';
+// And the shop owner's position while he delivers an order himself (deliveryTracking.ts).
+import '@/services/deliveryTracking';
 
 import { registerRootComponent } from 'expo';
 

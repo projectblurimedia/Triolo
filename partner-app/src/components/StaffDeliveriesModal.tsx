@@ -9,6 +9,7 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { PullToRefresh } from './PullToRefresh';
 import { ToastHost } from './ToastHost';
 import { LiveMap, MapPoint } from './LiveMap';
+import { firstName } from '@/utils/firstName';
 import { useAnswerDelivery, useMyDeliveries, useVerifyDeliveryPin } from '@/hooks/useDeliveries';
 import { useStaffLocationShare } from '@/hooks/useStaffLocationShare';
 import { useDeliveriesStore } from '@/state/deliveriesStore';
@@ -266,7 +267,14 @@ function TripModal({ delivery, me, onClose }: { delivery: StaffDelivery | null; 
     <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View>
-          <LiveMap customer={{ latitude: delivery.latitude, longitude: delivery.longitude }} worker={me} height={MAP_HEIGHT + insets.top} />
+          <LiveMap
+            mover="delivery"
+            customer={{ latitude: delivery.latitude, longitude: delivery.longitude }}
+            worker={me}
+            height={MAP_HEIGHT + insets.top}
+            customerLabel={firstName(delivery.customerFullName)}
+            moverLabel={t('liveMap.you')}
+          />
           <Pressable
             onPress={onClose}
             accessibilityLabel={t('common.back')}

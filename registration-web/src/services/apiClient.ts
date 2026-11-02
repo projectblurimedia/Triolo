@@ -7,10 +7,12 @@ import { useAuthStore } from '@/state/authStore';
  * from another device on the network, and `localhost` from that device would mean itself,
  * not the dev machine. Update alongside the mobile apps' `API_BASE_URL` if that IP changes
  * (find it with `ipconfig` on the dev machine — phone and PC must be on the same Wi-Fi
- * network). Override for staging/production once those API URLs exist (see
- * docs/deployment.md).
+ * network). A production build (the hosted site) talks to the live backend; VITE_API_URL
+ * overrides either.
  */
-const API_BASE_URL = 'http://192.168.1.14:4000/api/v1';
+const API_BASE_URL =
+  (import.meta.env.VITE_API_URL as string | undefined) ??
+  (import.meta.env.DEV ? 'http://192.168.1.14:4000/api/v1' : 'https://triolo-backend.vercel.app/api/v1');
 
 export interface ApiEnvelope<T> {
   success: boolean;

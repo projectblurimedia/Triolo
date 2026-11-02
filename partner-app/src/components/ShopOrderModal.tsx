@@ -45,6 +45,9 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { callPhone, openDirections } from '@/utils/tripLinks';
 import { formatDistance } from '@/utils/formatDistance';
+import { firstName } from '@/utils/firstName';
+import { isTrackingDelivery, startDeliveryTracking, stopDeliveryTracking } from '@/services/deliveryTracking';
+import { LiveMap } from './LiveMap';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
@@ -412,12 +415,27 @@ export function ShopOrderModal() {
     );
   };
 
+  // The owner delivering it himself shares his position (the customer sees him on a map) —
+  // started when he sends it out, picked up again if he reopens it, stopped once it's over or
+  // handed to staff.
+  const ownerDelivering = !!order && order.status === 'out_for_delivery' && order.fulfillment === 'delivery' && !order.deliveryStaff;
+  useEffect(() => {
+    if (!order) return;
+    const deliveryText = { title: t('ownerDelivery.notificationTitle'), body: t('ownerDelivery.notificationBody') };
+    isTrackingDelivery(order.id).then((tracking) => {
+      if (ownerDelivering && !tracking) startDeliveryTracking(order.id, deliveryText).catch(() => undefined);
+      if (!ownerDelivering && tracking) stopDeliveryTracking();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, ownerDelivering]);
+
   const handleVerifyPin = (o: ShopOrder) => {
     verifyPin.mutate(
       { id: o.id, pin },
       {
         onSuccess: () => {
           Keyboard.dismiss();
+          stopDeliveryTracking();
           setPin('');
           showToast({ variant: 'success', title: t('shopOrders.completedTitle'), message: t('shopOrders.completedMessage') });
         },
@@ -1138,6 +1156,19 @@ export function ShopOrderModal() {
       // With staff, they enter the PIN at the door; the owner can still take it back.
       return (
         <>
+          {/* Delivering it himself: his own position (shared with the customer) and the customer's place. */}
+          {!o.deliveryStaff ? (
+            <View style={styles.ownerMap}>
+              <LiveMap
+                mover="delivery"
+                customer={{ latitude: o.latitude, longitude: o.longitude }}
+                worker={o.staffLocation ? { latitude: o.staffLocation.latitude, longitude: o.staffLocation.longitude } : null}
+                height={220}
+                customerLabel={firstName(o.customerFullName)}
+                moverLabel={t('liveMap.you')}
+              />
+            </View>
+          ) : null}
           <DeliveryHandover order={o} onError={onError} deliverMyselfLoading={false} onDeliverMyself={() => undefined} />
           {/* Always here: the owner can enter the PIN too (e.g. the staff member's phone is off). */}
           {renderPinEntry(o)}
@@ -1165,6 +1196,12 @@ export function ShopOrderModal() {
           </View>
         ) : null}
         {renderRating(o)}
+        {o.mediaDeletedAt ? (
+          <View style={[styles.mediaGone, { backgroundColor: `${colors.textMuted}12`, borderColor: `${colors.textMuted}33` }]}>
+            <FontAwesome6 name="clock-rotate-left" size={13} color={colors.textMuted} solid />
+            <Text style={[styles.mediaGoneText, { color: colors.textMuted }]}>{t('shopOrders.mediaRemoved')}</Text>
+          </View>
+        ) : null}
         {o.totalAmount != null ? renderBill(o) : renderPlainList(o)}
       </>
     );
@@ -1321,6 +1358,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   card: { borderRadius: 18, borderWidth: 1, padding: 16 },
   voiceGap: { marginBottom: 10 },
+  ownerMap: { borderRadius: 18, overflow: 'hidden' },
+  mediaGone: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 12 },
+  mediaGoneText: { ...typography.caption, flex: 1, fontSize: 12.5, lineHeight: 17 },
+
   voiceHint: { marginTop: 8 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   bannerIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },

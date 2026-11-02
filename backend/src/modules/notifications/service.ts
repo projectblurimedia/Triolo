@@ -133,6 +133,11 @@ export class NotificationsService {
     await this.repository.removePushToken(accountId, app, token);
   }
 
+  /** A deleted account: no more pushes, and its notifications are removed. */
+  removeAllForAccount(accountId: string): Promise<void> {
+    return this.repository.removeAllForAccount(accountId);
+  }
+
   /**
    * Sends to the account's device(s) in the right app: exact-app tokens first; a 'legacy'
    * token (registered before the apps said which app they are) only when there's none.

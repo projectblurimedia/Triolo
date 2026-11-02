@@ -26,6 +26,8 @@ export interface Account {
   suspendedUntil: Date | null;
   /** The admin's reason for the current suspension or ban. */
   statusReason: string | null;
+  /** Set when the person deleted the account (wiped ACCOUNT_KEEP_DAYS later). */
+  deletionRequestedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

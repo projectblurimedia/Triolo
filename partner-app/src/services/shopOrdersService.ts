@@ -84,6 +84,8 @@ export interface ShopOrder {
   billVoiceUrl?: string | null;
   billVoiceSeconds?: number | null;
   billAmount?: number | null;
+  /** When its photos / voice messages were removed (30 days after the order ended). */
+  mediaDeletedAt?: string | null;
   customerFullName: string;
   /** Only once the order is accepted. */
   customerMobileNumber: string | null;
@@ -140,6 +142,9 @@ export const shopOrdersService = {
   /** Gives a delivery order to a staff member (null: the owner takes it back). */
   assignDelivery: (id: string, staffAccountId: string | null) =>
     apiClient.post<null>(`/orders/${id}/assign-delivery`, { staffAccountId }, true),
+  /** The owner delivering it himself: where he is now. */
+  updateDeliveryLocation: (id: string, latitude: number, longitude: number) =>
+    apiClient.put<null>(`/orders/${id}/delivery-location`, { latitude, longitude }, true),
   verifyPin: (id: string, pin: string) => apiClient.post<null>(`/orders/${id}/verify-pin`, { pin }, true),
   cancel: (id: string, reason?: string) => apiClient.post<null>(`/orders/${id}/shop-cancel`, { reason }, true),
 };

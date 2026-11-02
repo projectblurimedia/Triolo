@@ -25,6 +25,7 @@ import { Button } from './Button';
 import { ConfirmModal } from './ConfirmModal';
 import { useBusyAction } from './Ads';
 import { LiveMap, MapPoint } from './LiveMap';
+import { firstName } from '@/utils/firstName';
 import { ToastHost } from './ToastHost';
 import { ProblemDetailModal } from './ProblemDetailModal';
 import { useAssignedProblems } from '@/hooks/useProblems';
@@ -493,7 +494,13 @@ export function JobTrackingModal() {
     return (
       <>
         {MAP_STATUSES.includes(job.status) && keyboardHeight === 0 ? (
-          <LiveMap customer={jobPoint} worker={workerPoint} height={MAP_HEIGHT} />
+          <LiveMap
+            customer={jobPoint}
+            worker={workerPoint}
+            height={MAP_HEIGHT}
+            customerLabel={firstName(job.customerFullName)}
+            moverLabel={t('liveMap.you')}
+          />
         ) : null}
         <ScrollView
           showsVerticalScrollIndicator={false}

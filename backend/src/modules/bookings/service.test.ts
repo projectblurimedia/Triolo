@@ -28,6 +28,7 @@ function createMockRepository(): MockRepository {
     acceptOffer: jest.fn(),
     startTrip: jest.fn(),
     updateWorkerLocation: jest.fn(),
+    markNearIfClose: jest.fn().mockResolvedValue(null),
     markArrived: jest.fn(),
     verifyPin: jest.fn(),
     markWorkDone: jest.fn(),
@@ -294,6 +295,15 @@ describe('trip steps (worker)', () => {
     await expect(
       service.updateWorkerLocation('worker-account-1', 'request-1', { latitude: 17.4, longitude: 78.5 }),
     ).rejects.toMatchObject({ code: 'BOOKING_TRIP_NOT_ACTIVE' });
+  });
+
+  it('tells the customer once when the worker is within 100 m', async () => {
+    asWorker();
+    repo.updateWorkerLocation.mockResolvedValue(true);
+    repo.markNearIfClose.mockResolvedValueOnce({ accountId: 'customer-1', language: 'en' });
+    await service.updateWorkerLocation('worker-account-1', 'request-1', { latitude: 17.4, longitude: 78.5 });
+    expect(repo.markNearIfClose).toHaveBeenCalledWith('request-1', 'worker-1', 100);
+    expect(notifications.notify).toHaveBeenCalledWith('customer-1', 'booking_nearby', expect.any(String), expect.stringContaining('100 m'), expect.anything());
   });
 
   it('marks arrived and asks the customer to share their PIN', async () => {

@@ -51,6 +51,16 @@ const DISTANCE_SQL = `(6371000 * acos(LEAST(1.0, GREATEST(-1.0,
 export class ProblemsRepository {
   constructor(private readonly pool: Pool) {}
 
+  /** Clears the photos of every problem this account posted; returns them to delete. */
+  async clearPhotosForAccount(accountId: string): Promise<string[]> {
+    const result = await this.pool.query(
+      `WITH old AS (SELECT id, photo_urls FROM problem_posts WHERE account_id = $1 AND cardinality(photo_urls) > 0 FOR UPDATE)
+       UPDATE problem_posts p SET photo_urls = '{}' FROM old WHERE p.id = old.id RETURNING old.photo_urls`,
+      [accountId],
+    );
+    return result.rows.flatMap((row) => row.photo_urls ?? []);
+  }
+
   async create(params: CreateProblemPostParams): Promise<ProblemPost> {
     const result = await this.pool.query(
       `INSERT INTO problem_posts (account_id, skill_categories, description, quotation_amount, location_address, latitude, longitude)

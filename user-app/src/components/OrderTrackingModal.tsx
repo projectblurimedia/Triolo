@@ -21,6 +21,8 @@ import { LATE_AFTER_MS, LateNotice, useNow } from './LateNotice';
 import { FinishJobModal } from './FinishJobModal';
 import { ListPhotoStrip } from './ListPhotoStrip';
 import { VoiceMessage } from './VoiceMessage';
+import { LiveMap } from './LiveMap';
+import { firstName } from '@/utils/firstName';
 import { previousStepAt, stepTimeText } from '@/utils/stepTime';
 
 // The shop took the order but hasn't handed it over (mirrors the backend's ORDER_LATE_STATUSES).
@@ -536,9 +538,28 @@ export function OrderTrackingModal() {
               onPress={() => setRatingLate(true)}
             />
           ) : null}
+          {/* Out for delivery: the delivery on the map (van icon) coming to the customer's place (home icon). */}
+          {order.status === 'out_for_delivery' && order.deliveryLocation ? (
+            <View style={styles.deliveryMap}>
+              <LiveMap
+                mover="delivery"
+                customer={{ latitude: order.latitude, longitude: order.longitude }}
+                worker={order.deliveryLocation}
+                height={220}
+                customerLabel={t('liveMap.you')}
+                moverLabel={firstName(order.deliveryPersonName) || order.shop.name}
+              />
+            </View>
+          ) : null}
           {renderPin(order)}
           {renderRating(order)}
           {renderSteps(order)}
+          {order.mediaDeletedAt ? (
+          <View style={[styles.mediaGone, { backgroundColor: `${colors.textMuted}12`, borderColor: `${colors.textMuted}33` }]}>
+            <FontAwesome6 name="clock-rotate-left" size={13} color={colors.textMuted} solid />
+            <Text style={[styles.mediaGoneText, { color: colors.textMuted }]}>{t('orders.mediaRemoved')}</Text>
+          </View>
+        ) : null}
           {renderItems(order)}
           {order.businessId ? renderShop(order) : null}
           {CUSTOMER_CANCELLABLE.includes(order.status) ? (
@@ -626,6 +647,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: { borderRadius: 18, borderWidth: 1, padding: 16 },
   voiceGap: { marginBottom: 10 },
+  deliveryMap: { borderRadius: 18, overflow: 'hidden' },
+  mediaGone: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 12 },
+  mediaGoneText: { ...typography.caption, flex: 1, fontSize: 12.5, lineHeight: 17 },
+
   billAsOne: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 10, marginTop: 6 },
   billAsOneText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12.5, flex: 1, lineHeight: 17 },
   deliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12 },

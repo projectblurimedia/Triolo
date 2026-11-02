@@ -81,6 +81,12 @@ export class NotificationsRepository {
   }
 
   /** Deletes only the caller's own notifications — ids belonging to anyone else are silently ignored. */
+  /** A deleted account: its push tokens and its notifications. */
+  async removeAllForAccount(accountId: string): Promise<void> {
+    await this.pool.query('DELETE FROM push_tokens WHERE account_id = $1', [accountId]);
+    await this.pool.query('DELETE FROM notifications WHERE account_id = $1', [accountId]);
+  }
+
   async deleteMany(accountId: string, ids: string[]): Promise<number> {
     const result = await this.pool.query(`DELETE FROM notifications WHERE account_id = $1 AND id = ANY($2::uuid[])`, [
       accountId,

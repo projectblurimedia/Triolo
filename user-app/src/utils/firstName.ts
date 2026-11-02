@@ -1,4 +1,4 @@
-/** The first word of a person's name, for places too narrow for the whole name. */
-export function firstName(fullName: string): string {
-  return fullName.trim().split(/\s+/)[0] || fullName;
+/** "Ravi Kumar" → "Ravi" (for map labels and short greetings). */
+export function firstName(name: string | null | undefined): string {
+  return (name ?? '').trim().split(/\s+/)[0] ?? '';
 }
