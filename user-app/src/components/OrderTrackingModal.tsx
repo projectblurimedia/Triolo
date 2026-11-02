@@ -20,6 +20,7 @@ import { RadarPulse } from './RadarPulse';
 import { LATE_AFTER_MS, LateNotice, useNow } from './LateNotice';
 import { FinishJobModal } from './FinishJobModal';
 import { ListPhotoStrip } from './ListPhotoStrip';
+import { VoiceMessage } from './VoiceMessage';
 import { previousStepAt, stepTimeText } from '@/utils/stepTime';
 
 // The shop took the order but hasn't handed it over (mirrors the backend's ORDER_LATE_STATUSES).
@@ -234,7 +235,7 @@ export function OrderTrackingModal() {
           {item.name}
         </Text>
         <Text style={[styles.itemQty, { color: colors.textMuted }]}>{itemLabel(item)}</Text>
-        {showPrice ? <Text style={[styles.itemPrice, { color: colors.text }]}>{formatRupees(item.price)}</Text> : null}
+        {showPrice && item.price != null ? <Text style={[styles.itemPrice, { color: colors.text }]}>{formatRupees(item.price)}</Text> : null}
       </View>
     );
   };
@@ -243,30 +244,73 @@ export function OrderTrackingModal() {
     const billed = o.totalAmount != null;
     if (!billed) {
       return (
+        <>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.cardLabel, { color: colors.textMuted }]}>
-            {o.items.length > 0 ? t('orders.yourList', { count: o.items.length }) : t('orders.yourListPhotos')}
+            {o.items.length > 0
+              ? t('orders.yourList', { count: o.items.length })
+              : (o.listPhotoUrls ?? []).length > 0
+                ? t('orders.yourListPhotos')
+                : t('voice.yourVoice')}
           </Text>
+          {o.listVoiceUrl ? <VoiceMessage uri={o.listVoiceUrl} seconds={o.listVoiceSeconds} style={styles.voiceGap} /> : null}
           <ListPhotoStrip photos={o.listPhotoUrls ?? []} />
           {o.items.map((item) => renderItemRow(item, false))}
-          {o.fulfillment === 'delivery' && o.deliveryCharge > 0 ? (
-            <Text style={[styles.meta, styles.estimate, { color: colors.textMuted }]}>
-              {t('orders.deliveryChargeNote', { amount: formatRupees(o.deliveryCharge) })}
-            </Text>
-          ) : null}
         </View>
+        {/* Delivery: the shop that accepted sets the charge — shown now, not only on the bill. */}
+        {o.fulfillment === 'delivery' && o.deliveryCharge > 0 && !['placed', 'cancelled', 'declined', 'expired'].includes(o.status) ? (
+          <View style={[styles.deliveryCard, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}33` }]}>
+            <View style={[styles.deliveryIcon, { backgroundColor: colors.primary }]}>
+              <FontAwesome6 name="truck" size={14} color="#FFFFFF" solid />
+            </View>
+            <View style={styles.flexOne}>
+              <Text style={[styles.deliveryTitle, { color: colors.text }]}>{t('orders.deliveryChargeTitle')}</Text>
+              <Text style={[styles.deliverySub, { color: colors.textMuted }]}>{t('orders.deliveryChargeSub')}</Text>
+            </View>
+            <Text style={[styles.deliveryAmount, { color: colors.primary }]}>{formatRupees(o.deliveryCharge)}</Text>
+          </View>
+        ) : null}
+        </>
       );
     }
     const packed = o.items.filter((item) => item.status === 'packed');
     const missing = o.items.filter((item) => item.status === 'unavailable');
     return (
       <>
+        {/* What the customer sent first (their recording / photos), then the shop's bill. */}
+        {o.listVoiceUrl ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('voice.yourVoice')}</Text>
+            <VoiceMessage uri={o.listVoiceUrl} seconds={o.listVoiceSeconds} />
+          </View>
+        ) : null}
+        {(o.listPhotoUrls ?? []).length > 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('orders.yourListPhotos')}</Text>
+            <ListPhotoStrip photos={o.listPhotoUrls ?? []} />
+          </View>
+        ) : null}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.billHeader}>
             <FontAwesome6 name="receipt" size={14} color={colors.primary} solid />
             <Text style={[styles.cardLabel, styles.noMargin, { color: colors.textMuted }]}>{t('orders.bill')}</Text>
           </View>
           {packed.map((item) => renderItemRow(item, true))}
+          {/* Billed as one total (no price per item): say so, so the bill isn't blank. */}
+          {!packed.some((item) => item.price != null) && o.itemsTotal != null ? (
+            <View style={[styles.billAsOne, { backgroundColor: `${brandColors.success}10`, borderColor: `${brandColors.success}33` }]}>
+              <FontAwesome6 name={o.billVoiceUrl ? 'microphone' : 'receipt'} size={13} color={brandColors.success} solid />
+              <Text style={[styles.billAsOneText, { color: colors.text }]}>{t('orders.billedAsOne')}</Text>
+            </View>
+          ) : null}
+          {/* What the shop put with its bill: a voice message and photos (e.g. a written bill). */}
+          {o.billVoiceUrl || (o.billPhotoUrls ?? []).length > 0 ? (
+            <View style={[styles.billMedia, { backgroundColor: `${colors.primary}08`, borderColor: `${colors.primary}1F` }]}>
+              <Text style={[styles.billMediaTitle, { color: colors.text }]}>{t('orders.fromShop')}</Text>
+              {o.billVoiceUrl ? <VoiceMessage uri={o.billVoiceUrl} seconds={o.billVoiceSeconds} /> : null}
+              <ListPhotoStrip photos={o.billPhotoUrls ?? []} />
+            </View>
+          ) : null}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.sumRow}>
             <Text style={[styles.sumLabel, { color: colors.textMuted }]}>{t('orders.itemsTotal')}</Text>
@@ -284,12 +328,6 @@ export function OrderTrackingModal() {
           </View>
           <Text style={[styles.meta, { color: colors.textMuted }]}>{t('orders.payAtHandover')}</Text>
         </View>
-        {(o.listPhotoUrls ?? []).length > 0 ? (
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('orders.yourListPhotos')}</Text>
-            <ListPhotoStrip photos={o.listPhotoUrls ?? []} />
-          </View>
-        ) : null}
         {missing.length > 0 ? (
           <View style={[styles.card, { backgroundColor: `${brandColors.error}0D`, borderColor: `${brandColors.error}33` }]}>
             <View style={styles.billHeader}>
@@ -483,7 +521,11 @@ export function OrderTrackingModal() {
               waits like a Quick Book. */}
           {order.status === 'placed' ? (
             <View style={styles.countdownGap}>
-              <WaitCountdown createdAt={order.createdAt} kind={order.quick ? 'quickOrderMinutes' : 'orderMinutes'} />
+              <WaitCountdown
+                createdAt={order.createdAt}
+                kind={order.quick ? 'quickOrderMinutes' : 'orderMinutes'}
+                target={order.quick ? undefined : { type: 'shop', name: order.shop.name }}
+              />
             </View>
           ) : null}
           {isStalled(order) ? (
@@ -583,6 +625,17 @@ const styles = StyleSheet.create({
   body: { padding: 18, gap: 14 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: { borderRadius: 18, borderWidth: 1, padding: 16 },
+  voiceGap: { marginBottom: 10 },
+  billAsOne: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 10, marginTop: 6 },
+  billAsOneText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12.5, flex: 1, lineHeight: 17 },
+  deliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12 },
+  deliveryIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  flexOne: { flex: 1 },
+  deliveryTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  deliverySub: { ...typography.caption, fontSize: 12 },
+  deliveryAmount: { ...typography.subheading, fontFamily: fonts.semiBold },
+  billMedia: { borderRadius: 14, borderWidth: 1, padding: 10, gap: 10, marginTop: 8 },
+  billMediaTitle: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   bannerIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   bannerTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16 },

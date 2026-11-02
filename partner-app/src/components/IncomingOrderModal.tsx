@@ -16,6 +16,7 @@ import { ShopOrder } from '@/services/shopOrdersService';
 import { formatDistance } from '@/utils/formatDistance';
 import { typography, useThemeColors } from '@/theme';
 import { ListPhotoStrip } from './ListPhotoStrip';
+import { VoiceMessage } from './VoiceMessage';
 import { orderListText } from '@/utils/orderListText';
 
 // Lets the order screen finish fading in on top before this one closes underneath it.
@@ -105,6 +106,11 @@ export function IncomingOrderModal() {
       chips={itemChips}
       details={
         <>
+          {order?.listVoiceUrl ? (
+            <View style={styles.photos}>
+              <VoiceMessage uri={order.listVoiceUrl} seconds={order.listVoiceSeconds} />
+            </View>
+          ) : null}
           {(order?.listPhotoUrls ?? []).length > 0 ? (
             <View style={styles.photos}>
               <ListPhotoStrip photos={order?.listPhotoUrls ?? []} size={84} />

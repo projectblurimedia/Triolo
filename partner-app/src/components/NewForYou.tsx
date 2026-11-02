@@ -17,12 +17,14 @@ import { ApiError } from '@/services/apiClient';
 import { openJob } from '@/state/jobFocusStore';
 import { openShopOrder } from '@/state/shopOrderFocusStore';
 import { useIncomingStore } from '@/state/incomingStore';
+import { useAcceptingStore } from '@/state/acceptingStore';
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistance } from '@/utils/formatDistance';
 import { placeName } from '@/utils/formatAddress';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
 import { ListPhotoStrip } from './ListPhotoStrip';
+import { VoiceMessage } from './VoiceMessage';
 import { orderListText } from '@/utils/orderListText';
 import { GivenBackError } from '@/utils/afterAccept';
 import { FEW_ACCEPTS_LEFT, QUICK_LIMIT_QUERY_KEY, useQuickAcceptLimit } from '@/hooks/useQuickAcceptLimit';
@@ -38,7 +40,9 @@ const CARD_HEIGHT = 154;
 // Space on each side of the front card where the cards before / after it show their edge.
 // How far each card in the stack shows past the one above it: those already seen on the left,
 // those still to come on the right.
-const STACK_STEP = 10;
+// Each card behind peeks out this far; up to three on each side (like stacked notifications).
+const STACK_STEP = 5;
+const PEEKS = 3;
 const SWIPE_AWAY = 55;
 const FRESH_MS = 2 * 60 * 1000;
 
@@ -46,8 +50,8 @@ const FRESH_MS = 2 * 60 * 1000;
  * Live Requests: every request waiting for an answer — job requests and new shop orders together —
  * as a pile of cards in a fixed order. Cards already seen peek on the left, the next ones on the
  * right; swipe to move through them (each card keeps its own content and glides into place).
- * On Home a tap opens the Live Requests screen (`bare`), where every request is a row of one
- * list, the tapped one first. New requests join live.
+ * On Home a tap opens the Live Requests screen on that card; there (`bare`) the same pile shows
+ * each card's full details. New requests join live.
  */
 export function NewForYou({
   isWorker,
@@ -72,6 +76,8 @@ export function NewForYou({
   const manyShops = (useMyShops(isShop).data ?? []).length > 1;
   const focusKey = useIncomingStore((state) => state.focusKey);
   const autoAcceptKey = useIncomingStore((state) => state.autoAcceptKey);
+  const serviceLimit = useQuickAcceptLimit('service', bare && isWorker);
+  const shopLimit = useQuickAcceptLimit('shop', bare && isShop);
   const [currentKey, setCurrentKey] = useState<string | null>(bare ? focusKey : null);
   const [width, setWidth] = useState(320);
   const [edgeNote, setEdgeNote] = useState(false);
@@ -114,6 +120,27 @@ export function NewForYou({
   useEffect(() => {
     if (!animating.current) progress.setValue(index);
   }, [index, progress]);
+
+  // Each card's fade back into the stack after it leaves the front — whichever way it was swiped,
+  // it flies off fully faded, then shows again at its edge in the stack.
+  const settles = useRef<Record<string, Animated.Value>>({}).current;
+  const settleOf = (key: string | undefined) => {
+    if (!key) return 1;
+    if (!settles[key]) settles[key] = new Animated.Value(1);
+    return settles[key];
+  };
+  const keyAt = (position: number) => all[position]?.key;
+  const frontKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const now = all[index]?.key ?? null;
+    const before = frontKeyRef.current;
+    frontKeyRef.current = now;
+    if (!before || before === now) return;
+    const value = settleOf(before) as Animated.Value;
+    value.setValue(0);
+    Animated.timing(value, { toValue: 1, duration: 260, delay: 60, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, all]);
 
 
   const goTo = (target: number) => {
@@ -169,35 +196,16 @@ export function NewForYou({
 
   if (all.length === 0) return null;
 
-  // Live Requests: a plain list, one row per request (the one tapped on Home first).
-  if (bare) {
-    const rows = focusKey ? [...all].sort((a, b) => Number(b.key === focusKey) - Number(a.key === focusKey)) : all;
-    return (
-      <View style={styles.wrap}>
-        <View style={styles.titleRow}>
-          <View style={[styles.liveDot, { backgroundColor: brandColors.success }]} />
-          <Text style={[styles.titleSmall, { color: colors.text }]}>{t('newForYou.swipeTitle')}</Text>
-          <View style={[styles.counter, { backgroundColor: `${colors.primary}14` }]}>
-            <Text style={[styles.counterText, { color: colors.primary }]}>{all.length}</Text>
-          </View>
-        </View>
-        <View style={[styles.list, { borderTopColor: colors.border }]}>
-          {rows.map((item) => (
-            <View key={item.key} style={[styles.listRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-              <RequestCard item={item} manyShops={manyShops} rich onOpened={onOpened} autoAccept={autoAcceptKey === item.key} />
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  }
-
   const front = all[index];
+  const usedUp = [
+    isWorker && serviceLimit.data?.limit != null && (serviceLimit.data.remaining ?? 0) <= 0 ? ('service' as const) : null,
+    isShop && shopLimit.data?.limit != null && (shopLimit.data.remaining ?? 0) <= 0 ? ('shop' as const) : null,
+  ].filter((side): side is 'service' | 'shop' => side !== null);
 
-  const visible = all.map((item, position) => ({ item, position })).filter(({ position }) => Math.abs(position - index) <= 2);
+  const visible = all.map((item, position) => ({ item, position })).filter(({ position }) => Math.abs(position - index) <= PEEKS);
   // The pile takes the front card's height (an order's note adds a line); the cards behind only show their edge.
   const pileHeight = heights[front.key] ?? (bare ? 146 + richRows(front) * 40 : CARD_HEIGHT);
-  const cardWidth = width - STACK_STEP * 4;
+  const cardWidth = width - STACK_STEP * PEEKS * 2;
   const style = (position: number, isFront: boolean) => {
     const offset = Animated.subtract(position, progress);
     if (isFront) {
@@ -210,23 +218,33 @@ export function NewForYou({
       };
     }
     return {
-      opacity: offset.interpolate({ inputRange: [-3, -2, 2, 3], outputRange: [0, 1, 1, 0], extrapolate: 'clamp' }),
+      // A card that just left the front fades into its place in the stack instead of popping in.
+      opacity: Animated.multiply(
+        offset.interpolate({ inputRange: [-PEEKS - 1, -PEEKS, PEEKS, PEEKS + 1], outputRange: [0, 1, 1, 0], extrapolate: 'clamp' }),
+        settleOf(keyAt(position)),
+      ),
       transform: [
         {
           translateX: offset.interpolate({
-            inputRange: [-2, -1, 0, 1, 2],
-            outputRange: [-STACK_STEP * 2, -STACK_STEP, 0, STACK_STEP, STACK_STEP * 2],
+            inputRange: [-3, -2, -1, 0, 1, 2, 3],
+            outputRange: [-STACK_STEP * 3, -STACK_STEP * 2, -STACK_STEP, 0, STACK_STEP, STACK_STEP * 2, STACK_STEP * 3],
             extrapolate: 'clamp',
           }),
         },
-        { scaleY: offset.interpolate({ inputRange: [-2, -1, 0, 1, 2], outputRange: [0.88, 0.94, 1, 0.94, 0.88], extrapolate: 'clamp' }) },
+        {
+          scaleY: offset.interpolate({
+            inputRange: [-3, -2, -1, 0, 1, 2, 3],
+            outputRange: [0.82, 0.88, 0.94, 1, 0.94, 0.88, 0.82],
+            extrapolate: 'clamp',
+          }),
+        },
       ],
     };
   };
   const veil = (position: number) =>
     Animated.subtract(position, progress).interpolate({
-      inputRange: [-2, -1, 0, 1, 2],
-      outputRange: [0.55, 0.3, 0, 0.3, 0.55],
+      inputRange: [-3, -2, -1, 0, 1, 2, 3],
+      outputRange: [0.7, 0.55, 0.3, 0, 0.3, 0.55, 0.7],
       extrapolate: 'clamp',
     });
   // Drawn far-to-near, the one in front last (on top).
@@ -234,6 +252,27 @@ export function NewForYou({
 
   return (
     <View style={styles.wrap}>
+      {bare
+        ? usedUp.map((side) => (
+            <Pressable
+              key={side}
+              onPress={() => openSubscribe(side)}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.usedUpCard, { borderColor: `${GOLD_DEEP}55`, backgroundColor: `${GOLD_DEEP}12`, opacity: pressed ? 0.9 : 1 }]}
+            >
+              <View style={[styles.usedUpIcon, { backgroundColor: GOLD_DEEP }]}>
+                <FontAwesome6 name="crown" size={14} color="#FFFFFF" solid />
+              </View>
+              <View style={styles.flex}>
+                <Text style={[styles.usedUpTitle, { color: colors.text }]}>{t(`quickLimit.usedUpTitle.${side}`)}</Text>
+                <Text style={[styles.usedUpText, { color: colors.textMuted }]}>{t('quickLimit.usedUpCard')}</Text>
+              </View>
+              <View style={[styles.usedUpButton, { backgroundColor: GOLD_DEEP }]}>
+                <Text style={styles.usedUpButtonText}>{t('quickLimit.subscribeShort')}</Text>
+              </View>
+            </Pressable>
+          ))
+        : null}
       <View style={styles.titleRow}>
         <View style={[styles.liveDot, { backgroundColor: brandColors.success }]} />
         <Text style={[bare ? styles.titleSmall : styles.title, { color: colors.text }]}>{t(bare ? 'newForYou.swipeTitle' : 'newForYou.title')}</Text>
@@ -346,13 +385,19 @@ function useRequestActions(item: DeckItem | null, onOpened?: () => void) {
    */
   const accept = async (confirmed = false) => {
     if (!item || busy) return;
-    // None left: it still accepts — the one-time fee comes right after (completeAccept).
+    // None left: no paying per accept — subscribe first, then accept.
+    if (limit && limit.remaining <= 0) {
+      openSubscribe(side);
+      return;
+    }
     if (!confirmed && limit && limit.remaining <= FEW_ACCEPTS_LEFT) {
       setAskFew(true);
       return;
     }
     setAskFew(false);
     setBusy('accept');
+    // One 'Accepting…' cover until its screen opens (the list would show 0 requests meanwhile).
+    useAcceptingStore.getState().setAccepting(item.type);
     try {
       if (item.type === 'job') {
         const id = item.offer.bookingRequestId;
@@ -372,6 +417,7 @@ function useRequestActions(item: DeckItem | null, onOpened?: () => void) {
       onError(err as Error);
     } finally {
       setBusy(null);
+      useAcceptingStore.getState().setAccepting(null);
     }
   };
 
@@ -562,8 +608,8 @@ function RequestCard({
           <FontAwesome6 name={noneLeft ? 'lock' : 'hourglass-half'} size={11} color={GOLD_DEEP} solid />
           <Text style={[styles.limitNoteText, { color: colors.text }]} numberOfLines={2}>
             {noneLeft
-              ? t(limit?.limit ? 'quickLimit.paidNow' : 'quickLimit.alwaysPay', { limit: limit?.limit, amount: fee })
-              : t('quickLimit.fewLeft', { count: limit?.remaining, limit: limit?.limit })}
+              ? t(limit?.limit ? 'quickLimit.usedUp' : 'quickLimit.planNeeded', { limit: limit?.limit })
+              : t('quickLimit.fewLeft', { count: limit?.remaining, limit: limit?.limit, used: Math.max(0, (limit?.limit ?? 0) - (limit?.remaining ?? 0)) })}
           </Text>
           <FontAwesome6 name="crown" size={11} color={GOLD_DEEP} solid />
         </Pressable>
@@ -581,15 +627,13 @@ function RequestCard({
           )}
         </Pressable>
         <Pressable disabled={preview || busy !== null} onPress={() => accept()} style={styles.flex}>
-          <View style={[styles.accept, rich ? styles.buttonTall : null, { backgroundColor: brandColors.success }]}>
+          <View style={[styles.accept, rich ? styles.buttonTall : null, { backgroundColor: noneLeft ? GOLD_DEEP : brandColors.success }]}>
             {busy === 'accept' ? (
               <LoadingIndicator color="#FFFFFF" size={20} dotSize={4} />
             ) : (
               <>
-                <FontAwesome6 name="check" size={13} color="#FFFFFF" solid />
-                <Text style={styles.acceptText}>
-                  {noneLeft && fee > 0 ? t('quickLimit.acceptFee', { amount: fee }) : t('bookings.accept')}
-                </Text>
+                <FontAwesome6 name={noneLeft ? 'crown' : 'check'} size={13} color="#FFFFFF" solid />
+                <Text style={styles.acceptText}>{noneLeft ? t('quickLimit.subscribeToAccept') : t('bookings.accept')}</Text>
               </>
             )}
           </View>
@@ -632,6 +676,12 @@ function ItemsSheet({ visible, order, onClose }: { visible: boolean; order: Shop
               <FontAwesome6 name="xmark" size={14} color={colors.text} />
             </Pressable>
           </View>
+          {/* The customer's voice message: listen to the list. */}
+          {order.listVoiceUrl ? (
+            <View style={styles.sheetPhotos}>
+              <VoiceMessage uri={order.listVoiceUrl} seconds={order.listVoiceSeconds} />
+            </View>
+          ) : null}
           {/* A photo of a written list: tap to read it full screen. */}
           {(order.listPhotoUrls ?? []).length > 0 ? (
             <View style={styles.sheetPhotos}>
@@ -665,6 +715,12 @@ function ItemsSheet({ visible, order, onClose }: { visible: boolean; order: Shop
 }
 
 const styles = StyleSheet.create({
+  usedUpCard: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: 1, padding: 12, marginBottom: 12 },
+  usedUpIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  usedUpTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  usedUpText: { ...typography.caption, fontSize: 12, lineHeight: 16 },
+  usedUpButton: { borderRadius: 999, paddingHorizontal: 14, height: 34, alignItems: 'center', justifyContent: 'center' },
+  usedUpButtonText: { ...typography.caption, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 13 },
   limitNote: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7, marginTop: 10 },
   limitNoteText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12, lineHeight: 16, flex: 1 },
   subscribe: { backgroundColor: '#3D2500' },
@@ -676,11 +732,8 @@ const styles = StyleSheet.create({
   titleSmall: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14, flex: 1 },
   counter: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   counterText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11.5 },
-  // Live Requests' list: full-width rows (past the screen's padding), divided by lines.
-  list: { marginHorizontal: -16, borderTopWidth: StyleSheet.hairlineWidth },
-  listRow: { borderBottomWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   // Room on both sides for the edges of the cards in the stack.
-  card: { position: 'absolute', left: STACK_STEP * 2, right: STACK_STEP * 2, top: 0, borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+  card: { position: 'absolute', left: STACK_STEP * PEEKS, right: STACK_STEP * PEEKS, top: 0, borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
   frontCard: {
     shadowColor: '#0B3A8A',
     shadowOpacity: 0.14,

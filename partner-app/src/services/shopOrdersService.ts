@@ -76,6 +76,14 @@ export interface ShopOrder {
   items: ShopOrderItem[];
   /** Photos of a written list the customer sent (instead of, or as well as, typed items). */
   listPhotoUrls?: string[];
+  /** A voice message of the list, and its length in seconds. */
+  listVoiceUrl?: string | null;
+  listVoiceSeconds?: number | null;
+  /** What the shop put with its bill. */
+  billPhotoUrls?: string[];
+  billVoiceUrl?: string | null;
+  billVoiceSeconds?: number | null;
+  billAmount?: number | null;
   customerFullName: string;
   /** Only once the order is accepted. */
   customerMobileNumber: string | null;
@@ -92,7 +100,27 @@ export interface ItemUpdate {
   price?: number | null;
 }
 
+/** What the shop puts with its bill: photos, a voice message, and a total typed in when items aren't priced one by one. */
+export interface BillMedia {
+  photoUrls: string[];
+  voiceUrl: string | null;
+  voiceSeconds: number | null;
+  amount: number | null;
+}
+
 export const shopOrdersService = {
+  /** A photo for the bill (the same upload the customer's list photos use). */
+  uploadBillPhoto: (photo: { uri: string; name: string; type: string }) => {
+    const formData = new FormData();
+    formData.append('photo', { uri: photo.uri, name: photo.name, type: photo.type } as unknown as Blob);
+    return apiClient.postForm<{ url: string }>('/orders/list-photos', formData);
+  },
+  /** A voice message for the bill (an .m4a recording). */
+  uploadBillVoice: (uri: string) => {
+    const formData = new FormData();
+    formData.append('voice', { uri, name: 'bill-voice.m4a', type: 'audio/m4a' } as unknown as Blob);
+    return apiClient.postForm<{ url: string; seconds: number | null }>('/orders/list-voice', formData);
+  },
   listMine: () => apiClient.get<ShopOrder[]>('/orders/shop/mine', true),
   /** Find Orders Now: open Quick Orders nearby this shop can take join its list (returned). */
   searchQuick: () => apiClient.post<ShopOrder[]>('/orders/shop/quick/search', undefined, true),
@@ -105,7 +133,8 @@ export const shopOrdersService = {
   /** After accepting: backed out of the payment — the order goes back. */
   release: (id: string) => apiClient.post<null>(`/orders/${id}/release`, undefined, true),
   decline: (id: string, reason?: string) => apiClient.post<null>(`/orders/${id}/decline`, { reason }, true),
-  saveItems: (id: string, items: ItemUpdate[]) => apiClient.put<ShopOrder>(`/orders/${id}/items`, { items }, true),
+  saveItems: (id: string, items: ItemUpdate[], bill?: BillMedia) =>
+    apiClient.put<ShopOrder>(`/orders/${id}/items`, { items, ...(bill ? { bill } : {}) }, true),
   packed: (id: string) => apiClient.post<null>(`/orders/${id}/packed`, undefined, true),
   ready: (id: string) => apiClient.post<null>(`/orders/${id}/ready`, undefined, true),
   /** Gives a delivery order to a staff member (null: the owner takes it back). */

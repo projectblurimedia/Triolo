@@ -20,6 +20,8 @@ export interface OrderTemplateValues {
   count?: number;
   /** Photos of a written list sent with the order. */
   photos?: number;
+  /** A voice message of the list came with it. */
+  voice?: boolean;
   packed?: number;
   total?: string;
 }
@@ -28,17 +30,17 @@ type Template = (values: OrderTemplateValues) => { title: string; body: string }
 
 const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
   en: {
-    placed: ({ count, photos }) => ({
+    placed: ({ count, photos, voice }) => ({
       title: 'New Order',
       body: count
-        ? `A customer sent a list of ${count} item(s)${photos ? ' and a photo of their list' : ''}. Accept it to start packing.`
-        : 'A customer sent a photo of their list. Accept it to start packing.',
+        ? `A customer sent a list of ${count} item(s)${photos ? ' and a photo of their list' : ''}${voice ? ' with a voice message' : ''}. Accept it to start packing.`
+        : `A customer sent ${photos ? 'a photo of their list' : 'a voice message of their list'}. Accept it to start packing.`,
     }),
-    quick_placed: ({ count, photos }) => ({
+    quick_placed: ({ count, photos, voice }) => ({
       title: 'Quick Order — be first',
       body: count
-        ? `A customer nearby wants ${count} item(s)${photos ? ' (with a photo of their list)' : ''}. The first shop to accept gets the order.`
-        : 'A customer nearby sent a photo of their list. The first shop to accept gets the order.',
+        ? `A customer nearby wants ${count} item(s)${photos ? ' (with a photo of their list)' : ''}${voice ? ' with a voice message' : ''}. The first shop to accept gets the order.`
+        : `A customer nearby sent ${photos ? 'a photo of their list' : 'a voice message of their list'}. The first shop to accept gets the order.`,
     }),
     accepted: ({ shop }) => ({ title: 'Order Accepted', body: `${shop} is checking and packing your list.` }),
     declined: ({ shop }) => ({ title: 'Order Declined', body: `${shop} can't take your list right now. Try another shop.` }),
@@ -64,17 +66,17 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
     }),
   },
   te: {
-    placed: ({ count }) => ({
+    placed: ({ count, photos, voice }) => ({
       title: 'కొత్త ఆర్డర్',
       body: count
-        ? `ఒక కస్టమర్ ${count} వస్తువుల జాబితా పంపారు. ప్యాక్ చేయడం ప్రారంభించడానికి అంగీకరించండి.`
-        : 'ఒక కస్టమర్ తమ జాబితా ఫోటో పంపారు. ప్యాక్ చేయడం ప్రారంభించడానికి అంగీకరించండి.',
+        ? `ఒక కస్టమర్ ${count} వస్తువుల జాబితా పంపారు${voice ? ' (వాయిస్ మెసేజ్‌తో)' : ''}. ప్యాక్ చేయడం ప్రారంభించడానికి అంగీకరించండి.`
+        : `ఒక కస్టమర్ తమ జాబితా ${photos ? 'ఫోటో' : 'వాయిస్ మెసేజ్'} పంపారు. ప్యాక్ చేయడం ప్రారంభించడానికి అంగీకరించండి.`,
     }),
-    quick_placed: ({ count }) => ({
+    quick_placed: ({ count, photos, voice }) => ({
       title: 'క్విక్ ఆర్డర్ — ముందుగా అంగీకరించండి',
       body: count
-        ? `దగ్గరలోని ఒక కస్టమర్‌కు ${count} వస్తువులు కావాలి. ముందుగా అంగీకరించిన దుకాణానికే ఆర్డర్.`
-        : 'దగ్గరలోని ఒక కస్టమర్ తమ జాబితా ఫోటో పంపారు. ముందుగా అంగీకరించిన దుకాణానికే ఆర్డర్.',
+        ? `దగ్గరలోని ఒక కస్టమర్‌కు ${count} వస్తువులు కావాలి${voice ? ' (వాయిస్ మెసేజ్‌తో)' : ''}. ముందుగా అంగీకరించిన దుకాణానికే ఆర్డర్.`
+        : `దగ్గరలోని ఒక కస్టమర్ తమ జాబితా ${photos ? 'ఫోటో' : 'వాయిస్ మెసేజ్'} పంపారు. ముందుగా అంగీకరించిన దుకాణానికే ఆర్డర్.`,
     }),
     accepted: ({ shop }) => ({ title: 'ఆర్డర్ అంగీకరించబడింది', body: `${shop} మీ జాబితాను చూసి ప్యాక్ చేస్తోంది.` }),
     declined: ({ shop }) => ({

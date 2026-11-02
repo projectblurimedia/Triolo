@@ -10,6 +10,8 @@ interface WaitCountdownProps {
   createdAt: string;
   /** Which of the customer's waiting times applies. */
   kind: keyof WaitTimes;
+  /** Sent to one shop / worker: the hint names them (not "nobody", which fits Quick Book / Quick Order). */
+  target?: { type: 'shop' | 'worker'; name: string };
 }
 
 function formatLeft(ms: number): string {
@@ -26,7 +28,7 @@ function formatLeft(ms: number): string {
  * Time), as a live countdown with a draining bar — and Change, which opens Waiting Time right
  * here. A new time applies at once, also to this request.
  */
-export function WaitCountdown({ createdAt, kind }: WaitCountdownProps) {
+export function WaitCountdown({ createdAt, kind, target }: WaitCountdownProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const { data: times } = useWaitTimes();
@@ -70,7 +72,9 @@ export function WaitCountdown({ createdAt, kind }: WaitCountdownProps) {
         <View style={[styles.fill, { width: `${share * 100}%`, backgroundColor: almostUp ? colors.error : colors.primary }]} />
       </View>
       <Text style={[styles.hint, { color: colors.textMuted }]}>
-        {t('waitCountdown.hint', { time: formatWait(times[kind], t) })}
+        {target
+          ? t(target.type === 'shop' ? 'waitCountdown.hintShop' : 'waitCountdown.hintWorker', { name: target.name, time: formatWait(times[kind], t) })
+          : t('waitCountdown.hint', { time: formatWait(times[kind], t) })}
       </Text>
       <WaitingTimeModal visible={editVisible} onClose={() => setEditVisible(false)} />
     </View>

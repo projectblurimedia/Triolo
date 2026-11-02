@@ -9,9 +9,15 @@ const months = z
 export const audienceQuerySchema = z.object({ audience: z.enum(SUBSCRIPTION_AUDIENCES) });
 
 // 'all' = the all-in-one partner plan (services, shop and job posts together).
-export const checkoutSchema = z.object({ audience: z.enum(SUBSCRIPTION_AUDIENCES), months, plan: z.enum([...PARTNER_PLANS, 'all']).optional() });
+export const checkoutSchema = z.object({
+  audience: z.enum(SUBSCRIPTION_AUDIENCES),
+  months,
+  plan: z.enum([...PARTNER_PLANS, 'all']).optional(),
+  /** The app will pay in-app (no payment link needed). */
+  inApp: z.boolean().optional(),
+});
 
-export const badgeCheckoutSchema = z.object({ kind: z.enum(BADGE_KINDS), profileId: z.string().uuid().optional() });
+export const badgeCheckoutSchema = z.object({ kind: z.enum(BADGE_KINDS), profileId: z.string().uuid().optional(), inApp: z.boolean().optional() });
 
 const price = z.number().int().min(0).max(100000);
 const prices = z.object({ '1': price, '3': price, '6': price, '12': price });
@@ -53,6 +59,7 @@ export const passCheckoutSchema = z.object({
   targetId: z.string().uuid().optional(),
   // accept: which side's plan would make it free (services for jobs, shop for orders).
   plan: z.enum(PARTNER_PLANS).optional(),
+  inApp: z.boolean().optional(),
 });
 
 export const passListQuerySchema = z.object({

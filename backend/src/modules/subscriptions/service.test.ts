@@ -38,8 +38,8 @@ const SETTINGS: SubscriptionSettings = {
   partnerFees: { accept: 10, jobPost: 20, jobPostViewer: 5, profileViewer: 6 },
   quickBookLimit: 15,
   quickOrderLimit: null,
-  customerFreeBookings: null,
-  customerFreeOrders: null,
+  customerFreeBookings: 0,
+  customerFreeOrders: 0,
   updatedAt: '2026-10-21T00:00:00.000Z',
 };
 
@@ -106,7 +106,10 @@ describe('SubscriptionStatusService', () => {
     await expect(status.acceptLimit('p-1', 'service')).resolves.toBe(15);
     await expect(status.acceptLimit('p-1', 'shop')).resolves.toBeNull();
     await expect(status.acceptUnlock('p-1', 'service', async () => 14)).resolves.toBeNull();
-    await expect(status.acceptUnlock('p-1', 'service', async () => 15)).resolves.toBe('pay');
+    await expect(status.acceptUnlock('p-1', 'service', async () => 15)).rejects.toMatchObject({
+      code: 'ACCEPT_LIMIT_REACHED',
+      details: { side: 'service' },
+    });
     // No limit set: every accept free.
     await expect(status.acceptUnlock('p-1', 'shop', async () => 99)).resolves.toBeNull();
     repo.findActive.mockResolvedValue({ id: 'sub-1' });
@@ -244,6 +247,34 @@ describe('pay per use', () => {
     // Orders have their own limit.
     await expect(status.useCustomerPass('cust-1', 'quick_order')).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED' });
     expect(repo.countFreeUsesThisMonth).toHaveBeenLastCalledWith('cust-1', ['quick_order', 'shop_order']);
+  });
+
+  it('a free use of the month is taken before a payment kept from earlier', async () => {
+    const { status, repo } = makeService();
+    repo.getSettings.mockResolvedValue({ ...SETTINGS, customerFreeBookings: 1 });
+    repo.countFreeUsesThisMonth.mockResolvedValue(0);
+    repo.consumePass.mockResolvedValue('kept-1');
+    await expect(status.useCustomerPass('cust-1', 'quick_book')).resolves.toBe('free-1');
+    expect(repo.consumePass).not.toHaveBeenCalled();
+    repo.countFreeUsesThisMonth.mockResolvedValue(1);
+    await expect(status.useCustomerPass('cust-1', 'quick_book')).resolves.toBe('kept-1');
+  });
+
+  it('a customer limit of null means no limit: every use is free', async () => {
+    const { status, repo } = makeService();
+    repo.getSettings.mockResolvedValue({ ...SETTINGS, customerFreeBookings: null, customerFreeOrders: 0 });
+    repo.countFreeUsesThisMonth.mockResolvedValue(500);
+    await expect(status.useCustomerPass('cust-1', 'quick_book')).resolves.toBe('free-1');
+    // 0 = none free.
+    await expect(status.useCustomerPass('cust-1', 'quick_order')).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED' });
+  });
+
+  it('an in-app pass checkout makes no payment link', async () => {
+    const { service, repo } = makeService();
+    const result = await service.passCheckout('cust-1', 'staff_contact', 'post-1', undefined, true);
+    expect(repo.createPass).toHaveBeenCalledWith('cust-1', 'staff_contact', 10, 'post-1');
+    expect(razorpay.createPaymentLink).not.toHaveBeenCalled();
+    expect(result).toEqual({ id: 'pass-1', paid: false, amount: 10, paymentUrl: null });
   });
 
   it('with a plan, or plans off, nothing is charged', async () => {

@@ -48,13 +48,7 @@ export function FindNowCard({
         <View style={[styles.bubble, styles.bubbleSmall]} />
         <FontAwesome6 name="magnifying-glass-location" size={96} color="rgba(255,255,255,0.08)" solid style={styles.watermark} />
 
-        <View style={styles.eyebrowRow}>
-          <View style={[styles.liveDot, { backgroundColor: brandColors.success }]} />
-          <Text style={styles.eyebrow} numberOfLines={1}>
-            {eyebrow}
-          </Text>
-        </View>
-
+        {/* The small title above was dropped (asked for): the card says it in its own title. */}
         <View style={styles.row}>
           <View style={styles.iconSpot}>
             {busy ? null : <Animated.View style={[styles.ring, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]} />}

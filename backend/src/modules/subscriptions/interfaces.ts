@@ -169,7 +169,8 @@ export interface MySubscription {
   /** Partner app: free Quick Book / Quick Order accepts a month without a plan (null = no limit). */
   limits?: { quickBook: number | null; quickOrder: number | null };
   /** Customer app: free uses this month without a plan, for bookings and for orders (null when none are given). */
-  freeUses?: { bookings: { limit: number; used: number } | null; orders: { limit: number; used: number } | null };
+  /** `limit` null: no limit (every one free). */
+  freeUses?: { bookings: { limit: number | null; used: number } | null; orders: { limit: number | null; used: number } | null };
   /** Partner app: each plan on its own (services, shop, job posts). */
   // Per side, plus 'all' (the all-in-one plan).
   plans?: Record<PartnerPlan | 'all', PlanState>;

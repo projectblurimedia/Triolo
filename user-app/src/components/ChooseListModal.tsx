@@ -122,7 +122,7 @@ export function ChooseListModal({ visible, onClose, onPick, onCreate, shopName }
                       {list.name || t('chooseList.untitled')}
                     </Text>
                     <Text style={[styles.cardMeta, { color: colors.primary }]}>
-                      {listCountText(t, list.items.length, (list.photos ?? []).length)}
+                      {listCountText(t, list.items.length, (list.photos ?? []).length, list.voice?.seconds ?? null)}
                     </Text>
                     {list.items.length > 0 ? (
                       <Text style={[styles.cardPreview, { color: colors.textMuted }]} numberOfLines={2}>

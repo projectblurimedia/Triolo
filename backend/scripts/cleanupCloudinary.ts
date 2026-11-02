@@ -27,6 +27,9 @@ const URL_QUERIES = [
   `SELECT photo_url AS url FROM job_seeker_posts WHERE photo_url IS NOT NULL`,
   `SELECT unnest(photo_urls) AS url FROM problem_posts`,
   `SELECT unnest(list_photo_urls) AS url FROM shop_orders`,
+  `SELECT list_voice_url AS url FROM shop_orders WHERE list_voice_url IS NOT NULL`,
+  `SELECT unnest(bill_photo_urls) AS url FROM shop_orders`,
+  `SELECT bill_voice_url AS url FROM shop_orders WHERE bill_voice_url IS NOT NULL`,
   `SELECT unnest(image_urls) AS url FROM ads`,
   `SELECT video_url AS url FROM ads WHERE video_url IS NOT NULL`,
 ];

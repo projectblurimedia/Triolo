@@ -16,7 +16,7 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDay } from '@/utils/formatDate';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
-import { payInApp } from '@/utils/inAppPay';
+import { canPayInApp, payInApp } from '@/utils/inAppPay';
 
 // The app's own blue, like every other main card.
 const BOOST_GRADIENT = headerGradient;
@@ -73,7 +73,8 @@ export function BoostModal({ profile, onClose }: BoostModalProps) {
     }
   };
 
-  const openPayment = async (id: string, url: string) => {
+  /** `url`: the payment page, or null when paying in-app (fetched only if in-app turns out unavailable). */
+  const openPayment = async (id: string, url: string | null) => {
     // In the app, with the phone's UPI apps (new installs); else the payment page.
     const outcome = await payInApp({ type: 'boost', id }).catch(() => 'unavailable' as const);
     if (outcome === 'paid') {
@@ -82,7 +83,8 @@ export function BoostModal({ profile, onClose }: BoostModalProps) {
     }
     if (outcome === 'cancelled') return;
     watch(() => check(id, true));
-    await Linking.openURL(url).catch(() => {});
+    const page = url ?? (await subscriptionsService.payBoost(id)).paymentUrl;
+    await Linking.openURL(page).catch(() => {});
   };
 
   const start = async () => {
@@ -102,8 +104,7 @@ export function BoostModal({ profile, onClose }: BoostModalProps) {
   const payAgain = async (boost: Boost) => {
     setBusy(boost.id);
     try {
-      const link = await subscriptionsService.payBoost(boost.id);
-      await openPayment(boost.id, link.paymentUrl);
+      await openPayment(boost.id, canPayInApp() ? null : (await subscriptionsService.payBoost(boost.id)).paymentUrl);
     } catch (error) {
       showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) });
     } finally {

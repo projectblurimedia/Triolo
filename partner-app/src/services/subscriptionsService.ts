@@ -1,4 +1,6 @@
 import { apiClient } from './apiClient';
+// Paying in-app needs no payment link (the server then skips making one).
+import { canPayInApp } from '@/utils/inAppPay';
 
 export type SubscriptionPrices = Record<'1' | '3' | '6' | '12', number>;
 /** One paid use (partners): accepting a job / order, or publishing a job post. */
@@ -51,7 +53,8 @@ export interface PassCheckout {
 export interface CheckoutResult {
   id: string;
   amount: number;
-  paymentUrl: string;
+  /** Null when the app pays in-app (no payment link is made). */
+  paymentUrl: string | null;
 }
 
 /** One of my profiles and its "Trusted by Triolo" badge. */
@@ -102,26 +105,26 @@ function todayInIndia(): string {
 export const subscriptionsService = {
   getMine: () => apiClient.get<MySubscription>('/subscriptions/me?audience=partner', true),
   checkout: (months: number, plan: PartnerPlan) =>
-    apiClient.post<CheckoutResult>('/subscriptions/checkout', { audience: 'partner', months, plan }, true),
+    apiClient.post<CheckoutResult>('/subscriptions/checkout', { audience: 'partner', months, plan, inApp: canPayInApp() }, true),
   check: (id: string) => apiClient.post<MySubscription & { paid: boolean }>(`/subscriptions/${id}/check`, undefined, true),
   /** Pay once (no plan): returns paid at once when nothing is owed. */
   passCheckout: (kind: PassKind, targetId: string | null = null, plan?: PartnerPlan) =>
     apiClient.post<PassCheckout>(
       '/subscriptions/passes/checkout',
-      { kind, ...(targetId ? { targetId } : {}), ...(plan ? { plan } : {}) },
+      { kind, ...(targetId ? { targetId } : {}), ...(plan ? { plan } : {}), inApp: canPayInApp() },
       true,
     ),
   passCheck: (id: string) => apiClient.post<{ paid: boolean }>(`/subscriptions/passes/${id}/check`, undefined, true),
 
   getMyBadges: () => apiClient.get<MyBadges>('/subscriptions/badges/me', true),
   badgeCheckout: (kind: BadgeKind, profileId?: string) =>
-    apiClient.post<CheckoutResult>('/subscriptions/badges/checkout', profileId ? { kind, profileId } : { kind }, true),
+    apiClient.post<CheckoutResult>('/subscriptions/badges/checkout', { kind, ...(profileId ? { profileId } : {}), inApp: canPayInApp() }, true),
   badgeCheck: (id: string) => apiClient.post<MyBadges & { paid: boolean }>(`/subscriptions/badges/${id}/check`, undefined, true),
 
   boostInfo: () => apiClient.get<BoostInfo>('/ads/self/info', true),
   myBoosts: () => apiClient.get<Boost[]>('/ads/self', true),
   /** Books the boost (the admin reviews it once it's paid), then opens its payment. */
-  async startBoost(kind: BadgeKind, days: number, mobileNumber: string, profileId?: string): Promise<{ id: string; paymentUrl: string }> {
+  async startBoost(kind: BadgeKind, days: number, mobileNumber: string, profileId?: string): Promise<{ id: string; paymentUrl: string | null }> {
     const ad = await apiClient.post<Boost>(
       '/ads/self',
       {
@@ -137,6 +140,8 @@ export const subscriptionsService = {
       },
       true,
     );
+    // Paying in-app needs no payment link (Razorpay's test mode allows only a few).
+    if (canPayInApp()) return { id: ad.id, paymentUrl: null };
     const link = await apiClient.post<{ paymentUrl: string }>(`/ads/self/${ad.id}/pay-link`, undefined, true);
     return { id: ad.id, paymentUrl: link.paymentUrl };
   },

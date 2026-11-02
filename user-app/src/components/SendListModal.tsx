@@ -12,11 +12,14 @@ import { CategoryPicker } from './CategoryPicker';
 import { useTrustedIds } from '@/hooks/useSubscription';
 import { SHOP_CATEGORIES } from '@/constants/categories';
 import { usePayHint, withFee } from '@/hooks/useSubscription';
+import { FreeUsesNotice } from './FreeUsesNotice';
 import { payIfNeeded } from '@/state/payGateStore';
 import { LoadingIndicator } from './LoadingIndicator';
 import { RatingStars } from './RatingStars';
 import { ListPhotoStrip } from './ListPhotoStrip';
 import { listCountText, uploadListPhotos } from '@/utils/listPhotos';
+import { uploadListVoice } from '@/utils/listVoice';
+import { VoiceMessage } from './VoiceMessage';
 import { ToastHost } from './ToastHost';
 import { Avatar } from './WorkerMiniCard';
 import { useListStore } from '@/state/listStore';
@@ -95,7 +98,8 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
   const items = (currentList?.items ?? []).filter((item) => item.name.trim().length > 0);
   // A list can be (or include) photos of a written list.
   const photos = currentList?.photos ?? [];
-  const hasList = items.length > 0 || photos.length > 0;
+  const voice = currentList?.voice ?? null;
+  const hasList = items.length > 0 || photos.length > 0 || !!voice;
   const { location, refresh: refreshLocation } = useDeviceLocation();
   const coords = location.status === 'ready' ? location : null;
   const createOrder = useCreateOrder();
@@ -212,6 +216,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
       const locationAddress = fulfillment === 'delivery' ? await addressFor(here.latitude, here.longitude) : undefined;
       // Photos go up first (one request each); the order then carries their links.
       const listPhotos = currentList ? await uploadListPhotos(currentList) : { urls: [], remember: () => undefined };
+      const listVoice = currentList ? await uploadListVoice(currentList) : { url: null, seconds: null, remember: () => undefined };
       const order = await createOrder.mutateAsync({
         businessId: selected.id,
         fulfillment,
@@ -221,12 +226,15 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           unit: item.unit.trim() || null,
         })),
         listPhotoUrls: listPhotos.urls,
+        listVoiceUrl: listVoice.url,
+        listVoiceSeconds: listVoice.seconds,
         latitude: here.latitude,
         longitude: here.longitude,
         locationAddress,
         note: note.trim() || undefined,
       });
       listPhotos.remember();
+      listVoice.remember();
       showToast({
         variant: 'success',
         title: t('sendList.sentTitle'),
@@ -249,7 +257,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           {lists.map((list) =>
             renderChip(
               list.id,
-              `${list.name} (${listCountText(t, list.items.length, (list.photos ?? []).length)})`,
+              `${list.name} (${listCountText(t, list.items.length, (list.photos ?? []).length, list.voice?.seconds ?? null)})`,
               list.id === currentList?.id,
               () => setListId(list.id),
               'list-check',
@@ -262,8 +270,9 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
   const renderListPreview = () => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text style={[styles.cardLabel, { color: colors.textMuted }]} numberOfLines={1}>
-        {currentList?.name} · {listCountText(t, items.length, photos.length)}
+        {currentList?.name} · {listCountText(t, items.length, photos.length, voice?.seconds ?? null)}
       </Text>
+      {voice ? <VoiceMessage uri={voice.uri} seconds={voice.seconds} style={styles.voiceGap} /> : null}
       <ListPhotoStrip photos={photos.map((photo) => photo.uri)} size={64} />
       {items.slice(0, PREVIEW_ITEMS).map((item, index) => (
         <View key={item.id} style={styles.previewRow}>
@@ -453,6 +462,7 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           placeholder={t('sendList.notePlaceholder')}
           placeholderTextColor={colors.textMuted}
         />
+        <FreeUsesNotice kind="shop_order" />
         <Button
           label={withFee(items.length > 0 ? t('sendList.send', { count: items.length }) : t('sendList.sendPhotos'), orderFee)}
           onPress={() => run(handleSend)}
@@ -629,6 +639,7 @@ const styles = StyleSheet.create({
   stateTitle: { ...typography.body, fontFamily: fonts.semiBold, textAlign: 'center' },
   stateAction: { alignSelf: 'stretch', marginTop: 4 },
   centerText: { textAlign: 'center' },
+  voiceGap: { marginBottom: 10 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 14, gap: 10 },
   footerTitle: { ...typography.body, fontFamily: fonts.semiBold },
   options: { flexDirection: 'row', gap: 10 },

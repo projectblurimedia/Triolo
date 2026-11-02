@@ -10,6 +10,7 @@ import { CategoryPicker } from './CategoryPicker';
 import { ImagePickerField, PickedImage } from './ImagePickerField';
 import { LocationField } from './LocationField';
 import { PlaceValue } from '@/utils/place';
+import { FreeUsesNotice } from './FreeUsesNotice';
 import { ToastHost } from './ToastHost';
 import { SKILL_CATEGORIES } from '@/constants/categories';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -251,6 +252,7 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
               {t('problemForm.uploadingPhoto', uploadingPhoto)}
             </Text>
           ) : null}
+          {isEditMode ? null : <FreeUsesNotice kind="post_problem" style={styles.freeGap} />}
           <Button
             label={t(isEditMode ? 'common.saveChanges' : 'problemForm.submit')}
             onPress={() => run(handleSubmit)}
@@ -301,6 +303,7 @@ const styles = StyleSheet.create({
   quotationInput: { flex: 1, ...typography.body, paddingVertical: 12 },
   hint: { ...typography.caption, marginTop: 6 },
   descriptionInput: { borderWidth: 1, borderRadius: 8, padding: 14, minHeight: 100, ...typography.body },
+  freeGap: { marginBottom: 10 },
   submitWrap: { paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1 },
   progressText: { ...typography.caption, textAlign: 'center', marginBottom: 8 },
 });

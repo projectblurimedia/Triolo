@@ -194,7 +194,7 @@ Migration `0019_problem_jobs_as_trips_and_reviews.sql` also added `booking_reque
 Migrations `0013_create_problem_posts.sql`, `0014_problem_posts_location_address.sql`, `0015_problem_posts_job_flow.sql`. Indexes: `(status, created_at DESC)` and `(accepted_worker_id, created_at DESC)` (both 0015) for the worker-side nearby/assigned queries, plus `(account_id, created_at DESC)` for `GET /problems/mine`, and a GIN index on `skill_categories` for the future "show open posts to matching workers" query.
 
 ### shop_orders / shop_order_items (Orders module — implemented)
-Migration `0021_shop_orders_favorites_shop_ratings.sql`. A list the customer sends to one shop; the flow and rules are in `docs/api.md`'s Orders Module. Migration `0061`: `shop_orders.list_photo_urls TEXT[]` (photos of a written list, up to 5) and `shop_order_items.added_by_shop BOOLEAN` (items the shop typed in while packing).
+Migration `0021_shop_orders_favorites_shop_ratings.sql`. A list the customer sends to one shop; the flow and rules are in `docs/api.md`'s Orders Module. Migration `0061`: `shop_orders.list_photo_urls TEXT[]` (photos of a written list, up to 5) and `shop_order_items.added_by_shop BOOLEAN` (items the shop typed in while packing). Migration `0070`: `shop_orders.bill_photo_urls TEXT[]`, `bill_voice_url`, `bill_voice_seconds`, `bill_amount NUMERIC(12,2)` (what the shop puts with its bill). Migration `0069`: `shop_orders.list_voice_url TEXT` / `list_voice_seconds INTEGER` (a voice message of the list); it also removed given-back free monthly uses (`pay_passes` with `razorpay_payment_id LIKE 'month-free-%'` left `paid`) — they are deleted on give-back now.
 
 | column | type | notes |
 |---|---|---|
@@ -327,3 +327,7 @@ All schema changes via versioned migration files in `database/migrations/`, neve
 ### Migration 0067 — customer free bookings / orders
 
 - `subscription_settings.customer_free_bookings`, `customer_free_orders` (INT, NULL = none), copied from `customer_free_uses` (now unused).
+
+### Migration 0068 — customer free uses: no limit
+
+`subscription_settings.customer_free_bookings` / `customer_free_orders` now read like the partners' limits: NULL = no limit (every one free), 0 = none free. Existing NULLs (which meant none) became 0.

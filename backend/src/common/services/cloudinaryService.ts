@@ -43,6 +43,22 @@ export async function uploadToCloudinary(filePath: string, folder: string): Prom
   }
 }
 
+/** A voice message: Cloudinary keeps audio as a "video" resource and reports its length. */
+export async function uploadAudioToCloudinary(
+  filePath: string,
+  folder: string,
+): Promise<CloudinaryUploadResult & { seconds: number | null }> {
+  ensureConfigured();
+  try {
+    const result = await cloudinary.uploader.upload(filePath, { folder, resource_type: 'video' });
+    return { url: result.secure_url, publicId: result.public_id, seconds: typeof result.duration === 'number' ? result.duration : null };
+  } finally {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+}
+
 /**
  * Cloudinary secure URLs embed the public_id in their path:
  * https://res.cloudinary.com/{cloud}/image/upload/v{version}/{public_id}.{ext}

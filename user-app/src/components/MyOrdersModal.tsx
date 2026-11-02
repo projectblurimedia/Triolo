@@ -79,7 +79,7 @@ export function MyOrdersModal({ visible, onClose }: { visible: boolean; onClose:
             </View>
           </View>
           <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
-            {listCountText(t, item.items.length, (item.listPhotoUrls ?? []).length)} ·{' '}
+            {listCountText(t, item.items.length, (item.listPhotoUrls ?? []).length, item.listVoiceUrl ? (item.listVoiceSeconds ?? 0) : null)} ·{' '}
             {t(item.fulfillment === 'delivery' ? 'sendList.delivery' : 'sendList.pickup')} · {formatDate(item.createdAt)}
           </Text>
           {item.totalAmount != null ? (

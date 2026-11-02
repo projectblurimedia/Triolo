@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { ordersService } from '@/services/ordersService';
+import { formatVoiceLength } from './listVoice';
 import { PrepareListPhoto, SavedList, useListStore } from '@/state/listStore';
 
 /*
@@ -66,9 +67,19 @@ export async function uploadListPhotos(list: SavedList): Promise<{ urls: string[
   };
 }
 
-/** "3 items", "2 photos" or "3 items · 1 photo" — what a list (or an order) holds. */
-export function listCountText(t: (key: string, options?: Record<string, unknown>) => string, items: number, photos: number): string {
-  const parts = [items > 0 || photos === 0 ? t('prepareList.itemsCount', { count: items }) : '', photos > 0 ? t('prepareList.photosCount', { count: photos }) : ''];
+/** "3 items", "2 photos", "Voice 0:12" or a mix — what a list (or an order) holds. */
+export function listCountText(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  items: number,
+  photos: number,
+  voiceSeconds: number | null = null,
+): string {
+  const voice = voiceSeconds != null;
+  const parts = [
+    items > 0 || (photos === 0 && !voice) ? t('prepareList.itemsCount', { count: items }) : '',
+    photos > 0 ? t('prepareList.photosCount', { count: photos }) : '',
+    voice ? t('voice.countLine', { length: formatVoiceLength(voiceSeconds) }) : '',
+  ];
   return parts.filter(Boolean).join(' · ');
 }
 

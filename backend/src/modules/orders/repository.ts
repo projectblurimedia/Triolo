@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'crypto';
 import { Pool, PoolClient, QueryResultRow } from 'pg';
 import {
+  BillMedia,
   CreateOrderParams,
   CreateQuickOrderParams,
   CUSTOMER_CANCELLABLE,
@@ -82,6 +83,12 @@ function mapOrder(row: QueryResultRow, items: ShopOrderItem[]): ShopOrder {
     createdAt: row.created_at,
     items,
     listPhotoUrls: Array.isArray(row.list_photo_urls) ? row.list_photo_urls : [],
+    listVoiceUrl: row.list_voice_url ?? null,
+    listVoiceSeconds: row.list_voice_seconds ?? null,
+    billPhotoUrls: Array.isArray(row.bill_photo_urls) ? row.bill_photo_urls : [],
+    billVoiceUrl: row.bill_voice_url ?? null,
+    billVoiceSeconds: row.bill_voice_seconds ?? null,
+    billAmount: toNumber(row.bill_amount),
   };
 }
 
@@ -135,8 +142,8 @@ export class OrdersRepository {
     return this.inTransaction(async (client) => {
       const result = await client.query(
         `INSERT INTO shop_orders (account_id, business_id, fulfillment, latitude, longitude, location_address,
-                                  distance_meters, delivery_charge, note, list_photo_urls)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::text[])
+                                  distance_meters, delivery_charge, note, list_photo_urls, list_voice_url, list_voice_seconds)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::text[], $11, $12)
          RETURNING *`,
         [
           params.accountId,
@@ -149,6 +156,8 @@ export class OrdersRepository {
           params.deliveryCharge,
           params.note,
           params.listPhotoUrls,
+          params.listVoiceUrl,
+          params.listVoiceSeconds,
         ],
       );
       const order = result.rows[0];
@@ -176,8 +185,8 @@ export class OrdersRepository {
     return this.inTransaction(async (client) => {
       const result = await client.query(
         `INSERT INTO shop_orders (account_id, business_id, quick, shop_categories, custom_categories, fulfillment, latitude, longitude,
-                                  location_address, distance_meters, delivery_charge, note, list_photo_urls)
-         VALUES ($1, NULL, true, $2::business_shop_category[], $8::text[], $3, $4, $5, $6, 0, 0, $7, $9::text[])
+                                  location_address, distance_meters, delivery_charge, note, list_photo_urls, list_voice_url, list_voice_seconds)
+         VALUES ($1, NULL, true, $2::business_shop_category[], $8::text[], $3, $4, $5, $6, 0, 0, $7, $9::text[], $10, $11)
          RETURNING *`,
         [
           params.accountId,
@@ -189,6 +198,8 @@ export class OrdersRepository {
           params.note,
           params.customCategories,
           params.listPhotoUrls,
+          params.listVoiceUrl,
+          params.listVoiceSeconds,
         ],
       );
       const order = result.rows[0];
@@ -641,7 +652,7 @@ export class OrdersRepository {
    * Saves the checklist (each item packed with its price, or unavailable). Only while
    * reviewing; moves accepted → preparing. Returns false if the order isn't in that state.
    */
-  async saveItems(id: string, businessId: string, items: ItemUpdate[]): Promise<boolean> {
+  async saveItems(id: string, businessId: string, items: ItemUpdate[], bill?: BillMedia): Promise<boolean> {
     return this.inTransaction(
       async (client) => {
         const order = await client.query(
@@ -651,6 +662,12 @@ export class OrdersRepository {
           [id, businessId, PACKING_STATUSES],
         );
         if (order.rowCount === 0) return false;
+        if (bill) {
+          await client.query(
+            `UPDATE shop_orders SET bill_photo_urls = $2::text[], bill_voice_url = $3, bill_voice_seconds = $4, bill_amount = $5 WHERE id = $1`,
+            [id, bill.photoUrls, bill.voiceUrl, bill.voiceUrl ? bill.voiceSeconds : null, bill.amount],
+          );
+        }
         const existing = items.filter((item) => item.id);
         const added = items.filter((item) => !item.id && item.name);
         // Items the shop typed in earlier and has since removed. The customer's own items stay.
@@ -719,10 +736,16 @@ export class OrdersRepository {
       const items = (await client.query(`SELECT * FROM shop_order_items WHERE order_id = $1`, [id])).rows.map(mapItem);
       if (items.some((item) => item.status === 'pending')) return { transition: null, problem: 'pending' as const };
       const packed = items.filter((item) => item.status === 'packed');
-      if (packed.length === 0) return { transition: null, problem: 'empty' as const };
-      if (packed.some((item) => item.price == null)) return { transition: null, problem: 'price' as const };
+      const row = current.rows[0];
+      // A bill photo / voice message with a typed total stands for the bill on its own (the
+      // items need no prices one by one); otherwise every packed item needs its price.
+      const billMedia = (Array.isArray(row.bill_photo_urls) && row.bill_photo_urls.length > 0) || !!row.bill_voice_url;
+      const billAmount = toNumber(row.bill_amount);
+      const typedTotal = billMedia && billAmount != null && billAmount > 0;
+      if (packed.length === 0 && !typedTotal) return { transition: null, problem: 'empty' as const };
+      if (!typedTotal && packed.some((item) => item.price == null)) return { transition: null, problem: 'price' as const };
 
-      const itemsTotal = packed.reduce((sum, item) => sum + (item.price ?? 0), 0);
+      const itemsTotal = typedTotal ? (billAmount as number) : packed.reduce((sum, item) => sum + (item.price ?? 0), 0);
       const updated = await client.query(
         `WITH updated AS (
            UPDATE shop_orders

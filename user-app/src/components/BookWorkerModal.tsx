@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from './Button';
 import { usePayHint, withFee } from '@/hooks/useSubscription';
+import { FreeUsesNotice } from './FreeUsesNotice';
 import { payIfNeeded } from '@/state/payGateStore';
 import { GlassBackdrop, GlassCard } from './Glass';
 import { ToastHost } from './ToastHost';
@@ -155,6 +156,7 @@ export function BookWorkerModal({ worker, onClose, onBooked }: BookWorkerModalPr
             <Text style={[styles.noteText, { color: colors.text }]}>{t('directBook.note', { name })}</Text>
           </View>
 
+          <FreeUsesNotice kind="direct_book" style={{ marginBottom: 10 }} />
           <Button
             label={withFee(t('directBook.send'), bookFee)}
             onPress={() => run(send)}

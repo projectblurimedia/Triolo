@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { SavedList } from '@/state/listStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { ListPhotoStrip } from './ListPhotoStrip';
+import { VoiceMessage } from './VoiceMessage';
 import { listCountText } from '@/utils/listPhotos';
 
 const PREVIEW_ITEMS = 4;
@@ -43,7 +44,7 @@ export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProp
                   {list.name || t('chooseList.untitled')}
                 </Text>
                 <Text style={[styles.count, { color: active ? 'rgba(255,255,255,0.85)' : colors.textMuted }]}>
-                  {listCountText(t, count, photoCount)}
+                  {listCountText(t, count, photoCount, list.voice?.seconds ?? null)}
                 </Text>
               </View>
             </>
@@ -61,6 +62,7 @@ export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProp
           );
         })}
       </ScrollView>
+      {selected?.voice ? <VoiceMessage uri={selected.voice.uri} seconds={selected.voice.seconds} /> : null}
       <ListPhotoStrip photos={(selected?.photos ?? []).map((photo) => photo.uri)} size={56} />
       {names.length > 0 ? (
         <Text style={[styles.preview, { color: colors.textMuted }]} numberOfLines={1}>

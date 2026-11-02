@@ -13,6 +13,7 @@ import { Button } from './Button';
 import { CategoryPicker } from './CategoryPicker';
 import { workersService } from '@/services/workersService';
 import { usePayHint, withFee } from '@/hooks/useSubscription';
+import { FreeUsesNotice } from './FreeUsesNotice';
 import { payIfNeeded } from '@/state/payGateStore';
 import { SKILL_CATEGORIES } from '@/constants/categories';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
@@ -249,6 +250,7 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
           </View>
         </ScrollView>
         <View style={[styles.bookButtonWrap, { borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
+          <FreeUsesNotice kind="quick_book" style={styles.freeGap} />
           <Button
             label={withFee(t('quickBook.bookNearby'), bookFee)}
             onPress={() => run(handleBookNearby)}
@@ -329,6 +331,7 @@ const styles = StyleSheet.create({
   },
   chipInactive: { borderWidth: 1 },
   chipLabel: { ...typography.body, fontFamily: fonts.medium, fontSize: 13 },
+  freeGap: { marginBottom: 10 },
   bookButtonWrap: { paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1 },
   centerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   stateTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginTop: 16, marginBottom: 8, textAlign: 'center' },

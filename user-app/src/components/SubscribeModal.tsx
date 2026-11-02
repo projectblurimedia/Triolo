@@ -86,7 +86,7 @@ export function SubscribeModal() {
         return;
       }
       if (outcome === 'cancelled') return;
-      await Linking.openURL(result.paymentUrl);
+      if (result.paymentUrl) await Linking.openURL(result.paymentUrl);
     } catch (error) {
       showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) });
     } finally {

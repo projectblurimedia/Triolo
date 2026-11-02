@@ -30,6 +30,8 @@ import { registerAdPromotions } from '@/utils/adPromotions';
 import { IncomingJobModal } from '@/components/IncomingJobModal';
 import { IncomingOrderModal } from '@/components/IncomingOrderModal';
 import { IncomingRequestsHub } from '@/components/IncomingRequestsHub';
+import { AcceptingHost } from '@/components/AcceptingHost';
+import { useAcceptingStore } from '@/state/acceptingStore';
 import { JobTrackingModal } from '@/components/JobTrackingModal';
 import { ShopOrderModal } from '@/components/ShopOrderModal';
 import { ForYouModal } from '@/components/ForYouModal';
@@ -101,8 +103,9 @@ export default function App() {
       // ?focus=job-<id> / order-<id> opens on that request; &accept=1 (the card's Accept) accepts it.
       const query = new URLSearchParams(url.split('?')[1] ?? '');
       const focus = query.get('focus') ?? undefined;
-      useIncomingStore.getState().openList(true, focus);
-      useIncomingStore.getState().setAutoAccept(focus && query.get('accept') === '1' ? focus : null);
+      // Accept: accepted straight away and its screen opens (AcceptingHost) — no list in between.
+      if (focus && query.get('accept') === '1') useAcceptingStore.getState().acceptFromPopup(focus);
+      else useIncomingStore.getState().openList(true, focus);
     };
     Linking.getInitialURL().then(openLive).catch(() => {});
     const subscription = Linking.addEventListener('url', (event) => openLive(event.url));
@@ -207,6 +210,7 @@ export default function App() {
         <IncomingOrderModal />
         {/* Decides which of the two opens, or one list when several requests come at once. */}
         <IncomingRequestsHub />
+        <AcceptingHost />
         {/* The worker's live Quick Book job screen — opened from anywhere via jobFocusStore. */}
         <JobTrackingModal />
         <ShopOrderModal />

@@ -18,6 +18,8 @@ import { isListNameTaken, listFallbackName, MAX_LIST_PHOTOS, PrepareListPhoto, S
 import { ImagePickerField, PickedImage } from '@/components/ImagePickerField';
 import { SmartImage } from '@/components/SmartImage';
 import { keepListPhoto, pruneListPhotos } from '@/utils/listPhotos';
+import { formatVoiceLength, pruneListVoices } from '@/utils/listVoice';
+import { VoiceRecorderCard } from '@/components/VoiceRecorderCard';
 import { showToast } from '@/state/toastStore';
 import { parseVoiceListText } from '@/utils/parseVoiceList';
 import { RouteProp, useRoute } from '@react-navigation/native';
@@ -25,6 +27,12 @@ import { MainTabParamList } from '@/navigation/types';
 
 const MIC_SIZE = 84;
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
+// The four ways to make a list, each its own colour.
+const SPEAK_GRADIENT = ['#0055D3', '#1D76FA'] as const;
+const TYPE_GRADIENT = ['#0F9D58', '#34C77B'] as const;
+// The same colours as Home's Hire Staff quick action.
+const PHOTO_GRADIENT = ['#4338CA', '#7C3AED', '#C026D3'] as const;
+const RECORD_GRADIENT = ['#DB2777', '#F472B6'] as const;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Built by hand — Hermes on Android doesn't reliably ship Intl date formatting.
@@ -62,12 +70,13 @@ export function PrepareListScreen() {
   const discardDraft = useListStore((state) => state.discardDraft);
   const deleteList = useListStore((state) => state.deleteList);
   const setDraftPhotos = useListStore((state) => state.setDraftPhotos);
+  const setDraftVoice = useListStore((state) => state.setDraftVoice);
 
   // My Lists is always the tab; New List / Edit open the editor in its own full screen. An
   // unfinished draft (from before the app was closed) reopens it.
   const [screen, setScreen] = useState<'lists' | 'editor'>(() => {
     const state = useListStore.getState();
-    return state.draft.items.length > 0 || (state.draft.photos ?? []).length > 0 || state.draft.listId ? 'editor' : 'lists';
+    return state.draft.items.length > 0 || (state.draft.photos ?? []).length > 0 || !!state.draft.voice || state.draft.listId ? 'editor' : 'lists';
   });
   const [recognizing, setRecognizing] = useState(false);
   const [interimText, setInterimText] = useState('');
@@ -193,6 +202,46 @@ export function PrepareListScreen() {
   };
 
   const photos = draft.photos ?? [];
+  const voice = draft.voice ?? null;
+  const [showPhotos, setShowPhotos] = useState(false);
+  const [recordSignal, setRecordSignal] = useState(0);
+  const [recordingVoice, setRecordingVoice] = useState(false);
+  // A list is made one way: once it has items (spoken or typed), photos, or a voice message,
+  // only that way's options stay on screen. Emptied again, all four come back.
+  const listMode: 'items' | 'photo' | 'voice' | null =
+    items.length > 0 ? 'items' : photos.length > 0 || showPhotos ? 'photo' : voice || recordingVoice ? 'voice' : null;
+
+  /** One of the four ways to make a list: a colourful card, all the same size, with a big faded icon. */
+  const renderWay = (
+    key: string,
+    gradient: readonly [string, string, ...string[]],
+    icon: string,
+    title: string,
+    subtitle: string,
+    onPress: () => void,
+    active = false,
+  ) => (
+    <Pressable
+      key={key}
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.wayWrap, { opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+    >
+      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.way, active && styles.wayActive]}>
+        <View style={styles.wayBubble} />
+        <FontAwesome6 name={icon} size={78} color="rgba(255,255,255,0.16)" solid style={styles.wayBigIcon} />
+        <View style={styles.wayIcon}>
+          <FontAwesome6 name={icon} size={19} color="#FFFFFF" solid />
+        </View>
+        <Text style={styles.wayTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+          {title}
+        </Text>
+        <Text style={styles.waySub} numberOfLines={2}>
+          {subtitle}
+        </Text>
+      </LinearGradient>
+    </Pressable>
+  );
   const handlePhotosChange = (images: PickedImage[]) => {
     const next: PrepareListPhoto[] = images.map((image) => {
       const kept = photos.find((photo) => photo.uri === image.uri);
@@ -217,7 +266,13 @@ export function PrepareListScreen() {
 
   const handleSave = () => {
     stopListening();
-    const result = saveDraft(listFallbackName(t('prepareList.defaultListName')));
+    const prefix = t(listMode === 'voice' ? 'prepareList.defaultVoiceName' : listMode === 'photo' ? 'prepareList.defaultPhotoName' : 'prepareList.defaultListName');
+    const result = saveDraft(listFallbackName(prefix));
+    if (result.status === 'empty' && draft.listId) {
+      // Everything was taken out of a saved list: the list goes.
+      removeEmptiedList(draft.listId);
+      return;
+    }
     if (result.status === 'empty') {
       showToast({ variant: 'info', title: t('prepareList.emptyDraftTitle'), message: t('prepareList.emptyDraftMessage') });
       return;
@@ -228,19 +283,41 @@ export function PrepareListScreen() {
     }
     showToast({ variant: 'success', title: t('prepareList.savedTitle') });
     pruneListPhotos();
+    pruneListVoices();
     setScreen('lists');
+  };
+
+  useEffect(() => {
+    if (screen !== 'editor') {
+      setShowPhotos(false);
+      setRecordingVoice(false);
+    }
+  }, [screen]);
+
+  /** A saved list whose last item / photo / voice message was removed is deleted. */
+  const removeEmptiedList = (listId: string) => {
+    stopListening();
+    discardDraft();
+    deleteList(listId);
+    pruneListPhotos();
+    pruneListVoices();
+    setShowDiscardConfirm(false);
+    setScreen('lists');
+    showToast({ variant: 'info', title: t('prepareList.emptiedTitle'), message: t('prepareList.emptiedMessage') });
   };
 
   const leaveEditor = () => {
     stopListening();
     discardDraft();
     pruneListPhotos();
+    pruneListVoices();
     setShowDiscardConfirm(false);
     setScreen('lists');
   };
 
   const handleBack = () => {
-    if (items.some((item) => item.name.trim()) || photos.length > 0) setShowDiscardConfirm(true);
+    if (items.some((item) => item.name.trim()) || photos.length > 0 || voice) setShowDiscardConfirm(true);
+    else if (draft.listId) removeEmptiedList(draft.listId);
     else leaveEditor();
   };
 
@@ -269,8 +346,9 @@ export function PrepareListScreen() {
           </Text>
           <Text style={[styles.listMeta, { color: colors.textMuted }]}>
             {[
-              list.items.length || !(list.photos ?? []).length ? t('prepareList.itemsCount', { count: list.items.length }) : '',
+              list.items.length || (!(list.photos ?? []).length && !list.voice) ? t('prepareList.itemsCount', { count: list.items.length }) : '',
               (list.photos ?? []).length ? t('prepareList.photosCount', { count: list.photos.length }) : '',
+              list.voice ? t('voice.countLine', { length: formatVoiceLength(list.voice.seconds) }) : '',
             ]
               .filter(Boolean)
               .join(' · ')}{' '}
@@ -290,6 +368,14 @@ export function PrepareListScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.previewRow}
       >
+        {list.voice ? (
+          <View style={[styles.previewItem, { backgroundColor: `${colors.primary}14`, borderColor: `${colors.primary}33` }]}>
+            <FontAwesome6 name="microphone" size={10} color={colors.primary} solid />
+            <Text style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
+              {formatVoiceLength(list.voice.seconds)}
+            </Text>
+          </View>
+        ) : null}
         {(list.photos ?? []).map((photo) => (
           <SmartImage key={photo.id} source={{ uri: photo.uri }} style={[styles.previewPhoto, { borderColor: `${colors.primary}1F` }]} />
         ))}
@@ -369,34 +455,83 @@ export function PrepareListScreen() {
         </View>
       ) : null}
 
-      <View style={styles.micSection}>
-        <View style={styles.micWrap}>
-          {recognizing ? (
-            <Animated.View
-              style={[
-                styles.pulseRing,
-                { backgroundColor: colors.error, opacity: pulseOpacity, transform: [{ scale: pulseScale }] },
-              ]}
-            />
-          ) : null}
-          <Pressable onPress={handleMicPress} accessibilityLabel={t('prepareList.micLabel')}>
-            <LinearGradient
-              colors={recognizing ? DELETE_GRADIENT : headerGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.mic}
-            >
-              <FontAwesome6 name={recognizing ? 'stop' : 'microphone'} size={30} color="#FFFFFF" solid />
-            </LinearGradient>
-          </Pressable>
-        </View>
-        <Text style={[styles.micStatus, { color: colors.text }]}>
-          {t(recognizing ? 'prepareList.listening' : 'prepareList.tapToSpeak')}
-        </Text>
-        <Text style={[styles.micHint, { color: colors.textMuted }]} numberOfLines={2}>
-          {interimText || t('prepareList.exampleHint')}
-        </Text>
+      {listMode === null || listMode === 'items' ? (
+        <Text style={[styles.waysTitle, { color: colors.text }]}>{t(listMode ? 'prepareList.waysMore' : 'prepareList.waysTitle')}</Text>
+      ) : null}
+      <View style={styles.waysGrid}>
+        {(listMode === null || listMode === 'items') && renderWay(
+          'speak',
+          recognizing ? DELETE_GRADIENT : SPEAK_GRADIENT,
+          recognizing ? 'stop' : 'microphone-lines',
+          t(recognizing ? 'prepareList.ways.speakActive' : 'prepareList.ways.speak'),
+          t(recognizing ? 'prepareList.ways.speakActiveSub' : 'prepareList.ways.speakSub'),
+          handleMicPress,
+          recognizing,
+        )}
+        {(listMode === null || listMode === 'items') &&
+          renderWay('type', TYPE_GRADIENT, 'keyboard', t('prepareList.ways.type'), t('prepareList.ways.typeSub'), handleAddBlankItem)}
+        {listMode === null && renderWay(
+          'photo',
+          PHOTO_GRADIENT,
+          'camera',
+          t('prepareList.ways.photo'),
+          photos.length ? t('prepareList.photosCount', { count: photos.length }) : t('prepareList.ways.photoSub'),
+          () => setShowPhotos(true),
+        )}
+        {listMode === null && renderWay(
+          'record',
+          RECORD_GRADIENT,
+          'microphone',
+          t('prepareList.ways.record'),
+          voice ? t('voice.countLine', { length: formatVoiceLength(voice.seconds) }) : t('prepareList.ways.recordSub'),
+          () => setRecordSignal((value) => value + 1),
+        )}
       </View>
+
+      {/* Speak & prepare: what's being heard, turned into items as you talk. */}
+      {recognizing ? (
+        <View style={[styles.listening, { backgroundColor: `${colors.error}0D`, borderColor: `${colors.error}40` }]}>
+          <View style={styles.listeningDotWrap}>
+            <Animated.View
+              style={[styles.listeningRing, { backgroundColor: colors.error, opacity: pulseOpacity, transform: [{ scale: pulseScale }] }]}
+            />
+            <View style={[styles.listeningDot, { backgroundColor: colors.error }]} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={[styles.listeningTitle, { color: colors.text }]}>{t('prepareList.listening')}</Text>
+            <Text style={[styles.listeningText, { color: colors.textMuted }]} numberOfLines={3}>
+              {interimText || t('prepareList.exampleHint')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Photos of a written list: they go to the shop instead of (or with) typed items. */}
+      {showPhotos || photos.length ? (
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: `${colors.primary}26` }]}>
+          <View style={styles.sectionHead}>
+            <FontAwesome6 name="camera" size={13} color={PHOTO_GRADIENT[0]} solid />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('prepareList.photoTitle')}</Text>
+          </View>
+          <ImagePickerField
+            label=""
+            images={photos.map((photo) => ({ uri: photo.uri, name: photo.name, type: photo.type }))}
+            onChange={handlePhotosChange}
+            maxImages={MAX_LIST_PHOTOS}
+            allowCamera
+          />
+        </View>
+      ) : null}
+      {/* Opened Photo but changed their mind: back to the four ways. */}
+      {listMode === 'photo' && photos.length === 0 ? (
+        <Pressable onPress={() => setShowPhotos(false)} style={styles.otherWay} hitSlop={6}>
+          <FontAwesome6 name="arrow-left" size={11} color={colors.primary} solid />
+          <Text style={[styles.otherWayText, { color: colors.primary }]}>{t('prepareList.otherWay')}</Text>
+        </Pressable>
+      ) : null}
+
+      {/* Record: the shop hears the list in the customer's own words. */}
+      <VoiceRecorderCard voice={voice} onChange={setDraftVoice} onBeforeRecord={stopListening} startSignal={recordSignal} compact onRecordingChange={setRecordingVoice} />
 
       {items.length ? (
         <View style={styles.listHeaderRow}>
@@ -475,46 +610,13 @@ export function PrepareListScreen() {
           </View>
         ))}
 
-      <Pressable
-        onPress={handleAddBlankItem}
-        style={({ pressed }) => [
-          styles.addRow,
-          { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}40`, opacity: pressed ? 0.85 : 1 },
-        ]}
-      >
-        <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.addIcon}>
-          <FontAwesome6 name="keyboard" size={15} color="#FFFFFF" solid />
-        </LinearGradient>
-        <View style={styles.flex}>
-          <Text style={[styles.addRowText, { color: colors.text }]}>{t('prepareList.addItemManually')}</Text>
-          <Text style={[styles.addRowHint, { color: colors.textMuted }]} numberOfLines={1}>
-            {t('prepareList.addItemManuallyHint')}
-          </Text>
-        </View>
-        <View style={[styles.addPlus, { borderColor: colors.primary }]}>
+      {items.length ? (
+        <Pressable onPress={handleAddBlankItem} style={[styles.addMore, { borderColor: `${colors.primary}55` }]} hitSlop={4}>
           <FontAwesome6 name="plus" size={12} color={colors.primary} solid />
-        </View>
-      </Pressable>
-      {/* A list written on paper (or anywhere): its photos go to the shop instead of typed items. */}
-      <View style={[styles.photoCard, { backgroundColor: colors.surface, borderColor: `${colors.primary}26` }]}>
-        <View style={styles.photoHead}>
-          <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.addIcon}>
-            <FontAwesome6 name="camera" size={15} color="#FFFFFF" solid />
-          </LinearGradient>
-          <View style={styles.flex}>
-            <Text style={[styles.addRowText, { color: colors.text }]}>{t('prepareList.photoTitle')}</Text>
-            <Text style={[styles.addRowHint, { color: colors.textMuted }]}>{t('prepareList.photoHint')}</Text>
-          </View>
-        </View>
-        <ImagePickerField
-          label=""
-          images={photos.map((photo) => ({ uri: photo.uri, name: photo.name, type: photo.type }))}
-          onChange={handlePhotosChange}
-          maxImages={MAX_LIST_PHOTOS}
-          allowCamera
-        />
-      </View>
-      {items.length || photos.length ? (
+          <Text style={[styles.addMoreText, { color: colors.primary }]}>{t('prepareList.addAnother')}</Text>
+        </Pressable>
+      ) : null}
+      {items.length || photos.length || voice ? (
         <Pressable style={styles.saveButton} onPress={handleSave}>
           <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.saveButtonGradient}>
             <FontAwesome6 name="check" size={14} color="#FFFFFF" solid />
@@ -609,6 +711,7 @@ export function PrepareListScreen() {
           if (deleteTarget) {
             deleteList(deleteTarget.id);
             pruneListPhotos();
+            pruneListVoices();
           }
           setDeleteTarget(null);
         }}
@@ -678,6 +781,40 @@ const styles = StyleSheet.create({
   backButton: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   editorTitle: { ...typography.subheading, fontFamily: fonts.semiBold },
   nameField: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, height: 46, ...typography.body, includeFontPadding: false },
+  waysTitle: { ...typography.body, fontFamily: fonts.semiBold, marginTop: 18, marginBottom: 10 },
+  waysGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
+  wayWrap: { width: '48.5%' },
+  // One fixed size for every card, whatever its text.
+  way: { borderRadius: 20, padding: 14, height: 136, overflow: 'hidden', justifyContent: 'flex-end' },
+  wayBigIcon: { position: 'absolute', right: -10, bottom: -12, transform: [{ rotate: '-12deg' }] },
+  otherWay: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, paddingVertical: 10 },
+  otherWayText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13 },
+  wayActive: { borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)' },
+  wayBubble: { position: 'absolute', right: -26, top: -26, width: 86, height: 86, borderRadius: 43, backgroundColor: 'rgba(255,255,255,0.14)' },
+  wayIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    top: 14,
+    left: 14,
+  },
+  wayTitle: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 15 },
+  waySub: { ...typography.caption, color: 'rgba(255,255,255,0.88)', fontSize: 11.5, lineHeight: 16, marginTop: 2 },
+  listening: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12, marginTop: 12 },
+  listeningDotWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  listeningRing: { position: 'absolute', width: 24, height: 24, borderRadius: 12 },
+  listeningDot: { width: 12, height: 12, borderRadius: 6 },
+  listeningTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  listeningText: { ...typography.caption, fontSize: 12.5, lineHeight: 17 },
+  section: { borderRadius: 16, borderWidth: 1, padding: 12, paddingBottom: 0, marginTop: 12, gap: 8 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  addMore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', marginTop: 4 },
+  addMoreText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
   micSection: { alignItems: 'center', paddingVertical: 18 },
   micWrap: { width: MIC_SIZE, height: MIC_SIZE, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   pulseRing: { position: 'absolute', width: MIC_SIZE, height: MIC_SIZE, borderRadius: MIC_SIZE / 2 },

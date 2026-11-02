@@ -61,6 +61,11 @@ export class OrdersController {
     return created(res, await this.service.uploadListPhoto(req.file), 'Photo uploaded');
   });
 
+  uploadListVoice = asyncHandler(async (req: Request, res: Response) => {
+    requireAccountId(req);
+    return created(res, await this.service.uploadListVoice(req.file), 'Voice message uploaded');
+  });
+
   create = asyncHandler(async (req: Request, res: Response) => {
     return created(res, await this.service.createOrder(requireAccountId(req), req.body), 'Order sent to the shop');
   });

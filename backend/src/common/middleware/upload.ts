@@ -45,6 +45,19 @@ export const upload = multer({
   limits: { fileSize: 8 * 1024 * 1024 },
 });
 
+const AUDIO_EXTENSIONS = /\.(m4a|mp4|aac|3gp|amr|mp3|wav|webm|ogg|caf)$/i;
+const AUDIO_MIME_TYPES = /^(audio\/|video\/(mp4|3gpp|webm))/;
+
+/** Voice messages (a spoken list): audio only, 10MB (a few minutes of phone audio). */
+export const uploadAudio = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    if (AUDIO_EXTENSIONS.test(file.originalname) && AUDIO_MIME_TYPES.test(file.mimetype)) cb(null, true);
+    else cb(AppError.badRequest('Only audio files are allowed', 'INVALID_FILE_TYPE'));
+  },
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
 /**
  * Logs exactly what multer received (count/size/mimetype per file) right after it parses
  * the request, before validation runs — so a client-reported upload failure is

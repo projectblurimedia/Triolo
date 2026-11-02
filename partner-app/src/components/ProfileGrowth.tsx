@@ -110,7 +110,7 @@ export function ProfileGrowth({
       }
       if (outcome === 'cancelled') return;
       watch(() => checkBadge(id, true));
-      await Linking.openURL(paymentUrl);
+      if (paymentUrl) await Linking.openURL(paymentUrl);
     } catch (error) {
       showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) });
     } finally {

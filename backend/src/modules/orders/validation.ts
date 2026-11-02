@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_LIST_PHOTOS, MAX_ORDER_ITEMS } from './interfaces';
+import { MAX_LIST_PHOTOS, MAX_LIST_VOICE_SECONDS, MAX_ORDER_ITEMS } from './interfaces';
 
 const orderItemSchema = z.object({
   name: z.string().trim().min(1, 'Item name is required').max(100),
@@ -9,9 +9,13 @@ const orderItemSchema = z.object({
 
 // Photos of a written list, uploaded first (POST /orders/list-photos).
 const listPhotosSchema = z.array(z.string().url().max(500)).max(MAX_LIST_PHOTOS).default([]);
-// A list is typed items, photos of a written list, or both — never nothing.
-const hasItemsOrPhotos = (body: { items: unknown[]; listPhotoUrls: unknown[] }) => body.items.length > 0 || body.listPhotoUrls.length > 0;
-const itemsOrPhotosMessage = { message: 'Add at least one item or a photo of your list', path: ['items'] };
+// A spoken list, uploaded first (POST /orders/list-voice).
+const listVoiceUrlSchema = z.string().url().max(500).nullish();
+const listVoiceSecondsSchema = z.number().int().min(1).max(MAX_LIST_VOICE_SECONDS).nullish();
+// A list is typed items, photos of a written list, a voice message, or any mix — never nothing.
+const hasItemsOrPhotos = (body: { items: unknown[]; listPhotoUrls: unknown[]; listVoiceUrl?: string | null }) =>
+  body.items.length > 0 || body.listPhotoUrls.length > 0 || !!body.listVoiceUrl;
+const itemsOrPhotosMessage = { message: 'Add at least one item, a photo or a voice message of your list', path: ['items'] };
 
 export const createOrderSchema = z
   .object({
@@ -19,6 +23,8 @@ export const createOrderSchema = z
   fulfillment: z.enum(['pickup', 'delivery']),
   items: z.array(orderItemSchema).max(MAX_ORDER_ITEMS).default([]),
   listPhotoUrls: listPhotosSchema,
+  listVoiceUrl: listVoiceUrlSchema,
+  listVoiceSeconds: listVoiceSecondsSchema,
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   locationAddress: z.string().trim().max(300).optional(),
@@ -34,6 +40,8 @@ export const createQuickOrderSchema = z
   fulfillment: z.enum(['pickup', 'delivery']),
   items: z.array(orderItemSchema).max(MAX_ORDER_ITEMS).default([]),
   listPhotoUrls: listPhotosSchema,
+  listVoiceUrl: listVoiceUrlSchema,
+  listVoiceSeconds: listVoiceSecondsSchema,
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   locationAddress: z.string().trim().max(300).optional(),
@@ -61,6 +69,16 @@ export const saveItemsSchema = z.object({
         .refine((item) => !!item.id || !!item.name, { message: 'Item name is required', path: ['name'] }),
     )
     .max(MAX_ORDER_ITEMS),
+  // The bill's photos / voice message (uploaded through /orders/list-photos and /list-voice) and
+  // a typed total for when items aren't priced one by one. Left out: kept as it was.
+  bill: z
+    .object({
+      photoUrls: z.array(z.string().url().max(500)).max(MAX_LIST_PHOTOS).default([]),
+      voiceUrl: z.string().url().max(500).nullish(),
+      voiceSeconds: z.number().int().min(1).max(MAX_LIST_VOICE_SECONDS).nullish(),
+      amount: z.number().min(0).max(1000000).nullish(),
+    })
+    .optional(),
 });
 
 export const verifyOrderPinSchema = z.object({

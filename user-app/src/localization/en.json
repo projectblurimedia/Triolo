@@ -521,7 +521,27 @@
     "photosCount_one": "{{count}} photo",
     "photosCount_other": "{{count}} photos",
     "photoTitle": "Photo of a Written List",
-    "photoHint": "Wrote your list on paper? Take a photo — the shop reads it"
+    "photoHint": "Wrote your list on paper? Take a photo — the shop reads it",
+    "waysTitle": "How do you want to make your list?",
+    "addAnother": "Add another item",
+    "ways": {
+      "speak": "Speak & prepare",
+      "speakSub": "Say items — we write them down",
+      "speakActive": "Listening…",
+      "speakActiveSub": "Tap to stop",
+      "type": "Add items",
+      "typeSub": "Type them one by one",
+      "photo": "Photo of list",
+      "photoSub": "Snap a list written on paper",
+      "record": "Record voice",
+      "recordSub": "Just say it — the shop listens"
+    },
+    "waysMore": "Add more items",
+    "otherWay": "Choose another way",
+    "defaultVoiceName": "Voice list",
+    "defaultPhotoName": "Photo list",
+    "emptiedTitle": "List deleted",
+    "emptiedMessage": "It had nothing left in it."
   },
   "bazaar": {
     "comingSoon": "Shop ordering is coming soon.",
@@ -679,7 +699,54 @@
     "SUBSCRIPTION_NOT_FOUND": "We couldn't find that payment.",
     "SUBSCRIPTION_ACTIVE": "Your plan is already active.",
     "PAYMENT_REQUIRED": "Pay once or subscribe to continue.",
-    "PASS_NOT_FOUND": "We couldn't find that payment."
+    "PASS_NOT_FOUND": "We couldn't find that payment.",
+    "PAYMENT_PROVIDER_ERROR": "The payment service is busy right now. Please try again in a little while.",
+    "PAYMENTS_NOT_CONFIGURED": "Payments are not available right now. Please try again later.",
+    "PAYMENT_INVALID": "We could not confirm this payment. If money was taken, it will be returned.",
+    "PAYMENT_NOT_DONE": "The payment is not complete yet. Finish paying, then check again.",
+    "ALREADY_PAID": "This is already paid.",
+    "UNLOCK_NEEDS_PAYMENT": "Pay to see the details of this request.",
+    "AD_PAYMENT_INVALID": "We could not confirm this payment. If money was taken, it will be returned.",
+    "AD_PAYMENT_NOT_DONE": "The payment is not complete yet. Finish paying, then check again.",
+    "AD_NOT_PAYABLE": "This boost cannot be paid for any more.",
+    "AD_NOT_FOUND": "This boost was not found.",
+    "AD_NOT_EDITABLE": "This boost can no longer be changed.",
+    "AD_NOT_IN_REVIEW": "This boost is not waiting for review.",
+    "AD_PAID_PLAN_LOCKED": "A paid boost cannot be changed.",
+    "AD_DATES_PASSED": "These dates have already passed. Pick new dates.",
+    "AD_START_IN_PAST": "The start date cannot be in the past.",
+    "AD_MEDIA_INVALID": "This picture or video cannot be used.",
+    "AD_VIDEO_TOO_LONG": "The video is too long.",
+    "AD_ACTION_INVALID": "Choose what happens when people tap it.",
+    "AD_PROMOTE_ACCOUNT_NOT_FOUND": "No Triolo account has this mobile number.",
+    "ADMIN_ACCOUNT_PROTECTED": "This account cannot be changed.",
+    "BADGES_OFF": "Badges are not available right now.",
+    "BADGE_ALREADY_ACTIVE": "This profile already has the badge.",
+    "BADGE_NOT_ACTIVE": "This badge is not active.",
+    "BADGE_NOT_FOUND": "This badge was not found.",
+    "BADGE_PROFILE_NOT_FOUND": "That profile was not found.",
+    "BOOKING_ALREADY_WAITING": "You already have a request for this work waiting for an answer.",
+    "DELIVERY_NOT_ACCEPTED": "Accept this delivery first.",
+    "DELIVERY_NOT_ACTIVE": "This delivery is already finished or cancelled.",
+    "DELIVERY_NOT_FOUND": "This delivery was not found.",
+    "JOB_POST_LIMIT": "You have the most job posts allowed. Delete one to add another.",
+    "JOB_POST_NOT_FOUND": "This job post was not found.",
+    "ORDER_ALREADY_TAKEN": "Another shop already took this order.",
+    "ORDER_NOT_DELIVERY": "This order is for pickup, not delivery.",
+    "ORDER_PHOTO_INVALID": "This photo could not be added to the list.",
+    "PHOTO_REQUIRED": "Add a photo first.",
+    "PROBLEM_ALREADY_TAKEN": "Another worker already took this job.",
+    "PROBLEM_NOT_FOUND": "This problem was not found.",
+    "PROBLEM_NOT_OPEN": "This problem is no longer open.",
+    "QUICK_ORDER_NO_SHOPS": "No matching shops nearby right now.",
+    "SHOP_LIMIT": "You have the most shops allowed.",
+    "STAFF_INVITE_NOT_FOUND": "This invite was not found.",
+    "STAFF_LIMIT": "This shop has the most delivery staff allowed.",
+    "STAFF_NOT_FOUND": "This staff member was not found.",
+    "WORKER_NOT_VERIFIED": "This worker is not available for booking yet.",
+    "VOICE_REQUIRED": "Record a voice message first.",
+    "ORDER_VOICE_INVALID": "This voice message could not be used. Please record it again.",
+    "ORDER_VOICE_TOO_LONG": "The voice message is too long. Keep it under 3 minutes."
   },
   "problemForm": {
     "photosLabel": "Photos of the problem (up to 5)",
@@ -1067,7 +1134,11 @@
     "stepAcceptedBy": "{{shop}} accepted",
     "stepAcceptName": "{{shop}} accepts",
     "stepAcceptAny": "A shop accepts",
-    "yourListPhotos": "Photo of your list"
+    "yourListPhotos": "Photo of your list",
+    "fromShop": "From the shop",
+    "deliveryChargeTitle": "Delivery charge",
+    "deliveryChargeSub": "Set by the shop for this order — added to your bill",
+    "billedAsOne": "The shop billed your items as one total — see and hear their bill below."
   },
   "myOrders": {
     "title": "My Orders",
@@ -1495,10 +1566,18 @@
       "unlimited": "Unlimited use",
       "cta": "See plans"
     },
-    "freeUseTitle": "Free this month",
-    "freeUseMessage_zero": "That was your last free one this month.",
-    "freeUseMessage_one": "{{count}} free one left this month.",
-    "freeUseMessage_other": "{{count}} free ones left this month."
+    "freeUseTitle": {
+      "bookings": "Free booking",
+      "orders": "Free order"
+    },
+    "freeUseMessage": {
+      "bookings_zero": "That was your last free booking this month.",
+      "bookings_one": "{{count}} free booking left this month.",
+      "bookings_other": "{{count}} free bookings left this month.",
+      "orders_zero": "That was your last free order this month.",
+      "orders_one": "{{count}} free order left this month.",
+      "orders_other": "{{count}} free orders left this month."
+    }
   },
   "waiting": {
     "stepSent": "Request sent",
@@ -1537,7 +1616,9 @@
     "label": "Ends by itself in",
     "endingNow": "Ending now…",
     "change": "Change",
-    "hint": "If nobody accepts within {{time}}, it ends and you can try again. Change it any time."
+    "hint": "If nobody accepts within {{time}}, it ends and you can try again. Change it any time.",
+    "hintShop": "If {{name}} doesn't accept within {{time}}, it ends and you can send your list to another shop. Change the time any time.",
+    "hintWorker": "If {{name}} doesn't accept within {{time}}, it ends and you can book someone else. Change the time any time."
   },
   "quickOrder": {
     "title": "Quick Order",
@@ -1614,5 +1695,40 @@
       "post_problem": "Your next problem post is already paid for — you won't be asked to pay again.",
       "staff_contact": ""
     }
+  },
+  "freeUses": {
+    "left": {
+      "bookings_one": "Only {{count}} free booking left this month",
+      "bookings_other": "Only {{count}} free bookings left this month",
+      "orders_one": "Only {{count}} free order left this month",
+      "orders_other": "Only {{count}} free orders left this month"
+    },
+    "usedUpFee": {
+      "bookings": "Free bookings used up this month — ₹{{amount}} each now",
+      "orders": "Free orders used up this month — ₹{{amount}} each now"
+    },
+    "usedUp": {
+      "bookings": "Free bookings used up this month",
+      "orders": "Free orders used up this month"
+    },
+    "cta": "Get Triolo Plus — no fees, no limits ›"
+  },
+  "voice": {
+    "title": "Voice message",
+    "play": "Play voice message",
+    "pause": "Pause",
+    "delete": "Delete voice message",
+    "recordTitle": "Or just say your list",
+    "recordHint": "Record what you want in your own words — the shop listens to it. Up to 3 minutes.",
+    "tapToRecord": "Tap to record",
+    "recording": "Recording…",
+    "stop": "Stop and keep",
+    "recordAgain": "Record again",
+    "tooShortTitle": "Too short",
+    "tooShortMessage": "Hold on a little longer and say your list.",
+    "failedTitle": "Could not record",
+    "failedMessage": "Something stopped the recording. Please try again.",
+    "countLine": "Voice {{length}}",
+    "yourVoice": "Your voice message"
   }
 }

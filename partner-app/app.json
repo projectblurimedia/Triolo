@@ -2,7 +2,7 @@
   "expo": {
     "name": "Triolo Partner",
     "slug": "triolo-partner",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -58,7 +58,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Triolo Partner needs access to your photos to upload portfolio or shop images."
+          "photosPermission": "Triolo Partner needs access to your photos to upload portfolio or shop images.",
+          "cameraPermission": "Triolo Partner uses your camera to take a photo of the bill or items."
         }
       ],
       [
@@ -75,7 +76,14 @@
         }
       ],
       "./plugins/withLivePopup",
-      "./plugins/withUpiApps"
+      "./plugins/withUpiApps",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Triolo Partner uses your microphone to record a voice message with your bill."
+        }
+      ],
+      "expo-asset"
     ],
     "extra": {
       "eas": {

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useAcceptingStore } from '@/state/acceptingStore';
 import { placeName } from '@/utils/formatAddress';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -53,6 +54,12 @@ type Incoming = {
  *  - two or more at once, or a new one while a takeover is up → one "New requests" list, each
  *    with its own buttons. Anything left stays in Bookings and on Home.
  */
+/** Accept was tapped on the floating pop-up, or an accept is under way. */
+function acceptingNow(): boolean {
+  const state = useAcceptingStore.getState();
+  return state.popupKey !== null || state.accepting !== null;
+}
+
 export function IncomingRequestsHub() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const { data: offers, refetch: refetchOffers } = useBookingOffers();
@@ -77,7 +84,8 @@ export function IncomingRequestsHub() {
       if (kind === 'booking_offer' || kind === 'booking_taken') queryClient.invalidateQueries({ queryKey: BOOKING_OFFERS_QUERY_KEY });
       if (kind === 'order_placed' || kind === 'order_cancelled') queryClient.invalidateQueries({ queryKey: SHOP_ORDERS_QUERY_KEY });
       // A new job or order while the app is open: Live Requests straight away (not on the next poll).
-      if (kind === 'booking_offer' || kind === 'order_placed') {
+      // (Not while one is being accepted from the pop-up: its own screen opens instead.)
+      if ((kind === 'booking_offer' || kind === 'order_placed') && !acceptingNow()) {
         usePendingOfferStore.getState().clearFocusedOffer();
         useIncomingStore.getState().openList();
       }
@@ -132,6 +140,8 @@ export function IncomingRequestsHub() {
         !(item.type === 'job' && item.id === pending.focusedBookingRequestId) && !(item.type === 'order' && item.id === incoming.orderId),
     );
     if (others.length === 0) return;
+    // Accepting one from the pop-up: its screen opens next — Live Requests stays shut.
+    if (acceptingNow()) return;
     Vibration.vibrate([0, 400, 200, 400]);
     // The list is open: it already shows the new one.
     if (incoming.listOpen) return;

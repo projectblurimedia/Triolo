@@ -3,7 +3,7 @@ import { SubscriptionsRepository } from '@/modules/subscriptions/repository';
 import { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { pool } from '@/config/database';
 import { authenticate } from '@/common/middleware/authenticate';
-import { logUploadedFiles, upload } from '@/common/middleware/upload';
+import { logUploadedFiles, upload, uploadAudio } from '@/common/middleware/upload';
 import { validateBody } from '@/common/middleware/validate';
 import { AppError } from '@/common/errors/AppError';
 import { BusinessesRepository } from '@/modules/businesses/repository';
@@ -45,6 +45,8 @@ ordersRouter.get('/shop/:id', authenticate, controller.getShop);
 // Customer side. A photo of a written list is uploaded first, one per request (Vercel caps a
 // request body at 4.5 MB), then sent with the order as listPhotoUrls.
 ordersRouter.post('/list-photos', authenticate, upload.single('photo'), logUploadedFiles, controller.uploadListPhoto);
+// A voice message of the list, the same way.
+ordersRouter.post('/list-voice', authenticate, uploadAudio.single('voice'), logUploadedFiles, controller.uploadListVoice);
 ordersRouter.post('/', authenticate, validateBody(createOrderSchema), controller.create);
 // Quick Order: to every matching shop nearby at once (registered before /:id).
 ordersRouter.post('/quick', authenticate, validateBody(createQuickOrderSchema), controller.createQuick);

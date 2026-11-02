@@ -76,6 +76,12 @@ function buildOrder(overrides: Partial<ShopOrder> = {}): ShopOrder {
       { id: 'i2', position: 2, name: 'Minapappu', quantity: '2', unit: 'kg', status: 'unavailable', price: null, addedByShop: false },
     ],
     listPhotoUrls: [],
+    listVoiceUrl: null,
+    listVoiceSeconds: null,
+    billPhotoUrls: [],
+    billVoiceUrl: null,
+    billVoiceSeconds: null,
+    billAmount: null,
     ...overrides,
   };
 }
@@ -245,6 +251,25 @@ describe('createOrder', () => {
     expect(notifications.notify.mock.calls[0][3]).toContain('photo of their list');
   });
 
+  it('sends a voice message alone as the list', async () => {
+    const voice = 'https://res.cloudinary.com/demo/video/upload/v1/triolo/order-voice/abc123.m4a';
+    businesses.getPublicProfile.mockResolvedValue(buildShop());
+    repo.languageOf.mockResolvedValue('en');
+    repo.create.mockResolvedValue(buildOrder({ items: [], listVoiceUrl: voice, listVoiceSeconds: 12 }));
+    repo.findForCustomer.mockResolvedValue({ ...buildOrder(), shop: {}, pin: null } as unknown as CustomerOrder);
+
+    await service.createOrder('customer-1', { ...orderDto, items: [], listVoiceUrl: voice, listVoiceSeconds: 12 });
+
+    expect(repo.create.mock.calls[0][0]).toMatchObject({ listVoiceUrl: voice, listVoiceSeconds: 12 });
+    expect(notifications.notify.mock.calls[0][3]).toContain('voice message');
+  });
+
+  it('refuses a voice message that was not uploaded through Triolo', async () => {
+    await expect(
+      service.createOrder('customer-1', { ...orderDto, listVoiceUrl: 'https://example.com/list.m4a' }),
+    ).rejects.toMatchObject({ code: 'ORDER_VOICE_INVALID' });
+  });
+
   it('refuses a list photo that was not uploaded through Triolo', async () => {
     await expect(
       service.createOrder('customer-1', { ...orderDto, listPhotoUrls: ['https://example.com/list.jpg'] }),
@@ -343,6 +368,20 @@ describe('shop steps', () => {
     await expect(service.markPacked('owner-1', 'order-1')).rejects.toMatchObject({ code: 'ORDER_PRICE_MISSING' });
     repo.markPacked.mockResolvedValue({ transition: null, problem: 'empty' });
     await expect(service.markPacked('owner-1', 'order-1')).rejects.toMatchObject({ code: 'ORDER_NOTHING_PACKED' });
+  });
+
+  it('saves the bill\'s photos, voice message and typed total with the checklist', async () => {
+    repo.saveItems.mockResolvedValue(true);
+    const photo = 'https://res.cloudinary.com/demo/image/upload/v1/triolo/order-lists/bill.jpg';
+    const voice = 'https://res.cloudinary.com/demo/video/upload/v1/triolo/order-voice/bill.m4a';
+    await service.saveItems('owner-1', 'order-1', {
+      items: [],
+      bill: { photoUrls: [photo], voiceUrl: voice, voiceSeconds: 9, amount: 450 },
+    });
+    expect(repo.saveItems.mock.calls[0][3]).toEqual({ photoUrls: [photo], voiceUrl: voice, voiceSeconds: 9, amount: 450 });
+    await expect(
+      service.saveItems('owner-1', 'order-1', { items: [], bill: { photoUrls: [], voiceUrl: 'https://example.com/x.m4a', amount: null } }),
+    ).rejects.toMatchObject({ code: 'ORDER_VOICE_INVALID' });
   });
 
   it('sends the bill with the packed count and total', async () => {

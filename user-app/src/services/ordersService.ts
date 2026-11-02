@@ -80,6 +80,13 @@ export interface CustomerOrder {
   items: OrderItem[];
   /** Photos of the written list sent with the order. */
   listPhotoUrls?: string[];
+  listVoiceUrl?: string | null;
+  listVoiceSeconds?: number | null;
+  /** What the shop put with its bill. */
+  billPhotoUrls?: string[];
+  billVoiceUrl?: string | null;
+  billVoiceSeconds?: number | null;
+  billAmount?: number | null;
   shop: {
     name: string;
     photoUrl: string | null;
@@ -102,6 +109,8 @@ export interface CreateOrderParams {
   fulfillment: OrderFulfillment;
   items: { name: string; quantity: string; unit?: string | null }[];
   listPhotoUrls?: string[];
+  listVoiceUrl?: string | null;
+  listVoiceSeconds?: number | null;
   latitude: number;
   longitude: number;
   locationAddress?: string;
@@ -113,6 +122,8 @@ export interface CreateQuickOrderParams {
   fulfillment: OrderFulfillment;
   items: { name: string; quantity: string; unit?: string | null }[];
   listPhotoUrls?: string[];
+  listVoiceUrl?: string | null;
+  listVoiceSeconds?: number | null;
   latitude: number;
   longitude: number;
   locationAddress?: string;
@@ -130,6 +141,12 @@ export const ordersService = {
     const formData = new FormData();
     formData.append('photo', { uri: photo.uri, name: photo.name, type: photo.type } as unknown as Blob);
     return apiClient.postForm<{ url: string }>('/orders/list-photos', formData);
+  },
+  /** A voice message of the list (an .m4a recording); its link and length go with the order. */
+  uploadListVoice: (voice: { uri: string }) => {
+    const formData = new FormData();
+    formData.append('voice', { uri: voice.uri, name: 'list-voice.m4a', type: 'audio/m4a' } as unknown as Blob);
+    return apiClient.postForm<{ url: string; seconds: number | null }>('/orders/list-voice', formData);
   },
   create: (params: CreateOrderParams) => apiClient.post<CustomerOrder>('/orders', params, true),
   /** Quick Order: to every matching shop nearby at once (404 QUICK_ORDER_NO_SHOPS when none). */

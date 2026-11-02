@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { QUICK_LIMIT_QUERY_KEY } from '@/hooks/useQuickAcceptLimit';
 import { AppState, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -52,6 +53,8 @@ export function SubscribeModal() {
       queryClient.setQueryData(SUBSCRIPTION_QUERY_KEY, result);
       if (result.paid || result.active) {
         waitingId.current = null;
+        // Free accepts used up: subscribed now, so accepting works again straight away.
+        queryClient.invalidateQueries({ queryKey: QUICK_LIMIT_QUERY_KEY });
         showToast({ variant: 'success', title: t('subscribe.paidTitle'), message: t('subscribe.paidMessage') });
       } else if (!quiet) {
         showToast({ variant: 'info', title: t('subscribe.notPaidTitle'), message: t('subscribe.notPaidMessage') });
@@ -84,7 +87,7 @@ export function SubscribeModal() {
         return;
       }
       if (outcome === 'cancelled') return;
-      await Linking.openURL(result.paymentUrl);
+      if (result.paymentUrl) await Linking.openURL(result.paymentUrl);
     } catch (error) {
       showToast({ variant: 'error', title: t('common.errorTitle'), message: getLocalizedErrorMessage(error, t) });
     } finally {

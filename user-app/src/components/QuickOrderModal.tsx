@@ -10,6 +10,7 @@ import { Button } from './Button';
 import { CategoryPicker } from './CategoryPicker';
 import { ListPickerRow } from './ListPickerRow';
 import { uploadListPhotos } from '@/utils/listPhotos';
+import { uploadListVoice } from '@/utils/listVoice';
 import { ToastHost } from './ToastHost';
 import { addressFor } from './QuickBookModal';
 import { SHOP_CATEGORIES } from '@/constants/categories';
@@ -18,6 +19,7 @@ import { ApiError } from '@/services/apiClient';
 import { CustomerOrder, OrderFulfillment, ordersService } from '@/services/ordersService';
 import { MY_ORDERS_QUERY_KEY, orderQueryKey } from '@/hooks/useOrders';
 import { usePayHint, withFee } from '@/hooks/useSubscription';
+import { FreeUsesNotice } from './FreeUsesNotice';
 import { payIfNeeded } from '@/state/payGateStore';
 import { openOrderTracker } from '@/state/orderTrackerStore';
 import { showToast } from '@/state/toastStore';
@@ -63,7 +65,7 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
 
   const list = lists.find((entry) => entry.id === listId) ?? null;
   const items = (list?.items ?? []).filter((item) => item.name.trim().length > 0);
-  const hasList = items.length > 0 || (list?.photos ?? []).length > 0;
+  const hasList = items.length > 0 || (list?.photos ?? []).length > 0 || !!list?.voice;
 
   const order = async () => {
     if (!list || !hasList || categories.length === 0) return;
@@ -78,16 +80,20 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
     try {
       // Photos of a written list go up first; the order then carries their links.
       const listPhotos = await uploadListPhotos(list);
+      const listVoice = await uploadListVoice(list);
       const created = await ordersService.createQuick({
         shopCategories: categories,
         fulfillment,
         items: items.map((item) => ({ name: item.name.trim(), quantity: item.quantity.trim() || '1', unit: item.unit.trim() || null })),
         listPhotoUrls: listPhotos.urls,
+        listVoiceUrl: listVoice.url,
+        listVoiceSeconds: listVoice.seconds,
         latitude: here.latitude,
         longitude: here.longitude,
         locationAddress: fulfillment === 'delivery' ? await addressFor(here.latitude, here.longitude) : undefined,
       });
       listPhotos.remember();
+      listVoice.remember();
       // The tracker opens on it at once; My Orders, Continue and the Bazaar count too.
       queryClient.setQueryData(orderQueryKey(created.id), created);
       queryClient.setQueryData<CustomerOrder[]>(MY_ORDERS_QUERY_KEY, (current) => [
@@ -211,6 +217,7 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
 
         {lists.length > 0 ? (
           <View style={[styles.footer, { paddingBottom: insets.bottom + 16, borderTopColor: colors.border, backgroundColor: colors.background }]}>
+            <FreeUsesNotice kind="quick_order" style={styles.freeGap} />
             <Button
               label={withFee(t('quickOrder.orderNearby'), orderFee)}
               onPress={order}
@@ -263,5 +270,6 @@ const styles = StyleSheet.create({
   emptyTitle: { ...typography.subheading, fontFamily: fonts.semiBold, textAlign: 'center' },
   emptyText: { ...typography.body, textAlign: 'center', lineHeight: 21 },
   emptyAction: { alignSelf: 'stretch', marginTop: 8 },
+  freeGap: { marginBottom: 10 },
   footer: { paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1 },
 });

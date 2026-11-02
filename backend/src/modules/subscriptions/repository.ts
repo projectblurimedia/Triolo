@@ -517,11 +517,11 @@ export class SubscriptionsRepository {
   /** Gives passes back (their booking / order ended before anyone accepted it, or the action failed). */
   async restorePasses(refs: string[], ids: string[] = []): Promise<void> {
     if (refs.length === 0 && ids.length === 0) return;
-    await this.pool.query(
-      `UPDATE pay_passes SET status = 'paid', used_at = NULL, used_ref = NULL
-       WHERE status = 'used' AND kind NOT IN ('staff_contact', 'job_post_viewer', 'profile_viewer') AND (used_ref = ANY($1::text[]) OR id::text = ANY($2::text[]))`,
-      [refs, ids],
-    );
+    const match = `status = 'used' AND kind NOT IN ('staff_contact', 'job_post_viewer', 'profile_viewer') AND (used_ref = ANY($1::text[]) OR id::text = ANY($2::text[]))`;
+    // A free monthly use is simply taken back (the month gets it again); a paid one becomes a
+    // credit for the next one of its kind.
+    await this.pool.query(`DELETE FROM pay_passes WHERE razorpay_payment_id LIKE 'month-free-%' AND ${match}`, [refs, ids]);
+    await this.pool.query(`UPDATE pay_passes SET status = 'paid', used_at = NULL, used_ref = NULL WHERE ${match}`, [refs, ids]);
   }
 
   /** Job posts whose phone number this account paid to see. */

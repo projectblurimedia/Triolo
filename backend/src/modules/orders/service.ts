@@ -1,6 +1,6 @@
 import { splitShopCategories } from '@/modules/businesses/categories';
 import { randomInt } from 'crypto';
-import { uploadToCloudinary } from '@/common/services/cloudinaryService';
+import { uploadAudioToCloudinary, uploadToCloudinary } from '@/common/services/cloudinaryService';
 import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { UNLOCK_WINDOW_MINUTES } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
@@ -13,6 +13,8 @@ import { CreateOrderDto, CreateQuickOrderDto, CustomerCancelDto, RateOrderDto, S
 import {
   CustomerOrder,
   LIST_PHOTOS_FOLDER,
+  LIST_VOICE_FOLDER,
+  MAX_LIST_VOICE_SECONDS,
   OrderTransition,
   QUICK_ORDER_MAX_SHOPS,
   QUICK_ORDER_RADIUS_KM,
@@ -74,8 +76,19 @@ export class OrdersService {
     return { url: uploaded.url };
   }
 
+  /** A voice message of the list, uploaded on its own before the order (like list photos). */
+  async uploadListVoice(file: Express.Multer.File | undefined): Promise<{ url: string; seconds: number | null }> {
+    if (!file) throw AppError.badRequest('A voice message is required.', 'VOICE_REQUIRED');
+    const uploaded = await uploadAudioToCloudinary(file.path, LIST_VOICE_FOLDER);
+    if (uploaded.seconds != null && uploaded.seconds > MAX_LIST_VOICE_SECONDS + 2) {
+      throw AppError.badRequest('That voice message is too long.', 'ORDER_VOICE_TOO_LONG');
+    }
+    return { url: uploaded.url, seconds: uploaded.seconds == null ? null : Math.max(1, Math.round(uploaded.seconds)) };
+  }
+
   async createOrder(accountId: string, dto: CreateOrderDto): Promise<CustomerOrder> {
     assertListPhotos(dto.listPhotoUrls);
+    assertListVoice(dto.listVoiceUrl);
     const shop = await this.businessesService.getPublicProfile(dto.businessId);
     if (!shop || shop.verificationStatus !== 'verified') {
       throw AppError.notFound('Shop not found.', 'SHOP_NOT_FOUND');
@@ -106,6 +119,8 @@ export class OrdersService {
         unit: item.unit || null,
       })),
       listPhotoUrls: dto.listPhotoUrls,
+      listVoiceUrl: dto.listVoiceUrl || null,
+      listVoiceSeconds: dto.listVoiceUrl ? (dto.listVoiceSeconds ?? null) : null,
     });
 
     await this.subscriptionStatus?.attachPass(passId, order.id);
@@ -115,6 +130,7 @@ export class OrdersService {
       shop: shop.shopName,
       count: order.items.length,
       photos: order.listPhotoUrls.length,
+      voice: !!order.listVoiceUrl,
     });
     await this.notificationsService.notify(shop.accountId, 'order_placed', text.title, text.body, {
       data: { kind: 'order_placed', orderId: order.id },
@@ -131,6 +147,7 @@ export class OrdersService {
    */
   async createQuickOrder(accountId: string, dto: CreateQuickOrderDto): Promise<CustomerOrder> {
     assertListPhotos(dto.listPhotoUrls);
+    assertListVoice(dto.listVoiceUrl);
     const shops = await this.businessesService.searchNearby(accountId, {
       latitude: dto.latitude,
       longitude: dto.longitude,
@@ -159,6 +176,8 @@ export class OrdersService {
         unit: item.unit || null,
       })),
       listPhotoUrls: dto.listPhotoUrls,
+      listVoiceUrl: dto.listVoiceUrl || null,
+      listVoiceSeconds: dto.listVoiceUrl ? (dto.listVoiceSeconds ?? null) : null,
       offers: shops.map((shop) => ({
         businessId: shop.id,
         distanceMeters: shop.distanceMeters,
@@ -174,6 +193,7 @@ export class OrdersService {
           shop: shop.shopName,
           count: order.items.length,
           photos: order.listPhotoUrls.length,
+          voice: !!order.listVoiceUrl,
         });
         await this.notificationsService.notify(shop.accountId, 'order_placed', text.title, text.body, {
           data: { kind: 'order_placed', orderId: order.id },
@@ -411,6 +431,10 @@ export class OrdersService {
 
   async saveItems(ownerAccountId: string, orderId: string, dto: SaveItemsDto): Promise<ShopSideOrder> {
     const { shop } = await this.shopForOrder(ownerAccountId, orderId);
+    if (dto.bill) {
+      assertListPhotos(dto.bill.photoUrls);
+      assertListVoice(dto.bill.voiceUrl);
+    }
     const saved = await this.repository.saveItems(
       orderId,
       shop.id,
@@ -422,6 +446,14 @@ export class OrdersService {
         status: item.status,
         price: item.price ?? null,
       })),
+      dto.bill
+        ? {
+            photoUrls: dto.bill.photoUrls,
+            voiceUrl: dto.bill.voiceUrl ?? null,
+            voiceSeconds: dto.bill.voiceSeconds ?? null,
+            amount: dto.bill.amount ?? null,
+          }
+        : undefined,
     );
     if (!saved) throw await this.transitionError(orderId, 'Items can only be changed while packing.');
     return this.getShopOrder(ownerAccountId, orderId);
@@ -680,6 +712,15 @@ export function deliveryCharge(shop: Pick<BusinessProfile, 'deliveryPricePerKm' 
 const LIST_PHOTO_PATTERN = new RegExp(`^https://res\\.cloudinary\\.com/[^/]+/image/upload/(v\\d+/)?${LIST_PHOTOS_FOLDER}/[^/?#]+$`);
 
 /** Only photos uploaded through POST /orders/list-photos can go on an order. */
+const LIST_VOICE_PATTERN = new RegExp(`^https://res\\.cloudinary\\.com/[^/]+/video/upload/(v\\d+/)?${LIST_VOICE_FOLDER}/[^/?#]+$`);
+
+/** Only voice messages uploaded through POST /orders/list-voice can go on an order. */
+function assertListVoice(url: string | null | undefined): void {
+  if (url && !LIST_VOICE_PATTERN.test(url)) {
+    throw AppError.badRequest('That voice message could not be used. Record it again.', 'ORDER_VOICE_INVALID');
+  }
+}
+
 function assertListPhotos(urls: string[]): void {
   if (urls.some((url) => !LIST_PHOTO_PATTERN.test(url))) {
     throw AppError.badRequest('That list photo could not be used. Add it again.', 'ORDER_PHOTO_INVALID');

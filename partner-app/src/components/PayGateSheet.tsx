@@ -154,8 +154,7 @@ export function PayGateSheet() {
             </Pressable>
           ) : (
             <Pressable onPress={pay} disabled={busy} accessibilityRole="button" style={styles.payWrap}>
-              {/* The gradient is a layer under the label (not its parent), so the label always draws. */}
-              <LinearGradient colors={GOLD_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              {/* One solid gold (no gradient layer): on Android a layer under the label sometimes drew over it. */}
               <View style={styles.pay}>
                 {step === 'starting' ? (
                   <LoadingIndicator size={20} />

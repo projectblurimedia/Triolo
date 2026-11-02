@@ -1,4 +1,5 @@
 import { TFunction } from 'i18next';
+import i18n from './i18n';
 import { ApiError } from '@/services/apiClient';
 import { accountStandingMessage, STANDING_CODES } from './accountStanding';
 
@@ -22,9 +23,9 @@ export function getLocalizedErrorMessage(error: unknown, t: TFunction): string {
   }
   if (error instanceof ApiError && error.code) {
     const key = `errors.${error.code}`;
-    const translated = t(key, { defaultValue: '' });
-    if (translated) {
-      return translated;
+    // Only a message that really exists (a missing one would come back as the raw key).
+    if (i18n.exists(key)) {
+      return t(key);
     }
   }
   return t('errors.generic');

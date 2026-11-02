@@ -424,7 +424,11 @@ export function BookingTrackingModal() {
 
           {/* How long it waits before ending by itself — changeable right here. */}
           {rebooking ? null : (
-            <WaitCountdown createdAt={booking.createdAt} kind={directName ? 'directMinutes' : 'quickBookMinutes'} />
+            <WaitCountdown
+              createdAt={booking.createdAt}
+              kind={directName ? 'directMinutes' : 'quickBookMinutes'}
+              target={directName ? { type: 'worker', name: directName } : undefined}
+            />
           )}
 
           {/* The steps (the same list as after acceptance); below them, that there is no need to wait here. */}

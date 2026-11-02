@@ -121,22 +121,22 @@ export class SubscriptionStatusService {
     const settings = await this.settings();
     if (!customerPlansOn(settings)) return null;
     if (await this.isActive(accountId, 'customer')) return null;
-    // One already paid for (or given back) first, then the month's free ones, then the fee.
-    const paid = await this.repository.consumePass(accountId, kind, null);
-    if (paid) return paid;
+    // The month's free ones first (they don't carry over), then one already paid for (or given
+    // back), then the fee.
     if (await this.customerFreeLeft(accountId, kind, settings)) return this.repository.createFreeUse(accountId, kind, null);
     return this.consumeOrAsk(accountId, kind, settings);
   }
 
   /**
    * How many free uses this customer has left this month for this kind of action — bookings and
-   * orders each have their own (0 when none are given).
+   * orders each have their own. A limit of null means no limit (every one free); 0, none free.
    */
   async customerFreeLeft(accountId: string, kind: PassKind, settings?: SubscriptionSettings): Promise<number> {
     const group = FREE_USE_GROUP[kind];
     if (!group) return 0;
     const s = settings ?? (await this.settings());
     const limit = group === 'bookings' ? s.customerFreeBookings : s.customerFreeOrders;
+    if (limit === null) return Number.POSITIVE_INFINITY;
     if (!limit) return 0;
     return Math.max(0, limit - (await this.repository.countFreeUsesThisMonth(accountId, FREE_USE_KINDS[group])));
   }
@@ -173,14 +173,16 @@ export class SubscriptionStatusService {
   }
 
   /**
-   * After accepting (never before — someone else could take it meanwhile): free while this
-   * month's free accepts last, then the one-time fee (paid before the details open) — or
-   * nothing on the plan. `used` counts this month's accepts on that side so far.
+   * Checked before accepting: free while this month's free accepts last, or on the plan for
+   * that side. Once they're used up a partner can't pay per accept — ACCEPT_LIMIT_REACHED (with
+   * the side) until they subscribe. `used` counts this month's accepts on that side so far.
    */
   async acceptUnlock(accountId: string, side: 'service' | 'shop', used: () => Promise<number>): Promise<UnlockNeed> {
     const limit = await this.acceptLimit(accountId, side);
     if (limit == null) return null;
-    return (await used()) < limit ? null : 'pay';
+    if ((await used()) < limit) return null;
+    // Used up: no paying per accept — the partner subscribes first, then accepts.
+    throw new AppError(403, 'ACCEPT_LIMIT_REACHED', 'Free accepts used up this month. Subscribe to accept more.', { side, limit });
   }
 
   attachPass(id: string | null, ref: string): Promise<void> {

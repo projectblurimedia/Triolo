@@ -72,14 +72,15 @@ const PARTNER_PLAN_ROWS: { plan: PartnerPlan; label: string }[] = [
 // Free Quick Book / Quick Order accepts a month without a plan ('' = no limit).
 const LIMIT_OPTIONS: DropdownOption<string>[] = [
   { value: '', label: 'No limit', description: 'Every accept is free' },
-  { value: '0', label: 'None free', description: 'Every accept pays the fee' },
+  { value: '0', label: 'None', description: 'Every accept pays the fee' },
   ...['1', '2', '3', '5', '10', '15', '20', '30', '50', '100'].map((value) => ({ value, label: `${value} per month` })),
 ];
 
-// Customers' free bookings / orders / posts a month without a plan ('' = none: pay from the first).
+// Customers' free bookings / orders / posts a month without a plan ('' = no limit, like the partners').
 const FREE_USE_OPTIONS: DropdownOption<string>[] = [
-  { value: '', label: 'None', description: 'Pay from the first one' },
-  ...['1', '2', '3', '5', '10', '15', '20', '30'].map((value) => ({ value, label: `${value} per month` })),
+  { value: '', label: 'No limit', description: 'Every one is free' },
+  { value: '0', label: 'None', description: 'Pay from the first one' },
+  ...['1', '2', '3', '5', '10', '15', '20', '30', '50', '100'].map((value) => ({ value, label: `${value} per month` })),
 ];
 
 /** How many bookings / orders / problem posts customers without a plan get free each month. */

@@ -66,7 +66,7 @@ subscriptionsRouter.post(
   '/checkout',
   authenticate,
   validateBody(checkoutSchema),
-  asyncHandler(async (req: Request, res: Response) => ok(res, await service.checkout(accountIdOf(req), req.body.audience, req.body.months, req.body.plan))),
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.checkout(accountIdOf(req), req.body.audience, req.body.months, req.body.plan, req.body.inApp ?? false))),
 );
 
 subscriptionsRouter.get(
@@ -85,7 +85,7 @@ subscriptionsRouter.post(
   '/badges/checkout',
   authenticate,
   validateBody(badgeCheckoutSchema),
-  asyncHandler(async (req: Request, res: Response) => ok(res, await service.badgeCheckout(accountIdOf(req), req.body.kind, req.body.profileId))),
+  asyncHandler(async (req: Request, res: Response) => ok(res, await service.badgeCheckout(accountIdOf(req), req.body.kind, req.body.profileId, req.body.inApp ?? false))),
 );
 
 subscriptionsRouter.post(
@@ -100,7 +100,7 @@ subscriptionsRouter.post(
   authenticate,
   validateBody(passCheckoutSchema),
   asyncHandler(async (req: Request, res: Response) =>
-    ok(res, await service.passCheckout(accountIdOf(req), req.body.kind, req.body.targetId ?? null, req.body.plan)),
+    ok(res, await service.passCheckout(accountIdOf(req), req.body.kind, req.body.targetId ?? null, req.body.plan, req.body.inApp ?? false)),
   ),
 );
 

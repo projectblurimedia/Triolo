@@ -26,7 +26,7 @@ export function usePayHint(kind: PassKind): number | null {
   if (kind !== 'staff_contact' && (data.passes?.[kind] ?? 0) > 0) return null;
   // Still free this month.
   const free = freeUseFor(data, kind);
-  if (free && free.used < free.limit) return null;
+  if (free && (free.limit === null || free.used < free.limit)) return null;
   const fee = data.fees?.[kind] ?? 0;
   return fee > 0 ? fee : null;
 }

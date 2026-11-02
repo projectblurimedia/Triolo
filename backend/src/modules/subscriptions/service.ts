@@ -138,12 +138,15 @@ export class SubscriptionsService {
           }
         : {
             freeUses: {
-              bookings: settings.customerFreeBookings
-                ? { limit: settings.customerFreeBookings, used: await this.repository.countFreeUsesThisMonth(accountId, FREE_USE_KINDS.bookings) }
-                : null,
-              orders: settings.customerFreeOrders
-                ? { limit: settings.customerFreeOrders, used: await this.repository.countFreeUsesThisMonth(accountId, FREE_USE_KINDS.orders) }
-                : null,
+              // limit null: no limit (every one free); 0 / none given: null (pay from the first).
+              bookings:
+                settings.customerFreeBookings === 0
+                  ? null
+                  : { limit: settings.customerFreeBookings, used: await this.repository.countFreeUsesThisMonth(accountId, FREE_USE_KINDS.bookings) },
+              orders:
+                settings.customerFreeOrders === 0
+                  ? null
+                  : { limit: settings.customerFreeOrders, used: await this.repository.countFreeUsesThisMonth(accountId, FREE_USE_KINDS.orders) },
             },
           }),
       ...(audience === 'partner'
@@ -162,7 +165,11 @@ export class SubscriptionsService {
    * Starts paying for one use (or a job seeker's phone number). Free (plan, or plans off) or
    * already paid: { paid: true } straight away. Otherwise a payment link — a started one is reused.
    */
-  async passCheckout(accountId: string, kind: PassKind, targetId: string | null, plan?: PartnerPlan) {
+  /**
+   * `inApp`: the app pays with Razorpay's own screen (POST /pay/order), so no payment link is made —
+   * links are only for older installs (and Razorpay's test mode allows only a few of them).
+   */
+  async passCheckout(accountId: string, kind: PassKind, targetId: string | null, plan?: PartnerPlan, inApp = false) {
     const settings = await this.repository.getSettings();
     const audience = (CUSTOMER_PASS_KINDS as readonly PassKind[]).includes(kind) ? 'customer' : 'partner';
     const plansOn = audience === 'customer' ? customerPlansOn(settings) : partnerPlansOn(settings);
@@ -184,7 +191,9 @@ export class SubscriptionsService {
     }
     const existing = await this.repository.findUsablePass(accountId, kind, perTarget ? targetId : null);
     if (existing?.status === 'paid') return { id: existing.id, paid: true, amount: existing.amount, paymentUrl: null };
-    if (existing?.paymentUrl) return { id: existing.id, paid: false, amount: existing.amount, paymentUrl: existing.paymentUrl };
+    if (existing && (existing.paymentUrl || inApp)) {
+      return { id: existing.id, paid: false, amount: existing.amount, paymentUrl: existing.paymentUrl ?? null };
+    }
 
     const amount = passFee(settings, kind);
     const contact = await this.repository.accountContact(accountId);
@@ -195,6 +204,7 @@ export class SubscriptionsService {
       await this.repository.markPassPaid(pass.id, `free-${pass.id}`);
       return { id: pass.id, paid: true, amount: 0, paymentUrl: null };
     }
+    if (inApp) return { id: pass.id, paid: false, amount, paymentUrl: null };
     const link = await razorpayService.createPaymentLink({
       amountPaise: amount * 100,
       description: PASS_LABEL[kind],
@@ -303,7 +313,13 @@ export class SubscriptionsService {
    * Starts paying for a plan: a payment link to open (the plan starts once it's paid). Partners
    * choose which plan (services, shop or job posts); without one (older app builds) it covers all.
    */
-  async checkout(accountId: string, audience: SubscriptionAudience, months: SubscriptionMonths, requested?: PartnerPlan | 'all') {
+  async checkout(
+    accountId: string,
+    audience: SubscriptionAudience,
+    months: SubscriptionMonths,
+    requested?: PartnerPlan | 'all',
+    inApp = false,
+  ) {
     // The all-in-one plan is bought as a plan covering everything (no single side).
     const plan = requested === 'all' ? undefined : requested;
     const settings = await this.repository.getSettings();
@@ -320,6 +336,7 @@ export class SubscriptionsService {
     const contact = await this.repository.accountContact(accountId);
     if (!contact) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
     const subscription = await this.repository.createSubscription(accountId, audience, months, amount, partnerPlan ?? 'all');
+    if (inApp) return { id: subscription.id, amount, paymentUrl: null };
     const planName = partnerPlan ? ` ${PLAN_LABEL[partnerPlan]}` : '';
     const link = await razorpayService.createPaymentLink({
       amountPaise: amount * 100,
@@ -387,7 +404,7 @@ export class SubscriptionsService {
   }
 
   /** Starts buying the badge for one of the partner's own profiles. */
-  async badgeCheckout(accountId: string, kind: BadgeKind, profileId?: string) {
+  async badgeCheckout(accountId: string, kind: BadgeKind, profileId?: string, inApp = false) {
     const settings = await this.repository.getSettings();
     if (!settings.badgeEnabled) throw AppError.conflict('Badges are not available right now.', 'BADGES_OFF');
     const mine = (await this.getMyBadges(accountId)).profiles.find(
@@ -404,6 +421,7 @@ export class SubscriptionsService {
     const contact = await this.repository.accountContact(accountId);
     if (!contact) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
     const badge = await this.repository.createBadge(accountId, kind, mine.profileId, settings.badgePrice);
+    if (inApp) return { id: badge.id, amount: settings.badgePrice, paymentUrl: null };
     const link = await razorpayService.createPaymentLink({
       amountPaise: settings.badgePrice * 100,
       description: `"Trusted by Triolo" badge — ${mine.name}`,

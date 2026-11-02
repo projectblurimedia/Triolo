@@ -79,6 +79,10 @@ export const MAX_ORDER_ITEMS = 100;
 export const MAX_LIST_PHOTOS = 5;
 /** Where list photos are uploaded; an order only accepts photo links from here. */
 export const LIST_PHOTOS_FOLDER = 'triolo/order-lists';
+/** Where list voice messages are uploaded (Cloudinary keeps audio as "video"). */
+export const LIST_VOICE_FOLDER = 'triolo/order-voice';
+/** Longest voice message, in seconds. */
+export const MAX_LIST_VOICE_SECONDS = 180;
 
 export interface ShopOrderItem {
   id: string;
@@ -129,6 +133,22 @@ export interface ShopOrder {
   items: ShopOrderItem[];
   /** Photos of a written list (instead of, or as well as, typed items). */
   listPhotoUrls: string[];
+  /** A voice message of the list, and its length in seconds. */
+  listVoiceUrl: string | null;
+  listVoiceSeconds: number | null;
+  /** What the shop put with its bill: photos (e.g. a written bill), a voice message, a typed total. */
+  billPhotoUrls: string[];
+  billVoiceUrl: string | null;
+  billVoiceSeconds: number | null;
+  billAmount: number | null;
+}
+
+/** The bill's photos / voice message / typed total, saved with the packing checklist. */
+export interface BillMedia {
+  photoUrls: string[];
+  voiceUrl: string | null;
+  voiceSeconds: number | null;
+  amount: number | null;
 }
 
 /** The shop as the customer sees it on their order. */
@@ -226,6 +246,8 @@ export interface CreateOrderParams {
   note: string | null;
   items: { name: string; quantity: string; unit: string | null }[];
   listPhotoUrls: string[];
+  listVoiceUrl: string | null;
+  listVoiceSeconds: number | null;
 }
 
 export interface CreateQuickOrderParams {
@@ -240,6 +262,8 @@ export interface CreateQuickOrderParams {
   note: string | null;
   items: { name: string; quantity: string; unit: string | null }[];
   listPhotoUrls: string[];
+  listVoiceUrl: string | null;
+  listVoiceSeconds: number | null;
   offers: { businessId: string; distanceMeters: number }[];
 }
 

@@ -46,16 +46,23 @@ export async function payIfNeeded(kind: PassKind, targetId: string | null = null
     if (!mine.enabled || mine.active) return true;
     // A phone number is paid per person, so a spare pass never covers it.
     const perPerson = (kind as string) === 'staff_contact';
+    // This month's free ones come first (the server takes them first too) — say how many are left.
+    const free = freeUseFor(mine, kind);
+    // No limit: every one is free (nothing to say).
+    if (!perPerson && free && free.limit === null) return true;
+    if (!perPerson && free && free.limit !== null && free.used < free.limit) {
+      const left = free.limit - free.used - 1;
+      const group = kind === 'quick_order' || kind === 'shop_order' ? 'orders' : 'bookings';
+      showToast({
+        variant: 'info',
+        title: i18n.t(`payGate.freeUseTitle.${group}`),
+        message: i18n.t(`payGate.freeUseMessage.${group}`, { count: left }),
+      });
+      return true;
+    }
     if (!perPerson && (mine.passes?.[kind] ?? 0) > 0) {
       // Paid before for one that didn't go ahead: say so, so it doesn't look free by mistake.
       showToast({ variant: 'info', title: i18n.t('payGate.paidEarlierTitle'), message: i18n.t(`payGate.paidEarlierMessage.${kind}`) });
-      return true;
-    }
-    // Still within this month's free ones: nothing to pay — say how many are left.
-    const free = freeUseFor(mine, kind);
-    if (!perPerson && free && free.used < free.limit) {
-      const left = free.limit - free.used - 1;
-      showToast({ variant: 'info', title: i18n.t('payGate.freeUseTitle'), message: i18n.t('payGate.freeUseMessage', { count: left }) });
       return true;
     }
     const amount = mine.fees?.[kind] ?? 0;

@@ -13,6 +13,11 @@ import { askForLocation } from '@/utils/ensureLocationOn';
 import { useBusyAction } from './Ads';
 import { PullToRefresh } from './PullToRefresh';
 import { ListPhotoStrip } from './ListPhotoStrip';
+import { VoiceMessage } from './VoiceMessage';
+import { VoiceRecorderCard } from './VoiceRecorderCard';
+import { SmartImage } from './SmartImage';
+import { PhotoViewer } from './PhotoViewer';
+import * as ImagePicker from 'expo-image-picker';
 import { DetailSkeleton } from './DetailSkeleton';
 import { StepTimeline, TimelineStep } from './StepTimeline';
 import { GivenBackError } from '@/utils/afterAccept';
@@ -25,6 +30,7 @@ import { useShopOrder, useShopOrderAction } from '@/hooks/useShopOrders';
 import { useShopOrderFocusStore } from '@/state/shopOrderFocusStore';
 import {
   ACTIVE_SHOP_STATUSES,
+  BillMedia,
   formatRupees,
   ItemUpdate,
   PACKING_STATUSES,
@@ -60,6 +66,28 @@ const STATUS_ICONS: Record<ShopOrderStatus, IconName> = {
   expired: 'hourglass-end',
 };
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
+// The three ways to add to the bill, each its own colour.
+const ADD_GRADIENT = ['#0F9D58', '#34C77B'] as const;
+const RECORD_GRADIENT = ['#DB2777', '#F472B6'] as const;
+const CAPTURE_GRADIENT = ['#4338CA', '#7C3AED', '#C026D3'] as const;
+const MAX_BILL_PHOTOS = 5;
+
+/** The bill's photos / voice message / typed total while the shop packs. */
+interface BillDraft {
+  photoUrls: string[];
+  /** The recording: a file on this phone until uploaded, then `url` is set. */
+  voice: { uri: string; seconds: number; url?: string } | null;
+  amount: string;
+}
+const EMPTY_BILL: BillDraft = { photoUrls: [], voice: null, amount: '' };
+
+function billFrom(order: ShopOrder): BillDraft {
+  return {
+    photoUrls: order.billPhotoUrls ?? [],
+    voice: order.billVoiceUrl ? { uri: order.billVoiceUrl, seconds: order.billVoiceSeconds ?? 0, url: order.billVoiceUrl } : null,
+    amount: order.billAmount != null ? String(order.billAmount) : '',
+  };
+}
 const DANGER_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const STAR_COLOR = '#FBBF24';
 
@@ -102,8 +130,8 @@ export function ShopOrderModal() {
 
   const accept = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.accept(id), 'accept');
   const decline = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.decline(id));
-  const saveItems = useShopOrderAction(({ id, items }: { id: string; items: ItemUpdate[] }) =>
-    shopOrdersService.saveItems(id, items),
+  const saveItems = useShopOrderAction(({ id, items, bill }: { id: string; items: ItemUpdate[]; bill?: BillMedia }) =>
+    shopOrdersService.saveItems(id, items, bill),
   );
   const packed = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.packed(id));
   const ready = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.ready(id));
@@ -111,6 +139,10 @@ export function ShopOrderModal() {
   const cancel = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.cancel(id));
 
   const [draft, setDraft] = useState<Draft>({});
+  const [bill, setBill] = useState<BillDraft>(EMPTY_BILL);
+  const [billUploads, setBillUploads] = useState(0);
+  const [recordSignal, setRecordSignal] = useState(0);
+  const [viewBillPhoto, setViewBillPhoto] = useState<number | null>(null);
   const [dirty, setDirty] = useState(false);
   // Items the shop typed in that aren't saved yet, and saved ones it took off again.
   const [added, setAdded] = useState<string[]>([]);
@@ -144,6 +176,7 @@ export function ShopOrderModal() {
   useEffect(() => {
     if (order && !dirty) {
       setDraft(draftFrom(order));
+      setBill(billFrom(order));
       setAdded([]);
       setRemoved([]);
     }
@@ -227,10 +260,99 @@ export function ShopOrderModal() {
         };
       });
 
+  // What goes with the bill (only links already uploaded).
+  const billMedia = (): BillMedia => {
+    const amount = parsePrice(bill.amount);
+    return {
+      photoUrls: bill.photoUrls,
+      voiceUrl: bill.voice?.url ?? null,
+      voiceSeconds: bill.voice?.url ? Math.max(1, Math.round(bill.voice.seconds)) : null,
+      amount: amount != null && amount > 0 ? amount : null,
+    };
+  };
+  const hasBillMedia = bill.photoUrls.length > 0 || !!bill.voice;
+  const [billRecording, setBillRecording] = useState(false);
+  const [captureChoice, setCaptureChoice] = useState(false);
+
+  const uploadFailed = (error: unknown) =>
+    showToast({
+      variant: 'error',
+      title: t('bill.uploadFailedTitle'),
+      message: error instanceof ApiError ? getLocalizedErrorMessage(error, t) : t('bill.uploadFailedMessage'),
+    });
+
+  /** Record items: the recording goes up at once; the link is saved with the checklist. */
+  const handleBillVoice = async (voice: { uri: string; seconds: number } | null) => {
+    setDirty(true);
+    if (!voice) {
+      setBill((current) => ({ ...current, voice: null }));
+      return;
+    }
+    setBill((current) => ({ ...current, voice }));
+    try {
+      const uploaded = await shopOrdersService.uploadBillVoice(voice.uri);
+      setBill((current) =>
+        current.voice?.uri === voice.uri ? { ...current, voice: { ...voice, url: uploaded.url, seconds: uploaded.seconds ?? voice.seconds } } : current,
+      );
+    } catch (error) {
+      setBill((current) => (current.voice?.uri === voice.uri ? { ...current, voice: null } : current));
+      uploadFailed(error);
+    }
+  };
+
+  /** Capture items: a photo (camera, or the gallery when the camera isn't allowed), uploaded at once. */
+  const handleCapture = () => {
+    if (bill.photoUrls.length >= MAX_BILL_PHOTOS) {
+      showToast({ variant: 'info', title: t('bill.photos'), message: t('bill.maxPhotos') });
+      return;
+    }
+    setCaptureChoice(true);
+  };
+
+  /** Takes the photo (camera) or picks it (gallery), then uploads it. */
+  const pickBillPhoto = async (source: 'camera' | 'gallery') => {
+    setCaptureChoice(false);
+    try {
+      let result: ImagePicker.ImagePickerResult;
+      if (source === 'camera') {
+        const camera = await ImagePicker.requestCameraPermissionsAsync();
+        if (!camera.granted) {
+          showToast({ variant: 'error', title: t('imagePicker.cameraPermissionDeniedTitle'), message: t('imagePicker.cameraPermissionDeniedMessage') });
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
+      }
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      const type = asset.mimeType ?? 'image/jpeg';
+      setDirty(true);
+      setBillUploads((count) => count + 1);
+      try {
+        const { url } = await shopOrdersService.uploadBillPhoto({
+          uri: asset.uri,
+          name: asset.fileName ?? `bill_${Date.now()}.${type.split('/').pop() ?? 'jpg'}`,
+          type,
+        });
+        setBill((current) => ({ ...current, photoUrls: [...current.photoUrls, url].slice(0, MAX_BILL_PHOTOS) }));
+      } finally {
+        setBillUploads((count) => count - 1);
+      }
+    } catch (error) {
+      uploadFailed(error);
+    }
+  };
+
+  const removeBillPhoto = (url: string) => {
+    setDirty(true);
+    setBill((current) => ({ ...current, photoUrls: current.photoUrls.filter((entry) => entry !== url) }));
+  };
+
   // Closing mid-packing keeps the ticks and prices already entered.
   const handleClose = () => {
     if (order && dirty && PACKING_STATUSES.includes(order.status)) {
-      shopOrdersService.saveItems(order.id, draftUpdates(order, false)).catch(() => {});
+      shopOrdersService.saveItems(order.id, draftUpdates(order, false), billMedia()).catch(() => {});
       setDirty(false);
     }
     close();
@@ -239,6 +361,21 @@ export function ShopOrderModal() {
   /** Checks the list is complete, then asks for confirmation before sending the bill. */
   const handleSendBill = (o: ShopOrder) => {
     const updates = draftUpdates(o, true);
+    if (billUploads > 0 || (bill.voice && !bill.voice.url)) {
+      showToast({ variant: 'info', title: t('bill.uploading') });
+      return;
+    }
+    // A photo / voice message with a typed total stands for the bill (no prices needed one by one).
+    if (hasBillMedia && billMedia().amount != null) {
+      Keyboard.dismiss();
+      setConfirmBill(true);
+      return;
+    }
+    const unpriced = updates.some((item) => item.status === 'packed' && item.price == null);
+    if (hasBillMedia && (!updates.some((item) => item.status === 'packed') || unpriced)) {
+      showToast({ variant: 'info', title: t('bill.totalNeededTitle'), message: t('bill.totalNeededMessage') });
+      return;
+    }
     if (!updates.some((item) => item.status === 'packed')) {
       showToast({ variant: 'info', title: t('shopOrders.nothingPackedTitle'), message: t('shopOrders.nothingPackedMessage') });
       return;
@@ -253,7 +390,7 @@ export function ShopOrderModal() {
 
   const sendBill = (o: ShopOrder) => {
     saveItems.mutate(
-      { id: o.id, items: draftUpdates(o, true) },
+      { id: o.id, items: draftUpdates(o, true), bill: billMedia() },
       {
         onSuccess: () => {
           setDirty(false);
@@ -417,8 +554,13 @@ export function ShopOrderModal() {
   const renderPlainList = (o: ShopOrder) => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text style={[styles.cardLabel, { color: colors.textMuted }]}>
-        {o.items.length > 0 ? t('shopOrders.list', { count: o.items.length }) : t('shopOrders.listPhotos')}
+        {o.items.length > 0
+          ? t('shopOrders.list', { count: o.items.length })
+          : (o.listPhotoUrls ?? []).length > 0
+            ? t('shopOrders.listPhotos')
+            : t('voice.title')}
       </Text>
+      {o.listVoiceUrl ? <VoiceMessage uri={o.listVoiceUrl} seconds={o.listVoiceSeconds} style={styles.voiceGap} /> : null}
       <ListPhotoStrip photos={o.listPhotoUrls ?? []} size={84} />
       {o.items.map((item, index) => (
         <View key={item.id} style={styles.plainRow}>
@@ -561,14 +703,63 @@ export function ShopOrderModal() {
     );
   };
 
+  /** One of the three ways to add to the bill: a colourful card. */
+  const renderBillWay = (
+    key: string,
+    gradient: readonly [string, string, ...string[]],
+    icon: string,
+    title: string,
+    subtitle: string,
+    onPress: () => void,
+    done = false,
+  ) => (
+    <Pressable
+      key={key}
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.wayWrap, { opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+    >
+      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.way}>
+        <View style={styles.wayBubble} />
+        <FontAwesome6 name={icon} size={70} color="rgba(255,255,255,0.16)" solid style={styles.wayBigIcon} />
+        <View style={styles.wayIcon}>
+          <FontAwesome6 name={icon} size={17} color="#FFFFFF" solid />
+        </View>
+        {done ? (
+          <View style={styles.wayDone}>
+            <FontAwesome6 name="check" size={9} color={gradient[0]} solid />
+          </View>
+        ) : null}
+        <Text style={styles.wayTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {title}
+        </Text>
+        <Text style={styles.waySub} numberOfLines={2}>
+          {subtitle}
+        </Text>
+      </LinearGradient>
+    </Pressable>
+  );
+
   const renderChecklist = (o: ShopOrder) => {
     const list = checklistItems(o);
     const photos = o.listPhotoUrls ?? [];
     const entries = list.map((item) => draft[item.id] ?? { status: item.status, price: '' });
     const packedCount = entries.filter((entry) => entry.status === 'packed').length;
     const notPackedCount = entries.length - packedCount;
-    const itemsTotal = entries.reduce((sum, entry) => sum + (entry.status === 'packed' ? (parsePrice(entry.price) ?? 0) : 0), 0);
+    const typedTotal = hasBillMedia ? parsePrice(bill.amount) : null;
+    const itemsTotal =
+      typedTotal != null && typedTotal > 0
+        ? typedTotal
+        : entries.reduce((sum, entry) => sum + (entry.status === 'packed' ? (parsePrice(entry.price) ?? 0) : 0), 0);
     const total = itemsTotal + (o.fulfillment === 'delivery' ? o.deliveryCharge : 0);
+    const billWay: 'add' | 'record' | 'capture' | null =
+      bill.voice || billRecording
+        ? 'record'
+        : bill.photoUrls.length > 0 || billUploads > 0
+          ? 'capture'
+          : list.some((item) => item.addedByShop)
+            ? 'add'
+            : null;
     return (
       <>
         <View style={styles.counters}>
@@ -581,6 +772,14 @@ export function ShopOrderModal() {
             <Text style={[styles.counterLabel, { color: colors.textMuted }]}>{t('shopOrders.notPackedCount')}</Text>
           </View>
         </View>
+        {o.listVoiceUrl ? (
+          // A spoken list: listen, then type each item in with its price.
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('voice.title')}</Text>
+            <VoiceMessage uri={o.listVoiceUrl} seconds={o.listVoiceSeconds} />
+            <Text style={[styles.hint, styles.voiceHint, { color: colors.textMuted }]}>{t('voice.listenHint')}</Text>
+          </View>
+        ) : null}
         {photos.length > 0 ? (
           // A photo of a written list: read it, then type each item in with its price.
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -591,13 +790,108 @@ export function ShopOrderModal() {
         ) : null}
         <Text style={[styles.hint, { color: colors.textMuted }]}>{t('shopOrders.checklistHint')}</Text>
         {list.map(renderChecklistItem)}
-        <Pressable
-          onPress={addItem}
-          style={({ pressed }) => [styles.addItem, { borderColor: `${colors.primary}55`, backgroundColor: `${colors.primary}0A`, opacity: pressed ? 0.85 : 1 }]}
+
+        {/* Three ways to add to the bill: type items, say them, or take a photo. */}
+        <Text style={[styles.waysTitle, { color: colors.text }]}>{t('bill.waysTitle')}</Text>
+        <View style={styles.ways}>
+          {(billWay === null || billWay === 'add') && renderBillWay('add', ADD_GRADIENT, 'keyboard', t('bill.type'), t('bill.typeSub'), addItem)}
+          {(billWay === null || billWay === 'record') && renderBillWay(
+            'record',
+            RECORD_GRADIENT,
+            'microphone',
+            t('bill.record'),
+            t('bill.recordSub'),
+            () => setRecordSignal((value) => value + 1),
+            !!bill.voice,
+          )}
+          {(billWay === null || billWay === 'capture') && renderBillWay('capture', CAPTURE_GRADIENT, 'camera', t('bill.capture'), t('bill.captureSub'), handleCapture, bill.photoUrls.length > 0)}
+        </View>
+
+        {captureChoice ? (
+          <View style={styles.captureChoice}>
+            {(['camera', 'gallery'] as const).map((source) => (
+              <Pressable
+                key={source}
+                onPress={() => pickBillPhoto(source)}
+                style={({ pressed }) => [
+                  styles.captureOption,
+                  { borderColor: `${CAPTURE_GRADIENT[1]}55`, backgroundColor: `${CAPTURE_GRADIENT[1]}12`, opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <FontAwesome6 name={source === 'camera' ? 'camera' : 'images'} size={15} color={CAPTURE_GRADIENT[1]} solid />
+                <Text style={[styles.captureOptionText, { color: colors.text }]}>{t(source === 'camera' ? 'bill.camera' : 'bill.gallery')}</Text>
+              </Pressable>
+            ))}
+            <Pressable onPress={() => setCaptureChoice(false)} hitSlop={8} style={[styles.captureClose, { borderColor: colors.border }]}>
+              <FontAwesome6 name="xmark" size={13} color={colors.textMuted} solid />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Record items: the recording (and then its player) shows here. */}
+        <VoiceRecorderCard voice={bill.voice} onChange={handleBillVoice} startSignal={recordSignal} compact onRecordingChange={setBillRecording} />
+        {bill.voice && !bill.voice.url ? (
+          <Text style={[styles.hint, { color: colors.textMuted }]}>{t('bill.uploading')}</Text>
+        ) : null}
+
+        {/* What goes with the bill: photos, and the typed total. */}
+        <View
+          style={[
+            styles.card,
+            styles.billMediaCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            !hasBillMedia && billUploads === 0 && styles.billMediaHidden,
+          ]}
         >
-          <FontAwesome6 name="plus" size={13} color={colors.primary} solid />
-          <Text style={[styles.addItemText, { color: colors.primary }]}>{t('shopOrders.addItem')}</Text>
-        </Pressable>
+          {hasBillMedia ? <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('bill.fromYou')}</Text> : null}
+          {bill.photoUrls.length > 0 || billUploads > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.billPhotos}>
+              {bill.photoUrls.map((url, index) => (
+                <Pressable key={url} onPress={() => setViewBillPhoto(index)} style={[styles.billPhoto, { borderColor: colors.border }]}>
+                  <SmartImage source={{ uri: url }} style={StyleSheet.absoluteFill} />
+                  <Pressable onPress={() => removeBillPhoto(url)} hitSlop={8} style={styles.billPhotoRemove}>
+                    <FontAwesome6 name="xmark" size={11} color="#FFFFFF" solid />
+                  </Pressable>
+                </Pressable>
+              ))}
+              {billUploads > 0 && !(bill.voice && !bill.voice.url) ? (
+                <View style={[styles.billPhoto, styles.billPhotoLoading, { borderColor: colors.border }]}>
+                  <Text style={[styles.hint, { color: colors.textMuted }]}>{t('bill.uploading')}</Text>
+                </View>
+              ) : null}
+            </ScrollView>
+          ) : null}
+          {hasBillMedia ? (
+            <LinearGradient
+              colors={[`${brandColors.success}1F`, `${brandColors.success}08`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.billTotalCard, { borderColor: `${brandColors.success}40` }]}
+            >
+              <View style={styles.billTotalHead}>
+                <View style={[styles.billTotalIcon, { backgroundColor: brandColors.success }]}>
+                  <FontAwesome6 name="receipt" size={13} color="#FFFFFF" solid />
+                </View>
+                <Text style={[styles.billAmountLabel, { color: colors.text }]}>{t('bill.amountLabel')}</Text>
+              </View>
+              <View style={[styles.billAmountBox, { borderColor: `${brandColors.success}55`, backgroundColor: colors.surface }]}>
+                <Text style={[styles.billRupee, { color: brandColors.success }]}>₹</Text>
+                <TextInput
+                  value={bill.amount}
+                  onChangeText={(text) => {
+                    setDirty(true);
+                    setBill((current) => ({ ...current, amount: text.replace(/[^0-9.]/g, '') }));
+                  }}
+                  keyboardType="decimal-pad"
+                  placeholder={t('bill.amountPlaceholder')}
+                  placeholderTextColor={colors.textMuted}
+                  style={[styles.billAmountInput, { color: colors.text }]}
+                />
+              </View>
+            </LinearGradient>
+          ) : null}
+        </View>
+        <PhotoViewer photos={bill.photoUrls} startIndex={viewBillPhoto} onClose={() => setViewBillPhoto(null)} />
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.sumRow}>
             <Text style={[styles.sumLabel, { color: colors.textMuted }]}>{t('shopOrders.itemsTotal')}</Text>
@@ -624,10 +918,23 @@ export function ShopOrderModal() {
     const photos = o.listPhotoUrls ?? [];
     return (
       <>
+        {o.listVoiceUrl ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('voice.title')}</Text>
+            <VoiceMessage uri={o.listVoiceUrl} seconds={o.listVoiceSeconds} />
+          </View>
+        ) : null}
         {photos.length > 0 ? (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('shopOrders.listPhotos')}</Text>
             <ListPhotoStrip photos={photos} size={84} />
+          </View>
+        ) : null}
+        {o.billVoiceUrl || (o.billPhotoUrls ?? []).length > 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('bill.fromYou')}</Text>
+            {o.billVoiceUrl ? <VoiceMessage uri={o.billVoiceUrl} seconds={o.billVoiceSeconds} style={styles.voiceGap} /> : null}
+            <ListPhotoStrip photos={o.billPhotoUrls ?? []} size={84} />
           </View>
         ) : null}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -639,10 +946,21 @@ export function ShopOrderModal() {
               <Text style={[styles.meta, { color: colors.textMuted }]}>
                 {[item.quantity, item.unit].filter(Boolean).join(' ')}
               </Text>
-              <Text style={[styles.price, { color: colors.text }]}>{formatRupees(item.price)}</Text>
+              {item.price != null ? <Text style={[styles.price, { color: colors.text }]}>{formatRupees(item.price)}</Text> : null}
             </View>
           ))}
+          {/* Billed as one total (from the bill's photo / voice message): say so, so the bill isn't blank. */}
+          {!packedItems.some((item) => item.price != null) && o.itemsTotal != null ? (
+            <View style={[styles.billAsOne, { backgroundColor: `${brandColors.success}10`, borderColor: `${brandColors.success}33` }]}>
+              <FontAwesome6 name={o.billVoiceUrl ? 'microphone' : 'receipt'} size={13} color={brandColors.success} solid />
+              <Text style={[styles.billAsOneText, { color: colors.text }]}>{t('bill.billedAsOne')}</Text>
+            </View>
+          ) : null}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <View style={styles.sumRow}>
+            <Text style={[styles.sumLabel, { color: colors.textMuted }]}>{t('shopOrders.itemsTotal')}</Text>
+            <Text style={[styles.sumValue, { color: colors.text }]}>{formatRupees(o.itemsTotal)}</Text>
+          </View>
           {o.fulfillment === 'delivery' ? (
             <View style={styles.sumRow}>
               <Text style={[styles.sumLabel, { color: colors.textMuted }]}>{t('shopOrders.deliveryCharge')}</Text>
@@ -1002,6 +1320,8 @@ const styles = StyleSheet.create({
   body: { padding: 18, gap: 14 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   card: { borderRadius: 18, borderWidth: 1, padding: 16 },
+  voiceGap: { marginBottom: 10 },
+  voiceHint: { marginTop: 8 },
   banner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   bannerIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   bannerTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 16 },
@@ -1085,6 +1405,66 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 10 },
+  waysTitle: { ...typography.body, fontFamily: fonts.semiBold, marginTop: 4 },
+  ways: { flexDirection: 'row', gap: 8 },
+  wayWrap: { flex: 1 },
+  // One fixed size for every card, whatever its text.
+  way: { borderRadius: 18, padding: 12, height: 120, overflow: 'hidden', justifyContent: 'flex-end' },
+  wayBigIcon: { position: 'absolute', right: -10, bottom: -12, transform: [{ rotate: '-12deg' }] },
+  wayBubble: { position: 'absolute', right: -22, top: -22, width: 70, height: 70, borderRadius: 35, backgroundColor: 'rgba(255,255,255,0.14)' },
+  wayIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    top: 12,
+    left: 12,
+  },
+  wayDone: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wayTitle: { ...typography.body, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 13.5, lineHeight: 18 },
+  waySub: { ...typography.caption, color: 'rgba(255,255,255,0.88)', fontSize: 11, lineHeight: 15, marginTop: 2 },
+  billMediaCard: { gap: 10 },
+  billMediaHidden: { display: 'none' },
+  billPhotos: { gap: 8 },
+  billPhoto: { width: 84, height: 84, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  billPhotoLoading: { alignItems: 'center', justifyContent: 'center' },
+  billPhotoRemove: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureChoice: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  captureOption: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 14, borderWidth: 1 },
+  captureOptionText: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  captureClose: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  billTotalCard: { borderRadius: 16, borderWidth: 1, padding: 12, gap: 10 },
+  billAsOne: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 10, marginTop: 6 },
+  billAsOneText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 12.5, flex: 1, lineHeight: 17 },
+  billTotalHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  billTotalIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  billAmountLabel: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  billAmountBox: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 56, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 16 },
+  billRupee: { fontFamily: fonts.semiBold, fontSize: 22 },
+  billAmountInput: { flex: 1, fontFamily: fonts.semiBold, fontSize: 22, padding: 0, includeFontPadding: false },
   sumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
   sumLabel: { ...typography.body, fontSize: 13 },
   sumValue: { ...typography.body, fontFamily: fonts.medium, fontSize: 14 },
