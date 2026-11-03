@@ -529,9 +529,7 @@ export function ShopOrderModal() {
             {manyShops && o.shopName ? ` · ${o.shopName}` : ''}
           </Text>
           <Text style={[styles.name, { color: colors.text }]}>{o.customerFullName}</Text>
-          {o.customerMobileNumber ? (
-            <Text style={[styles.meta, { color: colors.textMuted }]}>{o.customerMobileNumber}</Text>
-          ) : (
+          {o.customerMobileNumber ? null : (
             <Text style={[styles.meta, { color: colors.textMuted }]}>{t('shopOrders.numberAfterAccept')}</Text>
           )}
         </View>

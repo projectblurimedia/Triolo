@@ -52,6 +52,11 @@ export class NotificationsRepository {
   }
 
   /** A viewer's name (for a subscribed partner's push). */
+  async accountLanguage(accountId: string): Promise<'en' | 'te'> {
+    const result = await this.pool.query(`SELECT preferred_language FROM accounts WHERE id = $1`, [accountId]);
+    return result.rows[0]?.preferred_language === 'te' ? 'te' : 'en';
+  }
+
   async accountName(accountId: string): Promise<string | null> {
     const result = await this.pool.query(`SELECT full_name FROM accounts WHERE id = $1`, [accountId]);
     return result.rows[0]?.full_name ?? null;

@@ -10,6 +10,7 @@ import { LogoutConfirmModal } from './LogoutConfirmModal';
 import { NearbySearchModal, NearbySearchMode } from './NearbySearchModal';
 import { SideMenuDrawer } from './SideMenuDrawer';
 import { DrawerMenuItem } from './DrawerMenuItem';
+import { YourProblemsModal } from './YourProblemsModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useLogout, useUpdateAccountLanguage } from '@/hooks/useAuthMutations';
 import { themeModeLabelKey, useThemeStore } from '@/state/themeStore';
@@ -42,6 +43,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
   const [nearbySearchMode, setNearbySearchMode] = useState<NearbySearchMode | null>(null);
   const [hireStaffVisible, setHireStaffVisible] = useState(false);
   const [continueVisible, setContinueVisible] = useState(false);
+  const [problemsVisible, setProblemsVisible] = useState(false);
 
   const handleLogoutConfirm = () => {
     setLogoutConfirmVisible(false);
@@ -59,6 +61,17 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
       onPress: () => {
         onClose();
         setContinueVisible(true);
+      },
+    },
+    {
+      key: 'yourProblems',
+      icon: 'clipboard-list' as const,
+      gradient: PURPLE_GRADIENT,
+      title: t('servicesMenu.yourProblemsTitle'),
+      subtitle: t('servicesMenu.yourProblemsSubtitle'),
+      onPress: () => {
+        onClose();
+        setProblemsVisible(true);
       },
     },
     {
@@ -167,6 +180,7 @@ export function HomeMenuModal({ visible, onClose }: HomeMenuModalProps) {
         onClose={() => setNearbySearchMode(null)}
       />
       <ContinueModal visible={continueVisible} onClose={() => setContinueVisible(false)} />
+      <YourProblemsModal visible={problemsVisible} onClose={() => setProblemsVisible(false)} />
     </>
   );
 }

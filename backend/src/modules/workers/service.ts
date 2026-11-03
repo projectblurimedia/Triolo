@@ -187,7 +187,12 @@ export class WorkersService {
     if (!profile) {
       throw AppError.notFound('Worker profile not found.', 'WORKER_PROFILE_NOT_FOUND');
     }
-    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId, 'service');
+    // Which work it is ("Electrician, Plumber"), for the notification.
+    const work = [
+      ...profile.skillCategories.filter((skill) => skill !== 'other').map((skill) => skill.charAt(0).toUpperCase() + skill.slice(1)),
+      ...(profile.otherSkillDescription ? [profile.otherSkillDescription] : []),
+    ].join(', ');
+    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId, 'service', { id: profile.id, label: work });
   }
 
   // --- Admin-facing (called only from modules/admin's service — see its own doc comment

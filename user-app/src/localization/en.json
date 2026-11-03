@@ -1236,7 +1236,7 @@
     "loadFailed": "Could not load people. Pull down to try again.",
     "viewProfile": "View profile",
     "callNow": "Call Now",
-    "phoneLabel": "Phone number",
+    "phoneLabel": "Call",
     "availabilityLabel": "Works",
     "experienceLabel": "Experience",
     "fresher": "Fresher",
@@ -1257,9 +1257,11 @@
     "numberHiddenTitle": "Number hidden",
     "payToSee": "Pay once to see it",
     "tapToSee": "Tap Call to see it",
-    "payAmount": "Pay to see the number",
+    "payAmount": "Pay to call",
     "unlockFor": "Unlock · ₹{{amount}}",
-    "showNumber": "Show number"
+    "showNumber": "Unlock call",
+    "readyToCall": "Tap Call to ring them",
+    "lockedToCall": "Unlock to call"
   },
   "continueSteps": {
     "title": "Continue Where You Left Off",
@@ -1529,7 +1531,7 @@
   },
   "payGate": {
     "title": {
-      "staff_contact": "See their phone number",
+      "staff_contact": "Call this person",
       "quick_book": "Quick Book",
       "direct_book": "Book this worker",
       "quick_order": "Quick Order",
@@ -1537,7 +1539,7 @@
       "post_problem": "Post your problem"
     },
     "message": {
-      "staff_contact": "Pay ₹{{amount}} once to see and call this number — it stays unlocked. With Triolo Plus every number is free.",
+      "staff_contact": "Pay ₹{{amount}} once to call them — it stays unlocked. With Triolo Plus every call is free.",
       "quick_book": "Pay ₹{{amount}} once to ask workers nearby. With Triolo Plus it's free.",
       "direct_book": "Pay ₹{{amount}} once to book this worker. With Triolo Plus it's free.",
       "quick_order": "Pay ₹{{amount}} once to ask shops nearby. With Triolo Plus it's free.",
@@ -1549,7 +1551,7 @@
     "subscribeInstead": "Subscribe instead — no fees",
     "paidTitle": "Paid!",
     "paidMessage": {
-      "staff_contact": "Their number is unlocked.",
+      "staff_contact": "You can call them now.",
       "quick_book": "Asking workers nearby now.",
       "direct_book": "Your booking is going out.",
       "quick_order": "Asking shops nearby now.",

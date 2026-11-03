@@ -282,7 +282,7 @@ export class BusinessesService {
     if (!profile) {
       throw AppError.notFound('Business profile not found.', 'BUSINESS_PROFILE_NOT_FOUND');
     }
-    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId, 'shop');
+    await this.notificationsService.notifyProfileViewed(profile.accountId, viewerAccountId, 'shop', { id: profile.id, label: profile.shopName });
   }
 
   // --- Admin-facing (called only from modules/admin's service — see WorkersService's own

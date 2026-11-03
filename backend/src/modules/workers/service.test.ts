@@ -470,7 +470,7 @@ describe('WorkersService.recordProfileView', () => {
     const service = new WorkersService(repo as unknown as WorkersRepository, notifications);
 
     await service.recordProfileView('worker-1', 'viewer-1');
-    expect(notifications.notifyProfileViewed).toHaveBeenCalledWith('owner-1', 'viewer-1', 'service');
+    expect(notifications.notifyProfileViewed).toHaveBeenCalledWith('owner-1', 'viewer-1', 'service', { id: 'worker-1', label: 'Electrician' });
   });
 });
 

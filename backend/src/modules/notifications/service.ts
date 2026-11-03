@@ -57,14 +57,23 @@ export class NotificationsService {
   constructor(private readonly repository: NotificationsRepository) {}
 
   /** Fired when a user opens a Worker/Business's detail card from Nearby Workers/Shops search. */
-  async notifyProfileViewed(recipientAccountId: string, viewerAccountId: string, kind?: 'service' | 'shop'): Promise<void> {
+  async notifyProfileViewed(
+    recipientAccountId: string,
+    viewerAccountId: string,
+    kind?: 'service' | 'shop',
+    /** Which profile: its id (opened from the notification) and a label (the shop's name / the work). */
+    profile?: { id: string; label: string },
+  ): Promise<void> {
     // A verified account can't view its own profile through nearby search (the query
     // excludes the searcher's own listing), but guard anyway rather than assume that holds.
     if (recipientAccountId === viewerAccountId) {
       return;
     }
-    const title = 'Profile Viewed';
-    const body = 'Someone viewed your profile.';
+    // Say which profile — a partner can have services and shops.
+    const language = await this.repository.accountLanguage(recipientAccountId);
+    const text = profileViewText(language, kind, profile?.label ?? '');
+    const title = text.title;
+    const body = text.body;
     // The viewer is remembered; a partner on the plan (or with plans off) sees who it was,
     // others can pay to see this one (here and in the list).
     const saved = await this.repository.create({
@@ -74,13 +83,14 @@ export class NotificationsService {
       body,
       actorAccountId: viewerAccountId,
       refKind: kind ?? null,
+      refId: profile?.id ?? null,
     });
     // Tapping it opens this notification in the partner app (who it was).
     const data = { notificationId: saved?.id ?? '' };
     if (await revealsViewers(recipientAccountId, kind)) {
       const name = await this.repository.accountName(viewerAccountId);
       if (name) {
-        await this.pushTo(recipientAccountId, 'partner', `${name} viewed your profile`, 'Open Triolo Partner to see your profile views.', { data });
+        await this.pushTo(recipientAccountId, 'partner', profileViewText(language, kind, profile?.label ?? '', name).title, body, { data });
         return;
       }
     }
@@ -245,4 +255,19 @@ export class NotificationsService {
   async markAllRead(accountId: string): Promise<void> {
     await this.repository.markAllRead(accountId);
   }
+}
+
+/** "Someone viewed your shop "Lakshmi Stores"" / "… your worker profile (Electrician)" — en / te. */
+function profileViewText(language: 'en' | 'te', kind: 'service' | 'shop' | undefined, label: string, viewer?: string) {
+  const shop = kind === 'shop';
+  if (language === 'te') {
+    const who = viewer ?? 'ఎవరో';
+    return shop
+      ? { title: `${who} మీ షాప్‌ను చూశారు`, body: label ? `మీ షాప్ "${label}" చూశారు.` : 'మీ షాప్ చూశారు.' }
+      : { title: `${who} మీ వర్కర్ ప్రొఫైల్‌ను చూశారు`, body: label ? `మీ ${label} ప్రొఫైల్ చూశారు.` : 'మీ వర్కర్ ప్రొఫైల్ చూశారు.' };
+  }
+  const who = viewer ?? 'Someone';
+  return shop
+    ? { title: `${who} viewed your shop`, body: label ? `Your shop "${label}" was viewed.` : 'Your shop was viewed.' }
+    : { title: `${who} viewed your worker profile`, body: label ? `Your ${label} profile was viewed.` : 'Your worker profile was viewed.' };
 }

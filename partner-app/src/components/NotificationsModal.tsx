@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { navigationRef } from '@/navigation/navigationRef';
 import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -145,7 +146,6 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
       <FontAwesome6 name="user" size={14} color={colors.primary} solid />
       <View style={styles.flexOne}>
         <Text style={[styles.viewerName, { color: colors.text }]}>{viewer.name}</Text>
-        {viewer.mobile ? <Text style={[styles.viewerMobile, { color: colors.textMuted }]}>{viewer.mobile}</Text> : null}
       </View>
       {viewer.mobile ? (
         <Pressable
@@ -442,6 +442,25 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         <Text style={[styles.detailMessage, { color: colors.text }]}>{item.body}</Text>
         {item.type === 'profile_view' ? (
           <View style={styles.jobView}>
+            {/* Which profile was viewed (services or which shop) — open it. */}
+            <Pressable
+              onPress={() => {
+                const shop = item.ref?.kind === 'shop';
+                setDetail(null);
+                onClose();
+                setTimeout(() => {
+                  if (navigationRef.isReady()) {
+                    navigationRef.navigate('MyInfo', shop ? { capability: 'business', shopId: item.ref?.id ?? undefined } : { capability: 'worker' });
+                  }
+                }, 260);
+              }}
+              style={[styles.allViews, { borderColor: colors.primary }]}
+            >
+              <FontAwesome6 name={item.ref?.kind === 'shop' ? 'store' : 'screwdriver-wrench'} size={13} color={colors.primary} solid />
+              <Text style={[styles.allViewsText, { color: colors.primary }]}>
+                {t(item.ref?.kind === 'shop' ? 'notifications.openShop' : 'notifications.openWorkerProfile')}
+              </Text>
+            </Pressable>
             {item.viewer
               ? viewerRow(item.viewer)
               : subscription.data?.enabled

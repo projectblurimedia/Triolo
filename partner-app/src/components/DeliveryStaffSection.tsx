@@ -94,7 +94,6 @@ function StaffEditor({
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
               {row.fullName}
             </Text>
-            <Text style={[styles.phone, { color: colors.textMuted }]}>{row.mobileNumber}</Text>
           </View>
           {row.status ? <StatusPill status={row.status} /> : null}
           <Pressable
@@ -229,7 +228,6 @@ export function DeliveryStaffCard({ shopId }: { shopId: string }) {
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
               {member.fullName}
             </Text>
-            <Text style={[styles.phone, { color: colors.textMuted }]}>{member.mobileNumber}</Text>
           </View>
           {member.status !== 'active' ? <StatusPill status={member.status} /> : null}
           <Pressable

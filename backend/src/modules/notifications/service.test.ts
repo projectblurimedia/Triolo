@@ -16,6 +16,7 @@ type MockRepository = {
 function createMockRepository(): MockRepository {
   return {
     create: jest.fn(),
+    accountLanguage: jest.fn().mockResolvedValue('en'),
     findForAccount: jest.fn(),
     markRead: jest.fn(),
     markAllRead: jest.fn(),
@@ -50,15 +51,17 @@ describe('NotificationsService.notifyProfileViewed', () => {
     repo.findPushTokens.mockResolvedValue([]);
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
-    await service.notifyProfileViewed('owner-1', 'viewer-1');
+    await service.notifyProfileViewed('owner-1', 'viewer-1', 'shop', { id: 'shop-1', label: 'Lakshmi Stores' });
 
+    // Says which profile was viewed, and links it.
     expect(repo.create).toHaveBeenCalledWith({
       accountId: 'owner-1',
       type: 'profile_view',
-      title: 'Profile Viewed',
-      body: 'Someone viewed your profile.',
+      title: 'Someone viewed your shop',
+      body: 'Your shop "Lakshmi Stores" was viewed.',
       actorAccountId: 'viewer-1',
-      refKind: null,
+      refKind: 'shop',
+      refId: 'shop-1',
     });
   });
 
@@ -78,12 +81,12 @@ describe('NotificationsService.notifyProfileViewed', () => {
     repo.findPushTokens.mockResolvedValue([{ token: 'device-token-123', app: 'partner' }]);
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
-    await service.notifyProfileViewed('owner-1', 'viewer-1');
+    await service.notifyProfileViewed('owner-1', 'viewer-1', 'service', { id: 'w-1', label: 'Electrician' });
 
     expect(sendPushNotification).toHaveBeenCalledWith(
       'device-token-123',
-      'Profile Viewed',
-      'Someone viewed your profile.',
+      'Someone viewed your worker profile',
+      'Your Electrician profile was viewed.',
       { data: { notificationId: 'notification-1' } },
     );
   });

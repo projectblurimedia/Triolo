@@ -160,9 +160,6 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
         <View style={styles.workerInfo}>
           <Text style={[styles.workerLabel, { color: colors.textMuted }]}>{t('yourProblems.assignedWorker')}</Text>
           <Text style={[styles.workerName, { color: colors.text }]}>{item.acceptedWorkerFullName}</Text>
-          {item.acceptedWorkerMobileNumber ? (
-            <Text style={[styles.workerPhone, { color: colors.textMuted }]}>{item.acceptedWorkerMobileNumber}</Text>
-          ) : null}
         </View>
         {item.acceptedWorkerMobileNumber && item.status !== 'completed' ? (
           <Pressable

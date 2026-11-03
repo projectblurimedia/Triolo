@@ -125,7 +125,6 @@ export function JobPostViewersSheet({ postId, title, onClose }: { postId: string
             {viewer.name ?? t('jobViews.someone')}
           </Text>
           <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
-            {viewer.mobile ? `${viewer.mobile} · ` : ''}
             {meta}
           </Text>
         </View>

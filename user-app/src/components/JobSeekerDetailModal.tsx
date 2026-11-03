@@ -133,26 +133,20 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
                 { paddingBottom: insets.bottom + 14, backgroundColor: colors.background, borderTopColor: colors.border },
               ]}
             >
-              {number ? (
-                <View style={styles.flex}>
-                  <Text style={[styles.phoneLabel, { color: colors.textMuted }]}>{t('hireStaff.phoneLabel')}</Text>
-                  <Text style={[styles.phone, { color: colors.text }]} selectable numberOfLines={1}>
-                    {number}
+              {/* The number itself is never shown — the Call button dials it. */}
+              <View style={styles.flex}>
+                <Text style={[styles.phoneLabel, { color: colors.textMuted }]}>{t('hireStaff.phoneLabel')}</Text>
+                <View style={styles.hiddenRow}>
+                  <Text style={[styles.phone, { color: colors.text }]} numberOfLines={1}>
+                    {number ? t('hireStaff.readyToCall') : t('hireStaff.lockedToCall')}
                   </Text>
-                </View>
-              ) : (
-                <View style={styles.flex}>
-                  <Text style={[styles.phoneLabel, { color: colors.textMuted }]}>{t('hireStaff.phoneLabel')}</Text>
-                  <View style={styles.hiddenRow}>
-                    <Text style={[styles.phone, styles.masked, { color: colors.text }]} numberOfLines={1}>
-                      +91 ••••• •••••
-                    </Text>
+                  {number ? null : (
                     <View style={[styles.lockBadge, { backgroundColor: `${colors.primary}16` }]}>
                       <FontAwesome6 name="lock" size={10} color={colors.primary} solid />
                     </View>
-                  </View>
+                  )}
                 </View>
-              )}
+              </View>
               <Pressable
                 onPress={() => callStaff({ id: person.id, mobileNumber: number }, setUnlockedNumber)}
                 accessibilityLabel={`${t('hireStaff.call')} ${person.fullName}`}

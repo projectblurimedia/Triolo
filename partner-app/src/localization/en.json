@@ -155,7 +155,9 @@
     "callViewer": "Call {{name}}",
     "seeWhoViewed": "Subscribe to see who viewed you",
     "unlockFor": "See who · ₹{{amount}}",
-    "seeAllWithPlan": "See all with a plan"
+    "seeAllWithPlan": "See all with a plan",
+    "openShop": "Open this shop",
+    "openWorkerProfile": "Open my worker profile"
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -567,7 +569,7 @@
   },
   "problems": {
     "myJobsTitle": "My Jobs",
-    "nearbyTitle": "Problems Near You",
+    "nearbyTitle": "Jobs Waiting Nearby",
     "finishedTitle": "Finished Jobs",
     "distanceAway": "{{distance}} away",
     "accept": "Accept Job",
@@ -588,15 +590,16 @@
       "work_done": "Awaiting Confirmation",
       "completed": "Finished"
     },
-    "noneNearbyTitle": "No Problems Nearby",
-    "noneNearbyMessage": "New problems that need your skills will appear here. Pull down to refresh.",
+    "noneNearbyTitle": "No jobs waiting nearby",
+    "noneNearbyMessage": "When customers nearby post work you do, it shows here. Pull down to refresh.",
     "noLocationTitle": "Location Needed",
     "noLocationMessage": "Add your current location to your Worker profile (Profile → edit) to see problems near you.",
     "workersOnlyTitle": "For Workers",
     "workersOnlyMessage": "Problems posted by customers near you show up here once your Worker profile is verified.",
     "loadFailedTitle": "Couldn't Load Jobs",
     "finishedTag": "Done",
-    "allBookings": "All Bookings"
+    "allBookings": "All Bookings",
+    "nearYou": "Near you"
   },
   "liveMap": {
     "unavailable": "Map unavailable right now",
@@ -854,7 +857,7 @@
     "quickKicker": "QUICK ORDER · FIRST TO ACCEPT",
     "quickTitle": "Quick Order — be the first",
     "quickMessage": "This list went to several shops nearby. Accept it first and it is yours.",
-    "numberAfterAccept": "Number shown after you accept",
+    "numberAfterAccept": "You can call them after accepting",
     "listPhotos": "Customer's list (photo)",
     "photoHint": "Tap a photo to read it, then add each item below with its price.",
     "addItem": "Add an Item",

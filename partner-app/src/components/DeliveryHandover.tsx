@@ -104,9 +104,9 @@ export function DeliveryHandover({
                       <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
                         {member.fullName}
                       </Text>
-                      <Text style={[styles.phone, { color: colors.textMuted }]}>
-                        {waiting ? t('deliveryStaff.waitingToJoin') : member.mobileNumber}
-                      </Text>
+                      {waiting ? (
+                        <Text style={[styles.phone, { color: colors.textMuted }]}>{t('deliveryStaff.waitingToJoin')}</Text>
+                      ) : null}
                     </View>
                     {current ? <FontAwesome6 name="circle-check" size={16} color={colors.primary} solid /> : null}
                   </Pressable>

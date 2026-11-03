@@ -230,7 +230,6 @@ export function HomeScreen() {
           <View style={styles.customerInfo}>
             <Text style={[styles.customerLabel, { color: colors.textMuted }]}>{t('problems.customer')}</Text>
             <Text style={[styles.customerName, { color: colors.text }]}>{job.customerFullName}</Text>
-            <Text style={[styles.customerPhone, { color: colors.textMuted }]}>{job.customerMobileNumber}</Text>
           </View>
           <Pressable
             style={[styles.callButton, { backgroundColor: brandColors.success }]}
@@ -273,43 +272,57 @@ export function HomeScreen() {
     );
   };
 
+  // A small card in one sideways row: photo, the work, the price, where and how far, Accept.
   const renderNearbyProblem = (problem: NearbyProblem) => (
     <Pressable
       key={problem.id}
       onPress={() => setDetailProblem(problem)}
-      style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.92 : 1 }]}
+      style={({ pressed }) => [
+        styles.problemCard,
+        { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.92 : 1 },
+      ]}
     >
-      <View style={styles.cardHeader}>
-        <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
-          {skillLabel(problem.skillCategories)}
-        </Text>
-        <View style={[styles.distancePill, { backgroundColor: `${colors.primary}16` }]}>
-          <FontAwesome6 name="location-arrow" size={11} color={colors.primary} solid />
-          <Text style={[styles.distanceText, { color: colors.primary }]}>
-            {t('problems.distanceAway', { distance: formatDistance(problem.distanceMeters) })}
+      <View style={styles.problemTop}>
+        {problem.photoUrls[0] ? (
+          <SmartImage source={{ uri: problem.photoUrls[0] }} style={styles.problemThumb} />
+        ) : (
+          <LinearGradient colors={PROBLEM_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.problemThumb}>
+            <FontAwesome6 name="screwdriver-wrench" size={18} color="#FFFFFF" solid />
+          </LinearGradient>
+        )}
+        <View style={styles.problemInfo}>
+          <Text style={[styles.problemSkill, { color: colors.text }]} numberOfLines={1}>
+            {skillLabel(problem.skillCategories)}
+          </Text>
+          <Text style={[styles.problemPrice, { color: colors.primary }]}>₹{problem.quotationAmount.toLocaleString('en-IN')}</Text>
+        </View>
+        <View style={[styles.problemDistance, { backgroundColor: `${colors.primary}14` }]}>
+          <Text style={[styles.problemDistanceText, { color: colors.primary }]} numberOfLines={1}>
+            {formatDistance(problem.distanceMeters)}
           </Text>
         </View>
       </View>
-      <Text style={[styles.quotation, { color: colors.primary }]}>₹{problem.quotationAmount.toLocaleString('en-IN')}</Text>
-      {renderMeta('location-dot', placeName(problem.locationAddress))}
-      {problem.description ? (
-        <Text style={[styles.description, { color: colors.text }]} numberOfLines={2}>
-          {problem.description}
+      <View style={styles.problemMetaRow}>
+        <FontAwesome6 name="location-dot" size={10} color={colors.textMuted} solid />
+        <Text style={[styles.problemMeta, { color: colors.textMuted }]} numberOfLines={1}>
+          {placeName(problem.locationAddress) || t('problems.nearYou')}
         </Text>
-      ) : null}
-      {renderPhotos(problem.photoUrls, () => setDetailProblem(problem))}
-      <View style={styles.viewDetails}>
-        <Text style={[styles.viewDetailsText, { color: colors.primary }]}>{t('problemDetail.viewDetails')}</Text>
-        <FontAwesome6 name="chevron-right" size={11} color={colors.primary} solid />
       </View>
-      <View style={styles.cardAction}>
-        <Button
-          label={t('problems.accept')}
-          onPress={() => handleAccept(problem)}
-          loading={acceptingId === problem.id}
-          disabled={acceptingId !== null && acceptingId !== problem.id}
-        />
-      </View>
+      {/* Tap the card for the photos and everything else; Accept right here. */}
+      <Pressable
+        onPress={() => handleAccept(problem)}
+        disabled={acceptingId !== null}
+        style={[styles.problemAccept, { backgroundColor: brandColors.success, opacity: acceptingId !== null && acceptingId !== problem.id ? 0.5 : 1 }]}
+      >
+          {acceptingId === problem.id ? (
+            <LoadingIndicator color="#FFFFFF" size={16} dotSize={3} />
+          ) : (
+            <>
+              <FontAwesome6 name="check" size={11} color="#FFFFFF" solid />
+              <Text style={styles.problemAcceptText}>{t('problems.accept')}</Text>
+            </>
+          )}
+      </Pressable>
     </Pressable>
   );
 
@@ -409,7 +422,18 @@ export function HomeScreen() {
           ? renderEmpty('location-crosshairs', t('problems.noLocationTitle'), t('problems.noLocationMessage'))
           : (nearby.data ?? []).length === 0
             ? renderEmpty('clipboard-list', t('problems.noneNearbyTitle'), t('problems.noneNearbyMessage'))
-            : (nearby.data ?? []).map(renderNearbyProblem)}
+            : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.problemRow}
+                style={styles.problemScroll}
+                decelerationRate="fast"
+                snapToInterval={PROBLEM_CARD_WIDTH + 10}
+              >
+                {(nearby.data ?? []).map(renderNearbyProblem)}
+              </ScrollView>
+            )}
 
         {recentJobs.length > 0 ? (
           <>
@@ -552,7 +576,40 @@ export function HomeScreen() {
   );
 }
 
+// Problems near you: small cards, side by side.
+const PROBLEM_CARD_WIDTH = 252;
+const PROBLEM_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
+
 const styles = StyleSheet.create({
+  problemScroll: { marginHorizontal: -20, marginBottom: 6 },
+  problemRow: { paddingHorizontal: 20, gap: 10, paddingVertical: 2 },
+  problemCard: {
+    width: PROBLEM_CARD_WIDTH,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  problemTop: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  problemDistance: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, maxWidth: 76 },
+  problemDistanceText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
+  problemThumb: { width: 54, height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  problemInfo: { flex: 1, minWidth: 0, gap: 1 },
+  problemSkill: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  problemPrice: { ...typography.body, fontFamily: fonts.bold, fontSize: 16, lineHeight: 21 },
+  problemMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  problemMeta: { ...typography.caption, fontSize: 11.5, flex: 1 },
+  problemDesc: { ...typography.caption, fontSize: 12 },
+  problemActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  problemDetails: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  problemDetailsText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12.5 },
+  problemAccept: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 12, alignSelf: 'stretch' },
+  problemAcceptText: { ...typography.caption, fontFamily: fonts.semiBold, color: '#FFFFFF', fontSize: 13 },
   // Extra bottom padding clears the floating CustomTabBar.
   body: { paddingBottom: 120 },
   greeting: { ...typography.heading, fontFamily: fonts.semiBold, fontSize: 19, marginBottom: 10 },
