@@ -224,7 +224,9 @@ export class BookingsService {
 
     if (matches.length > 0) {
       // Subscribed workers hear first; the others see (and are pushed) the offer after the head start.
-      const headStart = await this.subscriptionStatus?.headStart();
+      // With no subscriber among them nobody would hear first, so nobody waits.
+      const plans = await this.subscriptionStatus?.headStart();
+      const headStart = plans && matches.some((match) => plans.subscriberIds.has(match.accountId)) ? plans : null;
       const delayFor = (accountId: string) => (headStart && !headStart.subscriberIds.has(accountId) ? headStart.seconds : 0);
       await this.repository.createOffers(
         request.id,

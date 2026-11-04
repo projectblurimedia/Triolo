@@ -740,6 +740,26 @@ describe('subscriptions', () => {
     expect(notifications.sendRawPush).toHaveBeenCalledWith('worker-account-1', expect.any(String), expect.any(String), expect.any(Object));
   });
 
+  it('with no subscriber among the matches, every worker hears at once', async () => {
+    const status = {
+      useCustomerPass: jest.fn().mockResolvedValue(null),
+      attachPass: jest.fn(),
+      restorePasses: jest.fn(),
+      headStart: jest.fn().mockResolvedValue({ seconds: 30, subscriberIds: new Set(['someone-far-away']) }),
+    };
+    const noSubscribers = new BookingsService(repo as unknown as BookingsRepository, workers, notifications, status as never);
+    repo.createRequest.mockResolvedValue(buildRequest());
+    workers.findMatchingForBroadcast.mockResolvedValue(matches as never);
+
+    await noSubscribers.createQuickBooking('account-1', dto as never);
+
+    expect(repo.createOffers).toHaveBeenCalledWith('request-1', [
+      { workerId: 'worker-1', distanceMeters: 480, delaySeconds: 0 },
+      { workerId: 'worker-2', distanceMeters: 1200, delaySeconds: 0 },
+    ]);
+    expect(notifications.sendRawPush).toHaveBeenCalledTimes(2);
+  });
+
   it('a customer without a plan or a paid pass cannot Quick Book (nothing is created)', async () => {
     const status = { useCustomerPass: jest.fn().mockRejectedValue(Object.assign(new Error('x'), { code: 'PAYMENT_REQUIRED' })) };
     const locked = new BookingsService(repo as unknown as BookingsRepository, workers, notifications, status as never);

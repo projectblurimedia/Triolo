@@ -75,15 +75,19 @@ export interface PushNotificationOptions {
 const CHANNEL_IDS: Record<string, string> = { default: 'nearbyu-alerts', 'booking-offers': 'nearbyu-job-offers' };
 const NOTIFICATION_SOUND = 'nearbyu_notification';
 
+/** 'gone': FCM says this token is dead (app removed, data cleared) — drop it. */
+export type PushResult = 'sent' | 'failed' | 'gone';
+const GONE_CODES = ['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'];
+
 export async function sendPushNotification(
   token: string,
   title: string,
   body: string,
   options: PushNotificationOptions = {},
-): Promise<void> {
+): Promise<PushResult> {
   const firebaseApp = getFirebaseApp();
   if (!firebaseApp) {
-    return;
+    return 'failed';
   }
 
   const channelId = CHANNEL_IDS[options.channelId ?? 'default'] ?? options.channelId;
@@ -118,7 +122,11 @@ export async function sendPushNotification(
             },
       },
     });
+    return 'sent';
   } catch (err) {
+    const code = (err as { code?: string }).code ?? '';
+    if (GONE_CODES.includes(code)) return 'gone';
     logger.warn({ err }, 'Push notification failed to send');
+    return 'failed';
   }
 }

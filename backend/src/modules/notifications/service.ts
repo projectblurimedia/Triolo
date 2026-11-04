@@ -184,7 +184,11 @@ export class NotificationsService {
     for (const row of targets) {
       if (sent.has(row.token)) continue;
       sent.add(row.token);
-      await sendPushNotification(row.token, title, body, shown);
+      if ((await sendPushNotification(row.token, title, body, shown)) === 'gone') {
+        // A dead token (the app was removed or reinstalled): stop sending to it.
+        await Promise.resolve(this.repository.removePushToken(accountId, row.app as PushApp, row.token)).catch(() => undefined);
+        continue;
+      }
       if (row.fullScreen && (popup || popupCancel)) {
         await sendPushNotification(row.token, title, body, {
           ...shown,

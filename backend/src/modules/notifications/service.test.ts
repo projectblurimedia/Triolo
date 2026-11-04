@@ -262,6 +262,17 @@ describe('push tokens per app', () => {
     expect(sendPushNotification).toHaveBeenCalledWith('partner-phone', 'New job', 'Electrician needed', { dataOnly: true });
   });
 
+  it('drops a token FCM says is dead', async () => {
+    const repository = createMockRepository();
+    repository.findPushTokens.mockResolvedValue([{ token: 'dead-phone', app: 'partner' }]);
+    sendPushNotification.mockResolvedValueOnce('gone');
+    const service = new NotificationsService(repository as unknown as NotificationsRepository);
+
+    await service.sendRawPush('worker-1', 'New job', 'Electrician needed');
+
+    expect(repository.removePushToken).toHaveBeenCalledWith('worker-1', 'partner', 'dead-phone');
+  });
+
   it('falls back to a token from an older app version when there is no exact-app token', async () => {
     const repository = createMockRepository();
     repository.findPushTokens.mockResolvedValue([{ token: 'old-phone', app: 'legacy' }]);
