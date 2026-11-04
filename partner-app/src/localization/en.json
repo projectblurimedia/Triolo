@@ -278,7 +278,7 @@
     "errorTitle": "Couldn't find your location",
     "errorMessage": "Check that location is turned on, then try again.",
     "partnerNeededMessage": "Turn on location to get job requests near you and to accept or do any job.",
-    "deniedForeverMessage": "Location permission is off for Triolo Partner. Allow it in Settings to get jobs near you.",
+    "deniedForeverMessage": "Location permission is off for NearbyU Partner. Allow it in Settings to get jobs near you.",
     "turnOn": "Turn On Location",
     "openSettings": "Open Settings",
     "acceptNeedsLocation": "Turn on location, then open the app to accept this job.",
@@ -1306,7 +1306,7 @@
       "profile_viewer": "Showing who it was."
     },
     "notificationTitle": "Pay to accept",
-    "notificationBody": "Open Triolo Partner to accept this job.",
+    "notificationBody": "Open NearbyU Partner to accept this job.",
     "paidEarlierTitle": "Using your earlier payment",
     "paidEarlierMessage": {
       "accept": "You paid for one that didn't go ahead, so this one is free.",
@@ -1348,7 +1348,7 @@
   "backgroundAlerts": {
     "title": "Get job requests even when the app is closed",
     "offTitle": "Notifications are off",
-    "message": "Some phones stop Triolo Partner when it's swiped away or battery saving is on, so requests only arrive when you open the app. In Settings:",
+    "message": "Some phones stop NearbyU Partner when it's swiped away or battery saving is on, so requests only arrive when you open the app. In Settings:",
     "stepAutostart": "Turn on Auto-start (or \"Allow background activity\").",
     "stepBattery": "Battery → No restrictions (not \"Optimised\").",
     "stepRecents": "Don't swipe the app away from recent apps — or lock it there.",
@@ -1588,7 +1588,7 @@
   },
   "deliveryStaff": {
     "title": "Delivery Staff",
-    "hint": "People who deliver for this shop. Each one signs in to Triolo Partner with their own number and sees only the deliveries you give them — not your other orders or earnings.",
+    "hint": "People who deliver for this shop. Each one signs in to NearbyU Partner with their own number and sees only the deliveries you give them — not your other orders or earnings.",
     "add": "Add delivery staff",
     "addTitle": "Add Delivery Staff",
     "addHint": "They sign in with this number and an OTP",
@@ -1600,7 +1600,7 @@
     "phoneNeeded": "Enter a valid 10-digit mobile number.",
     "addButton": "Add",
     "addedTitle": "Staff added",
-    "addedMessage": "Ask them to install Triolo Partner, log in with this number and tap Join.",
+    "addedMessage": "Ask them to install NearbyU Partner, log in with this number and tap Join.",
     "call": "Call",
     "remove": "Remove",
     "removeTitle": "Remove staff?",
@@ -1624,7 +1624,7 @@
     "cardLine_one": "{{count}} person delivers for this shop",
     "cardLine_other": "{{count}} people deliver for this shop",
     "someNotAdded": "Some delivery staff could not be added. Add them again from Edit.",
-    "installNote": "Ask your staff to install the Triolo Partner app, log in with their number and tap Join. Only joined staff can be sent deliveries.",
+    "installNote": "Ask your staff to install the NearbyU Partner app, log in with their number and tap Join. Only joined staff can be sent deliveries.",
     "waitingToJoin": "Waiting to join",
     "seenAgo_one": "Location updated {{count}} min ago",
     "seenAgo_other": "Location updated {{count}} min ago",
@@ -1687,7 +1687,7 @@
   "accountSheet": {
     "title": "My details",
     "staffRole": "Delivery staff",
-    "partnerRole": "Triolo Partner",
+    "partnerRole": "NearbyU Partner",
     "deliversFor": "Delivers for",
     "shopLine": "{{shop}} · {{owner}}"
   },
