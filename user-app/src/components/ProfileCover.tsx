@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } f
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 const AVATAR = 80;
 // Just the back / heart row and a little room under it; the photo overlaps the edge.
@@ -93,9 +94,9 @@ export function ProfileCover({
           </Pressable>
           <View style={styles.kicker}>
             <FontAwesome6 name={kicker.icon} size={11} color="#FFFFFF" solid />
-            <Text style={styles.kickerText} numberOfLines={1}>
+            <FullText style={styles.kickerText} numberOfLines={1}>
               {kicker.label}
-            </Text>
+            </FullText>
           </View>
           {right ?? <View style={styles.backSpacer} />}
         </View>
@@ -103,13 +104,13 @@ export function ProfileCover({
 
       <View style={styles.identity}>
         <View style={[styles.avatarRing, { backgroundColor: colors.background, shadowColor: colors.primary }]}>{avatar}</View>
-        <Text style={[styles.name, { color: colors.text }]} numberOfLines={2}>
+        <FullText style={[styles.name, { color: colors.text }]} numberOfLines={2}>
           {name}
-        </Text>
+        </FullText>
         {subtitle ? (
-          <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={2}>
+          <FullText style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={2}>
             {subtitle}
-          </Text>
+          </FullText>
         ) : null}
         {pills ? <View style={styles.pills}>{pills}</View> : null}
       </View>
@@ -124,12 +125,12 @@ export function ProfileCover({
               <View style={[styles.statIcon, { backgroundColor: stat.gold ? `${GOLD}22` : `${colors.primary}14` }]}>
                 <FontAwesome6 name={stat.icon} size={13} color={stat.gold ? GOLD : colors.primary} solid />
               </View>
-              <Text style={[styles.statValue, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.statValue, { color: colors.text }]} numberOfLines={1}>
                 {stat.value}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]} numberOfLines={1}>
+              </FullText>
+              <FullText style={[styles.statLabel, { color: colors.textMuted }]} numberOfLines={1}>
                 {stat.label}
-              </Text>
+              </FullText>
             </View>
           ))}
         </View>
@@ -138,9 +139,9 @@ export function ProfileCover({
           <View style={styles.highlights}>
             <View style={styles.highlightsHead}>
               <View style={[styles.highlightsRule, { backgroundColor: `${colors.primary}26` }]} />
-              <Text style={[styles.highlightsTitle, { color: colors.textMuted }]} numberOfLines={1}>
+              <FullText style={[styles.highlightsTitle, { color: colors.textMuted }]} numberOfLines={1}>
                 {highlights.title}
-              </Text>
+              </FullText>
               <View style={[styles.highlightsRule, { backgroundColor: `${colors.primary}26` }]} />
             </View>
             <ScrollView
@@ -161,9 +162,9 @@ export function ProfileCover({
                         </LinearGradient>
                       </View>
                     </LinearGradient>
-                    <Text style={[styles.bubbleLabel, { color: colors.text }]} numberOfLines={2}>
+                    <FullText style={[styles.bubbleLabel, { color: colors.text }]} numberOfLines={2}>
                       {item.label}
-                    </Text>
+                    </FullText>
                   </View>
                 );
               })}
@@ -201,9 +202,9 @@ export function ProfilePill({
   return (
     <View style={[styles.pill, { backgroundColor: colors.surface, borderWidth: 1, borderColor: `${tone}33` }]}>
       <FontAwesome6 name={icon} size={10} color={tone} solid />
-      <Text style={[styles.pillText, { color: color ?? colors.text }]} numberOfLines={1}>
+      <FullText style={[styles.pillText, { color: color ?? colors.text }]} numberOfLines={1}>
         {label}
-      </Text>
+      </FullText>
     </View>
   );
 }
@@ -224,9 +225,9 @@ export function ProfileSection({
         <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sectionIcon}>
           <FontAwesome6 name={icon} size={12} color="#FFFFFF" solid />
         </LinearGradient>
-        <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
+        <FullText style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
           {title}
-        </Text>
+        </FullText>
         {count !== undefined ? (
           <View style={[styles.sectionCount, { backgroundColor: `${colors.primary}14` }]}>
             <Text style={[styles.sectionCountText, { color: colors.primary }]}>{count}</Text>

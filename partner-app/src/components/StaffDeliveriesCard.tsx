@@ -7,6 +7,7 @@ import { useStaffShops } from '@/hooks/useBusinessMutations';
 import { useMyDeliveries } from '@/hooks/useDeliveries';
 import { openDeliveries } from '@/state/deliveriesStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /**
  * Shown only to someone a shop owner added as delivery staff: opens their deliveries. Looks like
@@ -36,9 +37,9 @@ export function StaffDeliveriesCard() {
       </LinearGradient>
       <View style={styles.flex}>
         <Text style={[styles.title, { color: colors.text }]}>{t('deliveries.cardTitle')}</Text>
-        <Text style={[styles.text, { color: colors.textMuted }]} numberOfLines={1}>
+        <FullText style={[styles.text, { color: colors.textMuted }]} numberOfLines={1}>
           {t('deliveries.cardFor', { shops: (shops.data ?? []).map((shop) => shop.shopName).join(', ') })}
-        </Text>
+        </FullText>
       </View>
       {waiting > 0 ? (
         <View style={styles.badge}>

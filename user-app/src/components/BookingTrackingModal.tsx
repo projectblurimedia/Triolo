@@ -41,6 +41,7 @@ import { payIfNeeded } from '@/state/payGateStore';
 import { bookingStatusTitle } from '@/utils/bookingStatusText';
 import { waitingBookingIdFrom } from '@/utils/waitingBooking';
 import { WaitCountdown } from './WaitCountdown';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -248,12 +249,12 @@ export function BookingTrackingModal() {
       <View style={[styles.card, styles.workerRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Avatar name={b.worker.fullName} size={50} />
         <View style={styles.workerInfo}>
-          <Text style={[styles.workerName, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.workerName, { color: colors.text }]} numberOfLines={1}>
             {b.worker.fullName}
-          </Text>
-          <Text style={[styles.workerSkills, { color: colors.textMuted }]} numberOfLines={1}>
+          </FullText>
+          <FullText style={[styles.workerSkills, { color: colors.textMuted }]} numberOfLines={1}>
             {b.worker.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}
-          </Text>
+          </FullText>
           <RatingStars average={b.worker.ratingAverage} count={b.worker.ratingCount} />
         </View>
         {b.status !== 'completed' && b.status !== 'cancelled' ? (
@@ -552,12 +553,12 @@ export function BookingTrackingModal() {
                 <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
               </Pressable>
               <View style={styles.titleGroup}>
-                <Text style={styles.headerTitle} numberOfLines={1}>
+                <FullText style={styles.headerTitle} numberOfLines={1}>
                   {title}
-                </Text>
-                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                </FullText>
+                <FullText style={styles.headerSubtitle} numberOfLines={1}>
                   {t('tracking.subtitle', { skills: skillLabels })}
-                </Text>
+                </FullText>
               </View>
             </View>
           </LinearGradient>

@@ -38,6 +38,7 @@ import { openNewList } from '@/navigation/navigationRef';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { useBusyAction } from './Ads';
 import { shopKindLabels } from '@/utils/kindLabels';
+import { FullText } from '@/components/FullText';
 
 interface SendListModalProps {
   visible: boolean;
@@ -269,17 +270,17 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
 
   const renderListPreview = () => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.cardLabel, { color: colors.textMuted }]} numberOfLines={1}>
+      <FullText style={[styles.cardLabel, { color: colors.textMuted }]} numberOfLines={1}>
         {currentList?.name} · {listCountText(t, items.length, photos.length, voice?.seconds ?? null)}
-      </Text>
+      </FullText>
       {voice ? <VoiceMessage uri={voice.uri} seconds={voice.seconds} style={styles.voiceGap} /> : null}
       <ListPhotoStrip photos={photos.map((photo) => photo.uri)} size={64} />
       {items.slice(0, PREVIEW_ITEMS).map((item, index) => (
         <View key={item.id} style={styles.previewRow}>
           <Text style={[styles.previewIndex, { color: colors.textMuted }]}>{index + 1}.</Text>
-          <Text style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
             {item.name}
-          </Text>
+          </FullText>
           <Text style={[styles.previewQty, { color: colors.textMuted }]}>
             {[item.quantity, item.unit].filter(Boolean).join(' ')}
           </Text>
@@ -338,12 +339,12 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           seal={{ kind: 'business', id: item.id }}
         />
         <View style={styles.flex}>
-          <Text style={[styles.shopName, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.shopName, { color: colors.text }]} numberOfLines={1}>
             {item.shopName}
-          </Text>
-          <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+          </FullText>
+          <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
             {categories}
-          </Text>
+          </FullText>
           <View style={styles.metaRow}>
             <RatingStars average={item.ratingAverage} count={item.ratingCount} />
             <Text style={[styles.meta, { color: colors.primary }]}>· {formatDistanceValue(item.distanceMeters)}</Text>
@@ -441,9 +442,9 @@ export function SendListModal({ visible, onClose, shop: preselected, listId: ini
           { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: insets.bottom + 14 },
         ]}
       >
-        <Text style={[styles.footerTitle, { color: colors.text }]} numberOfLines={1}>
+        <FullText style={[styles.footerTitle, { color: colors.text }]} numberOfLines={1}>
           {t('sendList.sendTo', { shop: selected.shopName })}
-        </Text>
+        </FullText>
         <View style={styles.options}>
           {option('pickup', 'store', t('sendList.pickup'), t('sendList.pickupSub'), false)}
           {option(
@@ -587,7 +588,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     // No Android elevation: it shows through translucent glass as a grey box (as on the tab bar).
   },
-  chipRow: { gap: 8, paddingRight: 4 },
+  chipRow: { gap: 8, flexGrow: 1, justifyContent: 'center' },
   filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, borderRadius: 17, paddingHorizontal: 13 },
   filterChipOff: { borderWidth: 1 },
   filterText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12, includeFontPadding: false },

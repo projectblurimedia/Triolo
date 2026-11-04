@@ -73,6 +73,13 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
     if (takenId) LivePopup?.cancel(takenId);
     return;
   }
+  // The same job / order also comes as a normal notification (it always shows, even when this
+  // app isn't woken). When the app does wake for the pop-up, that one is removed so it isn't
+  // shown twice. A normal notification is posted with the job / order id as its tag.
+  const popupId = remoteData?.popup === '1' ? (remoteData.bookingRequestId ?? remoteData.orderId) : undefined;
+  if (popupId && LivePopup && AppState.currentState !== 'active') {
+    Notifications.dismissNotificationAsync(popupId).catch(() => {});
+  }
   if (remoteData?.popup === '1' && LivePopup && AppState.currentState !== 'active') {
     const isJob = !!remoteData.bookingRequestId;
     const id = remoteData.bookingRequestId ?? remoteData.orderId ?? String(Date.now());

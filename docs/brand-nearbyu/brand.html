@@ -1,0 +1,265 @@
+<title>NearbyU Brand</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@800&family=Baloo+Tammudu+2:wght@600&family=Nunito:wght@800;900&family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: four sections down the page — icons, opening animation, loader, the name in the app. */
+  :root {
+    --bg: #EEF3FB;
+    --card: #FFFFFF;
+    --fg: #0C1424;
+    --muted: #586477;
+    --line: #D6E0EF;
+    --accent: #0055D3;
+    --saffron: #FF9F1C;
+    --font-display: 'Nunito', 'Poppins', system-ui, sans-serif;
+    --font-telugu: 'Baloo Tammudu 2', 'Baloo 2', system-ui, sans-serif;
+    --font-body: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0A0E16; --card: #131A26; --fg: #EEF3FB; --muted: #9AA6B8; --line: #243046; --accent: #4C95FF; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #0A0E16; --card: #131A26; --fg: #EEF3FB; --muted: #9AA6B8; --line: #243046; --accent: #4C95FF; color-scheme: dark; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+  .page {
+    max-width: 980px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 32px 64px;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  header { display: flex; flex-direction: column; gap: 6px; }
+  .hero-word { font-size: clamp(2.6rem, 9vw, 4rem); align-self: flex-start; }
+  header p { color: var(--muted); margin: 0; line-height: 1.6; max-width: 66ch; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  section h2 { margin: 0; font-size: 1.15rem; font-weight: 600; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  section h2 span { font-size: 0.82rem; color: var(--muted); font-weight: 400; }
+  .row { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-end; justify-content: center; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .cell small { color: var(--muted); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .icon-xl { width: 150px; filter: drop-shadow(0 12px 24px rgba(0, 40, 120, 0.3)); }
+  .icon-s { width: 56px; filter: drop-shadow(0 4px 8px rgba(0, 40, 120, 0.25)); }
+  .icon-xs { width: 40px; }
+  .shapes { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .mask { width: 80px; height: 80px; overflow: hidden; }
+  .mask svg { width: 80px; display: block; }
+  .mask.rounded { border-radius: 18px; } .mask.squircle { border-radius: 34%; } .mask.teardrop { border-radius: 50% 50% 50% 14%; } .mask.circle { border-radius: 50%; }
+  .homescreen { display: flex; gap: 18px; padding: 16px 20px; border-radius: 20px; background: linear-gradient(160deg, #3B4F6E, #1B2638); }
+  .homescreen .cell small { color: #E6ECF5; text-transform: none; letter-spacing: 0; font-size: 0.72rem; }
+
+  /* The V4 wordmark: Nunito Black "Nearby" + the U glowing turmeric to saffron, a soft road line under it. */
+  .wm { font-family: var(--font-display); font-weight: 900; letter-spacing: -0.01em; display: inline-flex; align-items: flex-end; line-height: 1; white-space: nowrap; position: relative; padding-bottom: 0.14em; color: var(--fg); }
+  .wm .u { background: linear-gradient(180deg, #FFE08A, #FF9F1C); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 0.03em; }
+  .wm::after { content: ''; position: absolute; left: 0.05em; right: 0.15em; bottom: 0; height: 0.12em; border-radius: 1em; background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(120,150,200,.45) 45%, #FFB547 100%); }
+  .on-blue .wm, .wm.white { color: #FFFFFF; }
+  .on-blue .wm::after, .wm.white::after { background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 45%, #FFB547 100%); }
+
+  /* Phones for the opening animation and the loader. */
+  .phones { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+  .phone {
+    width: min(240px, 78vw); aspect-ratio: 9 / 18.5; max-width: 100%; border-radius: 32px; overflow: hidden; position: relative;
+    box-shadow: 0 0 0 8px #0B1220, 0 18px 40px rgba(0, 20, 60, 0.35);
+    background: linear-gradient(150deg, #0A3FB8 0%, #1E6BF5 55%, #4FA3FF 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  }
+  .phone svg.rings { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .phone svg.mark { width: 60%; overflow: visible; position: relative; }
+  .phone .wm { font-size: 1.9rem; position: relative; }
+  .phone .te { font-family: var(--font-telugu); color: rgba(255,255,255,.82); font-size: 0.9rem; position: relative; }
+  .phone .partner-tag { position: relative; font: 700 0.68rem var(--font-body); letter-spacing: 0.16em; color: #3A2200; background: linear-gradient(90deg, #FFC93C, #FF9F1C); border-radius: 999px; padding: 4px 12px; }
+  .controls { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  button { font: 600 0.92rem var(--font-body); color: #FFFFFF; background: var(--accent); border: 0; border-radius: 999px; padding: 10px 22px; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  label.slow { color: var(--muted); font-size: 0.85rem; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+
+  /* Opening animation (about 1.3 s). */
+  .open { --s: 1.35; }
+  .open .ring { transform-box: view-box; transform-origin: 160px 300px; animation: ring calc(.5s * var(--s)) cubic-bezier(.2,.7,.3,1) both; }
+  .open .ring.r2 { animation-delay: calc(.08s * var(--s)); }
+  .open .orbit { transform-box: view-box; transform-origin: 160px 300px; animation: orbit calc(.42s * var(--s)) cubic-bezier(.2,.8,.3,1) both; }
+  .open .orbit.o1 { animation-delay: calc(.42s * var(--s)); }
+  .open .orbit.o2 { animation-delay: calc(.5s * var(--s)); --from: 32deg; }
+  .open .orbit.o3 { animation-delay: calc(.58s * var(--s)); --from: -30deg; }
+  .open .halo { opacity: 0; transform-box: fill-box; transform-origin: center; animation: pulse calc(.5s * var(--s)) ease-out both; }
+  .open .halo.h1 { animation-delay: calc(.84s * var(--s)); } .open .halo.h2 { animation-delay: calc(.92s * var(--s)); } .open .halo.h3 { animation-delay: calc(1s * var(--s)); }
+  .open .pin { transform-box: view-box; transform-origin: 34px 57px; animation: drop calc(.3s * var(--s)) cubic-bezier(.3,1.5,.5,1) calc(.08s * var(--s)) both; }
+  .open .roadmask { stroke-dasharray: 130; stroke-dashoffset: 130; animation: draw calc(.4s * var(--s)) cubic-bezier(.45,0,.2,1) calc(.25s * var(--s)) forwards; }
+  .open .home { transform-box: view-box; transform-origin: 86px 59px; animation: rise calc(.24s * var(--s)) cubic-bezier(.3,1.6,.5,1) calc(.45s * var(--s)) both; }
+  .open .wm, .open .te, .open .partner-tag { animation: up calc(.3s * var(--s)) ease-out calc(.6s * var(--s)) both; }
+  .open .te { animation-delay: calc(.66s * var(--s)); } .open .partner-tag { animation-delay: calc(.72s * var(--s)); }
+  @keyframes ring { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes orbit { from { transform: rotate(var(--from, -34deg)); opacity: 0; } 60% { opacity: 1; } to { transform: rotate(0); opacity: 1; } }
+  @keyframes pulse { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(3.2); opacity: 0; } }
+  @keyframes drop { 0% { transform: translateY(-26px) scale(.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes rise { 0% { transform: scale(0); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  @keyframes up { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* Loader (2.4 s loop). */
+  .loop { --t: 2.4s; }
+  .loop .scene { animation: scene var(--t) ease-in-out infinite; }
+  @keyframes scene { 0% { opacity: 1; } 80% { opacity: 1; } 98%, 100% { opacity: 0; } }
+  .loop .ring { transform-box: view-box; transform-origin: 60px 60px; animation: lring var(--t) cubic-bezier(.2,.7,.3,1) infinite; }
+  .loop .ring.r2 { animation-name: lring2; }
+  @keyframes lring { 0% { transform: scale(.4); opacity: 0; } 16%, 100% { transform: scale(1); opacity: 1; } }
+  @keyframes lring2 { 0%, 3% { transform: scale(.4); opacity: 0; } 19%, 100% { transform: scale(1); opacity: 1; } }
+  .loop .pin { transform-box: view-box; transform-origin: 34px 57px; animation: ldrop var(--t) cubic-bezier(.3,1.5,.5,1) infinite; }
+  @keyframes ldrop { 0% { transform: translateY(-26px) scale(.6); opacity: 0; } 12%, 100% { transform: none; opacity: 1; } }
+  .loop .roadmask { stroke-dasharray: 130; animation: ldraw var(--t) linear infinite; }
+  @keyframes ldraw { 0%, 8% { stroke-dashoffset: 130; animation-timing-function: cubic-bezier(.3,0,.7,1); } 32%, 100% { stroke-dashoffset: 0; } }
+  .loop .home { transform-box: view-box; transform-origin: 86px 59px; animation: lrise var(--t) cubic-bezier(.3,1.6,.5,1) infinite; }
+  @keyframes lrise { 0%, 25% { transform: scale(.2); opacity: 0; } 35%, 100% { transform: none; opacity: 1; } }
+  .loop .orbit { transform-box: view-box; transform-origin: 60px 60px; animation: lorbit var(--t) cubic-bezier(.2,.8,.3,1) infinite; }
+  .loop .orbit.o2 { animation-name: lorbit2; } .loop .orbit.o3 { animation-name: lorbit3; }
+  @keyframes lorbit { 0%, 28% { transform: rotate(-34deg); opacity: 0; } 38% { opacity: 1; } 46%, 100% { transform: rotate(0); opacity: 1; } }
+  @keyframes lorbit2 { 0%, 31% { transform: rotate(32deg); opacity: 0; } 41% { opacity: 1; } 49%, 100% { transform: rotate(0); opacity: 1; } }
+  @keyframes lorbit3 { 0%, 34% { transform: rotate(-30deg); opacity: 0; } 44% { opacity: 1; } 52%, 100% { transform: rotate(0); opacity: 1; } }
+  .loop .halo { transform-box: fill-box; transform-origin: center; animation: lpulse var(--t) ease-out infinite; opacity: 0; }
+  .loop .halo.h2 { animation-name: lpulse2; } .loop .halo.h3 { animation-name: lpulse3; }
+  @keyframes lpulse { 0%, 46% { transform: scale(1); opacity: 0; } 48% { opacity: .7; } 68%, 100% { transform: scale(3.2); opacity: 0; } }
+  @keyframes lpulse2 { 0%, 50% { transform: scale(1); opacity: 0; } 52% { opacity: .7; } 72%, 100% { transform: scale(3.2); opacity: 0; } }
+  @keyframes lpulse3 { 0%, 54% { transform: scale(1); opacity: 0; } 56% { opacity: .7; } 76%, 100% { transform: scale(3.2); opacity: 0; } }
+  .loaders { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; justify-content: center; }
+  .loadscreen { width: 220px; aspect-ratio: 9 / 13; border-radius: 22px; overflow: hidden; background: linear-gradient(150deg, #0A3FB8 0%, #1E6BF5 55%, #4FA3FF 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+  .loadscreen svg { width: 92%; overflow: visible; }
+  .loadscreen span { color: rgba(255,255,255,.9); font-size: .8rem; font-weight: 500; }
+  .loadcard { display: flex; align-items: center; gap: 12px; background: #FFFFFF; border: 1px solid #DCE5F2; border-radius: 18px; padding: 10px 14px; color: #0C1424; font-size: .9rem; font-weight: 500; }
+  .loadcard svg { width: 84px; overflow: visible; }
+  .loadbtn { display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 20px 0 12px; border-radius: 999px; color: #FFFFFF; font-weight: 600; font-size: .92rem; background: linear-gradient(90deg, #0055D3, #1D76FA); }
+  .loadbtn svg { width: 34px; overflow: visible; }
+
+  /* The name in the app. */
+  .mocks { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .mocks { grid-template-columns: 1fr; } }
+  .label { font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .app { border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: #F9FCFF; }
+  .appbar { background: linear-gradient(135deg, #0055D3, #1D76FA); padding: 16px 14px 14px; display: flex; align-items: center; gap: 10px; }
+  .appbar .logo { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3); display: grid; place-items: center; flex-shrink: 0; }
+  .appbar .logo svg { width: 30px; }
+  .appbar .brand { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .appbar .wm { font-size: 1.5rem; align-self: flex-start; }
+  .appbar .sub { color: rgba(255,255,255,.82); font-size: .72rem; margin-top: 2px; }
+  .appbar .actions { display: flex; gap: 8px; } .appbar .actions span { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3); }
+  .homebody { padding: 14px; display: flex; flex-direction: column; gap: 10px; } .homebody div { height: 40px; border-radius: 14px; background: #E7EEFA; } .homebody div:nth-child(2) { height: 70px; }
+  .welcome { border-radius: 22px; overflow: hidden; background: linear-gradient(160deg, #0A3FB8 0%, #1E6BF5 60%, #4FA3FF 100%); padding: 26px 18px 18px; display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 270px; justify-content: center; text-align: center; }
+  .welcome svg { width: 84px; } .welcome .wm { font-size: 2.5rem; }
+  .welcome .te { font-family: var(--font-telugu); color: rgba(255,255,255,.8); font-size: .95rem; }
+  .welcome .tag { color: rgba(255,255,255,.88); font-size: .82rem; }
+  .welcome .cta { margin-top: 8px; background: #FFFFFF; color: #0055D3; font-weight: 600; font-size: .85rem; border-radius: 999px; padding: 9px 22px; }
+  @media (prefers-reduced-motion: reduce) { .open *, .loop * { animation-duration: 1ms !important; animation-delay: 0s !important; } }
+</style>
+
+<div class="page">
+  <header>
+    <span class="wm hero-word">Nearby<span class="u">U</span></span>
+    <p>The final NearbyU brand: the S1 logo, the opening animation, the loader and the V4 name. The partner app keeps the same blue, with a saffron PARTNER label at the bottom of its icon (inside the area every phone keeps, whatever shape it cuts icons to) and a Partner tag on its opening screen.</p>
+  </header>
+
+  <section>
+    <h2>App icons <span>customer and partner, the partner icon cut to the shapes phones use, and on a home screen</span></h2>
+    <div class="row" id="icons"></div>
+  </section>
+
+  <section>
+    <h2>Opening animation <span>about 1.3 seconds, plays once when the app opens</span></h2>
+    <div class="phones" id="opening"></div>
+    <div class="controls"><button type="button" id="replay">Replay</button><label class="slow"><input type="checkbox" id="slow"> Slow motion (×4)</label></div>
+  </section>
+
+  <section>
+    <h2>Loader <span>the opening animation on a smooth 2.4-second loop</span></h2>
+    <div class="loaders" id="loaders"></div>
+  </section>
+
+  <section>
+    <h2>The name in the app <span>V4 in the Home tab header and on the first-open / logged-out screen</span></h2>
+    <div class="mocks" id="mocks"></div>
+  </section>
+</div>
+
+<script>
+let uid = 0;
+const WORD = (white = true) => `<span class="wm${white ? ' white' : ''}">Nearby<span class="u">U</span></span>`;
+// The approved S1 mark.
+const markParts = (fg, cut) => ({
+  road: `<path d="M27 54V70A33 33 0 0 0 93 70V58H79V70A19 19 0 0 1 41 70V54Z" fill="${fg}" stroke="${fg}" stroke-width="1.5" stroke-linejoin="round"/><path d="M34 60V70A26 26 0 0 0 86 70V62" fill="none" stroke="${cut}" stroke-width="2.4" stroke-dasharray="4 5.5" stroke-linecap="round"/>`,
+  home: `<path d="M68 59V40H62L86 16L110 40H104V59Z" fill="${fg}" stroke="${fg}" stroke-width="2.5" stroke-linejoin="round"/><path d="M79.5 59.5V50.5a6.5 6.5 0 0 1 13 0V59.5Z" fill="${cut}"/><circle cx="89.3" cy="54.5" r="1.4" fill="${fg}"/>`,
+  pin: `<path d="M34 57C29 50.5 17 40.5 17 26.5A17 17 0 0 1 51 26.5C51 40.5 39 50.5 34 57Z" fill="${fg}" stroke="${cut}" stroke-width="3" stroke-linejoin="round"/><circle cx="34" cy="26.5" r="6.6" fill="${cut}"/>`,
+});
+const markAll = (fg, cut) => { const m = markParts(fg, cut); return m.road + m.home + m.pin; };
+
+// App icon: S1 background; the partner one adds a saffron PARTNER ribbon across the bottom-right corner.
+function icon(partner, cls) {
+  const p = 'i' + uid++;
+  // Partner: a saffron pill centred at the bottom, kept inside the circle any launcher shape keeps.
+  const ribbon = partner ? `<rect x="33" y="88" width="54" height="14" rx="7" fill="url(#${p}rib)"/><text x="60" y="98.1" text-anchor="middle" font-family="Poppins, sans-serif" font-weight="700" font-size="7.6" letter-spacing="1.1" fill="#3A2200">PARTNER</text>` : '';
+  return `<svg class="${cls}" viewBox="0 0 120 120" role="img" aria-label="NearbyU ${partner ? 'Partner' : ''} icon"><defs>
+      <clipPath id="${p}c"><rect width="120" height="120" rx="28"/></clipPath>
+      <linearGradient id="${p}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0A3FB8"/><stop offset=".55" stop-color="#1E6BF5"/><stop offset="1" stop-color="#4FA3FF"/></linearGradient>
+      <linearGradient id="${p}rib" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFC93C"/><stop offset="1" stop-color="#FF9F1C"/></linearGradient></defs>
+    <g clip-path="url(#${p}c)"><rect width="120" height="120" fill="url(#${p}g)"/>
+      <g fill="none" stroke="#FFFFFF" stroke-width="1.2" opacity=".12"><circle cx="80" cy="44" r="50"/><circle cx="80" cy="44" r="76"/></g>
+      <g fill="#FFFFFF" opacity=".45"><circle cx="31" cy="27" r="2.6"/><circle cx="15" cy="104" r="2.6"/><circle cx="103" cy="112" r="2.2"/></g>
+      ${ribbon}</g>
+    <g transform="${partner ? 'translate(20 9) scale(.66)' : 'translate(11 14) scale(.8)'}">${markAll('#FFFFFF', '#0B4FD0')}</g></svg>`;
+}
+document.getElementById('icons').innerHTML = `
+  <div class="cell">${icon(false, 'icon-xl')}<small>Customer</small></div>
+  <div class="cell">${icon(true, 'icon-xl')}<small>Partner</small></div>
+  <div class="shapes">
+    ${['rounded', 'squircle', 'teardrop', 'circle'].map((shape) => `<div class="cell"><div class="mask ${shape}">${icon(true, 'icon-m')}</div><small>${shape}</small></div>`).join('')}
+  </div>
+  <div class="homescreen">
+    <div class="cell">${icon(false, 'icon-s')}<small>NearbyU</small></div>
+    <div class="cell">${icon(true, 'icon-s')}<small>NearbyU Partner</small></div>
+  </div>`;
+
+// Opening animation.
+function opening(partner) {
+  const id = 'o' + uid++;
+  const m = markParts('#FFFFFF', '#0B4FD0');
+  return `<div class="cell"><div class="phone" data-open>
+    <svg class="rings" viewBox="0 0 320 658" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <g fill="none" stroke="#FFFFFF" stroke-width="1.6"><g opacity=".14"><circle class="ring" cx="160" cy="300" r="140"/></g><g opacity=".09"><circle class="ring r2" cx="160" cy="300" r="210"/></g></g>
+      ${[[46, 200, 5, 1], [36, 430, 5, 2], [268, 470, 4.4, 3]].map(([x, y, r, i]) => `<g class="orbit o${i}"><circle class="halo h${i}" cx="${x}" cy="${y}" r="${r}" fill="none" stroke="#FFFFFF" stroke-width="1.5"/><circle cx="${x}" cy="${y}" r="${r}" fill="#FFFFFF" opacity=".55"/></g>`).join('')}
+    </svg>
+    <svg class="mark" viewBox="10 10 104 100" role="img" aria-label="NearbyU"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="120"><path class="roadmask" d="M34 50V70A26 26 0 0 0 86 70V56" fill="none" stroke="#FFFFFF" stroke-width="22"/></mask></defs>
+      <g mask="url(#${id})">${m.road}</g><g class="home">${m.home}</g><g class="pin">${m.pin}</g></svg>
+    ${WORD()}<span class="te">నియర్‌బై యు</span>${partner ? '<span class="partner-tag">PARTNER</span>' : ''}
+  </div><small>${partner ? 'Partner app' : 'Customer app'}</small></div>`;
+}
+document.getElementById('opening').innerHTML = opening(false) + opening(true);
+const phones = [...document.querySelectorAll('[data-open]')];
+const slow = document.getElementById('slow');
+function play() {
+  for (const phone of phones) { phone.classList.remove('open'); phone.style.setProperty('--s', slow.checked ? '5.4' : '1.35'); void phone.offsetWidth; phone.classList.add('open'); }
+}
+document.getElementById('replay').addEventListener('click', play);
+slow.addEventListener('change', play);
+play();
+
+// Loader.
+function loader(fg, cut, rings = true) {
+  const id = 'l' + uid++;
+  const m = markParts(fg, cut);
+  const ringsSvg = rings ? `<g fill="none" stroke="${fg}" stroke-width="1.4"><g opacity=".22"><circle class="ring" cx="60" cy="60" r="70"/></g><g opacity=".14"><circle class="ring r2" cx="60" cy="60" r="100"/></g></g>
+    ${[[-6, 28, 4.4, 1], [-34, 112, 4.4, 2], [138, 118, 3.8, 3]].map(([x, y, r, i]) => `<g class="orbit o${i}"><circle class="halo h${i}" cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${fg}" stroke-width="1.4"/><circle cx="${x}" cy="${y}" r="${r}" fill="${fg}" opacity=".6"/></g>`).join('')}` : '';
+  return `<svg class="loop" viewBox="${rings ? '-50 -50 220 220' : '10 10 104 100'}" aria-hidden="true"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="120"><path class="roadmask" d="M34 50V70A26 26 0 0 0 86 70V56" fill="none" stroke="#FFFFFF" stroke-width="22"/></mask></defs>
+    <g class="scene">${ringsSvg}<g mask="url(#${id})">${m.road}</g><g class="home">${m.home}</g><g class="pin">${m.pin}</g></g></svg>`;
+}
+document.getElementById('loaders').innerHTML = `
+  <div class="loadscreen">${loader('#FFFFFF', '#1559E6')}<span>Finding help near you…</span></div>
+  <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start">
+    <div class="loadcard">${loader('#0055D3', '#FFFFFF')}Loading your bookings</div>
+    <div class="loadbtn">${loader('#FFFFFF', '#0A5BE0', false)}Booking…</div>
+  </div>`;
+
+// The name in the app.
+const small = (fg, cut) => `<svg viewBox="10 10 104 100" aria-hidden="true">${markAll(fg, cut)}</svg>`;
+document.getElementById('mocks').innerHTML = `
+  <div><div class="label">Home tab header</div><div class="app">
+    <div class="appbar"><div class="logo">${small('#FFFFFF', '#1E68EE')}</div><div class="brand">${WORD()}<span class="sub">Help that's near you</span></div><div class="actions"><span></span><span></span></div></div>
+    <div class="homebody"><div></div><div></div><div></div></div></div></div>
+  <div><div class="label">First open / logged out</div><div class="welcome">
+    ${small('#FFFFFF', '#1559E6')}${WORD()}<span class="te">నియర్‌బై యు</span><span class="tag">Workers, shops and help, near you</span><span class="cta">Get started</span></div></div>`;
+</script>

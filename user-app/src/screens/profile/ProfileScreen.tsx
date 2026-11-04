@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { DetailRow, GradientCard } from '@/components/GradientCard';
 import { useQueryClient } from '@tanstack/react-query';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,13 +11,15 @@ import { PullToRefresh } from '@/components/PullToRefresh';
 import { SmartImage } from '@/components/SmartImage';
 import { WorkerProfileCard } from '@/components/WorkerProfileCard';
 import { BusinessProfileCard } from '@/components/BusinessProfileCard';
-import { ProfileStatsRow } from '@/components/ProfileStatsRow';
 import { ProfileActivity, ProfileOrders } from '@/components/ProfileActivity';
 import { SubscriptionCard } from '@/components/SubscriptionCard';
+import { EditProfileModal } from '@/components/EditProfileModal';
+import { placeName } from '@/utils/formatAddress';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
 import { useMyWorkerProfile } from '@/hooks/useWorkerMutations';
 import { useMyBusinessProfile } from '@/hooks/useBusinessMutations';
+import { FullText } from '@/components/FullText';
 
 // A deeper three-stop blue for the profile card, so it reads richer than the flat header.
 const HERO_GRADIENT = ['#0A3FAE', '#0055D3', '#2B83FF'] as const;
@@ -57,6 +60,8 @@ export function ProfileScreen() {
   const tabBarClearance = Math.max(insets.bottom, 18) + 66 + 24;
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [editVisible, setEditVisible] = useState(false);
+  const { isDark } = useThemeColors();
   // Everything on this tab (profiles, bookings, orders) reloads together.
   const onRefresh = async () => {
     setRefreshing(true);
@@ -93,9 +98,9 @@ export function ProfileScreen() {
                   )}
                 </View>
                 <View style={styles.heroIdentity}>
-                  <Text style={styles.heroName} numberOfLines={1}>
+                  <FullText style={styles.heroName} numberOfLines={1}>
                     {account.fullName}
-                  </Text>
+                  </FullText>
                   {account.status === 'active' ? (
                     <View style={styles.statusPill}>
                       <View style={styles.statusDot} />
@@ -110,35 +115,22 @@ export function ProfileScreen() {
           {account ? <SubscriptionCard /> : null}
 
           {account ? (
-            <View style={styles.detailsSection}>
-              <Text style={[styles.detailsTitle, { color: colors.textMuted }]}>{t('profile.detailsTitle')}</Text>
-              <View style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                {[
-                  { icon: 'phone' as const, label: t('profile.detailPhone'), value: account.mobileNumber },
-                  ...(account.email
-                    ? [{ icon: 'envelope' as const, label: t('profile.detailEmail'), value: account.email }]
-                    : []),
-                ].map((row, index) => (
-                  <View
-                    key={row.icon}
-                    style={[
-                      styles.detailRow,
-                      index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null,
-                    ]}
-                  >
-                    <View style={[styles.detailIcon, { backgroundColor: `${colors.primary}14` }]}>
-                      <FontAwesome6 name={row.icon} size={13} color={colors.primary} solid />
-                    </View>
-                    <View style={styles.detailText}>
-                      <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{row.label}</Text>
-                      <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
-                        {row.value}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
+            <GradientCard
+              title={t('profile.detailsTitle')}
+              icon="id-card"
+              action={{ label: t('common.edit'), icon: 'pen', onPress: () => setEditVisible(true) }}
+              style={styles.detailsCard}
+            >
+              {[
+                { icon: 'phone' as const, label: t('profile.detailPhone'), value: account.mobileNumber },
+                ...(account.email ? [{ icon: 'envelope' as const, label: t('profile.detailEmail'), value: account.email }] : []),
+                ...(placeName(account.locationAddress)
+                  ? [{ icon: 'location-dot' as const, label: t('profile.detailPlace'), value: placeName(account.locationAddress) }]
+                  : []),
+              ].map((row, index) => (
+                <DetailRow key={row.icon} icon={row.icon} label={row.label} value={row.value} first={index === 0} />
+              ))}
+            </GradientCard>
           ) : null}
 
           {account ? (
@@ -151,22 +143,6 @@ export function ProfileScreen() {
           {workerProfile ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.workerSection')}</Text>
-              <ProfileStatsRow
-                stats={[
-                  {
-                    icon: 'star',
-                    value: workerProfile.ratingAverage != null ? workerProfile.ratingAverage.toFixed(1) : t('workerReviews.new'),
-                    label: t('workerReviews.statRating'),
-                    tint: colors.primary,
-                  },
-                  {
-                    icon: 'circle-check',
-                    value: String(workerProfile.ratingCount),
-                    label: t('workerReviews.statRatedJobs'),
-                    tint: colors.primary,
-                  },
-                ]}
-              />
               <WorkerProfileCard profile={workerProfile} />
             </View>
           ) : null}
@@ -174,23 +150,6 @@ export function ProfileScreen() {
           {businessProfile ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('profile.businessSection')}</Text>
-              <ProfileStatsRow
-                stats={[
-                  {
-                    icon: 'star',
-                    value:
-                      businessProfile.ratingAverage != null ? businessProfile.ratingAverage.toFixed(1) : t('workerReviews.new'),
-                    label: t('workerReviews.statRating'),
-                    tint: colors.primary,
-                  },
-                  {
-                    icon: 'bag-shopping',
-                    value: String(businessProfile.ratingCount),
-                    label: t('profile.ratedOrders'),
-                    tint: colors.primary,
-                  },
-                ]}
-              />
               <BusinessProfileCard profile={businessProfile} />
             </View>
           ) : null}
@@ -206,6 +165,7 @@ export function ProfileScreen() {
           ) : null}
         </ScrollView>
       </PullToRefresh>
+      <EditProfileModal visible={editVisible} onClose={() => setEditVisible(false)} />
     </ScreenContainer>
   );
 }
@@ -219,7 +179,7 @@ const styles = StyleSheet.create({
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatarRing: { width: 58, height: 58, borderRadius: 29, padding: 3, backgroundColor: 'rgba(255, 255, 255, 0.28)' },
   avatar: { flex: 1, borderRadius: 26, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontFamily: fonts.semiBold, fontSize: 22, lineHeight: 28, color: '#0055D3' },
+  avatarText: { fontFamily: fonts.semiBold, fontSize: 22, lineHeight: 28, color: '#0055D3', includeFontPadding: false, transform: [{ translateY: 1 }] },
   heroIdentity: { flex: 1, gap: 6 },
   heroName: { ...typography.subheading, fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 24, color: '#FFFFFF' },
   statusPill: {
@@ -236,21 +196,7 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ADE80' },
   statusText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11, color: '#FFFFFF' },
-  // Same header and card style as the activity cards below.
-  detailsSection: { marginBottom: 22 },
-  detailsTitle: {
-    ...typography.caption,
-    fontFamily: fonts.semiBold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-  detailsCard: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 14 },
-  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  detailIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  detailText: { flex: 1 },
-  detailLabel: { ...typography.caption, fontSize: 11 },
-  detailValue: { ...typography.body, fontFamily: fonts.medium, fontSize: 14, marginTop: 1 },
+  detailsCard: { marginBottom: 20 },
   section: { marginBottom: 4 },
   sectionTitle: { ...typography.caption, fontFamily: fonts.medium, marginBottom: 10, marginLeft: 4 },
   emptyCard: {

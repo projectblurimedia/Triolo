@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { GlassBackdrop, GlassCard } from './Glass';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /** A from – to range of whole days; null ends are open ("since", "until", or all time). */
 export interface DateRange {
@@ -131,9 +132,9 @@ export function DateRangeSheet({
         <Text style={[styles.boxLabel, { color: active ? colors.primary : colors.textMuted }]}>
           {t(which === 'from' ? 'dateRange.from' : 'dateRange.to')}
         </Text>
-        <Text style={[styles.boxValue, { color: date ? colors.text : colors.textMuted }]} numberOfLines={1}>
+        <FullText style={[styles.boxValue, { color: date ? colors.text : colors.textMuted }]} numberOfLines={1}>
           {date ? `${formatDay(date)} ${date.getFullYear()}` : t('dateRange.anyDay')}
-        </Text>
+        </FullText>
       </Pressable>
     );
   };
@@ -148,9 +149,9 @@ export function DateRangeSheet({
             </View>
             <View style={styles.flex}>
               <Text style={styles.headTitle}>{t('dateRange.title')}</Text>
-              <Text style={styles.headText} numberOfLines={1}>
+              <FullText style={styles.headText} numberOfLines={1}>
                 {label ?? t('dateRange.all')}
-              </Text>
+              </FullText>
             </View>
             <Pressable onPress={onClose} hitSlop={8} style={styles.close} accessibilityLabel={t('common.close')}>
               <FontAwesome6 name="xmark" size={14} color="#FFFFFF" solid />
@@ -272,9 +273,9 @@ export function DateRangeSheet({
               >
                 <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.apply}>
                   <FontAwesome6 name="check" size={13} color="#FFFFFF" solid />
-                  <Text style={styles.applyText} numberOfLines={1}>
+                  <FullText style={styles.applyText} numberOfLines={1}>
                     {label ? t('dateRange.showRange', { range: label }) : t('dateRange.showAll')}
-                  </Text>
+                  </FullText>
                 </LinearGradient>
               </Pressable>
             </View>

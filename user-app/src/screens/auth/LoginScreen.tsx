@@ -12,6 +12,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
 import { useRequestLoginOtp } from '@/hooks/useAuthMutations';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
+import { FullText } from '@/components/FullText';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -127,9 +128,9 @@ export function LoginScreen({ navigation }: Props) {
                   <View style={[styles.perkIcon, { backgroundColor: `${colors.primary}14` }]}>
                     <FontAwesome6 name={perk.icon} size={14} color={colors.primary} solid />
                   </View>
-                  <Text style={[styles.perkText, { color: colors.textMuted }]} numberOfLines={2}>
+                  <FullText style={[styles.perkText, { color: colors.textMuted }]} numberOfLines={2}>
                     {t(`auth.perks.${perk.key}`)}
-                  </Text>
+                  </FullText>
                 </View>
               ))}
             </View>

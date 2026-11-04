@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { ALERTS_CHANNEL, NOTIFICATION_SOUND, OLD_CHANNELS } from '@/constants/notificationChannels';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { pushTokenService } from '@/services/pushTokenService';
@@ -44,10 +45,12 @@ export function usePushNotifications() {
 
     (async () => {
       try {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'default',
+        await Notifications.setNotificationChannelAsync(ALERTS_CHANNEL, {
+          name: 'Triolo',
           importance: Notifications.AndroidImportance.HIGH,
+          sound: NOTIFICATION_SOUND,
         });
+        for (const id of OLD_CHANNELS) await Notifications.deleteNotificationChannelAsync(id).catch(() => {});
 
         const permission = await Notifications.requestPermissionsAsync();
         if (!permission.granted || cancelled) {

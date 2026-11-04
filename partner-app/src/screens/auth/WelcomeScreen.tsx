@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { NearbyMark } from '@/components/brand/NearbyMark';
+import { Wordmark } from '@/components/brand/Wordmark';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -8,6 +10,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LanguagePickerModal } from '@/components/LanguagePickerModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
+import { FullText } from '@/components/FullText';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 
@@ -81,16 +84,16 @@ export function WelcomeScreen({ navigation }: Props) {
           </Pressable>
 
           <View style={styles.brandIcon}>
-            <FontAwesome6 name="handshake" size={24} color="#0055D3" solid />
+            <NearbyMark size={42} color="#0055D3" />
           </View>
-          <View style={styles.brandRow}>
-            {/* Two pieces in the same script face: as one string the font drew only "Triolo" on some phones. */}
-            <Text style={styles.brandText}>Triolo</Text>
-            <Text style={styles.brandText}>{t('partnerWelcome.partnerTag')}</Text>
-          </View>
-          <Text style={styles.headline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+          <Wordmark size={42} style={styles.brandName} />
+          <Text style={styles.brandTelugu}>నియర్‌బై యు</Text>
+          <LinearGradient colors={['#FFC93C', '#FF9F1C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.partnerPill}>
+            <Text style={styles.partnerPillText}>PARTNER</Text>
+          </LinearGradient>
+          <FullText style={styles.headline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
             {t('partnerWelcome.headline')}
-          </Text>
+          </FullText>
           <Text style={styles.subline}>{t('partnerWelcome.subline')}</Text>
         </LinearGradient>
 
@@ -200,9 +203,9 @@ function EntryCard({ icon, title, subtitle, colors, onPress }: EntryCardProps) {
       </LinearGradient>
       <View style={styles.cardText}>
         <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.cardSubtitle, { color: colors.textMuted }]} numberOfLines={2}>
+        <FullText style={[styles.cardSubtitle, { color: colors.textMuted }]} numberOfLines={2}>
           {subtitle}
-        </Text>
+        </FullText>
       </View>
       <View style={[styles.cardArrow, { backgroundColor: `${colors.primary}12` }]}>
         <FontAwesome6 name="arrow-right" size={13} color={colors.primary} solid />
@@ -257,6 +260,10 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0.7, height: 0 },
     textShadowRadius: 1,
   },
+  brandName: { alignSelf: 'center', marginTop: 8 },
+  brandTelugu: { color: 'rgba(255,255,255,0.82)', fontSize: 15, marginTop: 4 },
+  partnerPill: { marginTop: 8, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 4 },
+  partnerPillText: { color: '#3A2200', fontFamily: fonts.semiBold, fontSize: 11, letterSpacing: 2 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 },
   headline: { color: '#FFFFFF', fontFamily: fonts.medium, fontSize: 18, lineHeight: 25, marginTop: 8, textAlign: 'center' },
   subline: {

@@ -14,6 +14,7 @@ import { JobPostViewer, jobSeekerService } from '@/services/jobSeekerService';
 import { payIfNeeded } from '@/state/payGateStore';
 import { openSubscribe } from '@/state/subscribeStore';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 // "5m" / "3h" / "2d" ago (kept here rather than imported, so NotificationsModal can open this sheet).
 function ago(iso: string, justNow: string): string {
@@ -92,9 +93,9 @@ export function JobPostViewersSheet({ postId, title, onClose }: { postId: string
               <View style={[styles.blurBar, { width: 92, backgroundColor: `${GOLD_DEEP}40` }]} />
               <View style={[styles.blurBar, { width: 54, backgroundColor: `${GOLD_DEEP}2E` }]} />
             </View>
-            <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
               {t('jobViews.hiddenNumber')} · {meta}
-            </Text>
+            </FullText>
           </View>
           {viewer.isNew ? <View style={[styles.newDot, { backgroundColor: brandColors.error }]} /> : null}
           <Pressable onPress={() => unlock(viewer)} disabled={!!unlocking} accessibilityRole="button" style={({ pressed }) => [styles.unlockWrap, { opacity: pressed ? 0.9 : 1 }]}>
@@ -121,12 +122,12 @@ export function JobPostViewersSheet({ postId, title, onClose }: { postId: string
           <FontAwesome6 name="user" size={14} color={colors.primary} solid />
         </View>
         <View style={styles.flex}>
-          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
             {viewer.name ?? t('jobViews.someone')}
-          </Text>
-          <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+          </FullText>
+          <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
             {meta}
-          </Text>
+          </FullText>
         </View>
         {viewer.isNew ? (
           <View style={[styles.newPill, { backgroundColor: `${brandColors.error}14` }]}>
@@ -156,10 +157,10 @@ export function JobPostViewersSheet({ postId, title, onClose }: { postId: string
             </View>
             <View style={styles.flex}>
               <Text style={styles.title}>{t('jobViews.title')}</Text>
-              <Text style={styles.subtitle} numberOfLines={1}>
+              <FullText style={styles.subtitle} numberOfLines={1}>
                 {title ? `${title} · ` : ''}
                 {t('jobViews.total', { count: data?.total ?? 0 })}
-              </Text>
+              </FullText>
             </View>
             <Pressable onPress={onClose} hitSlop={8} style={styles.close}>
               <FontAwesome6 name="xmark" size={14} color="#FFFFFF" solid />

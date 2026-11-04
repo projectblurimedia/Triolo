@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 const RED_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
@@ -39,9 +40,9 @@ export function CancelButton({ label, onPress, hint, icon = 'xmark' }: CancelBut
         <LinearGradient colors={RED_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.badge}>
           <FontAwesome6 name={icon} size={13} color="#FFFFFF" solid />
         </LinearGradient>
-        <Text style={[styles.label, { color: brandColors.error }]} numberOfLines={1}>
+        <FullText style={[styles.label, { color: brandColors.error }]} numberOfLines={1}>
           {label}
-        </Text>
+        </FullText>
       </Pressable>
       {hint ? <Text style={[styles.hint, { color: colors.textMuted }]}>{hint}</Text> : null}
     </View>

@@ -37,6 +37,7 @@ import { ALL_TIME, DateRange, inRange, rangeLabel } from '@/components/DateRange
 import { ActivitySummary } from '@/components/ActivitySummary';
 import { formatRupees } from '@/services/shopOrdersService';
 import { GivenBackError } from '@/utils/afterAccept';
+import { FullText } from '@/components/FullText';
 
 type Side = 'services' | 'shop' | 'job';
 // Activity is a record of what you did: requests waiting for an answer live in New for you.
@@ -242,9 +243,9 @@ export function BookingsScreen() {
             <FontAwesome6 name="user" size={16} color={colors.primary} solid />
           </View>
           <View style={styles.entryBody}>
-            <Text style={[styles.offerName, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.offerName, { color: colors.text }]} numberOfLines={1}>
               {item.customerFullName}
-            </Text>
+            </FullText>
             {item.direct ? (
               <View style={[styles.directTag, { backgroundColor: `${colors.primary}14` }]}>
                 <FontAwesome6 name="user-check" size={10} color={colors.primary} solid />
@@ -252,9 +253,9 @@ export function BookingsScreen() {
               </View>
             ) : null}
             {item.locationAddress ? (
-              <Text style={[styles.entryMeta, { color: colors.textMuted }]} numberOfLines={1}>
+              <FullText style={[styles.entryMeta, { color: colors.textMuted }]} numberOfLines={1}>
                 {placeName(item.locationAddress)}
-              </Text>
+              </FullText>
             ) : null}
           </View>
         </View>
@@ -363,31 +364,31 @@ export function BookingsScreen() {
         </View>
         <View style={styles.entryBody}>
           <View style={styles.entryTitleRow}>
-            <Text style={[styles.entryTitle, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.entryTitle, { color: colors.text }]} numberOfLines={1}>
               {customer}
-            </Text>
+            </FullText>
             <View style={[styles.statusPill, { backgroundColor: `${tone}1A` }]}>
-              <Text style={[styles.statusText, { color: tone }]} numberOfLines={1}>
+              <FullText style={[styles.statusText, { color: tone }]} numberOfLines={1}>
                 {statusLabel}
-              </Text>
+              </FullText>
             </View>
           </View>
-          <Text style={[styles.entryMeta, { color: colors.textMuted }]} numberOfLines={1}>
+          <FullText style={[styles.entryMeta, { color: colors.textMuted }]} numberOfLines={1}>
             {skills} · {formatDate(item.createdAt)}
             {amount != null ? ` · ₹${amount.toLocaleString('en-IN')}` : ''}
-          </Text>
-          <Text style={[styles.entryType, { color: accent }]} numberOfLines={1}>
+          </FullText>
+          <FullText style={[styles.entryType, { color: accent }]} numberOfLines={1}>
             {t(isProblem ? 'bookings.typeProblem' : 'bookings.typeQuickBook')}
-          </Text>
+          </FullText>
           {rating ? (
             <View style={styles.ratingRow}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <FontAwesome6 key={star} name="star" size={11} color={star <= rating ? STAR_COLOR : colors.border} solid />
               ))}
               {review ? (
-                <Text style={[styles.entryMeta, styles.reviewText, { color: colors.text }]} numberOfLines={1}>
+                <FullText style={[styles.entryMeta, styles.reviewText, { color: colors.text }]} numberOfLines={1}>
                   “{review}”
-                </Text>
+                </FullText>
               ) : null}
             </View>
           ) : null}
@@ -581,9 +582,9 @@ export function BookingsScreen() {
           return (
             <Pressable key={value} onPress={() => setPickedSide(value)} style={[styles.modeOption, active ? { backgroundColor: colors.primary } : null]}>
               <FontAwesome6 name={SIDE_ICONS[value]} size={12} color={active ? '#FFFFFF' : colors.textMuted} solid />
-              <Text style={[styles.modeText, { color: active ? '#FFFFFF' : colors.textMuted }]} numberOfLines={1}>
+              <FullText style={[styles.modeText, { color: active ? '#FFFFFF' : colors.textMuted }]} numberOfLines={1}>
                 {t(`homeSides.${value === 'services' ? 'services' : value === 'shop' ? 'shop' : 'jobPost'}`)}
-              </Text>
+              </FullText>
             </Pressable>
           );
         })}

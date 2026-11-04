@@ -49,6 +49,7 @@ import { firstName } from '@/utils/firstName';
 import { isTrackingDelivery, startDeliveryTracking, stopDeliveryTracking } from '@/services/deliveryTracking';
 import { LiveMap } from './LiveMap';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 // `name`: an item the shop types in itself (read from the list's photos). New ones have keys
@@ -524,10 +525,10 @@ export function ShopOrderModal() {
           <Text style={styles.avatarText}>{initialsOf(o.customerFullName)}</Text>
         </LinearGradient>
         <View style={styles.flex}>
-          <Text style={[styles.cardLabelInline, { color: colors.textMuted }]} numberOfLines={1}>
+          <FullText style={[styles.cardLabelInline, { color: colors.textMuted }]} numberOfLines={1}>
             {t('shopOrders.customer')}
             {manyShops && o.shopName ? ` · ${o.shopName}` : ''}
-          </Text>
+          </FullText>
           <Text style={[styles.name, { color: colors.text }]}>{o.customerFullName}</Text>
           {o.customerMobileNumber ? null : (
             <Text style={[styles.meta, { color: colors.textMuted }]}>{t('shopOrders.numberAfterAccept')}</Text>
@@ -746,12 +747,12 @@ export function ShopOrderModal() {
             <FontAwesome6 name="check" size={9} color={gradient[0]} solid />
           </View>
         ) : null}
-        <Text style={styles.wayTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+        <FullText style={styles.wayTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
           {title}
-        </Text>
-        <Text style={styles.waySub} numberOfLines={2}>
+        </FullText>
+        <FullText style={styles.waySub} numberOfLines={2}>
           {subtitle}
-        </Text>
+        </FullText>
       </LinearGradient>
     </Pressable>
   );
@@ -1264,13 +1265,13 @@ export function ShopOrderModal() {
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.flex}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <FullText style={styles.headerTitle} numberOfLines={1}>
                 {order ? t(`shopOrders.status.${order.status}.title`) : t('timeline.orderDetails')}
-              </Text>
+              </FullText>
               {order ? (
-                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                <FullText style={styles.headerSubtitle} numberOfLines={1}>
                   {`${order.customerFullName} · ${t(order.fulfillment === 'delivery' ? 'shopOrders.delivery' : 'shopOrders.pickup')}`}
-                </Text>
+                </FullText>
               ) : (
                 <View style={styles.subtitleBar} />
               )}

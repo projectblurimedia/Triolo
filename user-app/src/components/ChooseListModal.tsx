@@ -8,6 +8,7 @@ import { Button } from './Button';
 import { useListStore } from '@/state/listStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { listCountText } from '@/utils/listPhotos';
+import { FullText } from '@/components/FullText';
 
 // The app's own blue, like every other screen's icons.
 const LIST_GRADIENT = headerGradient;
@@ -62,12 +63,12 @@ export function ChooseListModal({ visible, onClose, onPick, onCreate, shopName }
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <FullText style={styles.headerTitle} numberOfLines={1}>
                 {t('chooseList.title')}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              </FullText>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {shopName ? t('chooseList.subtitleShop', { shop: shopName }) : t('chooseList.subtitle')}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>
@@ -91,9 +92,9 @@ export function ChooseListModal({ visible, onClose, onPick, onCreate, shopName }
               <View style={[styles.stepDot, { backgroundColor: colors.border }]}>
                 <Text style={[styles.stepNumber, { color: colors.textMuted }]}>2</Text>
               </View>
-              <Text style={[styles.stepText, { color: colors.textMuted }]} numberOfLines={1}>
+              <FullText style={[styles.stepText, { color: colors.textMuted }]} numberOfLines={1}>
                 {shopName ? t('chooseList.stepSend') : t('chooseList.stepShop')}
-              </Text>
+              </FullText>
             </View>
 
             {lists.map((list) => {
@@ -118,16 +119,16 @@ export function ChooseListModal({ visible, onClose, onPick, onCreate, shopName }
                     <FontAwesome6 name="basket-shopping" size={16} color="#FFFFFF" solid />
                   </LinearGradient>
                   <View style={styles.flex}>
-                    <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+                    <FullText style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
                       {list.name || t('chooseList.untitled')}
-                    </Text>
+                    </FullText>
                     <Text style={[styles.cardMeta, { color: colors.primary }]}>
                       {listCountText(t, list.items.length, (list.photos ?? []).length, list.voice?.seconds ?? null)}
                     </Text>
                     {list.items.length > 0 ? (
-                      <Text style={[styles.cardPreview, { color: colors.textMuted }]} numberOfLines={2}>
+                      <FullText style={[styles.cardPreview, { color: colors.textMuted }]} numberOfLines={2}>
                         {preview(list.items.map((item) => item.name))}
-                      </Text>
+                      </FullText>
                     ) : null}
                   </View>
                   <View

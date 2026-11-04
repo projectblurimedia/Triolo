@@ -5,6 +5,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { JobPost } from '@/services/jobSeekerService';
 import { fonts, headerGradient, typography } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /**
  * A job post's visits as one bright card — how many opened it and "See who viewed" — that opens
@@ -23,9 +24,9 @@ export function JobPostViewsCard({ post, onPress, showNew = false }: { post: Job
         </View>
         <View style={styles.flex}>
           <Text style={styles.value}>{t('jobViews.visits', { count: post.viewCount ?? 0 })}</Text>
-          <Text style={styles.text} numberOfLines={1}>
+          <FullText style={styles.text} numberOfLines={1}>
             {t('jobViews.seeWhoLong')}
-          </Text>
+          </FullText>
         </View>
         {fresh > 0 ? (
           <View style={styles.newPill}>

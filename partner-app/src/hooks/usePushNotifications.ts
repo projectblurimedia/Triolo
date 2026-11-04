@@ -1,4 +1,5 @@
 import { openDeliveries } from '@/state/deliveriesStore';
+import { ALERTS_CHANNEL, NOTIFICATION_SOUND, OLD_CHANNELS } from '@/constants/notificationChannels';
 import { useEffect } from 'react';
 import i18n from '@/localization/i18n';
 import { Platform, Vibration } from 'react-native';
@@ -160,9 +161,10 @@ export function usePushNotifications() {
 
     (async () => {
       try {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'default',
+        await Notifications.setNotificationChannelAsync(ALERTS_CHANNEL, {
+          name: 'Triolo',
           importance: Notifications.AndroidImportance.HIGH,
+          sound: NOTIFICATION_SOUND,
         });
         // Dedicated channel for Quick Book's broadcast offers — separate from 'default' so a
         // job offer reads as visibly more urgent (its own vibration pattern, heads-up at
@@ -175,8 +177,9 @@ export function usePushNotifications() {
           name: 'Job Offers',
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 400, 200, 400],
-          sound: 'default',
+          sound: NOTIFICATION_SOUND,
         });
+        for (const id of OLD_CHANNELS) await Notifications.deleteNotificationChannelAsync(id).catch(() => {});
 
         // Accept/Reject buttons on the notification itself, per explicit request — both
         // `opensAppToForeground: false` ("silent": tapping either never brings the app to

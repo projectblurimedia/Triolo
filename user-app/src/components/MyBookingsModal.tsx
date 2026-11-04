@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -16,14 +16,17 @@ import { openBookingTracker } from '@/state/bookingTrackerStore';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from './PullToRefresh';
 import { bookingStatusTitle } from '@/utils/bookingStatusText';
-import { CountBadge } from './CountBadge';
+import { FilterChips } from './FilterChips';
+import { FullText } from '@/components/FullText';
 
 interface MyBookingsModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Which filter to open on (Profile's stat tiles); All otherwise. */
+  initialFilter?: BookingFilter;
 }
 
-type Tab = 'active' | 'history';
+export type BookingFilter = 'active' | 'all' | 'quick' | 'problems' | 'finished' | 'notDone' | 'rated';
 type Entry =
   | { kind: 'booking'; id: string; createdAt: string; active: boolean; booking: CustomerBooking }
   | { kind: 'problem'; id: string; createdAt: string; active: boolean; problem: ProblemPost };
@@ -45,11 +48,15 @@ function formatDate(iso: string): string {
  * actions live. Problems nobody has taken yet stay in Your Problems only — they aren't
  * bookings yet.
  */
-export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
+export function MyBookingsModal({ visible, onClose, initialFilter }: MyBookingsModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<Tab>('active');
+  const [filter, setFilter] = useState<BookingFilter>(initialFilter ?? 'all');
+  // Each opening starts on the filter it was opened for.
+  useEffect(() => {
+    if (visible) setFilter(initialFilter ?? 'all');
+  }, [visible, initialFilter]);
   const [problemsVisible, setProblemsVisible] = useState(false);
   const bookings = useMyBookings(visible);
   const problems = useMyProblems(visible);
@@ -76,8 +83,39 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
     return [...fromBookings, ...fromProblems].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [bookings.data, problems.data]);
 
-  const shown = entries.filter((entry) => (tab === 'active' ? entry.active : !entry.active));
-  const activeCount = entries.filter((entry) => entry.active).length;
+  const matches = (entry: Entry, key: BookingFilter): boolean => {
+    const status = entry.kind === 'booking' ? entry.booking.status : entry.problem.status;
+    const isProblem = entry.kind === 'problem' || !!entry.booking.problemPostId;
+    const rating = entry.kind === 'booking' ? entry.booking.workerRating : entry.problem.workerRating;
+    switch (key) {
+      case 'active':
+        return entry.active;
+      case 'quick':
+        return !isProblem;
+      case 'problems':
+        return isProblem;
+      case 'finished':
+        return status === 'completed';
+      case 'notDone':
+        return status === 'cancelled' || status === 'expired';
+      case 'rated':
+        return rating != null;
+      default:
+        return true;
+    }
+  };
+  const shown = entries.filter((entry) => matches(entry, filter));
+  const filterOptions = (
+    [
+      { key: 'all', icon: 'list', label: t('myBookings.filters.all') },
+      { key: 'active', icon: 'person-running', label: t('myBookings.active') },
+      { key: 'quick', icon: 'bolt', label: t('myBookings.typeQuickBook') },
+      { key: 'problems', icon: 'clipboard-list', label: t('myBookings.filters.problems') },
+      { key: 'finished', icon: 'circle-check', label: t('myBookings.filters.finished') },
+      { key: 'notDone', icon: 'ban', label: t('myBookings.filters.notDone') },
+      { key: 'rated', icon: 'star', label: t('myBookings.filters.rated') },
+    ] as const
+  ).map((option) => ({ ...option, count: entries.filter((entry) => matches(entry, option.key)).length }));
   const loading = bookings.isLoading || problems.isLoading;
 
   const onRefresh = async () => {
@@ -126,25 +164,25 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
         </View>
         <View style={styles.cardBody}>
           <View style={styles.titleRow}>
-            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.title, { color: colors.text }]} numberOfLines={1}>
               {skills}
-            </Text>
+            </FullText>
             <View style={[styles.pill, { backgroundColor: `${tone}1A` }]}>
-              <Text style={[styles.pillText, { color: tone }]} numberOfLines={1}>
+              <FullText style={[styles.pillText, { color: tone }]} numberOfLines={1}>
                 {statusLabel}
-              </Text>
+              </FullText>
             </View>
           </View>
-          <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+          <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
             {t(isProblem ? 'myBookings.typeProblem' : 'myBookings.typeQuickBook')} · {formatDate(item.createdAt)}
             {amount != null ? ` · ₹${amount.toLocaleString('en-IN')}` : ''}
-          </Text>
+          </FullText>
           {workerName ? (
             <View style={styles.workerRow}>
               <FontAwesome6 name="user" size={10} color={colors.textMuted} solid />
-              <Text style={[styles.meta, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.meta, { color: colors.text }]} numberOfLines={1}>
                 {workerName}
-              </Text>
+              </FullText>
               {rating ? (
                 <View style={styles.ratingRow}>
                   <FontAwesome6 name="star" size={10} color={STAR_COLOR} solid />
@@ -158,11 +196,6 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
       </Pressable>
     );
   };
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'active', label: t('myBookings.active') },
-    { key: 'history', label: t('myBookings.history') },
-  ];
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -179,29 +212,15 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
             </Pressable>
             <View style={styles.titleGroup}>
               <Text style={styles.headerTitle}>{t('myBookings.title')}</Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {t('myBookings.subtitle')}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>
 
-        {/* Active / History sit below the header — headers carry only a title and subtitle. */}
-        <View style={[styles.segment, { backgroundColor: `${colors.primary}10` }]}>
-          {tabs.map((option) => {
-            const active = tab === option.key;
-            return (
-              <Pressable
-                key={option.key}
-                onPress={() => setTab(option.key)}
-                style={[styles.segmentItem, active ? { backgroundColor: colors.surface } : null]}
-              >
-                <Text style={[styles.segmentText, { color: active ? colors.primary : colors.textMuted }]}>{option.label}</Text>
-                {option.key === 'active' ? <CountBadge count={activeCount} /> : null}
-              </Pressable>
-            );
-          })}
-        </View>
+        {/* Filters sit below the header — headers carry only a title and subtitle. */}
+        <FilterChips options={filterOptions} value={filter} onChange={setFilter} />
 
         {loading ? (
           <View style={styles.center}>
@@ -220,7 +239,7 @@ export function MyBookingsModal({ visible, onClose }: MyBookingsModalProps) {
                     <FontAwesome6 name="calendar-check" size={22} color={colors.primary} solid />
                   </View>
                   <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                    {t(tab === 'active' ? 'myBookings.emptyActiveTitle' : 'myBookings.emptyHistoryTitle')}
+                    {t(filter === 'active' ? 'myBookings.emptyActiveTitle' : 'myBookings.filters.emptyTitle')}
                   </Text>
                   <Text style={[styles.emptyMessage, { color: colors.textMuted }]}>{t('myBookings.emptyMessage')}</Text>
                 </View>
@@ -253,12 +272,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  segment: { flexDirection: 'row', borderRadius: 14, padding: 4, margin: 16, marginBottom: 6 },
-  segmentItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 11 },
-  // Fixed line height, no font padding: the text and the red count line up in the middle.
-  segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, includeFontPadding: false, textAlignVertical: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: 16, paddingTop: 10, paddingBottom: 40, flexGrow: 1 },
+  // 12 between the filters and the first card, as between the cards.
+  list: { padding: 16, paddingTop: 12, paddingBottom: 40, flexGrow: 1 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },
   icon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1, gap: 3 },

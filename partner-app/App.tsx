@@ -16,6 +16,8 @@ import {
   Poppins_600SemiBold,
   Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
+import { Nunito_900Black } from '@expo-google-fonts/nunito';
+import { BrandIntro } from '@/components/brand/BrandIntro';
 import { GrandHotel_400Regular } from '@expo-google-fonts/grand-hotel';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider, focusManager } from '@tanstack/react-query';
@@ -24,6 +26,7 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { LogoutOverlay } from '@/components/LogoutOverlay';
 import { UpdateOverlay } from '@/components/UpdateOverlay';
 import { ToastHost } from '@/components/ToastHost';
+import { FullTextHost } from '@/components/FullTextHost';
 import { AdActionHost, useAdOnScreen } from '@/components/Ads';
 import { PortalHost } from '@/components/Portal';
 import { registerAdPromotions } from '@/utils/adPromotions';
@@ -71,10 +74,14 @@ export default function App() {
     Poppins_500Medium,
     Poppins_600SemiBold,
     Poppins_700Bold,
+    // The NearbyU name (Wordmark).
+    Nunito_900Black,
     // The script face for the app name on the Welcome screen.
     GrandHotel_400Regular,
   });
   const { colors, isDark } = useThemeColors();
+  // The NearbyU opening animation, once per launch (BrandIntro).
+  const [introDone, setIntroDone] = useState(false);
   const isLoggingOut = useAuthStore((state) => state.isLoggingOut);
 
   // Real push notifications (device registration) — see the hook's own doc comment for why
@@ -223,6 +230,8 @@ export default function App() {
         {/* A local business's ad before a key action (see showAdBefore). */}
         <AdActionHost />
         <ToastHost />
+        <FullTextHost />
+        {introDone ? null : <BrandIntro partner onFinish={() => setIntroDone(true)} />}
         {/* Always light — the app's persistent top chrome is the blue gradient header,
             so status-bar text/icons need to read against that, not the body theme. */}
         <StatusBar style="light" />

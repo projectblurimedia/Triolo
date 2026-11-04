@@ -6,8 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { Button } from '@/components/Button';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
-import { RatingStars } from '@/components/RatingStars';
-import { Avatar } from '@/components/WorkerMiniCard';
+import { CardFill, KindChips, MetaLine, RatedAvatar, useCardChrome } from '@/components/WorkerMiniCard';
 import { ShopMiniCard } from '@/components/ShopMiniCard';
 import { NearbyResultDetailModal } from '@/components/NearbyResultDetailModal';
 import { SendListModal } from '@/components/SendListModal';
@@ -31,6 +30,7 @@ import { colors as brandColors, fonts, typography, useThemeColors } from '@/them
 import { PullToRefresh } from '@/components/PullToRefresh';
 import { HomeSearchModal } from '@/components/HomeSearchModal';
 import { customKindGroups, shopKindLabels } from '@/utils/kindLabels';
+import { FullText } from '@/components/FullText';
 
 const SHOP_LIMIT = 50;
 // "Every shop nearby" in the single-list view (the blue card's See all).
@@ -50,6 +50,7 @@ const TOP_RATED_LIMIT = 10;
 export function BazaarScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const chrome = useCardChrome();
   const { data: businessProfile } = useMyBusinessProfile();
   const [searchVisible, setSearchVisible] = useState(false);
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
@@ -111,31 +112,32 @@ export function BazaarScreen() {
     <Pressable
       key={shop.id}
       onPress={() => openShop(shop)}
-      style={[styles.wideCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={[styles.wideCard, chrome]}
     >
-      <Avatar
+      <CardFill variant="side" />
+      <RatedAvatar
         photoUrl={shop.profilePhotoUrl}
         name={shop.shopName}
         size={56}
         seal={{ kind: 'business', id: shop.id }}
+        average={shop.ratingAverage}
+        count={shop.ratingCount}
       />
       <View style={styles.wideInfo}>
-        <Text style={[styles.wideName, { color: colors.text }]} numberOfLines={1}>
+        <FullText style={[styles.wideName, { color: colors.text }]} numberOfLines={1}>
           {shop.shopName}
-        </Text>
-        <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
-          {shopKindLabels(t, shop).join(', ')}
-        </Text>
-        <View style={styles.wideMetaRow}>
-          <RatingStars average={shop.ratingAverage} count={shop.ratingCount} />
-          <Text style={[styles.metaText, { color: shop.deliveryAvailable ? brandColors.success : colors.textMuted }]}>
-            · {t(shop.deliveryAvailable ? 'sendList.delivers' : 'sendList.pickupOnly')}
-          </Text>
-        </View>
+        </FullText>
+        <KindChips kinds={shopKindLabels(t, shop)} />
+        <MetaLine
+          parts={[
+            { text: formatDistanceValue(shop.distanceMeters), color: colors.primary, strong: true, icon: 'location-arrow' },
+            shop.deliveryAvailable
+              ? { text: t('home.delivery'), color: brandColors.success, strong: true }
+              : { text: t('home.pickup') },
+          ]}
+        />
       </View>
-      <View style={[styles.distancePill, { backgroundColor: `${colors.primary}14` }]}>
-        <Text style={[styles.metaStrong, { color: colors.primary }]}>{formatDistanceValue(shop.distanceMeters)}</Text>
-      </View>
+      <FontAwesome6 name="chevron-right" size={12} color={colors.textMuted} solid />
     </Pressable>
   );
 
@@ -215,14 +217,14 @@ export function BazaarScreen() {
           {/* One kind of shop: say which, with the way back to all of them. */}
           <View style={[styles.categoryBar, { backgroundColor: `${colors.primary}10` }]}>
             <View style={styles.flex}>
-              <Text style={[styles.categoryBarTitle, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.categoryBarTitle, { color: colors.text }]} numberOfLines={1}>
                 {showAll
                   ? t('bazaar.allShopsNearby')
                   : category
                       .split(',')
                       .map((key) => t(`businessProfile.categories.${key}`))
                       .join(', ')}
-              </Text>
+              </FullText>
               <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
                 {t('bazaar.shopsNearbyCount', { count: shops.length })}
               </Text>
@@ -300,9 +302,9 @@ export function BazaarScreen() {
             accessibilityRole="search"
           >
             <FontAwesome6 name="magnifying-glass" size={15} color={colors.primary} solid />
-            <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
               {t('bazaar.searchPlaceholder')}
-            </Text>
+            </FullText>
           </Pressable>
 
           <NearbyHero
@@ -403,15 +405,26 @@ const styles = StyleSheet.create({
   categoryBarTitle: { ...typography.body, fontFamily: fonts.semiBold },
   showAll: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   seeAll: { ...typography.caption, fontFamily: fonts.semiBold },
-  carousel: { gap: 12, paddingRight: 4 },
+  carousel: { gap: 12, paddingRight: 4, paddingLeft: 1, paddingTop: 2, paddingBottom: 8 },
   metaStrong: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
   metaText: { ...typography.caption, fontSize: 11 },
   list: { marginTop: 16, gap: 12 },
-  wideCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, padding: 12, gap: 12 },
+  wideCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    paddingLeft: 11,
+    paddingRight: 14,
+    gap: 14,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
   wideInfo: { flex: 1, gap: 3 },
   wideName: { ...typography.body, fontFamily: fonts.semiBold },
-  wideMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  distancePill: { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 },
   loading: { paddingVertical: 48, alignItems: 'center' },
   stateCard: {
     marginTop: 20,

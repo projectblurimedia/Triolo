@@ -30,6 +30,7 @@ import { PROFILE_AVATAR_SIZE, ProfileCover, ProfilePill, ProfileSection } from '
 import { SHOP_CATEGORIES, SKILL_CATEGORIES } from '@/constants/categories';
 import { firstName } from '@/utils/firstName';
 import { SmartImage } from './SmartImage';
+import { FullText } from '@/components/FullText';
 
 interface NearbyResultDetailModalProps {
   visible: boolean;
@@ -235,17 +236,17 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
               <View style={styles.deliveryBannerIcon}>
                 <FontAwesome6 name="truck-fast" size={14} color="#FFFFFF" solid />
               </View>
-              <Text style={[styles.deliveryBannerTitle, styles.flex]} numberOfLines={1}>
+              <FullText style={[styles.deliveryBannerTitle, styles.flex]} numberOfLines={1}>
                 {t('profileView.deliveryTitle')}
-              </Text>
+              </FullText>
               {/* One line: "₹10 per km · Min ₹20". */}
               <View style={styles.deliveryCharges}>
-                <Text style={styles.deliveryChargeValue} numberOfLines={1}>
+                <FullText style={styles.deliveryChargeValue} numberOfLines={1}>
                   {t('profileView.deliveryChargeLine', {
                     perKm: b.deliveryPricePerKm ?? 0,
                     min: b.deliveryMinCharge ?? b.deliveryPricePerKm ?? 0,
                   })}
-                </Text>
+                </FullText>
               </View>
             </LinearGradient>
           ) : (
@@ -253,9 +254,9 @@ export function NearbyResultDetailModal({ visible, onClose, mode, result }: Near
               <View style={[styles.deliveryFactIcon, { backgroundColor: `${colors.primary}1F` }]}>
                 <FontAwesome6 name="store" size={13} color={colors.primary} solid />
               </View>
-              <Text style={[styles.pickupText, { color: colors.text }]} numberOfLines={2}>
+              <FullText style={[styles.pickupText, { color: colors.text }]} numberOfLines={2}>
                 {t('profileView.pickupOnly')}
-              </Text>
+              </FullText>
             </View>
           )
         }

@@ -27,6 +27,7 @@ import { JOB_CATEGORIES, JobSeeker, jobSeekersService } from '@/services/jobSeek
 import { formatRupees } from '@/services/ordersService';
 import { formatDistanceValue, NearbySearchMode } from '@/utils/nearbyResult';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 interface HomeSearchModalProps {
   visible: boolean;
@@ -303,9 +304,9 @@ export function HomeSearchModal({ visible, onClose, initialScope, onPickShop }: 
                 <Text style={[styles.kindText, { color: colors.primary }]}>{t('homeSearch.staff')}</Text>
               </View>
             </View>
-            <Text style={[styles.resultTags, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.resultTags, { color: colors.textMuted }]} numberOfLines={1}>
               {jobSeekerTitle(entry, t)} · {formatRupees(entry.payAmount)} / {t(`hireStaff.per.${entry.payPeriod}`)}
-            </Text>
+            </FullText>
             <View style={styles.resultMeta}>
               <Text style={[styles.resultDistance, { color: colors.primary }]}>
                 {t('nearbySearch.distanceAway', { distance: formatDistanceValue(entry.distanceMeters) })}
@@ -357,9 +358,9 @@ export function HomeSearchModal({ visible, onClose, initialScope, onPickShop }: 
         <FontAwesome6 name={item.icon as never} size={14} color="#FFFFFF" solid />
       </LinearGradient>
       <View style={styles.flex}>
-        <Text style={[styles.itemLabel, { color: colors.text }]} numberOfLines={2}>
+        <FullText style={[styles.itemLabel, { color: colors.text }]} numberOfLines={2}>
           {item.label}
-        </Text>
+        </FullText>
         {partner ? <Text style={[styles.itemHint, { color: colors.textMuted }]}>{t('picker.partnerMade')}</Text> : null}
       </View>
     </Pressable>
@@ -603,9 +604,9 @@ export function HomeSearchModal({ visible, onClose, initialScope, onPickShop }: 
                     const content = (
                       <>
                         <FontAwesome6 name={option.icon} size={12} color={active ? '#FFFFFF' : colors.primary} solid />
-                        <Text style={[styles.scopeText, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
+                        <FullText style={[styles.scopeText, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
                           {option.label}
-                        </Text>
+                        </FullText>
                       </>
                     );
                     return (
@@ -661,7 +662,8 @@ const styles = StyleSheet.create({
   resultGroupHeader: { marginTop: 14, marginBottom: 10 },
   resultGroupHeaderFirst: { marginTop: 0, marginBottom: 10 },
   filters: { marginTop: 10, gap: 10 },
-  filterRow: { gap: 8, paddingRight: 4 },
+  // Centred when the chips fit; still scrolls sideways when they don't.
+  filterRow: { gap: 8, flexGrow: 1, justifyContent: 'center' },
   filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, borderRadius: 17, paddingHorizontal: 13 },
   filterChipOff: { borderWidth: 1 },
   filterText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12, includeFontPadding: false },

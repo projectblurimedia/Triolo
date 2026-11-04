@@ -1,10 +1,13 @@
 import React from 'react';
+import { NearbyMark } from './brand/NearbyMark';
+import { Wordmark } from './brand/Wordmark';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, headerGradient, typography } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 export interface HeaderAction {
   icon: keyof typeof FontAwesome6.glyphMap;
@@ -28,13 +31,15 @@ interface GradientHeaderProps {
   actions?: HeaderAction[];
   /** Overrides the brand-blue gradient — e.g. Bazaar's own orange, matching its Business identity everywhere else (SHOP_GRADIENT). */
   gradient?: readonly [string, string];
+  /** The NearbyU brand instead of a title (Home): the mark in the leading tile, the name as the title. */
+  brand?: boolean;
 }
 
 /** Brand header used on every top-level screen — see docs/localization.md for why title is passed pre-translated. */
-export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions, gradient = headerGradient }: GradientHeaderProps) {
+export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions, gradient = headerGradient, brand }: GradientHeaderProps) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const hasLeading = Boolean(showBack || leadingIcon);
+  const hasLeading = Boolean(showBack || leadingIcon || brand);
 
   return (
     <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
@@ -49,6 +54,10 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
             >
               <FontAwesome6 name="chevron-left" size={18} color={colors.white} solid />
             </Pressable>
+          ) : brand ? (
+            <View style={styles.leadingIconButton}>
+              <NearbyMark size={30} />
+            </View>
           ) : leadingIcon ? (
             <View style={styles.leadingIconButton}>
               <FontAwesome6 name={leadingIcon} size={22} color={colors.white} solid />
@@ -56,13 +65,17 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
           ) : null}
 
           <View style={[styles.titleGroup, hasLeading && styles.titleGroupWithLeading]}>
-            <Text style={styles.title} numberOfLines={1}>
-              {title}
-            </Text>
+            {brand ? (
+              <Wordmark size={23} style={styles.brandName} />
+            ) : (
+              <FullText style={styles.title} numberOfLines={1}>
+                {title}
+              </FullText>
+            )}
             {subtitle ? (
-              <Text style={styles.subtitle} numberOfLines={1}>
+              <FullText style={styles.subtitle} numberOfLines={1}>
                 {subtitle}
-              </Text>
+              </FullText>
             ) : null}
           </View>
 
@@ -78,9 +91,9 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
                     style={styles.labeledAction}
                   >
                     <FontAwesome6 name={action.icon} size={13} color={colors.white} solid />
-                    <Text style={styles.labeledActionText} numberOfLines={1}>
+                    <FullText style={styles.labeledActionText} numberOfLines={1}>
                       {action.label}
-                    </Text>
+                    </FullText>
                   </Pressable>
                 ) : (
                   <Pressable
@@ -93,9 +106,9 @@ export function GradientHeader({ title, subtitle, showBack, leadingIcon, actions
                     <FontAwesome6 name={action.icon} size={17} color={colors.white} solid />
                     {action.badgeCount ? (
                       <View style={styles.badge}>
-                        <Text style={styles.badgeText} numberOfLines={1}>
+                        <FullText style={styles.badgeText} numberOfLines={1}>
                           {action.badgeCount > 9 ? '9+' : action.badgeCount}
-                        </Text>
+                        </FullText>
                       </View>
                     ) : null}
                   </Pressable>
@@ -131,6 +144,7 @@ const styles = StyleSheet.create({
   titleGroup: {
     flex: 1,
   },
+  brandName: { marginBottom: 2 },
   titleGroupWithLeading: {
     marginLeft: 12,
   },

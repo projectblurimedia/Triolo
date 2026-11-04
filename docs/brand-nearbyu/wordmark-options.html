@@ -1,0 +1,157 @@
+<title>NearbyU Wordmark</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Baloo+Tammudu+2:wght@600;700&family=Fredoka:wght@600;700&family=Lexend:wght@600;700&family=Nunito:wght@800;900&family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: one card per wordmark; each shows the Home header and the welcome screen side by side. */
+  :root {
+    --bg: #EEF3FB;
+    --card: #FFFFFF;
+    --fg: #0C1424;
+    --muted: #586477;
+    --line: #D6E0EF;
+    --accent: #0055D3;
+    --font-display: 'Baloo 2', 'Poppins', system-ui, sans-serif;
+    --font-body: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0A0E16; --card: #131A26; --fg: #EEF3FB; --muted: #9AA6B8; --line: #243046; --accent: #4C95FF; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #0A0E16; --card: #131A26; --fg: #EEF3FB; --muted: #9AA6B8; --line: #243046; --accent: #4C95FF; color-scheme: dark; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+  .page {
+    max-width: 980px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 32px 56px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  header h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.4rem); margin: 0; line-height: 1.1; }
+  header p { color: var(--muted); margin: 8px 0 0; line-height: 1.6; max-width: 66ch; }
+  .item { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .code { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); padding: 3px 10px; border-radius: 999px; }
+  .top h2 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+  .item p { margin: 0; color: var(--muted); font-size: 0.88rem; line-height: 1.55; max-width: 72ch; }
+  .mocks { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .mocks { grid-template-columns: 1fr; } }
+  .label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+
+  /* Home tab header mock (the app's gradient header). */
+  .phone { border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: #F9FCFF; }
+  .appbar { background: linear-gradient(135deg, #0055D3, #1D76FA); padding: 16px 14px 14px; display: flex; align-items: center; gap: 10px; }
+  .appbar .logo { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.3); display: grid; place-items: center; flex-shrink: 0; }
+  .appbar .logo svg { width: 30px; }
+  .appbar .brand { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .appbar .sub { color: rgba(255,255,255,0.82); font-size: 0.72rem; margin-top: 1px; }
+  .appbar .actions { display: flex; gap: 8px; }
+  .appbar .actions span { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.3); }
+  .homebody { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .homebody div { height: 40px; border-radius: 14px; background: #E7EEFA; }
+  .homebody div:nth-child(2) { height: 70px; }
+
+  /* Welcome screen mock (first open / logged out). */
+  .welcome { border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: linear-gradient(160deg, #0A3FB8 0%, #1E6BF5 60%, #4FA3FF 100%); padding: 26px 18px 18px; display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 270px; justify-content: center; text-align: center; }
+  .welcome svg.mark { width: 84px; }
+  .welcome .tag { color: rgba(255,255,255,0.88); font-size: 0.82rem; }
+  .welcome .te { font-family: 'Baloo Tammudu 2', 'Baloo 2', sans-serif; color: rgba(255,255,255,0.8); font-size: 0.95rem; }
+  .welcome .cta { margin-top: 8px; background: #FFFFFF; color: #0055D3; font-weight: 600; font-size: 0.85rem; border-radius: 999px; padding: 9px 22px; }
+
+  /* ---------- The wordmarks ---------- */
+  .wm { display: inline-flex; align-items: flex-end; line-height: 1; white-space: nowrap; }
+  .wm .u { display: inline-flex; }
+  /* N1 Rounded friendly: Fredoka, the U in turmeric with a pin dot above it. */
+  .n1 { font-family: 'Fredoka', 'Poppins', sans-serif; font-weight: 700; letter-spacing: 0.005em; }
+  .n1 .u { position: relative; color: #FFC93C; }
+  .n1 .u::after { content: ''; position: absolute; left: 50%; top: -0.12em; width: 0.2em; height: 0.2em; border-radius: 50%; background: currentColor; transform: translateX(-50%); }
+  /* N2 Badge: Poppins, the U in its own white rounded badge. */
+  .n2 { font-family: 'Poppins', sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+  .n2 .u { margin-left: 0.08em; padding: 0.02em 0.2em 0.04em; border-radius: 0.28em; background: #FFFFFF; color: #0055D3; }
+  /* N3 Road U: Baloo 2, and the U is the logo mark itself. */
+  .n3 { font-family: 'Baloo 2', 'Poppins', sans-serif; font-weight: 800; letter-spacing: 0.01em; }
+  .n3 .u svg { width: 0.98em; height: 0.98em; margin-left: 0.04em; transform: translateY(0.06em); }
+  /* N4 Modern: Lexend, lowercase "nearby" and a gold capital U with a dashed road under it. */
+  .n4 { font-family: 'Lexend', 'Poppins', sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+  .n4 .u { position: relative; color: #FFC93C; margin-left: 0.02em; }
+  .n4 .u::after { content: ''; position: absolute; left: -2.9em; right: 0; bottom: -0.16em; height: 0.07em; background: repeating-linear-gradient(90deg, #FFC93C 0 0.22em, transparent 0.22em 0.36em); border-radius: 1em; }
+  /* N5 Warm: Nunito black, the U in a turmeric-to-saffron gradient. */
+  .n5 { font-family: 'Nunito', 'Poppins', sans-serif; font-weight: 900; letter-spacing: -0.01em; }
+  .n5 .u { background: linear-gradient(180deg, #FFE08A, #FF9F1C); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 0.03em; }
+
+  .appbar .wm { color: #FFFFFF; font-size: 1.55rem; align-self: flex-start; }
+  .welcome .wm { color: #FFFFFF; font-size: 2.6rem; }
+
+  /* ---------- N5 variations ---------- */
+  .v { font-family: 'Nunito', 'Poppins', sans-serif; font-weight: 900; letter-spacing: -0.01em; }
+  .v .u { background: linear-gradient(180deg, #FFE08A, #FF9F1C); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 0.03em; position: relative; }
+  .v2 .u::after { content: ''; position: absolute; left: 50%; top: -0.1em; width: 0.17em; height: 0.17em; border-radius: 50%; background: #FFB547; transform: translateX(-50%); }
+  .v3 .u { font-size: 1.16em; filter: drop-shadow(0 0 0.14em rgba(255, 181, 71, 0.75)); line-height: .9; }
+  .v4 { position: relative; padding-bottom: 0.14em; }
+  .v4::after { content: ''; position: absolute; left: 0.05em; right: 0.15em; bottom: 0; height: 0.12em; border-radius: 1em; background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 45%, #FFB547 100%); }
+  .v5 .nb { background: linear-gradient(180deg, #FFFFFF 30%, #CFE3FF 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .v6 .u { margin-left: 0.06em; padding: 0 0.16em; border-radius: 50%; background-image: linear-gradient(180deg, #FFE08A, #FF9F1C), radial-gradient(circle, rgba(255, 201, 60, 0.35), rgba(255, 201, 60, 0.12) 60%, transparent 72%); background-clip: text, border-box; -webkit-background-clip: text, border-box; }
+  .v7 .nb { font-family: 'Baloo 2', 'Nunito', sans-serif; font-weight: 800; }
+  .v8 .nb { text-transform: lowercase; }
+</style>
+
+<div class="page">
+  <header>
+    <h1>NearbyU · more of N5</h1>
+    <p>Eight takes on N5: Nunito Black with the U glowing from turmeric to saffron. Each is shown in the Home tab header and on the first-open / logged-out screen. Tell me the code you like.</p>
+  </header>
+  <div id="list" style="display:flex;flex-direction:column;gap:18px"></div>
+</div>
+
+<script>
+// The approved S1 mark.
+const mark = (fg, cut) => `
+  <path d="M27 54V70A33 33 0 0 0 93 70V58H79V70A19 19 0 0 1 41 70V54Z" fill="${fg}" stroke="${fg}" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M34 60V70A26 26 0 0 0 86 70V62" fill="none" stroke="${cut}" stroke-width="2.4" stroke-dasharray="4 5.5" stroke-linecap="round"/>
+  <path d="M68 59V40H62L86 16L110 40H104V59Z" fill="${fg}" stroke="${fg}" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M79.5 59.5V50.5a6.5 6.5 0 0 1 13 0V59.5Z" fill="${cut}"/><circle cx="89.3" cy="54.5" r="1.4" fill="${fg}"/>
+  <path d="M34 57C29 50.5 17 40.5 17 26.5A17 17 0 0 1 51 26.5C51 40.5 39 50.5 34 57Z" fill="${fg}" stroke="${cut}" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="34" cy="26.5" r="6.6" fill="${cut}"/>`;
+const markSvg = (fg, cut, cls = '') => `<svg class="${cls}" viewBox="10 10 104 100" aria-hidden="true">${mark(fg, cut)}</svg>`;
+
+const WORDMARKS = [
+  ['V1', 'N5 as it is', 'Nunito Black, bold and friendly, the U glowing from turmeric to saffron.', 'v v1'],
+  ['V2', 'With a pin dot', 'The same, with a small saffron dot above the U, like a pin marking you.', 'v v2'],
+  ['V3', 'Big glowing U', 'The U a little bigger than the other letters, with a soft warm glow around it.', 'v v3'],
+  ['V4', 'Road to you', 'A soft swoosh runs under “Nearby” and warms to saffron as it reaches the U, like the road arriving at you.', 'v v4'],
+  ['V5', 'Shining name', '“Nearby” with a gentle white-to-sky shine, the U warm, so the whole word has depth.', 'v v5'],
+  ['V6', 'Golden circle', 'The warm U sits in a softly glowing golden circle: you, at the centre.', 'v v6'],
+  ['V7', 'Baloo and Nunito', '“Nearby” in Baloo 2, designed in India for Indian languages, with the warm Nunito U.', 'v v7'],
+  ['V8', 'Lowercase nearby', 'All lowercase “nearby” with the warm capital U, so the U stands out even more.', 'v v8'],
+];
+
+document.getElementById('list').innerHTML = WORDMARKS.map(([code, name, note, cls]) => {
+  const word = () => `<span class="wm ${cls}"><span class="nb">Nearby</span><span class="u">U</span></span>`;
+  return `<article class="item">
+    <div class="top"><span class="code">${code}</span><h2>${name}</h2></div>
+    <p>${note}</p>
+    <div class="mocks">
+      <div>
+        <div class="label">Home tab header</div>
+        <div class="phone">
+          <div class="appbar">
+            <div class="logo">${markSvg('#FFFFFF', '#1E68EE')}</div>
+            <div class="brand">${word('#FFFFFF')}<span class="sub">Help that's near you</span></div>
+            <div class="actions"><span></span><span></span></div>
+          </div>
+          <div class="homebody"><div></div><div></div><div></div></div>
+        </div>
+      </div>
+      <div>
+        <div class="label">First open / logged out</div>
+        <div class="welcome">
+          ${markSvg('#FFFFFF', '#1559E6', 'mark')}
+          ${word('#FFFFFF')}
+          <span class="te">నియర్‌బై యు</span>
+          <span class="tag">Workers, shops and help, near you</span>
+          <span class="cta">Get started</span>
+        </div>
+      </div>
+    </div>
+  </article>`;
+}).join('');
+</script>

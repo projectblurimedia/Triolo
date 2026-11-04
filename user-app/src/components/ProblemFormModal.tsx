@@ -20,6 +20,7 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { useBusyAction } from './Ads';
 import { payIfNeeded } from '@/state/payGateStore';
+import { FullText } from '@/components/FullText';
 
 interface ProblemFormModalProps {
   visible: boolean;
@@ -181,12 +182,12 @@ export function ProblemFormModal({ visible, onClose, problem }: ProblemFormModal
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <FullText style={styles.headerTitle} numberOfLines={1}>
                 {t(isEditMode ? 'problemForm.editTitle' : 'problemForm.addTitle')}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              </FullText>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {t(isEditMode ? 'problemForm.editSubtitle' : 'problemForm.addSubtitle')}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>

@@ -23,6 +23,7 @@ export function HomeHeader({ title, subtitle }: HomeHeaderProps) {
         title={title}
         subtitle={subtitle}
         leadingIcon="shapes"
+        brand
         actions={[
           {
             icon: 'bell',

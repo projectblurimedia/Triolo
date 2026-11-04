@@ -1,0 +1,176 @@
+<title>NearbyU Opening Animation</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Baloo+Tammudu+2:wght@600&family=Poppins:wght@400;500;600&display=swap">
+<style>
+  /* Layout: two phone screens side by side (customer, partner) playing the opening animation, a Replay button under them. */
+  :root {
+    --bg: #EEF3FB;
+    --fg: #0C1424;
+    --muted: #586477;
+    --line: #D6E0EF;
+    --accent: #0055D3;
+    --font-display: 'Baloo 2', 'Poppins', system-ui, sans-serif;
+    --font-telugu: 'Baloo Tammudu 2', 'Baloo 2', system-ui, sans-serif;
+    --font-body: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0A0E16; --fg: #EEF3FB; --muted: #9AA6B8; --line: #243046; --accent: #4C95FF; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #0A0E16; --fg: #EEF3FB; --muted: #9AA6B8; --line: #243046; --accent: #4C95FF; color-scheme: dark; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+  .page {
+    max-width: 860px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 32px 48px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  header h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.4rem); margin: 0; line-height: 1.1; }
+  header p { color: var(--muted); margin: 8px 0 0; line-height: 1.6; max-width: 64ch; }
+  .phones { display: flex; gap: 22px; justify-content: center; flex-wrap: wrap; }
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .phone-wrap small { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .phone {
+    width: min(260px, 80vw); aspect-ratio: 9 / 18.5; max-width: 100%;
+    border-radius: 34px; overflow: hidden; position: relative;
+    box-shadow: 0 0 0 8px #0B1220, 0 18px 40px rgba(0, 20, 60, 0.35);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  }
+  .phone.customer { background: linear-gradient(150deg, #0A3FB8 0%, #1E6BF5 55%, #4FA3FF 100%); }
+  .phone.partner { background: linear-gradient(150deg, #081A44 0%, #14316F 55%, #2A55A8 100%); }
+  .phone svg.mark { width: 62%; overflow: visible; }
+  .phone svg.rings { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .word { font-family: var(--font-display); font-weight: 800; color: #FFFFFF; font-size: 2rem; line-height: 1; letter-spacing: 0.01em; }
+  .te { font-family: var(--font-telugu); font-weight: 600; color: rgba(255, 255, 255, 0.8); font-size: 0.95rem; margin-top: -4px; }
+  .controls { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  button {
+    font: 600 0.95rem var(--font-body); color: #FFFFFF; background: var(--accent); border: 0;
+    border-radius: 999px; padding: 10px 22px; cursor: pointer;
+  }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  label.slow { color: var(--muted); font-size: 0.85rem; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .timeline { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.88rem; }
+  .timeline b { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+
+  /* ---- The animation (total 0.9 s). --speed slows it for the "slow motion" check. ---- */
+  .play { --speed: 1.35; }
+  .play .ring { transform-origin: 160px 300px; animation: ring calc(0.5s * var(--speed)) cubic-bezier(.2,.7,.3,1) both; }
+  .play .ring.r2 { animation-delay: calc(0.08s * var(--speed)); }
+  /* The helpers swing along their ring into place, then each sends out one soft pulse. */
+  .play .orbit { transform-origin: 160px 300px; animation: orbit calc(0.42s * var(--speed)) cubic-bezier(.2,.8,.3,1) both; }
+  .play .orbit.o1 { animation-delay: calc(0.42s * var(--speed)); }
+  .play .orbit.o2 { animation-delay: calc(0.5s * var(--speed)); --from: 32deg; }
+  .play .orbit.o3 { animation-delay: calc(0.58s * var(--speed)); --from: -30deg; }
+  .play .halo { opacity: 0; transform-box: fill-box; transform-origin: center; animation: pulse calc(0.5s * var(--speed)) ease-out both; }
+  .play .halo.h1 { animation-delay: calc(0.84s * var(--speed)); }
+  .play .halo.h2 { animation-delay: calc(0.92s * var(--speed)); }
+  .play .halo.h3 { animation-delay: calc(1s * var(--speed)); }
+  .play .pin { transform-origin: 34px 57px; animation: drop calc(0.3s * var(--speed)) cubic-bezier(.3,1.5,.5,1) calc(0.08s * var(--speed)) both; }
+  .play .roadmask { stroke-dasharray: 130; stroke-dashoffset: 130; animation: draw calc(0.4s * var(--speed)) cubic-bezier(.45,0,.2,1) calc(0.25s * var(--speed)) forwards; }
+  .play .home { transform-origin: 86px 59px; animation: rise calc(0.24s * var(--speed)) cubic-bezier(.3,1.6,.5,1) calc(0.45s * var(--speed)) both; }
+  .play .word, .play .te { animation: up calc(0.3s * var(--speed)) ease-out calc(0.6s * var(--speed)) both; }
+  .play .te { animation-delay: calc(0.66s * var(--speed)); }
+  @keyframes ring { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes orbit { from { transform: rotate(var(--from, -34deg)); opacity: 0; } 60% { opacity: 1; } to { transform: rotate(0); opacity: 1; } }
+  @keyframes pulse { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(3.2); opacity: 0; } }
+  @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes drop { 0% { transform: translateY(-26px) scale(.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes rise { 0% { transform: scale(0); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  @keyframes up { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .dot { transform-box: fill-box; transform-origin: center; }
+  @media (prefers-reduced-motion: reduce) { .play * { animation-duration: 1ms !important; animation-delay: 0s !important; } }
+</style>
+
+<div class="page">
+  <header>
+    <h1>Opening animation</h1>
+    <p>What people see when NearbyU opens: the pin drops in, the road draws itself to the home, the home pops up and the name rises in. It's all over in about 1.3 seconds. Tap Replay to watch again, or tick Slow motion to see each step.</p>
+  </header>
+
+  <div class="phones" id="phones"></div>
+
+  <div class="controls">
+    <button type="button" id="replay">Replay</button>
+    <label class="slow"><input type="checkbox" id="slow"> Slow motion (×4)</label>
+  </div>
+
+  <div class="timeline">
+    <b>0.00–0.40 s</b><span>Rings ripple out from the home</span>
+    <b>0.11–0.51 s</b><span>The location pin drops in with a small bounce</span>
+    <b>0.34–0.88 s</b><span>The road draws itself from the pin, round the bend, up to the home</span>
+    <b>0.61–0.93 s</b><span>The home pops up where the road arrives</span>
+    <b>0.57–1.35 s</b><span>Three helpers swing along their rings into place, then each sends out a soft pulse</span>
+    <b>0.81–1.30 s</b><span>“NearbyU” and నియర్‌బై యు rise in</span>
+  </div>
+</div>
+
+<script>
+// The S1 mark, split into parts so each can move on its own (same shapes as the approved logo).
+function screen(kind) {
+  const cut = kind === 'partner' ? '#0E2558' : '#0B4FD0';
+  const id = 'm' + kind;
+  return `
+    <div class="phone-wrap">
+      <div class="phone ${kind}" data-phone>
+        <svg class="rings" viewBox="0 0 320 658" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <g fill="none" stroke="#FFFFFF" stroke-width="1.6">
+            <g opacity=".14"><circle class="ring" cx="160" cy="300" r="140"/></g>
+            <g opacity=".09"><circle class="ring r2" cx="160" cy="300" r="210"/></g>
+          </g>
+          <g class="orbit o1">
+            <circle class="halo h1" cx="46" cy="200" r="5" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+            <circle class="dot d1" cx="46" cy="200" r="5" fill="#FFFFFF" opacity=".55"/>
+          </g>
+          <g class="orbit o2">
+            <circle class="halo h2" cx="36" cy="430" r="5" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+            <circle class="dot d2" cx="36" cy="430" r="5" fill="#FFFFFF" opacity=".55"/>
+          </g>
+          <g class="orbit o3">
+            <circle class="halo h3" cx="268" cy="470" r="4.4" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+            <circle class="dot d3" cx="268" cy="470" r="4.4" fill="#FFFFFF" opacity=".55"/>
+          </g>
+        </svg>
+        <svg class="mark" viewBox="10 10 104 100" role="img" aria-label="NearbyU">
+          <defs>
+            <mask id="${id}road" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="120">
+              <path class="roadmask" d="M34 50V70A26 26 0 0 0 86 70V56" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="butt"/>
+            </mask>
+          </defs>
+          <g mask="url(#${id}road)">
+            <path d="M27 54V70A33 33 0 0 0 93 70V58H79V70A19 19 0 0 1 41 70V54Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M34 60V70A26 26 0 0 0 86 70V62" fill="none" stroke="${cut}" stroke-width="2.4" stroke-dasharray="4 5.5" stroke-linecap="round"/>
+          </g>
+          <g class="home">
+            <path d="M68 59V40H62L86 16L110 40H104V59Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M79.5 59.5V50.5a6.5 6.5 0 0 1 13 0V59.5Z" fill="${cut}"/>
+            <circle cx="89.3" cy="54.5" r="1.4" fill="#FFFFFF"/>
+          </g>
+          <g class="pin">
+            <path d="M34 57C29 50.5 17 40.5 17 26.5A17 17 0 0 1 51 26.5C51 40.5 39 50.5 34 57Z" fill="#FFFFFF" stroke="${cut}" stroke-width="3" stroke-linejoin="round"/>
+            <circle cx="34" cy="26.5" r="6.6" fill="${cut}"/>
+          </g>
+        </svg>
+        <div class="word">NearbyU</div>
+        <div class="te">నియర్‌బై యు</div>
+      </div>
+      <small>${kind === 'partner' ? 'Partner app' : 'Customer app'}</small>
+    </div>`;
+}
+document.getElementById('phones').innerHTML = screen('customer') + screen('partner');
+
+const phones = [...document.querySelectorAll('[data-phone]')];
+const slow = document.getElementById('slow');
+function play() {
+  for (const phone of phones) {
+    phone.classList.remove('play');
+    phone.style.setProperty('--speed', slow.checked ? '5.4' : '1.35');
+    void phone.offsetWidth; // restart the CSS animations
+    phone.classList.add('play');
+  }
+}
+document.getElementById('replay').addEventListener('click', play);
+slow.addEventListener('change', play);
+play();
+</script>

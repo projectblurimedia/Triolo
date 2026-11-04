@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { colors as brandColors, fonts } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /**
  * A count in a small red pill with white text, like a notification badge — on the tab bar's
@@ -11,9 +12,9 @@ export function CountBadge({ count, style }: { count: number; style?: StyleProp<
   if (count <= 0) return null;
   return (
     <View style={[styles.badge, style]}>
-      <Text style={styles.text} numberOfLines={1}>
+      <FullText style={styles.text} numberOfLines={1}>
         {count > 9 ? '9+' : count}
-      </Text>
+      </FullText>
     </View>
   );
 }

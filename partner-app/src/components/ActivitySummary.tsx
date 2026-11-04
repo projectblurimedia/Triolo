@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { fonts, typography } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -32,12 +33,12 @@ export function ActivitySummary({
           <FontAwesome6 name={icon} size={16} color="#FFFFFF" solid />
         </View>
         <View style={styles.flex}>
-          <Text style={styles.label} numberOfLines={1}>
+          <FullText style={styles.label} numberOfLines={1}>
             {label}
-          </Text>
-          <Text style={styles.value} numberOfLines={1}>
+          </FullText>
+          <FullText style={styles.value} numberOfLines={1}>
             {value}
-          </Text>
+          </FullText>
         </View>
       </View>
       <View style={styles.stats}>
@@ -47,9 +48,9 @@ export function ActivitySummary({
               <FontAwesome6 name={stat.icon} size={11} color="#FFFFFF" solid />
               <Text style={styles.statValue}>{stat.value}</Text>
             </View>
-            <Text style={styles.statLabel} numberOfLines={1}>
+            <FullText style={styles.statLabel} numberOfLines={1}>
               {stat.label}
-            </Text>
+            </FullText>
           </View>
         ))}
       </View>

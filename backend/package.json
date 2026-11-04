@@ -18,6 +18,7 @@
     "cleanup:cloudinary": "tsx scripts/cleanupCloudinary.ts"
   },
   "dependencies": {
+    "@vercel/functions": "2.2.13",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.10.0",
     "cors": "^2.8.5",

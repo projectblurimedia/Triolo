@@ -5,6 +5,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 interface ComingSoonModalProps {
   visible: boolean;
@@ -53,12 +54,12 @@ export function ComingSoonModal({
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <FullText style={styles.headerTitle} numberOfLines={1}>
                 {title}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              </FullText>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {subtitle}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>

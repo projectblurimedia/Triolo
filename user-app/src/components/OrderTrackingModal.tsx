@@ -35,6 +35,7 @@ import { BlurScope } from './Glass';
 import { PullToRefresh } from './PullToRefresh';
 import { WaitCountdown } from './WaitCountdown';
 import { KeptPaymentNotice } from './KeptPaymentNotice';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -188,14 +189,14 @@ export function OrderTrackingModal() {
       <View style={styles.row}>
         <Avatar photoUrl={o.shop.photoUrl ?? undefined} name={o.shop.name} size={48} />
         <View style={styles.flex}>
-          <Text style={[styles.shopName, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.shopName, { color: colors.text }]} numberOfLines={1}>
             {o.shop.name}
-          </Text>
+          </FullText>
           <RatingStars average={o.shop.ratingAverage} count={o.shop.ratingCount} />
           {o.shop.address ? (
-            <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
               {o.shop.address}
-            </Text>
+            </FullText>
           ) : null}
         </View>
         {o.shop.mobileNumber ? (
@@ -233,9 +234,9 @@ export function OrderTrackingModal() {
     return (
       <View key={item.id} style={styles.itemRow}>
         <FontAwesome6 name={icon} size={15} color={tone} solid={item.status !== 'pending'} />
-        <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={2}>
+        <FullText style={[styles.itemName, { color: colors.text }]} numberOfLines={2}>
           {item.name}
-        </Text>
+        </FullText>
         <Text style={[styles.itemQty, { color: colors.textMuted }]}>{itemLabel(item)}</Text>
         {showPrice && item.price != null ? <Text style={[styles.itemPrice, { color: colors.text }]}>{formatRupees(item.price)}</Text> : null}
       </View>
@@ -584,12 +585,12 @@ export function OrderTrackingModal() {
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.flex}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <FullText style={styles.headerTitle} numberOfLines={1}>
                 {order ? (isFindingShop(order) ? t('quickOrder.title') : t(`orders.status.${order.status}.title`)) : t('orders.title')}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              </FullText>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {order ? orderShopName(order, t) : ''}
-              </Text>
+              </FullText>
             </View>
           </LinearGradient>
           {renderBody()}

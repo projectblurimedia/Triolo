@@ -17,6 +17,7 @@ import { usePendingOfferStore } from '@/state/pendingOfferStore';
 import { useLocationGatedMutation } from '@/hooks/useLocationGatedMutation';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 const POSITION_TIMEOUT_MS = 6000;
 const FAB = 62;
@@ -106,9 +107,9 @@ export function FindJobsButton({
     return (
       <View pointerEvents="box-none" style={[styles.fabWrap, { bottom: 66 + Math.max(insets.bottom, 16) + 18 }]}>
         <View style={[styles.fabLabel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.fabLabelText, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.fabLabelText, { color: colors.text }]} numberOfLines={1}>
             {t(search.isPending ? 'findJobs.searching' : 'findJobs.button')}
-          </Text>
+          </FullText>
         </View>
         <View style={styles.fabSpot}>
           {search.isPending ? null : (

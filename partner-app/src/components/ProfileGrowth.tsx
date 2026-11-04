@@ -16,6 +16,7 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { payInApp } from '@/utils/inAppPay';
+import { FullText } from '@/components/FullText';
 
 const TRUST_GRADIENT = ['#047857', '#10B981'] as const;
 // The two posters' heroes and the boost's button.
@@ -163,12 +164,12 @@ export function ProfileGrowth({
           )}
         </LinearGradient>
         <View style={styles.flex}>
-          <Text style={[styles.actionTitle, { color: ink }]} numberOfLines={1}>
+          <FullText style={[styles.actionTitle, { color: ink }]} numberOfLines={1}>
             {t('badge.tileTitle')}
-          </Text>
-          <Text style={[styles.actionText, { color: gold ? '#166534' : brandColors.success }]} numberOfLines={1}>
+          </FullText>
+          <FullText style={[styles.actionText, { color: gold ? '#166534' : brandColors.success }]} numberOfLines={1}>
             {label}
-          </Text>
+          </FullText>
         </View>
       </Pressable>
     );
@@ -199,12 +200,12 @@ export function ProfileGrowth({
             <FontAwesome6 name="rocket" size={15} color="#FFFFFF" solid />
           </LinearGradient>
           <View style={styles.flex}>
-            <Text style={[styles.actionTitle, { color: ink }]} numberOfLines={1}>
+            <FullText style={[styles.actionTitle, { color: ink }]} numberOfLines={1}>
               {t('plans.boosting')}
-            </Text>
-            <Text style={[styles.actionText, { color: gold ? '#0B3A8A' : colors.primary }]} numberOfLines={1}>
+            </FullText>
+            <FullText style={[styles.actionText, { color: gold ? '#0B3A8A' : colors.primary }]} numberOfLines={1}>
               {current.status === 'running' ? t('boost.views', { count: current.impressions }) : t(`boost.status.${current.status}`)}
-            </Text>
+            </FullText>
           </View>
         </Pressable>
       );
@@ -227,12 +228,12 @@ export function ProfileGrowth({
         <FontAwesome6 name="rocket" size={15} color="#FFFFFF" solid />
       </LinearGradient>
       <View style={styles.flex}>
-        <Text style={[styles.actionTitle, { color: ink }]} numberOfLines={1}>
+        <FullText style={[styles.actionTitle, { color: ink }]} numberOfLines={1}>
           {t('growth.boost')}
-        </Text>
-        <Text style={[styles.actionText, { color: gold ? '#0B3A8A' : colors.primary }]} numberOfLines={1}>
+        </FullText>
+        <FullText style={[styles.actionText, { color: gold ? '#0B3A8A' : colors.primary }]} numberOfLines={1}>
           {boostFrom !== null ? t('plans.boostFrom', { amount: boostFrom }) : t('growth.boostCta')}
-        </Text>
+        </FullText>
       </View>
     </Pressable>
     );
@@ -268,9 +269,9 @@ export function ProfileGrowth({
               <View style={styles.flex}>
                 <Text style={styles.posterKicker}>{t(`growth.kind.${profile.kind}`)}</Text>
                 <Text style={styles.posterTitle}>{t('badge.tileTitle')}</Text>
-                <Text style={styles.posterFor} numberOfLines={1}>
+                <FullText style={styles.posterFor} numberOfLines={1}>
                   {profile.name}
-                </Text>
+                </FullText>
               </View>
               <View style={[styles.posterPill, active ? styles.posterPillOn : null]}>
                 <FontAwesome6 name={active ? 'check' : 'tag'} size={10} color={active ? '#047857' : '#FFFFFF'} solid />
@@ -294,9 +295,9 @@ export function ProfileGrowth({
                   <FontAwesome6 name="circle-check" size={13} color={brandColors.success} solid />
                 </View>
               </View>
-              <Text style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
                 {profile.name}
-              </Text>
+              </FullText>
               <View style={[styles.previewTag, { backgroundColor: `${brandColors.success}1F` }]}>
                 <FontAwesome6 name="shield-halved" size={9} color={brandColors.success} solid />
                 <Text style={[styles.previewTagText, { color: brandColors.success }]}>{t('growth.trustedTag')}</Text>
@@ -391,9 +392,9 @@ export function ProfileGrowth({
               <View style={styles.flex}>
                 <Text style={styles.posterKicker}>{t('growth.boostKicker')}</Text>
                 <Text style={styles.posterTitle}>{t('growth.boost')}</Text>
-                <Text style={styles.posterFor} numberOfLines={1}>
+                <FullText style={styles.posterFor} numberOfLines={1}>
                   {profile.name}
-                </Text>
+                </FullText>
               </View>
               {current ? (
                 <View style={[styles.posterPill, styles.posterPillOn]}>
@@ -480,9 +481,9 @@ export function ProfileGrowth({
               <FontAwesome6 name={KIND_ICON[profile.kind]} size={14} color="#FFFFFF" solid />
             </LinearGradient>
             <View style={styles.flex}>
-              <Text style={[styles.cardTitle, { color: ink }]} numberOfLines={1}>
+              <FullText style={[styles.cardTitle, { color: ink }]} numberOfLines={1}>
                 {profile.name}
-              </Text>
+              </FullText>
               <Text style={[styles.cardKind, { color: inkSoft }]}>{t(`growth.kind.${profile.kind}`)}</Text>
             </View>
           </View>
@@ -522,9 +523,9 @@ export function ProfileGrowth({
                 <FontAwesome6 name="rocket" size={16} color="#FFFFFF" solid />
                 <View style={styles.flex}>
                   <Text style={styles.detailsTitle}>{t('plans.boostDetailsTitle')}</Text>
-                  <Text style={styles.detailsSub} numberOfLines={1}>
+                  <FullText style={styles.detailsSub} numberOfLines={1}>
                     {details.promoted?.name ?? ''} · {t(`boost.status.${details.status}`)}
-                  </Text>
+                  </FullText>
                 </View>
               </LinearGradient>
               <View style={styles.detailsStats}>

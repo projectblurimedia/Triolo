@@ -1,55 +1,43 @@
 import React from 'react';
-import { Pressable, Text, View, StyleSheet } from 'react-native';
-import { FontAwesome6 } from '@expo/vector-icons';
+import { Pressable, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Avatar, miniCardStyles } from './WorkerMiniCard';
-import { RatingStars } from './RatingStars';
+import { CardFill, KindChips, MetaLine, RatedAvatar, miniCardStyles, useCardChrome } from './WorkerMiniCard';
 import { BusinessNearbyResult } from '@/services/businessesService';
 import { formatDistanceValue } from '@/utils/nearbyResult';
-import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
+import { colors as brandColors, useThemeColors } from '@/theme';
 import { shopKindLabels } from '@/utils/kindLabels';
+import { FullText } from '@/components/FullText';
 
-/** Compact shop card for horizontal carousels (Home's marketplace row). */
+/** Compact shop card for horizontal carousels (Home's marketplace row, Bazaar). */
 export function ShopMiniCard({ shop, onPress }: { shop: BusinessNearbyResult; onPress: () => void }) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const chrome = useCardChrome();
   const categories = shopKindLabels(t, shop).join(', ');
 
   return (
-    <Pressable onPress={onPress} style={[miniCardStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Avatar
+    <Pressable onPress={onPress} style={[miniCardStyles.card, chrome]}>
+      <CardFill />
+      <RatedAvatar
         photoUrl={shop.profilePhotoUrl}
         name={shop.shopName}
         size={56}
         seal={{ kind: 'business', id: shop.id }}
+        average={shop.ratingAverage}
+        count={shop.ratingCount}
       />
-      <Text style={[miniCardStyles.name, { color: colors.text }]} numberOfLines={1}>
+      <FullText style={[miniCardStyles.name, { color: colors.text }]} numberOfLines={1}>
         {shop.shopName}
-      </Text>
-      <Text style={[miniCardStyles.sub, { color: colors.textMuted }]} numberOfLines={1}>
-        {categories}
-      </Text>
-      <RatingStars average={shop.ratingAverage} count={shop.ratingCount} />
-      {shop.deliveryAvailable ? (
-        <View style={[styles.deliveryPill, { backgroundColor: `${brandColors.success}1A` }]}>
-          <FontAwesome6 name="truck" size={9} color={brandColors.success} solid />
-          <Text style={[styles.deliveryText, { color: brandColors.success }]}>{t('home.delivery')}</Text>
-        </View>
-      ) : (
-        <View style={[styles.deliveryPill, { backgroundColor: `${colors.textMuted}14` }]}>
-          <FontAwesome6 name="store" size={9} color={colors.textMuted} solid />
-          <Text style={[styles.deliveryText, { color: colors.textMuted }]}>{t('home.pickup')}</Text>
-        </View>
-      )}
-      <View style={miniCardStyles.meta}>
-        <FontAwesome6 name="location-arrow" size={10} color={colors.primary} solid />
-        <Text style={[miniCardStyles.metaStrong, { color: colors.primary }]}>{formatDistanceValue(shop.distanceMeters)}</Text>
-      </View>
+      </FullText>
+      <KindChips kinds={shopKindLabels(t, shop)} center />
+      <MetaLine
+        parts={[
+          { text: formatDistanceValue(shop.distanceMeters), color: colors.primary, strong: true, icon: 'location-arrow' },
+          shop.deliveryAvailable
+            ? { text: t('home.delivery'), color: brandColors.success, strong: true }
+            : { text: t('home.pickup') },
+        ]}
+      />
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  deliveryPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
-  deliveryText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10 },
-});

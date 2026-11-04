@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Triolo",
+    "appName": "NearbyU",
     "continue": "కొనసాగించు",
     "cancel": "రద్దు చేయి",
     "close": "మూసివేయి",
@@ -605,7 +605,7 @@
       "problemsPosted": "పోస్ట్ చేసిన సమస్యలు",
       "finished": "పూర్తయినవి",
       "inProgress": "జరుగుతున్నవి",
-      "notDone": "రద్దు / వర్కర్ దొరకలేదు",
+      "notDone": "రద్దయినవి",
       "rated": "రేటింగ్ ఇచ్చిన వర్కర్లు",
       "viewAll": "అన్ని బుకింగ్‌లు చూడండి"
     },
@@ -626,7 +626,11 @@
     "detailEmail": "ఇమెయిల్",
     "manageWorkerInPartnerApp": "మీ సేవలను మార్చడానికి Triolo Partner యాప్ వాడండి.",
     "manageShopInPartnerApp": "మీ షాప్‌ను మార్చడానికి Triolo Partner యాప్ వాడండి.",
-    "accountSection": "ఖాతా"
+    "accountSection": "ఖాతా",
+    "viewAll": "అన్నీ చూడండి",
+    "detailPlace": "ప్రదేశం",
+    "statExperience": "అనుభవం",
+    "statDelivery": "డెలివరీ"
   },
   "themePicker": {
     "title": "థీమ్ ఎంచుకోండి",
@@ -917,7 +921,15 @@
     "typeProblem": "సమస్య",
     "emptyActiveTitle": "యాక్టివ్ బుకింగ్‌లు లేవు",
     "emptyHistoryTitle": "ఇంకా గత బుకింగ్‌లు లేవు",
-    "emptyMessage": "ప్రారంభించడానికి క్విక్ బుక్‌తో వర్కర్‌ను బుక్ చేయండి లేదా సమస్యను పోస్ట్ చేయండి."
+    "emptyMessage": "ప్రారంభించడానికి క్విక్ బుక్‌తో వర్కర్‌ను బుక్ చేయండి లేదా సమస్యను పోస్ట్ చేయండి.",
+    "filters": {
+      "all": "అన్నీ",
+      "problems": "సమస్యలు",
+      "finished": "పూర్తయినవి",
+      "notDone": "జరగనివి",
+      "rated": "రేటింగ్ ఇచ్చినవి",
+      "emptyTitle": "ఇక్కడ ఇంకా ఏమీ లేవు"
+    }
   },
   "tracking": {
     "title": "మీ బుకింగ్",
@@ -1155,7 +1167,14 @@
     "history": "చరిత్ర",
     "emptyActive": "యాక్టివ్ ఆర్డర్లు లేవు",
     "emptyHistory": "ఇంకా గత ఆర్డర్లు లేవు",
-    "emptyMessage": "జాబితా తయారు చేసి దగ్గరలోని షాప్‌కు ప్యాక్ చేయడానికి పంపండి."
+    "emptyMessage": "జాబితా తయారు చేసి దగ్గరలోని షాప్‌కు ప్యాక్ చేయడానికి పంపండి.",
+    "filters": {
+      "all": "అన్నీ",
+      "completed": "పూర్తయినవి",
+      "notDone": "జరగనివి",
+      "rated": "రేటింగ్ ఇచ్చినవి",
+      "emptyTitle": "ఇక్కడ ఇంకా ఏమీ లేవు"
+    }
   },
   "favorites": {
     "workersTitle": "ఇష్టమైన వర్కర్లు",

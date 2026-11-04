@@ -15,6 +15,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PlaceValue, placeFromCoords } from '@/utils/place';
 import { ensureLocationOn } from '@/utils/ensureLocationOn';
 import { showToast } from '@/state/toastStore';
+import { FullText } from '@/components/FullText';
 
 interface MapPickerModalProps {
   visible: boolean;
@@ -189,12 +190,12 @@ export function MapPickerModal({ visible, initial, onClose, onPick }: MapPickerM
             <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
           </Pressable>
           <View style={styles.flex}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
+            <FullText style={styles.headerTitle} numberOfLines={1}>
               {t('location.mapTitle')}
-            </Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
+            </FullText>
+            <FullText style={styles.headerSubtitle} numberOfLines={1}>
               {t('location.mapSubtitle')}
-            </Text>
+            </FullText>
           </View>
         </LinearGradient>
 
@@ -275,9 +276,9 @@ export function MapPickerModal({ visible, initial, onClose, onPick }: MapPickerM
             <View style={styles.flex}>
               <Text style={[styles.placeCaption, { color: colors.textMuted }]}>{t('location.pinCaption')}</Text>
               {preview && !moving ? (
-                <Text style={[styles.placeName, { color: colors.text }]} numberOfLines={2}>
+                <FullText style={[styles.placeName, { color: colors.text }]} numberOfLines={2}>
                   {placeName(preview.locationName) || preview.locationName}
-                </Text>
+                </FullText>
               ) : (
                 <Text style={[styles.placeName, { color: colors.textMuted }]}>
                   {mapState === 'ready' ? t('location.findingPlace') : '…'}

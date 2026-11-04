@@ -19,6 +19,7 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { MainStackParamList, MainTabParamList } from '@/navigation/types';
 import { placeName } from '@/utils/formatAddress';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 type HomeNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Home'>,
@@ -62,9 +63,9 @@ export function JobPostHomeSection() {
           </View>
           <View style={styles.flex}>
             <Text style={styles.inviteTitle}>{t('jobPost.lookingTitle')}</Text>
-            <Text style={styles.inviteText} numberOfLines={2}>
+            <FullText style={styles.inviteText} numberOfLines={2}>
               {t('jobPost.lookingSubtitle')}
-            </Text>
+            </FullText>
           </View>
           <FontAwesome6 name="chevron-right" size={14} color="#FFFFFF" solid />
         </LinearGradient>
@@ -86,9 +87,9 @@ export function JobPostHomeSection() {
                   <Text style={[styles.pickNumberText, { color: active ? '#FFFFFF' : colors.primary }]}>{index + 1}</Text>
                 </View>
                 <FontAwesome6 name={categoryIcon(post.category) as never} size={12} color={active ? '#FFFFFF' : colors.primary} solid />
-                <Text style={[styles.pickText, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
+                <FullText style={[styles.pickText, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
                   {jobTitle(post, t)}
-                </Text>
+                </FullText>
                 <View
                   style={[styles.pickDot, { backgroundColor: (post.newViews ?? 0) > 0 ? '#EF4444' : post.isActive ? brandColors.success : colors.textMuted }]}
                 />

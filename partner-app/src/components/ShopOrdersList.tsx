@@ -11,6 +11,7 @@ import { colors as brandColors, fonts, typography, useThemeColors } from '@/them
 import { PullToRefresh } from './PullToRefresh';
 import { ALL_TIME, DateRange, inRange } from './DateRangeSheet';
 import { orderListText } from '@/utils/orderListText';
+import { FullText } from '@/components/FullText';
 
 export type ShopFilter = 'all' | 'new' | 'active' | 'done' | 'cancelled';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -102,20 +103,20 @@ export function ShopOrdersList({
         </View>
         <View style={styles.flex}>
           <View style={styles.titleRow}>
-            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
               {order.customerFullName}
-            </Text>
+            </FullText>
             <View style={[styles.pill, { backgroundColor: `${color}1A` }]}>
-              <Text style={[styles.pillText, { color }]} numberOfLines={1}>
+              <FullText style={[styles.pillText, { color }]} numberOfLines={1}>
                 {t(`shopOrders.status.${order.status}.title`)}
-              </Text>
+              </FullText>
             </View>
           </View>
-          <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+          <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
             {manyShops && order.shopName ? `${order.shopName} · ` : ''}
             {orderListText(t, order, 'shopOrders.itemsCount')} ·{' '}
             {t(order.fulfillment === 'delivery' ? 'shopOrders.delivery' : 'shopOrders.pickup')} · {formatDate(order.createdAt)}
-          </Text>
+          </FullText>
           {order.totalAmount != null ? (
             <Text style={[styles.total, { color: colors.primary }]}>{formatRupees(order.totalAmount)}</Text>
           ) : null}

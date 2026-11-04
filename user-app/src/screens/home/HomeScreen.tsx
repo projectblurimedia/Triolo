@@ -1,4 +1,6 @@
 import { ContinueSteps } from '@/components/ContinueSteps';
+import { SectionHeader } from '@/components/SectionHeader';
+import { CardFill, useCardChrome } from '@/components/WorkerMiniCard';
 import React, { useMemo, useState } from 'react';
 import { HomeAdCarousel } from '@/components/Ads';
 
@@ -39,6 +41,7 @@ import { QuickOrderModal } from '@/components/QuickOrderModal';
 import { SendListModal } from '@/components/SendListModal';
 import { HomeLocationBar } from '@/components/HomeLocationBar';
 import { withLocation } from '@/utils/ensureLocationOn';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -73,6 +76,7 @@ const ACTIVE_STATUSES = ['open', 'accepted', 'work_done'];
 export function HomeScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const chrome = useCardChrome();
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const account = useAuthStore((state) => state.account);
   const firstName = account?.fullName?.split(' ')[0] ?? '';
@@ -143,16 +147,12 @@ export function HomeScreen() {
     else setQuickOrderVisible(true);
   };
 
-  const renderSectionHeader = (title: string, onSeeAll?: () => void) => (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      {onSeeAll ? (
-        <Pressable onPress={onSeeAll} hitSlop={8}>
-          <Text style={[styles.seeAll, { color: colors.primary }]}>{t('home.seeAll')}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
+  const renderSectionHeader = (
+    title: string,
+    icon: React.ComponentProps<typeof FontAwesome6>['name'],
+    onSeeAll?: () => void,
+    count?: number,
+  ) => <SectionHeader title={title} icon={icon} count={count} onSeeAll={onSeeAll} seeAllLabel={t('home.seeAll')} />;
 
   const renderSummary = () => {
     let headline: string;
@@ -210,9 +210,9 @@ export function HomeScreen() {
             accessibilityRole="search"
           >
             <FontAwesome6 name="magnifying-glass" size={15} color={colors.textMuted} solid />
-            <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
               {t('home.searchPlaceholder')}
-            </Text>
+            </FullText>
           </Pressable>
 
           {/* Local businesses' ads, sliding by (only when the admin turned it on). */}
@@ -224,7 +224,7 @@ export function HomeScreen() {
 
           {renderSummary()}
 
-          {renderSectionHeader(t('home.quickActions'))}
+          {renderSectionHeader(t('home.quickActions'), 'bolt')}
           <View style={styles.actionsGrid}>
             {QUICK_ACTIONS.map((action) => (
               <Pressable
@@ -254,12 +254,12 @@ export function HomeScreen() {
                   <View style={styles.actionIcon}>
                     <FontAwesome6 name={action.icon} size={17} color="#FFFFFF" solid />
                   </View>
-                  <Text style={styles.actionLabel} numberOfLines={1}>
+                  <FullText style={styles.actionLabel} numberOfLines={1}>
                     {t(`home.action.${action.key}`)}
-                  </Text>
-                  <Text style={styles.actionHint} numberOfLines={1}>
+                  </FullText>
+                  <FullText style={styles.actionHint} numberOfLines={1}>
                     {t(`home.actionHint.${action.key}`)}
-                  </Text>
+                  </FullText>
                 </LinearGradient>
               </Pressable>
             ))}
@@ -277,16 +277,16 @@ export function HomeScreen() {
                 <Text style={[styles.problemsTitle, { color: colors.text }]}>
                   {t('home.activeProblems', { count: activeProblems.length })}
                 </Text>
-                <Text style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
+                <FullText style={[styles.problemsDetail, { color: colors.textMuted }]} numberOfLines={1}>
                   {latestActive.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')} ·{' '}
                   {t(`yourProblems.status.${latestActive.status}`)}
-                </Text>
+                </FullText>
               </View>
               <FontAwesome6 name="chevron-right" size={13} color={colors.textMuted} solid />
             </Pressable>
           ) : null}
 
-          {renderSectionHeader(t('home.browseServices'), () => navigation.navigate('Services', undefined))}
+          {renderSectionHeader(t('home.browseServices'), 'grip', () => navigation.navigate('Services', undefined), SKILL_CATEGORIES.length)}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
             {[...SKILL_CATEGORIES]
               .sort((a, b) => (countsByCategory[b.key] ?? 0) - (countsByCategory[a.key] ?? 0))
@@ -294,15 +294,18 @@ export function HomeScreen() {
               .map((skill) => (
               <Pressable
                 key={skill.key}
-                style={[styles.categoryTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                style={[styles.categoryTile, chrome]}
                 onPress={() => navigation.navigate('Services', { category: skill.key, linkedAt: Date.now() })}
               >
-                <View style={[styles.categoryIcon, { backgroundColor: `${colors.primary}14` }]}>
-                  <FontAwesome6 name={skill.icon} size={18} color={colors.primary} solid />
+                <CardFill height={42} radius={16} />
+                <View style={[styles.categoryIcon, styles.categoryIconRing]}>
+                  <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.categoryIconInner}>
+                    <FontAwesome6 name={skill.icon} size={16} color="#FFFFFF" solid />
+                  </LinearGradient>
                 </View>
-                <Text style={[styles.categoryLabel, { color: colors.text }]} numberOfLines={1}>
+                <FullText style={[styles.categoryLabel, { color: colors.text }]} numberOfLines={1}>
                   {t(`workerProfile.skills.${skill.key}`)}
-                </Text>
+                </FullText>
                 <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
                   {t('home.nearbyCount', { count: countsByCategory[skill.key] ?? 0 })}
                 </Text>
@@ -316,9 +319,9 @@ export function HomeScreen() {
               <View style={[styles.categoryIcon, { backgroundColor: colors.primary }]}>
                 <FontAwesome6 name="grip" size={18} color="#FFFFFF" solid />
               </View>
-              <Text style={[styles.categoryLabel, { color: colors.primary }]} numberOfLines={1}>
+              <FullText style={[styles.categoryLabel, { color: colors.primary }]} numberOfLines={1}>
                 {t('home.seeAll')}
-              </Text>
+              </FullText>
               <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
                 {t('home.allServicesCount', { count: SKILL_CATEGORIES.length })}
               </Text>
@@ -327,7 +330,7 @@ export function HomeScreen() {
 
           {(workers.data ?? []).length > 0 ? (
             <>
-              {renderSectionHeader(t('home.topWorkers'), () => navigation.navigate('Services', undefined))}
+              {renderSectionHeader(t('home.topWorkers'), 'screwdriver-wrench', () => navigation.navigate('Services', undefined), (workers.data ?? []).length)}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
                 {(workers.data ?? []).slice(0, CAROUSEL_LIMIT).map((worker) => (
                   <WorkerMiniCard key={worker.id} worker={worker} onPress={() => openWorker(worker)} />
@@ -338,7 +341,7 @@ export function HomeScreen() {
 
           {(shops.data ?? []).length > 0 ? (
             <>
-              {renderSectionHeader(t('home.marketplace'), () => navigation.navigate('Bazaar'))}
+              {renderSectionHeader(t('home.marketplace'), 'store', () => navigation.navigate('Bazaar'), (shops.data ?? []).length)}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
                 {(shops.data ?? []).slice(0, CAROUSEL_LIMIT).map((shop) => (
                   <ShopMiniCard key={shop.id} shop={shop} onPress={() => openShop(shop)} />
@@ -474,11 +477,15 @@ const styles = StyleSheet.create({
   problemsInfo: { flex: 1 },
   problemsTitle: { ...typography.body, fontFamily: fonts.semiBold },
   problemsDetail: { ...typography.caption, marginTop: 2 },
-  carousel: { gap: 12, paddingRight: 4 },
+  carousel: { gap: 12, paddingRight: 4, paddingLeft: 1, paddingTop: 2, paddingBottom: 8 },
   categoryTile: { width: 96, borderRadius: 16, borderWidth: 1, paddingVertical: 14, alignItems: 'center', gap: 6 },
   categoryIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  // White disc over the tile's gradient header, like the white-ringed photos on the cards.
+  categoryIconRing: { backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: '#FFFFFF' },
+  categoryIconInner: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   categoryLabel: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
-  categoryCount: { ...typography.caption, fontSize: 10 },
+  // Pulled up to the label above it (the tile's gap is for the icon).
+  categoryCount: { ...typography.caption, fontSize: 10, marginTop: -5 },
   emptyCard: {
     marginTop: 22,
     borderRadius: 16,

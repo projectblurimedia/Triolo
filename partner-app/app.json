@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Triolo Partner",
+    "name": "NearbyU Partner",
     "slug": "triolo-partner",
-    "version": "1.5.0",
+    "version": "1.7.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
       "package": "com.projectblurimedia.triolopartner",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#0A3FB8",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -42,9 +42,9 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#031F64",
+          "backgroundColor": "#0A3FB8",
           "dark": {
-            "backgroundColor": "#031F64"
+            "backgroundColor": "#0A3FB8"
           }
         }
       ],
@@ -65,7 +65,11 @@
       [
         "expo-notifications",
         {
-          "color": "#0055D3"
+          "color": "#0055D3",
+          "sounds": [
+            "./assets/sounds/nearbyu_notification.wav"
+          ],
+          "icon": "./assets/notification-icon.png"
         }
       ],
       "expo-task-manager",
@@ -77,6 +81,7 @@
       ],
       "./plugins/withLivePopup",
       "./plugins/withUpiApps",
+      "./plugins/withKeepNotificationSound",
       [
         "expo-audio",
         {

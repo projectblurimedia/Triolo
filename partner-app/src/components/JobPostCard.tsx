@@ -7,6 +7,7 @@ import { colors as brandColors, fonts, headerGradient, typography, useThemeColor
 import { JOB_CATEGORIES, JobPost } from '@/services/jobSeekerService';
 import { formatRupees } from '@/services/shopOrdersService';
 import { SmartImage } from './SmartImage';
+import { FullText } from '@/components/FullText';
 
 /** "₹30,000 / month" — shared with the Home section. */
 export function formatPay(post: Pick<JobPost, 'payAmount' | 'payPeriod'>, t: (key: string) => string): string {
@@ -55,13 +56,13 @@ export function JobPostCard({
         )}
         <View style={styles.text}>
           <Text style={[styles.caption, { color: colors.primary }]}>{t('jobPost.cardCaption')}</Text>
-          <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
             {name ?? jobTitle(post, t)}
-          </Text>
+          </FullText>
           <View style={styles.compactMetaRow}>
-            <Text style={[styles.compactMeta, styles.compactMetaText, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.compactMeta, styles.compactMetaText, { color: colors.textMuted }]} numberOfLines={1}>
               {jobTitle(post, t)}
-            </Text>
+            </FullText>
             <FontAwesome6 name="eye" size={10} color={colors.textMuted} solid />
             <Text style={[styles.compactMeta, { color: colors.textMuted }]}>{post.viewCount ?? 0}</Text>
             {(post.newViews ?? 0) > 0 ? (
@@ -97,21 +98,21 @@ export function JobPostCard({
             {name ? (
               <>
                 <Text style={[styles.caption, { color: colors.primary }]}>{t('jobPost.cardCaption')}</Text>
-                <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+                <FullText style={[styles.title, { color: colors.text }]} numberOfLines={1}>
                   {name}
-                </Text>
-                <Text style={[styles.meta, { color: colors.text }]} numberOfLines={1}>
+                </FullText>
+                <FullText style={[styles.meta, { color: colors.text }]} numberOfLines={1}>
                   {jobTitle(post, t)}
-                </Text>
+                </FullText>
               </>
             ) : (
-              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.title, { color: colors.text }]} numberOfLines={1}>
                 {jobTitle(post, t)}
-              </Text>
+              </FullText>
             )}
-            <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
               {formatPay(post, t)} · {t(`jobPost.availability.${post.availability}`)}
-            </Text>
+            </FullText>
             <View style={[styles.pill, { backgroundColor: `${live ? brandColors.success : colors.textMuted}1A` }]}>
               <View style={[styles.dot, { backgroundColor: live ? brandColors.success : colors.textMuted }]} />
               <Text style={[styles.pillText, { color: live ? brandColors.success : colors.textMuted }]}>
@@ -122,9 +123,9 @@ export function JobPostCard({
         ) : (
           <>
             <Text style={[styles.title, { color: colors.text }]}>{t('jobPost.lookingTitle')}</Text>
-            <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={2}>
+            <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={2}>
               {t('jobPost.lookingSubtitle')}
-            </Text>
+            </FullText>
           </>
         )}
       </View>

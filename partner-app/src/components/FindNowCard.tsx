@@ -4,6 +4,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LoadingIndicator } from './LoadingIndicator';
 import { colors as brandColors, fonts, headerGradient, typography } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /**
  * Home's "Find Jobs Now" / "Find Orders Now": one blue gradient card that carries its own
@@ -61,12 +62,12 @@ export function FindNowCard({
             </View>
           </View>
           <View style={styles.text}>
-            <Text style={styles.title} numberOfLines={1}>
+            <FullText style={styles.title} numberOfLines={1}>
               {title}
-            </Text>
-            <Text style={styles.hint} numberOfLines={2}>
+            </FullText>
+            <FullText style={styles.hint} numberOfLines={2}>
               {hint}
-            </Text>
+            </FullText>
           </View>
           <View style={styles.go}>
             <FontAwesome6 name="arrow-right" size={14} color={headerGradient[0]} solid />

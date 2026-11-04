@@ -30,6 +30,7 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDistance } from '@/utils/formatDistance';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 // A request this fresh when the app first loads still pops up (the push may have been missed).
 const FRESH_OFFER_MS = 90 * 1000;
@@ -239,12 +240,12 @@ function IncomingRequestsList({ visible, offers, orders }: { visible: boolean; o
             <FontAwesome6 name="chevron-left" size={16} color="#FFFFFF" solid />
           </Pressable>
           <View style={styles.flex}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
+            <FullText style={styles.headerTitle} numberOfLines={1}>
               {t('incoming.menuTitle')}
-            </Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
+            </FullText>
+            <FullText style={styles.headerSubtitle} numberOfLines={1}>
               {t('incoming.menuHint')}
-            </Text>
+            </FullText>
           </View>
           <View style={styles.livePill}>
             <View style={styles.liveDot} />

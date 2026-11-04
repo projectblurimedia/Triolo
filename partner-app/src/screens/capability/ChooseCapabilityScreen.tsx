@@ -22,6 +22,7 @@ import { StaffInvitesCard } from '@/components/StaffInvitesCard';
 import { AccountSheet } from '@/components/AccountSheet';
 import { openForYou } from '@/state/forYouStore';
 import { LanguagePickerModal } from '@/components/LanguagePickerModal';
+import { FullText } from '@/components/FullText';
 
 const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 
@@ -182,9 +183,9 @@ function CapabilityCard({ card, colors }: CardProps) {
         ) : (
           <>
             <Text style={[styles.cardTitle, { color: colors.text }]}>{card.unregisteredTitle}</Text>
-            <Text style={[styles.cardSubtitle, { color: colors.textMuted }]} numberOfLines={2}>
+            <FullText style={[styles.cardSubtitle, { color: colors.textMuted }]} numberOfLines={2}>
               {card.unregisteredSubtitle}
-            </Text>
+            </FullText>
           </>
         )}
       </View>

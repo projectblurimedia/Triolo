@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { LoadingIndicator } from './LoadingIndicator';
+import { FullText } from '@/components/FullText';
 
 /*
  * (Copied between user-app and partner-app — keep in sync.)
@@ -155,17 +156,17 @@ function StepCard({
       </Animated.View>
       <View style={styles.text}>
         <View style={styles.nameRow}>
-          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
             {step.name}
-          </Text>
+          </FullText>
         </View>
-        <Text style={[styles.step, { color: colors.text }]} numberOfLines={1}>
+        <FullText style={[styles.step, { color: colors.text }]} numberOfLines={1}>
           {step.stepTitle}
-        </Text>
+        </FullText>
         {step.hint && !slim ? (
-          <Text style={[styles.hint, { color: colors.textMuted }]} numberOfLines={compact ? 1 : 2}>
+          <FullText style={[styles.hint, { color: colors.textMuted }]} numberOfLines={compact ? 1 : 2}>
             {step.hint}
-          </Text>
+          </FullText>
         ) : null}
       </View>
       {/* Where it stands (Pending, On the way…) on the right, where a "Continue" button used to be. */}
@@ -183,9 +184,9 @@ function StepCard({
           end={{ x: 1, y: 1 }}
           style={[styles.go, styles.goSlim]}
         >
-          <Text style={[styles.goText, styles.goTextSlim]} numberOfLines={1}>
+          <FullText style={[styles.goText, styles.goTextSlim]} numberOfLines={1}>
             {tag.label}
-          </Text>
+          </FullText>
           <FontAwesome6 name="chevron-right" size={10} color="#FFFFFF" solid />
         </LinearGradient>
       )}
@@ -269,20 +270,34 @@ export function StepStack({
   return (
     <View style={[styles.section, style]}>
       <View style={[styles.headerRow, minimized ? styles.headerRowSlim : null]}>
-        {live ? <LiveDot color={accent} /> : <FontAwesome6 name={icon} size={13} color={accent} solid />}
-        <Text style={[styles.sectionTitle, minimized ? styles.sectionTitleSlim : null, { color: colors.text }]}>{title}</Text>
-        {/* How many there are, at the right of the heading (tapping the stack lists them all). */}
-        {stacked ? (
-          <View style={[styles.countPill, { backgroundColor: `${colors.primary}14` }]}>
-            <Text style={[styles.countText, { color: colors.primary }]}>{steps.length}</Text>
-          </View>
-        ) : null}
-        {onSeeAll ? (
-          <Pressable onPress={onSeeAll} hitSlop={8} style={styles.seeAll} accessibilityRole="button">
-            <Text style={[styles.seeAllText, { color: colors.primary }]}>{t('continueSteps.seeAll')}</Text>
-            <FontAwesome6 name="chevron-right" size={10} color={colors.primary} solid />
+        {/* The same heading as the other sections: icon square, title, a rule, and on the right
+            the count — inside See all when there is one. */}
+        <LinearGradient colors={live ? RED_GRADIENT : headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headIcon}>
+          {live ? <LiveDot color="#FFFFFF" /> : <FontAwesome6 name={icon} size={12} color="#FFFFFF" solid />}
+        </LinearGradient>
+        <Text style={[styles.sectionTitle, minimized ? styles.sectionTitleSlim : null, { color: colors.text }]} numberOfLines={1}>
+          {title}
+        </Text>
+        <View style={[styles.rule, { backgroundColor: `${colors.primary}1F` }]} />
+        {/* See all (with the count) opens the full list — the section's own list when it has
+            none, the same as tapping the stack. One item: just the count. */}
+        {onSeeAll || stacked ? (
+          <Pressable
+            onPress={onSeeAll ?? (() => setListOpen(true))}
+            hitSlop={8}
+            accessibilityRole="button"
+            style={[styles.seeAllPill, { borderColor: `${live ? RED_GRADIENT[0] : colors.primary}40`, backgroundColor: `${live ? RED_GRADIENT[0] : colors.primary}10` }]}
+          >
+            <Text style={[styles.seeAllText, { color: live ? RED_GRADIENT[0] : colors.primary }]}>{t('continueSteps.seeAll')}</Text>
+            <LinearGradient colors={live ? RED_GRADIENT : headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.seeAllCount}>
+              <Text style={styles.seeAllCountText}>{steps.length}</Text>
+            </LinearGradient>
           </Pressable>
-        ) : null}
+        ) : (
+          <LinearGradient colors={live ? RED_GRADIENT : headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.seeAllCount}>
+            <Text style={styles.seeAllCountText}>{steps.length}</Text>
+          </LinearGradient>
+        )}
       </View>
 
       <View style={{ paddingBottom: behind.length * PEEK_OFFSET }}>
@@ -340,9 +355,9 @@ export function StepStack({
             </Pressable>
             <View style={styles.flex}>
               <Text style={styles.headerTitle}>{title}</Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {t('continueSteps.allSubtitle', { count: steps.length })}
-              </Text>
+              </FullText>
             </View>
           </LinearGradient>
           <ScrollView
@@ -362,15 +377,17 @@ export function StepStack({
 const RED_GRADIENT = ['#DC2626', '#EF4444'] as const;
 
 const styles = StyleSheet.create({
-  seeAll: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto' },
-  seeAllText: { fontFamily: fonts.semiBold, fontSize: 13 },
+  headIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  rule: { flex: 1, height: 1, minWidth: 8 },
+  seeAllPill: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, borderRadius: 14, borderWidth: 1, paddingLeft: 11, paddingRight: 3 },
+  seeAllText: { fontFamily: fonts.semiBold, fontSize: 12, lineHeight: 16, includeFontPadding: false },
+  seeAllCount: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
+  seeAllCountText: { fontFamily: fonts.semiBold, fontSize: 11, lineHeight: 14, color: '#FFFFFF', includeFontPadding: false },
   flex: { flex: 1 },
   expanded: { gap: 12 },
   section: { marginTop: 18, marginBottom: 4 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  sectionTitle: { ...typography.subheading, fontFamily: fonts.semiBold, flex: 1 },
-  countPill: { minWidth: 26, height: 22, borderRadius: 11, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
-  countText: { fontFamily: fonts.semiBold, fontSize: 12 },
+  sectionTitle: { ...typography.body, fontFamily: fonts.semiBold, flexShrink: 1 },
   dotWrap: { width: 12, height: 12, alignItems: 'center', justifyContent: 'center' },
   dotRing: { position: 'absolute', width: 10, height: 10, borderRadius: 5 },
   dot: { width: 10, height: 10, borderRadius: 5 },

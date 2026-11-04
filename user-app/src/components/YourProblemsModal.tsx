@@ -21,6 +21,7 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { BlurScope } from './Glass';
 import { PullToRefresh } from './PullToRefresh';
 import { SmartImage } from './SmartImage';
+import { FullText } from '@/components/FullText';
 
 interface YourProblemsModalProps {
   visible: boolean;
@@ -195,9 +196,9 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
           )}
           <View style={styles.cardInfo}>
             <View style={styles.titleRow}>
-              <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
                 {item.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}
-              </Text>
+              </FullText>
               <View style={[styles.statusPill, { backgroundColor: `${statusColor}1A` }]}>
                 <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
                 <Text style={[styles.statusText, { color: statusColor }]}>
@@ -211,9 +212,9 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
             {item.locationAddress ? (
               <View style={styles.metaRow}>
                 <FontAwesome6 name="location-dot" size={11} color={colors.textMuted} solid />
-                <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
+                <FullText style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
                   {placeName(item.locationAddress)}
-                </Text>
+                </FullText>
               </View>
             ) : null}
             <View style={styles.metaRow}>
@@ -227,9 +228,9 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
         </View>
 
         {item.description ? (
-          <Text style={[styles.description, { color: colors.text }]} numberOfLines={2}>
+          <FullText style={[styles.description, { color: colors.text }]} numberOfLines={2}>
             {item.description}
-          </Text>
+          </FullText>
         ) : null}
 
         {renderWorker(item)}
@@ -313,12 +314,12 @@ export function YourProblemsModal({ visible, onClose }: YourProblemsModalProps) 
                 <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
               </Pressable>
               <View style={styles.titleGroup}>
-                <Text style={styles.headerTitle} numberOfLines={1}>
+                <FullText style={styles.headerTitle} numberOfLines={1}>
                   {t('yourProblems.title')}
-                </Text>
-                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                </FullText>
+                <FullText style={styles.headerSubtitle} numberOfLines={1}>
                   {t('yourProblems.subtitle')}
-                </Text>
+                </FullText>
               </View>
             </View>
           </LinearGradient>

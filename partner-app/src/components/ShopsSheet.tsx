@@ -9,6 +9,7 @@ import { VerificationBadge } from './VerificationBadge';
 import { BusinessProfile } from '@/services/businessesService';
 import { formatAddress } from '@/utils/formatAddress';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /**
  * Every shop of the partner in one sheet (Profile shows them as one card when there are two
@@ -81,13 +82,13 @@ export function ShopRow({ shop, onPress }: { shop: BusinessProfile; onPress: () 
     >
       <ShopAvatar shop={shop} size={40} />
       <View style={styles.flex}>
-        <Text style={[styles.rowName, { color: colors.text }]} numberOfLines={1}>
+        <FullText style={[styles.rowName, { color: colors.text }]} numberOfLines={1}>
           {shop.shopName}
-        </Text>
+        </FullText>
         {place ? (
-          <Text style={[styles.rowPlace, { color: colors.textMuted }]} numberOfLines={1}>
+          <FullText style={[styles.rowPlace, { color: colors.textMuted }]} numberOfLines={1}>
             {place}
-          </Text>
+          </FullText>
         ) : null}
       </View>
       {shop.verificationStatus !== 'verified' ? <VerificationBadge status={shop.verificationStatus} /> : null}

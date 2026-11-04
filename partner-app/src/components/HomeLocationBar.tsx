@@ -11,6 +11,7 @@ import { useLocationStore } from '@/state/locationStore';
 import { PlaceValue, placeFromCoords } from '@/utils/place';
 import { placeName } from '@/utils/formatAddress';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /*
  * (Copied between user-app and partner-app — keep in sync.)
@@ -121,12 +122,12 @@ export function HomeLocationBar() {
         <FontAwesome6 name={opts.icon} size={13} color={opts.active ? '#FFFFFF' : colors.primary} solid />
       </View>
       <View style={styles.flex}>
-        <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+        <FullText style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
           {opts.title}
-        </Text>
-        <Text style={[styles.rowPlace, { color: colors.textMuted }]} numberOfLines={1}>
+        </FullText>
+        <FullText style={[styles.rowPlace, { color: colors.textMuted }]} numberOfLines={1}>
           {opts.place}
-        </Text>
+        </FullText>
       </View>
       {opts.item ? (
         <>
@@ -159,13 +160,13 @@ export function HomeLocationBar() {
         <View style={styles.flex}>
           <View style={styles.labelRow}>
             {selected ? null : <View style={[styles.liveDot, { backgroundColor: ready ? '#16A34A' : colors.textMuted }]} />}
-            <Text style={[styles.barLabel, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.barLabel, { color: colors.textMuted }]} numberOfLines={1}>
               {selected ? labelOf(selected) : t('homeLocation.current')}
-            </Text>
+            </FullText>
           </View>
-          <Text style={[styles.barName, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.barName, { color: colors.text }]} numberOfLines={1}>
             {shownName}
-          </Text>
+          </FullText>
         </View>
         <View style={[styles.changePill, { backgroundColor: `${colors.primary}12` }]}>
           <Text style={[styles.changeText, { color: colors.primary }]}>{t('homeLocation.changeShort')}</Text>
@@ -182,9 +183,9 @@ export function HomeLocationBar() {
               </View>
               <View style={styles.flex}>
                 <Text style={styles.headTitle}>{t(draft ? 'homeLocation.saveTitle' : 'homeLocation.title')}</Text>
-                <Text style={styles.headText} numberOfLines={1}>
+                <FullText style={styles.headText} numberOfLines={1}>
                   {draft?.place ? placeName(draft.place.locationName) || draft.place.locationName : t('homeLocation.subtitle')}
-                </Text>
+                </FullText>
               </View>
               <Pressable
                 onPress={() => (draft ? setDraft(null) : setSheetOpen(false))}

@@ -342,21 +342,34 @@ describe('NotificationsService — who viewed', () => {
     expect(list.items[0]).toMatchObject({ title: 'Profile Viewed', viewer: null, locked: true });
   });
 
-  it('a new job goes to a pop-up-capable phone as data, to an older build as a notification', async () => {
+  it('a new job always goes as a normal notification (tagged), plus the pop-up as data on a pop-up phone', async () => {
     const repository = createMockRepository();
     repository.findPushTokens.mockResolvedValue([{ token: 'new-phone', app: 'partner', fullScreen: true }]);
     const service = new NotificationsService(repository as unknown as NotificationsRepository);
+    (sendPushNotification as jest.Mock).mockClear();
 
     await service.sendRawPush('account-1', 'New job', 'Someone nearby', { data: { kind: 'booking_offer', bookingRequestId: 'r1' } });
-    expect(sendPushNotification).toHaveBeenLastCalledWith(
+    expect(sendPushNotification).toHaveBeenCalledTimes(2);
+    expect(sendPushNotification).toHaveBeenNthCalledWith(
+      1,
+      'new-phone',
+      'New job',
+      'Someone nearby',
+      expect.objectContaining({ tag: 'r1', channelId: 'booking-offers', priority: 'max' }),
+    );
+    expect((sendPushNotification as jest.Mock).mock.calls[0][3].dataOnly).toBeFalsy();
+    expect(sendPushNotification).toHaveBeenNthCalledWith(
+      2,
       'new-phone',
       'New job',
       'Someone nearby',
       expect.objectContaining({ dataOnly: true, data: expect.objectContaining({ popup: '1', kind: 'booking_offer' }) }),
     );
 
+    (sendPushNotification as jest.Mock).mockClear();
     repository.findPushTokens.mockResolvedValue([{ token: 'old-phone', app: 'partner', fullScreen: false }]);
-    await service.sendRawPush('account-1', 'New job', 'Someone nearby', { data: { kind: 'booking_offer', bookingRequestId: 'r1' } });
-    expect(sendPushNotification).toHaveBeenLastCalledWith('old-phone', 'New job', 'Someone nearby', expect.not.objectContaining({ dataOnly: true }));
+    await service.sendRawPush('account-1', 'New order', 'A list', { data: { kind: 'order_placed', orderId: 'o1' } });
+    expect(sendPushNotification).toHaveBeenCalledTimes(1);
+    expect(sendPushNotification).toHaveBeenCalledWith('old-phone', 'New order', 'A list', expect.objectContaining({ tag: 'o1' }));
   });
 });

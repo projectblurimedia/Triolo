@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { formatVoiceLength } from '@/utils/voice';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 const BARS = 26;
 
@@ -81,9 +82,9 @@ export function VoiceMessage({
       <View style={styles.middle}>
         <View style={styles.labelRow}>
           <FontAwesome6 name="microphone" size={11} color={colors.primary} solid />
-          <Text style={[styles.label, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.label, { color: colors.text }]} numberOfLines={1}>
             {t('voice.title')}
-          </Text>
+          </FullText>
         </View>
         <View style={styles.wave}>
           {heights.map((height, index) => (

@@ -26,9 +26,13 @@ import { useGlass } from './Glass';
 import { LoadingIndicator } from './LoadingIndicator';
 
 // The hidden room above the content: how far it opens, and so the gap the spinner sits in
-// while refreshing. Letting go past half of it opens it (and refreshes); less closes it.
-const ROOM = 96;
-const HALF = ROOM / 2;
+// while refreshing. Only a deliberate pull refreshes: it must start with the list at its top
+// and go TRIGGER px down; anything shorter closes again.
+const ROOM = 112;
+const TRIGGER = 90;
+// "At the top" when the drag starts (a scroll up through the content that runs on into the
+// room is not a pull).
+const TOP_SLACK = 4;
 const BUBBLE = 40;
 // The spinner shows at least this long, so a fast refresh doesn't just flicker.
 const MIN_SPIN_MS = 700;
@@ -99,9 +103,10 @@ function renderHeader(header: ScrollableProps['ListHeaderComponent']): ReactNode
 
 /**
  * Our own pull-to-refresh (instead of the platform RefreshControl): pull down at the top and
- * the content comes down with a bubble in the gap (its arrow turns past halfway). Let go past
- * halfway and it opens fully with a spinner while the data reloads, shows a tick, then glides
- * back; less than halfway and it just closes.
+ * the content comes down with a bubble in the gap (its arrow turns once far enough). Let go
+ * past TRIGGER and it opens fully with a spinner while the data reloads, shows a tick, then
+ * glides back; less and it just closes. A drag that began below the top never refreshes, so
+ * scrolling back up a list (or a sideways swipe with a little drift) can't set it off.
  *
  * How it stays smooth: the list has a hidden room of ROOM px above its content and rests just
  * past it, so the pull is the list's own native scroll (nothing has to win the finger from it),
@@ -136,6 +141,8 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
   const lastPinAt = useRef(0);
   // The person themselves pulled the room open (only that may refresh).
   const userPull = useRef(false);
+  // The current drag began with the list resting at its top.
+  const dragFromTop = useRef(false);
   const [revealed, setRevealed] = useState(false);
   const revealedRef = useRef(false);
   const contentHeight = useRef(0);
@@ -220,7 +227,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
       if (phaseRef.current === 'pulling') setPhaseBoth('idle');
       return;
     }
-    if (userPull.current && ROOM - top >= HALF) {
+    if (userPull.current && ROOM - top >= TRIGGER) {
       if (top > 1) scrollTo(0, true);
       runRefresh();
       return;
@@ -293,11 +300,16 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
     const pulled = Math.max(0, ROOM - y.current);
     pull.setValue(pulled);
     if (dragging.current && !busy()) {
-      // Only a finger in the room may open it on letting go.
-      setOpenable(y.current < ROOM);
-      if (pulled > 0) {
-        setPhaseBoth('pulling');
-        userPull.current = true;
+      if (!dragFromTop.current) {
+        // Scrolled up from further down: the room never opens on this drag.
+        setOpenable(false);
+      } else {
+        // Only a finger far enough into the room may open it on letting go.
+        setOpenable(pulled >= TRIGGER);
+        if (pulled > 0) {
+          setPhaseBoth('pulling');
+          userPull.current = true;
+        }
       }
     }
     props.onScroll?.(event);
@@ -305,6 +317,7 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
 
   const onScrollBeginDrag = (event: ScrollEvent) => {
     dragging.current = true;
+    dragFromTop.current = !momentum.current && event.nativeEvent.contentOffset.y <= ROOM + TOP_SLACK;
     momentum.current = false;
     autoScrollUntil.current = 0;
     reveal();
@@ -425,10 +438,10 @@ export function PullToRefresh({ refreshing, onRefresh, style, children }: PullTo
     extrapolate: 'clamp',
   });
   const bubbleOpacity = pull.interpolate({ inputRange: [0, 14, 36], outputRange: [0, 0.2, 1], extrapolate: 'clamp' });
-  const bubbleScale = pull.interpolate({ inputRange: [0, HALF], outputRange: [0.55, 1], extrapolate: 'clamp' });
-  const arrowTurn = pull.interpolate({ inputRange: [18, HALF], outputRange: ['0deg', '180deg'], extrapolate: 'clamp' });
+  const bubbleScale = pull.interpolate({ inputRange: [0, TRIGGER], outputRange: [0.55, 1], extrapolate: 'clamp' });
+  const arrowTurn = pull.interpolate({ inputRange: [30, TRIGGER], outputRange: ['0deg', '180deg'], extrapolate: 'clamp' });
   // A ring that fills in brand colour once letting go would refresh.
-  const ringOpacity = pull.interpolate({ inputRange: [HALF - 14, HALF], outputRange: [0, 1], extrapolate: 'clamp' });
+  const ringOpacity = pull.interpolate({ inputRange: [TRIGGER - 14, TRIGGER], outputRange: [0, 1], extrapolate: 'clamp' });
 
   return (
     <View style={[styles.fill, style]}>

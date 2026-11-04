@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from './Button';
 import { LoadingIndicator } from './LoadingIndicator';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -231,9 +232,9 @@ export function CategoryPicker({
           <View style={[styles.rowIcon, { backgroundColor: colors.primary }]}>
             <FontAwesome6 name="plus" size={13} color="#FFFFFF" solid />
           </View>
-          <Text style={[styles.rowLabel, { color: colors.primary }]} numberOfLines={2}>
+          <FullText style={[styles.rowLabel, { color: colors.primary }]} numberOfLines={2}>
             {t('picker.add', { name: item.text })}
-          </Text>
+          </FullText>
         </Pressable>
       );
     }
@@ -257,9 +258,9 @@ export function CategoryPicker({
           <FontAwesome6 name={(option.icon ?? customIcon) as IconName} size={14} color={colors.primary} solid />
         </View>
         <View style={styles.flex}>
-          <Text style={[styles.rowLabel, { color: colors.text }]} numberOfLines={2}>
+          <FullText style={[styles.rowLabel, { color: colors.text }]} numberOfLines={2}>
             {option.label}
-          </Text>
+          </FullText>
           {item.custom ? <Text style={[styles.rowHint, { color: colors.textMuted }]}>{t('picker.partnerMade')}</Text> : null}
         </View>
         {counts ? (
@@ -302,12 +303,12 @@ export function CategoryPicker({
         ]}
       >
         <FontAwesome6 name={pickedOptions.length && single ? ((pickedOptions[0].icon ?? fieldIcon) as IconName) : fieldIcon} size={14} color={colors.primary} solid />
-        <Text
+        <FullText
           style={[styles.fieldText, { color: pickedOptions.length || allLabel ? colors.text : colors.textMuted }]}
           numberOfLines={1}
         >
           {summary}
-        </Text>
+        </FullText>
         {(allLabel || clearable) && pickedOptions.length > 0 ? (
           <Pressable onPress={() => onChange([])} hitSlop={10} accessibilityLabel={t('picker.clear')}>
             <FontAwesome6 name="circle-xmark" size={16} color={colors.textMuted} solid />
@@ -322,9 +323,9 @@ export function CategoryPicker({
           {pickedOptions.map((option) => (
             <View key={option.key} style={[styles.card, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}40` }]}>
               <FontAwesome6 name={(option.icon ?? customIcon) as IconName} size={12} color={colors.primary} solid />
-              <Text style={[styles.cardText, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.cardText, { color: colors.text }]} numberOfLines={1}>
                 {option.label}
-              </Text>
+              </FullText>
               <Pressable
                 onPress={() => onChange(selected.filter((key) => key !== option.key))}
                 hitSlop={8}
@@ -358,12 +359,12 @@ export function CategoryPicker({
                 <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
               </Pressable>
               <View style={styles.flex}>
-                <Text style={styles.headerTitle} numberOfLines={1}>
+                <FullText style={styles.headerTitle} numberOfLines={1}>
                   {title}
-                </Text>
-                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                </FullText>
+                <FullText style={styles.headerSubtitle} numberOfLines={1}>
                   {single ? t('picker.pickOne') : t('picker.pickMany')}
-                </Text>
+                </FullText>
               </View>
             </View>
           </LinearGradient>
@@ -410,9 +411,9 @@ export function CategoryPicker({
                           style={[styles.card, { backgroundColor: colors.surface, borderColor: `${colors.primary}40` }]}
                         >
                           <FontAwesome6 name={(option.icon ?? customIcon) as IconName} size={12} color={colors.primary} solid />
-                          <Text style={[styles.cardText, { color: colors.text }]} numberOfLines={1}>
+                          <FullText style={[styles.cardText, { color: colors.text }]} numberOfLines={1}>
                             {option.label}
-                          </Text>
+                          </FullText>
                           <FontAwesome6 name="xmark" size={11} color={colors.textMuted} solid />
                         </Pressable>
                       );

@@ -50,8 +50,8 @@ async function unlockedProfileViews(accountId: string): Promise<Set<string>> {
 const POPUP_KINDS = ['booking_offer', 'order_placed'];
 /** "Someone else took it": closes that pop-up (as data, on phones that show pop-ups). */
 const POPUP_CANCEL_KINDS = ['booking_taken', 'order_taken'];
-/** Only phones with the pop-up need these at all (nothing to close on the others). */
-const POPUP_ONLY_KINDS = ['order_taken'];
+/** New jobs / orders ring on the urgent channel, not the everyday one. */
+const URGENT_CHANNEL = 'booking-offers';
 
 export class NotificationsService {
   constructor(private readonly repository: NotificationsRepository) {}
@@ -123,7 +123,7 @@ export class NotificationsService {
     if (await revealsViewers(recipientAccountId, 'job_post')) {
       const contact = await this.repository.accountContact(viewerAccountId);
       if (contact) {
-        await this.pushTo(recipientAccountId, 'partner', `${contact.name} viewed your job post`, `${post.title} · call ${contact.mobile}`, { data });
+        await this.pushTo(recipientAccountId, 'partner', `${contact.name} viewed your job post`, post.title, { data });
         return;
       }
     }
@@ -162,21 +162,36 @@ export class NotificationsService {
     const tokens = await this.repository.findPushTokens(accountId);
     let targets = audience === 'any' ? tokens : tokens.filter((row) => row.app === audience);
     if (targets.length === 0) targets = tokens.filter((row) => row.app === 'legacy');
-    // A new job or order: a phone that can show the full-screen pop-up gets it as data (the app
-    // shows the pop-up itself, even when closed); any other phone gets the normal notification.
+    // A new job or order always goes as a normal notification, which Android shows itself even
+    // with the app closed or the phone locked. A data-only message only reaches a closed app if
+    // the phone wakes it, and many phones (Vivo, Oppo, Xiaomi, Realme…) don't — sent alone, jobs
+    // and orders showed up only once the app was opened. Phones that can show the full-screen
+    // pop-up also get it as data; when the app does wake, it opens the pop-up and removes the
+    // normal notification (same tag = the job / order id). "Taken" replaces it in place.
     const kind = options?.data?.kind ?? '';
     const popup = POPUP_KINDS.includes(kind);
     const popupCancel = POPUP_CANCEL_KINDS.includes(kind);
+    const shown: PushNotificationOptions | undefined =
+      popup || popupCancel
+        ? {
+            ...options,
+            tag: options?.tag ?? options?.data?.bookingRequestId ?? options?.data?.orderId,
+            channelId: popup ? URGENT_CHANNEL : (options?.channelId ?? URGENT_CHANNEL),
+            priority: popup ? 'max' : options?.priority,
+          }
+        : options;
     const sent = new Set<string>();
     for (const row of targets) {
       if (sent.has(row.token)) continue;
-      if (POPUP_ONLY_KINDS.includes(kind) && !row.fullScreen) continue;
       sent.add(row.token);
-      const asData =
-        row.fullScreen && (popup || popupCancel)
-          ? { ...options, dataOnly: true, data: { ...options?.data, [popup ? 'popup' : 'popupCancel']: '1' } }
-          : options;
-      await sendPushNotification(row.token, title, body, asData);
+      await sendPushNotification(row.token, title, body, shown);
+      if (row.fullScreen && (popup || popupCancel)) {
+        await sendPushNotification(row.token, title, body, {
+          ...shown,
+          dataOnly: true,
+          data: { ...options?.data, [popup ? 'popup' : 'popupCancel']: '1' },
+        });
+      }
     }
   }
 

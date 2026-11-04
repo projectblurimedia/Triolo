@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { JOB_CATEGORIES, JobCategory } from '@/services/jobSeekerService';
+import { FullText } from '@/components/FullText';
 
 /** The chosen kind of work: a listed category, or `other` with the person's own words. */
 export interface WorkType {
@@ -71,9 +72,9 @@ export function WorkTypePicker({ value, onChange }: WorkTypePickerProps) {
             <FontAwesome6 name={icon as never} size={13} color={colors.primary} solid />
           </View>
         ) : null}
-        <Text style={[styles.fieldText, { color: value ? colors.text : colors.textMuted }]} numberOfLines={1}>
+        <FullText style={[styles.fieldText, { color: value ? colors.text : colors.textMuted }]} numberOfLines={1}>
           {value ? workTypeLabel(value, t) : t('jobPost.categoryPlaceholder')}
-        </Text>
+        </FullText>
         <FontAwesome6 name="chevron-down" size={13} color={colors.textMuted} solid />
       </Pressable>
 
@@ -90,9 +91,9 @@ export function WorkTypePicker({ value, onChange }: WorkTypePickerProps) {
             </Pressable>
             <View style={styles.flex}>
               <Text style={styles.headerTitle}>{t('jobPost.categoryLabel')}</Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {t('jobPost.categoryPickerSubtitle')}
-              </Text>
+              </FullText>
             </View>
           </LinearGradient>
 
@@ -123,9 +124,9 @@ export function WorkTypePicker({ value, onChange }: WorkTypePickerProps) {
                   <View style={[styles.addBadge, { backgroundColor: colors.primary }]}>
                     <FontAwesome6 name="plus" size={12} color="#FFFFFF" solid />
                   </View>
-                  <Text style={[styles.addText, { color: colors.primary }]} numberOfLines={2}>
+                  <FullText style={[styles.addText, { color: colors.primary }]} numberOfLines={2}>
                     {t('jobPost.addCustomWork', { work: typed })}
-                  </Text>
+                  </FullText>
                 </Pressable>
               ) : null
             }

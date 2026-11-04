@@ -70,6 +70,11 @@ export interface PushNotificationOptions {
   dataOnly?: boolean;
 }
 
+// The apps' channels with the NearbyU sound (a channel's sound can't change once created, so
+// they have new ids). Older app builds without them fall back to their default channel.
+const CHANNEL_IDS: Record<string, string> = { default: 'nearbyu-alerts', 'booking-offers': 'nearbyu-job-offers' };
+const NOTIFICATION_SOUND = 'nearbyu_notification';
+
 export async function sendPushNotification(
   token: string,
   title: string,
@@ -81,9 +86,10 @@ export async function sendPushNotification(
     return;
   }
 
+  const channelId = CHANNEL_IDS[options.channelId ?? 'default'] ?? options.channelId;
   const data: Record<string, string> = { ...options.data };
   if (options.tag) data.tag = options.tag;
-  if (options.channelId) data.channelId = options.channelId;
+  data.channelId = channelId;
   if (options.priority) data.priority = options.priority;
   if (options.dataOnly) {
     data.title = title;
@@ -104,9 +110,10 @@ export async function sendPushNotification(
           ? undefined
           : {
               tag: options.tag,
-              channelId: options.channelId,
+              channelId,
               priority: options.priority,
-              defaultSound: true,
+              // Android 8+ plays the channel's sound; this covers older phones.
+              sound: NOTIFICATION_SOUND,
               visibility: options.priority === 'max' ? 'public' : undefined,
             },
       },

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Triolo",
+    "name": "NearbyU",
     "slug": "triolo",
-    "version": "1.3.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
       "package": "com.projectblurimedia.triolo",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#001850",
+        "backgroundColor": "#0A3FB8",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -38,9 +38,9 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#001B57",
+          "backgroundColor": "#0A3FB8",
           "dark": {
-            "backgroundColor": "#001B57"
+            "backgroundColor": "#0A3FB8"
           }
         }
       ],
@@ -70,7 +70,11 @@
       [
         "expo-notifications",
         {
-          "color": "#0055D3"
+          "color": "#0055D3",
+          "sounds": [
+            "./assets/sounds/nearbyu_notification.wav"
+          ],
+          "icon": "./assets/notification-icon.png"
         }
       ],
       [
@@ -80,6 +84,7 @@
         }
       ],
       "./plugins/withUpiApps",
+      "./plugins/withKeepNotificationSound",
       [
         "expo-audio",
         {

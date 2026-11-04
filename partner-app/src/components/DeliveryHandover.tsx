@@ -13,6 +13,7 @@ import { formatRupees, ShopOrder, shopOrdersService } from '@/services/shopOrder
 import { showToast } from '@/state/toastStore';
 import { callPhone } from '@/utils/tripLinks';
 import { colors as brandColors, fonts, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
 
@@ -101,9 +102,9 @@ export function DeliveryHandover({
                       <FontAwesome6 name="person-biking" size={13} color={colors.primary} solid />
                     </View>
                     <View style={styles.flex}>
-                      <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+                      <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
                         {member.fullName}
-                      </Text>
+                      </FullText>
                       {waiting ? (
                         <Text style={[styles.phone, { color: colors.textMuted }]}>{t('deliveryStaff.waitingToJoin')}</Text>
                       ) : null}
@@ -144,9 +145,9 @@ export function DeliveryHandover({
             <FontAwesome6 name="hourglass-half" size={13} color={brandColors.warning} solid />
           </View>
           <View style={styles.flex}>
-            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
               {person.fullName}
-            </Text>
+            </FullText>
             <Text style={[styles.phone, { color: colors.textMuted }]}>{t('deliveryStaff.waitingText')}</Text>
           </View>
           <Pressable onPress={() => setPicking(true)} hitSlop={6} style={[styles.changeButton, { borderColor: `${colors.primary}40` }]}>
@@ -192,9 +193,9 @@ export function DeliveryHandover({
           <FontAwesome6 name={person ? 'person-biking' : 'store'} size={13} color={colors.primary} solid />
         </View>
         <View style={styles.flex}>
-          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
             {person ? person.fullName : t('deliveryStaff.you')}
-          </Text>
+          </FullText>
           {person ? (
             <Text style={[styles.phone, { color: colors.textMuted }]}>
               {person.accepted === false ? t('deliveryStaff.waitingText') : t('deliveryStaff.collects', { amount: formatRupees(order.totalAmount ?? 0) })}

@@ -5,8 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { Button } from '@/components/Button';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
-import { RatingStars } from '@/components/RatingStars';
-import { Avatar, WorkerMiniCard } from '@/components/WorkerMiniCard';
+import { CardFill, KindChips, MetaLine, RatedAvatar, WorkerMiniCard, useCardChrome } from '@/components/WorkerMiniCard';
 import { NearbyResultDetailModal } from '@/components/NearbyResultDetailModal';
 import { WorkerProfileCard } from '@/components/WorkerProfileCard';
 import { SKILL_CATEGORIES } from '@/constants/categories';
@@ -24,7 +23,8 @@ import { HomeSearchModal } from '@/components/HomeSearchModal';
 import { NearbyHero } from '@/components/NearbyHero';
 import { SectionHeader } from '@/components/SectionHeader';
 import { useTrustedIds } from '@/hooks/useSubscription';
-import { customKindGroups } from '@/utils/kindLabels';
+import { customKindGroups, workerKindLabels } from '@/utils/kindLabels';
+import { FullText } from '@/components/FullText';
 
 const TOP_RATED_LIMIT = 10;
 // "Every worker nearby" in the single-list view (the blue card's See all).
@@ -43,6 +43,7 @@ const ALL = '__all__';
 export function ServicesScreen() {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const chrome = useCardChrome();
   const { data: workerProfile } = useMyWorkerProfile();
   const [searchVisible, setSearchVisible] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
@@ -118,31 +119,30 @@ export function ServicesScreen() {
     <Pressable
       key={worker.id}
       onPress={() => openWorker(worker)}
-      style={[styles.wideCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={[styles.wideCard, chrome]}
     >
-      <Avatar
+      <CardFill variant="side" />
+      <RatedAvatar
         photoUrl={worker.profilePhotoUrl}
         name={worker.accountFullName}
         size={56}
         seal={{ kind: 'service', id: worker.id }}
+        average={worker.ratingAverage}
+        count={worker.ratingCount}
       />
       <View style={styles.wideInfo}>
-        <Text style={[styles.wideName, { color: colors.text }]} numberOfLines={1}>
+        <FullText style={[styles.wideName, { color: colors.text }]} numberOfLines={1}>
           {worker.accountFullName}
-        </Text>
-        <Text style={[styles.compactSkills, { color: colors.textMuted }]} numberOfLines={1}>
-          {skillLabel(worker.skillCategories)}
-        </Text>
-        <View style={styles.wideMetaRow}>
-          <RatingStars average={worker.ratingAverage} count={worker.ratingCount} />
-          <Text style={[styles.metaText, { color: colors.textMuted }]}>
-            · {t('services.experienceShort', { count: worker.experienceYears })}
-          </Text>
-        </View>
+        </FullText>
+        <KindChips kinds={workerKindLabels(t, worker)} />
+        <MetaLine
+          parts={[
+            { text: formatDistanceValue(worker.distanceMeters), color: colors.primary, strong: true, icon: 'location-arrow' },
+            { text: t('services.experienceShort', { count: worker.experienceYears }) },
+          ]}
+        />
       </View>
-      <View style={[styles.distancePill, { backgroundColor: `${colors.primary}14` }]}>
-        <Text style={[styles.metaStrong, { color: colors.primary }]}>{formatDistanceValue(worker.distanceMeters)}</Text>
-      </View>
+      <FontAwesome6 name="chevron-right" size={12} color={colors.textMuted} solid />
     </Pressable>
   );
 
@@ -238,14 +238,14 @@ export function ServicesScreen() {
           {/* One kind of work: say which, with the way back to everyone. */}
           <View style={[styles.categoryBar, { backgroundColor: `${colors.primary}10` }]}>
             <View style={styles.flex}>
-              <Text style={[styles.categoryBarTitle, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.categoryBarTitle, { color: colors.text }]} numberOfLines={1}>
                 {showAll
                   ? t('services.allWorkersNearby')
                   : category
                       .split(',')
                       .map((key) => t(`workerProfile.skills.${key}`))
                       .join(', ')}
-              </Text>
+              </FullText>
               <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
                 {t('services.workersNearbyCount', { count: workers.length })}
               </Text>
@@ -320,9 +320,9 @@ export function ServicesScreen() {
             accessibilityRole="search"
           >
             <FontAwesome6 name="magnifying-glass" size={15} color={colors.primary} solid />
-            <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.searchPlaceholder, { color: colors.textMuted }]} numberOfLines={1}>
               {t('services.searchPlaceholder')}
-            </Text>
+            </FullText>
           </Pressable>
 
           <NearbyHero
@@ -390,16 +390,27 @@ const styles = StyleSheet.create({
   showAll: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   flex: { flex: 1 },
   seeAll: { ...typography.caption, fontFamily: fonts.semiBold },
-  carousel: { gap: 12, paddingRight: 4 },
+  carousel: { gap: 12, paddingRight: 4, paddingLeft: 1, paddingTop: 2, paddingBottom: 8 },
   compactSkills: { ...typography.caption, fontSize: 11, textAlign: 'center' },
   metaStrong: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11 },
   metaText: { ...typography.caption, fontSize: 11 },
   list: { marginTop: 16, gap: 12 },
-  wideCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, padding: 12, gap: 12 },
+  wideCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    paddingLeft: 11,
+    paddingRight: 14,
+    gap: 14,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
   wideInfo: { flex: 1, gap: 3 },
   wideName: { ...typography.body, fontFamily: fonts.semiBold },
-  wideMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  distancePill: { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 },
   loading: { paddingVertical: 48, alignItems: 'center' },
   loadingText: { marginTop: 12 },
   stateCard: {

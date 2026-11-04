@@ -26,6 +26,7 @@ import { askForLocation } from '@/utils/ensureLocationOn';
 import { useBusyAction } from './Ads';
 import { ServiceOrbit } from './ServiceOrbit';
 import { findWaitingQuickBook, waitingBookingIdFrom } from '@/utils/waitingBooking';
+import { FullText } from '@/components/FullText';
 
 interface QuickBookModalProps {
   visible: boolean;
@@ -276,12 +277,12 @@ export function QuickBookModal({ visible, onClose }: QuickBookModalProps) {
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <FullText style={styles.headerTitle} numberOfLines={1}>
                 {t('quickBook.title')}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              </FullText>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {t('quickBook.subtitle')}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>

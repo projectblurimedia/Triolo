@@ -1,0 +1,127 @@
+<title>NearbyU Loaders</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Poppins:wght@400;500;600&display=swap">
+<style>
+  /* Layout: the loader large on a loading screen, then on a white card and in a button, with its step timeline. */
+  :root {
+    --bg: #EEF3FB;
+    --card: #FFFFFF;
+    --fg: #0C1424;
+    --muted: #586477;
+    --line: #D6E0EF;
+    --accent: #0055D3;
+    --font-display: 'Baloo 2', 'Poppins', system-ui, sans-serif;
+    --font-body: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0A0E16; --card: #131A26; --fg: #EEF3FB; --muted: #9AA6B8; --line: #243046; --accent: #4C95FF; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #0A0E16; --card: #131A26; --fg: #EEF3FB; --muted: #9AA6B8; --line: #243046; --accent: #4C95FF; color-scheme: dark; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+  .page {
+    max-width: 900px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 32px 56px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  header h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.4rem); margin: 0; line-height: 1.1; }
+  header p { color: var(--muted); margin: 8px 0 0; line-height: 1.6; max-width: 66ch; }
+  .stage { display: grid; grid-template-columns: minmax(0, 300px) 1fr; gap: 18px; align-items: stretch; }
+  @media (max-width: 640px) { .stage { grid-template-columns: 1fr; } }
+  .screen {
+    border-radius: 26px; aspect-ratio: 9 / 15; max-width: 100%; overflow: hidden;
+    background: linear-gradient(150deg, #0A3FB8 0%, #1E6BF5 55%, #4FA3FF 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  }
+  .screen svg { width: 92%; overflow: visible; }
+  .screen span { color: rgba(255, 255, 255, 0.9); font-size: 0.85rem; font-weight: 500; }
+  .side { display: flex; flex-direction: column; gap: 14px; justify-content: center; min-width: 0; }
+  .whitecard { display: flex; align-items: center; gap: 14px; background: #FFFFFF; border: 1px solid #DCE5F2; border-radius: 18px; padding: 12px 16px; color: #0C1424; font-size: 0.92rem; font-weight: 500; box-shadow: 0 8px 22px rgba(11, 42, 91, 0.08); }
+  .whitecard svg { width: 92px; flex-shrink: 0; overflow: visible; }
+  .whitecard small { display: block; color: #586477; font-weight: 400; font-size: 0.78rem; }
+  .btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 20px 0 12px; border-radius: 999px; color: #FFFFFF; font-weight: 600; font-size: 0.92rem; background: linear-gradient(90deg, #0055D3, #1D76FA); box-shadow: 0 8px 18px rgba(0, 85, 211, 0.3); }
+  .btn svg { width: 34px; overflow: visible; }
+  .timeline { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.88rem; }
+  .timeline b { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+
+  /* One loop of the opening animation (2.6 s): the same steps, then a soft fade, then again. */
+  .loop { --t: 2.4s; }
+  .loop .scene { animation: scene var(--t) ease-in-out infinite; }
+  @keyframes scene { 0% { opacity: 1; } 80% { opacity: 1; } 98% { opacity: 0; } 100% { opacity: 0; } }
+  .loop .ring { transform-box: view-box; transform-origin: 60px 60px; animation: ring var(--t) cubic-bezier(.2,.7,.3,1) infinite; }
+  .loop .ring.r2 { animation-name: ring2; }
+  @keyframes ring { 0% { transform: scale(.4); opacity: 0; } 16%, 100% { transform: scale(1); opacity: 1; } }
+  @keyframes ring2 { 0%, 3% { transform: scale(.4); opacity: 0; } 19%, 100% { transform: scale(1); opacity: 1; } }
+  .loop .pin { transform-box: view-box; transform-origin: 34px 57px; animation: drop var(--t) cubic-bezier(.3,1.5,.5,1) infinite; }
+  @keyframes drop { 0% { transform: translateY(-26px) scale(.6); opacity: 0; } 12%, 100% { transform: none; opacity: 1; } }
+  .loop .roadmask { stroke-dasharray: 130; animation: draw var(--t) linear infinite; }
+  @keyframes draw { 0%, 8% { stroke-dashoffset: 130; animation-timing-function: cubic-bezier(.3,0,.7,1); } 32%, 100% { stroke-dashoffset: 0; } }
+  .loop .home { transform-box: view-box; transform-origin: 86px 59px; animation: rise var(--t) cubic-bezier(.3,1.6,.5,1) infinite; }
+  @keyframes rise { 0%, 25% { transform: scale(.2); opacity: 0; } 35%, 100% { transform: none; opacity: 1; } }
+  .loop .orbit { transform-box: view-box; transform-origin: 60px 60px; animation: orbit var(--t) cubic-bezier(.2,.8,.3,1) infinite; }
+  .loop .orbit.o2 { animation-name: orbit2; } .loop .orbit.o3 { animation-name: orbit3; }
+  @keyframes orbit { 0%, 28% { transform: rotate(-34deg); opacity: 0; } 38% { opacity: 1; } 46%, 100% { transform: rotate(0); opacity: 1; } }
+  @keyframes orbit2 { 0%, 31% { transform: rotate(32deg); opacity: 0; } 41% { opacity: 1; } 49%, 100% { transform: rotate(0); opacity: 1; } }
+  @keyframes orbit3 { 0%, 34% { transform: rotate(-30deg); opacity: 0; } 44% { opacity: 1; } 52%, 100% { transform: rotate(0); opacity: 1; } }
+  .loop .halo { transform-box: fill-box; transform-origin: center; animation: pulse var(--t) ease-out infinite; opacity: 0; }
+  .loop .halo.h2 { animation-name: pulse2; } .loop .halo.h3 { animation-name: pulse3; }
+  @keyframes pulse { 0%, 46% { transform: scale(1); opacity: 0; } 48% { opacity: .7; } 68%, 100% { transform: scale(3.2); opacity: 0; } }
+  @keyframes pulse2 { 0%, 50% { transform: scale(1); opacity: 0; } 52% { opacity: .7; } 72%, 100% { transform: scale(3.2); opacity: 0; } }
+  @keyframes pulse3 { 0%, 54% { transform: scale(1); opacity: 0; } 56% { opacity: .7; } 76%, 100% { transform: scale(3.2); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .loop * { animation-duration: 6s !important; } }
+</style>
+
+<div class="page">
+  <header>
+    <h1>Loading, like the opening</h1>
+    <p>The loader is the opening animation on a loop: the rings ripple out, the pin drops in, the road draws itself to the home, the home pops up and the three helpers swing in and pulse. Then it fades softly and plays again, for as long as the app is loading.</p>
+  </header>
+
+  <div class="stage">
+    <div class="screen" id="screen"></div>
+    <div class="side">
+      <div class="whitecard" id="card"></div>
+      <div class="btn" id="btn"></div>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <b>0.00–0.38 s</b><span>Rings ripple out</span>
+    <b>0.00–0.29 s</b><span>The location pin drops in with a small bounce</span>
+    <b>0.19–0.77 s</b><span>As it lands, the road draws itself at an even pace from the pin to the home</span>
+    <b>0.60–0.84 s</b><span>The home rises while the road climbs to it, so it is there as the road arrives</span>
+    <b>0.67–1.25 s</b><span>The three helpers swing into place on the rings</span>
+    <b>1.10–1.82 s</b><span>Each helper sends out a soft pulse</span>
+    <b>1.92–2.40 s</b><span>Everything fades softly and the next loop begins (2.4 s per loop)</span>
+  </div>
+</div>
+
+<script>
+let uid = 0;
+// fg = mark colour, cut = colour behind it, rings = whether to draw the rings and helpers (the button leaves them out).
+function loader(fg, cut, rings = true) {
+  const id = 'l' + uid++;
+  const ringsSvg = rings ? `
+    <g fill="none" stroke="${fg}" stroke-width="1.4"><g opacity=".22"><circle class="ring" cx="60" cy="60" r="70"/></g><g opacity=".14"><circle class="ring r2" cx="60" cy="60" r="100"/></g></g>
+    ${[[-6, 28, 4.4, 1], [-34, 112, 4.4, 2], [138, 118, 3.8, 3]].map(([x, y, r, i]) => `<g class="orbit o${i}">
+      <circle class="halo h${i}" cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${fg}" stroke-width="1.4"/>
+      <circle cx="${x}" cy="${y}" r="${r}" fill="${fg}" opacity=".6"/></g>`).join('')}` : '';
+  return `<svg class="loop" viewBox="${rings ? '-50 -50 220 220' : '10 10 104 100'}" aria-hidden="true">
+    <defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="120"><path class="roadmask" d="M34 50V70A26 26 0 0 0 86 70V56" fill="none" stroke="#FFFFFF" stroke-width="22"/></mask></defs>
+    <g class="scene">
+      ${ringsSvg}
+      <g mask="url(#${id})">
+        <path d="M27 54V70A33 33 0 0 0 93 70V58H79V70A19 19 0 0 1 41 70V54Z" fill="${fg}" stroke="${fg}" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M34 60V70A26 26 0 0 0 86 70V62" fill="none" stroke="${cut}" stroke-width="2.4" stroke-dasharray="4 5.5" stroke-linecap="round"/>
+      </g>
+      <g class="home"><path d="M68 59V40H62L86 16L110 40H104V59Z" fill="${fg}" stroke="${fg}" stroke-width="2.5" stroke-linejoin="round"/><path d="M79.5 59.5V50.5a6.5 6.5 0 0 1 13 0V59.5Z" fill="${cut}"/><circle cx="89.3" cy="54.5" r="1.4" fill="${fg}"/></g>
+      <g class="pin"><path d="M34 57C29 50.5 17 40.5 17 26.5A17 17 0 0 1 51 26.5C51 40.5 39 50.5 34 57Z" fill="${fg}" stroke="${cut}" stroke-width="3" stroke-linejoin="round"/><circle cx="34" cy="26.5" r="6.6" fill="${cut}"/></g>
+    </g>
+  </svg>`;
+}
+document.getElementById('screen').innerHTML = loader('#FFFFFF', '#1559E6') + '<span>Finding help near you…</span>';
+document.getElementById('card').innerHTML = loader('#0055D3', '#FFFFFF') + '<div>Loading your bookings<small>On a white card, in the app’s blue</small></div>';
+document.getElementById('btn').innerHTML = loader('#FFFFFF', '#0A5BE0', false) + 'Booking…';
+</script>

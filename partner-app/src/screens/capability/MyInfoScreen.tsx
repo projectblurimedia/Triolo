@@ -28,6 +28,7 @@ import { formatRupees } from '@/services/shopOrdersService';
 import { placeName } from '@/utils/formatAddress';
 import { JobPostViewsCard } from '@/components/JobPostViewsCard';
 import { JobPostViewersSheet } from '@/components/JobPostViewersSheet';
+import { FullText } from '@/components/FullText';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'MyInfo'>;
 type MyInfoNavigation = Props['navigation'];
@@ -231,16 +232,16 @@ function BusinessInfo({ navigation, shopId }: { navigation: MyInfoNavigation; sh
               <View style={styles.deliveryIcon}>
                 <FontAwesome6 name="truck-fast" size={14} color="#FFFFFF" solid />
               </View>
-              <Text style={[styles.deliveryTitle, styles.flex]} numberOfLines={1}>
+              <FullText style={[styles.deliveryTitle, styles.flex]} numberOfLines={1}>
                 {t('myInfo.deliveryTitle')}
-              </Text>
+              </FullText>
               <View style={styles.deliveryCharges}>
-                <Text style={styles.deliveryChargeText} numberOfLines={1}>
+                <FullText style={styles.deliveryChargeText} numberOfLines={1}>
                   {t('myInfo.deliveryChargeLine', {
                     perKm: profile.deliveryPricePerKm ?? 0,
                     min: profile.deliveryMinCharge ?? profile.deliveryPricePerKm ?? 0,
                   })}
-                </Text>
+                </FullText>
               </View>
             </LinearGradient>
           ) : (
@@ -248,9 +249,9 @@ function BusinessInfo({ navigation, shopId }: { navigation: MyInfoNavigation; sh
               <View style={[styles.pickupIcon, { backgroundColor: `${colors.primary}1F` }]}>
                 <FontAwesome6 name="store" size={13} color={colors.primary} solid />
               </View>
-              <Text style={[styles.pickupText, { color: colors.text }]} numberOfLines={2}>
+              <FullText style={[styles.pickupText, { color: colors.text }]} numberOfLines={2}>
                 {t('myInfo.pickupOnly')}
-              </Text>
+              </FullText>
             </View>
           )
         }

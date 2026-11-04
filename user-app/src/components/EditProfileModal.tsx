@@ -18,6 +18,7 @@ import { authService } from '@/services/authService';
 import { PlaceValue, placeFromCoords } from '@/utils/place';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
+import { FullText } from '@/components/FullText';
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -139,12 +140,12 @@ export function EditProfileModal({ visible, onClose }: EditProfileModalProps) {
             <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
           </Pressable>
           <View style={styles.flex}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
+            <FullText style={styles.headerTitle} numberOfLines={1}>
               {t('editProfile.title')}
-            </Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
+            </FullText>
+            <FullText style={styles.headerSubtitle} numberOfLines={1}>
               {t('editProfile.subtitle')}
-            </Text>
+            </FullText>
           </View>
         </LinearGradient>
 

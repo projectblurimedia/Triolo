@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 export interface ScopeOption {
   /** `null` = everything (the first chip). */
@@ -40,9 +41,9 @@ export function ActivityScopeChips({
             ]}
           >
             <FontAwesome6 name={option.key === null ? 'layer-group' : icon} size={11} color={active ? '#FFFFFF' : colors.primary} solid />
-            <Text style={[styles.label, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.label, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
               {option.label}
-            </Text>
+            </FullText>
             <Text style={[styles.count, { color: active ? 'rgba(255,255,255,0.85)' : colors.textMuted }]}>{option.count}</Text>
           </Pressable>
         );

@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { useGlass } from './Glass';
+import { FullText } from '@/components/FullText';
 
 interface DrawerMenuItemProps {
   icon: React.ComponentProps<typeof FontAwesome6>['name'];
@@ -24,12 +25,12 @@ export function DrawerMenuItem({ icon, gradient, title, subtitle, onPress }: Dra
         <FontAwesome6 name={icon} size={18} color={colors.white} solid />
       </LinearGradient>
       <View style={styles.itemText}>
-        <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
+        <FullText style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
           {title}
-        </Text>
-        <Text style={[styles.itemSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
+        </FullText>
+        <FullText style={[styles.itemSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
           {subtitle}
-        </Text>
+        </FullText>
       </View>
       <FontAwesome6 name="chevron-right" size={14} color={colors.textMuted} solid />
     </Pressable>

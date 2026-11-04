@@ -11,6 +11,7 @@ import { formatDistanceValue } from '@/utils/nearbyResult';
 import { Avatar } from './WorkerMiniCard';
 import { RatingStars } from './RatingStars';
 import { HighlightText } from './HighlightText';
+import { FullText } from '@/components/FullText';
 
 const MAX_TAGS = 3;
 
@@ -64,15 +65,15 @@ export function SearchResultCard(props: SearchResultCardProps) {
           <View style={styles.metaRow}>
             <RatingStars average={item.ratingAverage} count={item.ratingCount} />
             {isWorker ? (
-              <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+              <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
                 {t('services.experienceShort', { count: props.worker.experienceYears })}
-              </Text>
+              </FullText>
             ) : props.shop.deliveryAvailable ? (
               <View style={styles.inline}>
                 <FontAwesome6 name="truck" size={10} color={colors.success} solid />
-                <Text style={[styles.meta, { color: colors.success }]} numberOfLines={1}>
+                <FullText style={[styles.meta, { color: colors.success }]} numberOfLines={1}>
                   {t('bazaar.deliveryAvailableYes')}
-                </Text>
+                </FullText>
               </View>
             ) : null}
           </View>
@@ -86,8 +87,8 @@ export function SearchResultCard(props: SearchResultCardProps) {
       {shown.length > 0 ? (
         <View style={styles.tags}>
           {shown.map((tag) => (
-            <View key={tag} style={[styles.tag, { backgroundColor: colors.background, borderColor: `${colors.primary}1F` }]}>
-              <HighlightText text={tag} term={term} style={[styles.tagText, { color: colors.text }]} numberOfLines={1} />
+            <View key={tag} style={[styles.tag, { backgroundColor: `${colors.primary}14`, borderColor: `${colors.primary}33` }]}>
+              <HighlightText text={tag} term={term} style={[styles.tagText, { color: colors.primary }]} numberOfLines={1} />
             </View>
           ))}
           {more > 0 ? (

@@ -7,6 +7,7 @@ import { CompositeScreenProps } from '@react-navigation/native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenContainer } from '@/components/ScreenContainer';
+import { DetailRow, GradientCard } from '@/components/GradientCard';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { useAuthStore } from '@/state/authStore';
@@ -25,6 +26,7 @@ import { useMyJobPosts } from '@/hooks/useJobPost';
 const MAX_JOB_POSTS = 5;
 import { SealedPhoto } from '@/components/TrustedSeal';
 import { useTrustedKinds } from '@/hooks/useSubscription';
+import { FullText } from '@/components/FullText';
 
 type Props = CompositeScreenProps<BottomTabScreenProps<MainTabParamList, 'Profile'>, NativeStackScreenProps<MainStackParamList>>;
 
@@ -76,9 +78,9 @@ export function ProfileScreen({ navigation }: Props) {
                   </View>
                 </View>
                 <View style={styles.heroIdentity}>
-                  <Text style={styles.heroName} numberOfLines={1}>
+                  <FullText style={styles.heroName} numberOfLines={1}>
                     {account.fullName}
-                  </Text>
+                  </FullText>
                   <View style={styles.statusPill}>
                     <View style={styles.statusDot} />
                     <Text style={styles.statusText}>{t('mainTabs.Profile.activeStatus')}</Text>
@@ -87,33 +89,16 @@ export function ProfileScreen({ navigation }: Props) {
               </View>
             </LinearGradient>
 
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t('mainTabs.Profile.detailsTitle')}</Text>
-            <View style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <GradientCard title={t('mainTabs.Profile.detailsTitle')} icon="id-card" style={styles.detailsCard}>
               {[
                 { icon: 'phone' as const, label: t('mainTabs.Profile.detailPhone'), value: account.mobileNumber },
                 ...(account.email
                   ? [{ icon: 'envelope' as const, label: t('mainTabs.Profile.detailEmail'), value: account.email }]
                   : []),
               ].map((row, index) => (
-                <View
-                  key={row.icon}
-                  style={[
-                    styles.detailRow,
-                    index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null,
-                  ]}
-                >
-                  <View style={[styles.detailIcon, { backgroundColor: `${colors.primary}14` }]}>
-                    <FontAwesome6 name={row.icon} size={13} color={colors.primary} solid />
-                  </View>
-                  <View style={styles.detailText}>
-                    <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{row.label}</Text>
-                    <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1}>
-                      {row.value}
-                    </Text>
-                  </View>
-                </View>
+                <DetailRow key={row.icon} icon={row.icon} label={row.label} value={row.value} first={index === 0} />
               ))}
-            </View>
+            </GradientCard>
           </>
         ) : null}
 
@@ -300,15 +285,15 @@ function KindCard({
     >
       <View style={styles.kindAvatar}>{avatar}</View>
       <View style={styles.flex}>
-        <Text style={[styles.kindLabel, { color: colors.primary }]} numberOfLines={1}>
+        <FullText style={[styles.kindLabel, { color: colors.primary }]} numberOfLines={1}>
           {kind}
-        </Text>
-        <Text style={[styles.kindTitle, { color: colors.text }]} numberOfLines={1}>
+        </FullText>
+        <FullText style={[styles.kindTitle, { color: colors.text }]} numberOfLines={1}>
           {title}
-        </Text>
-        <Text style={[styles.kindFact, { color: colors.textMuted }]} numberOfLines={1}>
+        </FullText>
+        <FullText style={[styles.kindFact, { color: colors.textMuted }]} numberOfLines={1}>
           {fact}
-        </Text>
+        </FullText>
       </View>
       {status && status !== 'verified' ? <VerificationBadge status={status} /> : null}
       <FontAwesome6 name={adding ? 'plus' : 'chevron-right'} size={13} color={adding ? colors.primary : colors.textMuted} solid />
@@ -342,7 +327,8 @@ const styles = StyleSheet.create({
   // extra vertical-only padding layered on top of it).
   // Clears the floating CustomTabBar so the last review isn't hidden under it.
   body: { paddingBottom: 140 },
-  heroCard: { borderRadius: 22, padding: 16, marginBottom: 24, overflow: 'hidden' },
+  // 16 between the cards on this tab, as on the customer app's Profile.
+  heroCard: { borderRadius: 22, padding: 16, marginBottom: 16, overflow: 'hidden' },
   bubble: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' },
   bubbleLarge: { width: 150, height: 150, top: -70, right: -40 },
   bubbleSmall: { width: 90, height: 90, bottom: -50, left: -20 },
@@ -366,12 +352,7 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ADE80' },
   statusText: { ...typography.caption, fontFamily: fonts.medium, fontSize: 11, color: '#FFFFFF' },
-  detailsCard: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, marginBottom: 24 },
-  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  detailIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  detailText: { flex: 1 },
-  detailLabel: { ...typography.caption, fontSize: 11 },
-  detailValue: { ...typography.body, fontFamily: fonts.medium, fontSize: 14, marginTop: 1 },
+  detailsCard: { marginBottom: 16 },
   sectionLabel: {
     ...typography.caption,
     fontFamily: fonts.semiBold,

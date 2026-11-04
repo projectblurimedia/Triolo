@@ -40,6 +40,7 @@ import { callPhone, distanceBetween, openDirections } from '@/utils/tripLinks';
 import { formatDistance } from '@/utils/formatDistance';
 import { askForLocation, ensureLocationOn } from '@/utils/ensureLocationOn';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -543,13 +544,13 @@ export function JobTrackingModal() {
                 <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
               </Pressable>
               <View style={styles.titleGroup}>
-                <Text style={styles.headerTitle} numberOfLines={1}>
+                <FullText style={styles.headerTitle} numberOfLines={1}>
                   {status ? t(`job.status.${status}.title`) : t('timeline.jobDetails')}
-                </Text>
+                </FullText>
                 {job ? (
-                  <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  <FullText style={styles.headerSubtitle} numberOfLines={1}>
                     {`${job.customerFullName} · ${job.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(', ')}`}
-                  </Text>
+                  </FullText>
                 ) : (
                   <View style={styles.subtitleBar} />
                 )}

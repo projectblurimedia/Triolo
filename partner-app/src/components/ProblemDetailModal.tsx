@@ -11,6 +11,7 @@ import { ToastHost } from './ToastHost';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { formatDistance } from '@/utils/formatDistance';
 import { SmartImage } from './SmartImage';
+import { FullText } from '@/components/FullText';
 
 /** What this screen needs — both a nearby (open) problem and an accepted one fit. */
 export interface ProblemDetails {
@@ -119,12 +120,12 @@ export function ProblemDetailModal({ problem, onClose, onAccept, accepting }: Pr
             <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
           </Pressable>
           <View style={styles.flex}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
+            <FullText style={styles.headerTitle} numberOfLines={1}>
               {t('problemDetail.title')}
-            </Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
+            </FullText>
+            <FullText style={styles.headerSubtitle} numberOfLines={1}>
               {skills.join(', ')}
-            </Text>
+            </FullText>
           </View>
         </LinearGradient>
 

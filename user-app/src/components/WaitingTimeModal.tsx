@@ -12,6 +12,7 @@ import { apiClient } from '@/services/apiClient';
 import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 export interface WaitTimes {
   quickBookMinutes: number;
@@ -137,9 +138,9 @@ export function WaitingTimeModal({ visible, onClose }: { visible: boolean; onClo
             </Pressable>
             <View style={styles.flex}>
               <Text style={styles.headerTitle}>{t('waitTime.title')}</Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {t('waitTime.subtitle')}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>

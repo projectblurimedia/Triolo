@@ -15,6 +15,7 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { MainStackParamList } from '@/navigation/types';
 import { placeName } from '@/utils/formatAddress';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /**
  * One job post as a single card — the same on Home and in Activity: photo, name and work, the
@@ -55,12 +56,12 @@ export function JobPostSummaryCard({ post, onViews }: { post: JobPost; onViews: 
           </LinearGradient>
         )}
         <View style={styles.flex}>
-          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
             {account?.fullName ?? ''}
-          </Text>
-          <Text style={[styles.work, { color: colors.primary }]} numberOfLines={1}>
+          </FullText>
+          <FullText style={[styles.work, { color: colors.primary }]} numberOfLines={1}>
             {jobTitle(post, t)}
-          </Text>
+          </FullText>
         </View>
         <View style={styles.switchBox}>
           <Switch
@@ -78,9 +79,9 @@ export function JobPostSummaryCard({ post, onViews }: { post: JobPost; onViews: 
         <View style={[styles.basic, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}26` }]}>
           <FontAwesome6 name="indian-rupee-sign" size={12} color={colors.primary} solid />
           <View style={styles.flex}>
-            <Text style={[styles.value, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.value, { color: colors.text }]} numberOfLines={1}>
               {formatPay(post, t)}
-            </Text>
+            </FullText>
             <Text style={[styles.label, { color: colors.textMuted }]}>{t('jobPost.expectedPay')}</Text>
           </View>
         </View>
@@ -91,9 +92,9 @@ export function JobPostSummaryCard({ post, onViews }: { post: JobPost; onViews: 
               <FontAwesome6 name="eye" size={11} color="#FFFFFF" solid />
             </View>
             <View style={styles.flex}>
-              <Text style={styles.visitsValue} numberOfLines={1}>
+              <FullText style={styles.visitsValue} numberOfLines={1}>
                 {t('jobViews.visits', { count: post.viewCount ?? 0 })}
-              </Text>
+              </FullText>
               <Text style={styles.visitsLabel}>{t('jobViews.seeWho')}</Text>
             </View>
             {fresh > 0 ? (
@@ -109,9 +110,9 @@ export function JobPostSummaryCard({ post, onViews }: { post: JobPost; onViews: 
         {place ? (
           <>
             <FontAwesome6 name="location-dot" size={11} color={colors.textMuted} solid />
-            <Text style={[styles.place, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.place, { color: colors.textMuted }]} numberOfLines={1}>
               {place}
-            </Text>
+            </FullText>
           </>
         ) : (
           <View style={styles.flex} />

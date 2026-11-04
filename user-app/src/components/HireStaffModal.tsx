@@ -31,6 +31,7 @@ import { placeName } from '@/utils/formatAddress';
 import { useTrustedIds } from '@/hooks/useSubscription';
 import { HighlightText } from './HighlightText';
 import { SectionHeader } from './SectionHeader';
+import { FullText } from '@/components/FullText';
 
 const CALL_GRADIENT = ['#16A34A', '#22C55E'] as const;
 // Tile colours on the intro, one per kind of work in turn (no orange — that's the shop colour).
@@ -211,16 +212,16 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
           </View>
           <View style={[styles.factDivider, { backgroundColor: `${colors.primary}1F` }]} />
           <View style={styles.fact}>
-            <Text style={[styles.factValue, { color: brandColors.success }]} numberOfLines={1}>
+            <FullText style={[styles.factValue, { color: brandColors.success }]} numberOfLines={1}>
               {t(`hireStaff.availability.${item.availability}`)}
-            </Text>
+            </FullText>
             <Text style={[styles.factLabel, { color: colors.textMuted }]}>{t('hireStaff.availabilityLabel')}</Text>
           </View>
           <View style={[styles.factDivider, { backgroundColor: `${colors.primary}1F` }]} />
           <View style={styles.fact}>
-            <Text style={[styles.factValue, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.factValue, { color: colors.text }]} numberOfLines={1}>
               {item.experienceYears > 0 ? t('hireStaff.years', { count: item.experienceYears }) : t('hireStaff.fresher')}
-            </Text>
+            </FullText>
             <Text style={[styles.factLabel, { color: colors.textMuted }]}>{t('hireStaff.experienceLabel')}</Text>
           </View>
         </View>
@@ -244,9 +245,9 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
           ) : null}
           <View style={[styles.pill, { backgroundColor: colors.text, borderColor: colors.text }]}>
             <FontAwesome6 name="location-dot" size={10} color={colors.background} solid />
-            <Text style={[styles.pillText, { color: colors.background }]} numberOfLines={1}>
+            <FullText style={[styles.pillText, { color: colors.background }]} numberOfLines={1}>
               {place || t('hireStaff.nearYou')}
-            </Text>
+            </FullText>
           </View>
           </View>
           <Pressable onPress={() => callStaff(item, () => results.refetch())} accessibilityLabel={`${t('hireStaff.call')} ${item.fullName}`}>
@@ -436,9 +437,9 @@ export function HireStaffModal({ visible, onClose }: HireStaffModalProps) {
           </Pressable>
           <View style={styles.flex}>
             <Text style={styles.headerTitle}>{t('hireStaff.title')}</Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
+            <FullText style={styles.headerSubtitle} numberOfLines={1}>
               {t('hireStaff.subtitle')}
-            </Text>
+            </FullText>
           </View>
         </LinearGradient>
 

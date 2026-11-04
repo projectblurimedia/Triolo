@@ -1,4 +1,5 @@
 import { randomInt } from 'crypto';
+import { afterResponse, sleep } from '@/common/utils/afterResponse';
 import type { SubscriptionStatusService } from '@/modules/subscriptions/statusService';
 import { UNLOCK_WINDOW_MINUTES } from '@/modules/subscriptions/statusService';
 import { AppError } from '@/common/errors/AppError';
@@ -229,6 +230,13 @@ export class BookingsService {
         request.id,
         matches.map((match) => ({ workerId: match.workerId, distanceMeters: match.distanceMeters, delaySeconds: delayFor(match.accountId) })),
       );
+      // The rest hear once the head start is over — pushed then, not when some app next asks.
+      if (headStart && matches.some((match) => delayFor(match.accountId) > 0)) {
+        afterResponse(async () => {
+          await sleep(headStart.seconds * 1000 + 500);
+          await this.releaseDueOffers();
+        });
+      }
 
       // Fire every push in parallel — a slow/failed send to one worker must never delay or
       // block delivery to the others (each is independently best-effort, see pushSender.ts).

@@ -4,6 +4,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { LoadingIndicator } from './LoadingIndicator';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /*
  * (Copied between user-app and partner-app — keep in sync.)
@@ -152,13 +153,13 @@ export function MapSearchBar({
                 <FontAwesome6 name="location-dot" size={12} color={colors.primary} solid />
               </View>
               <View style={styles.flex}>
-                <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+                <FullText style={[styles.title, { color: colors.text }]} numberOfLines={1}>
                   {item.title}
-                </Text>
+                </FullText>
                 {item.detail ? (
-                  <Text style={[styles.detail, { color: colors.textMuted }]} numberOfLines={1}>
+                  <FullText style={[styles.detail, { color: colors.textMuted }]} numberOfLines={1}>
                     {item.detail}
-                  </Text>
+                  </FullText>
                 ) : null}
               </View>
               <FontAwesome6 name="arrow-up-right-from-square" size={11} color={colors.textMuted} solid />

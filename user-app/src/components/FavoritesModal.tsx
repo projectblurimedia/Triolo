@@ -17,6 +17,7 @@ import { distanceBetween } from '@/utils/tripLinks';
 import { NearbyResult } from '@/utils/nearbyResult';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { shopKindLabels, workerKindLabels } from '@/utils/kindLabels';
+import { FullText } from '@/components/FullText';
 
 interface FavoritesModalProps {
   visible: boolean;
@@ -71,12 +72,12 @@ export function FavoritesModal({ visible, onClose, type }: FavoritesModalProps) 
       >
         <Avatar photoUrl={photo} name={name} size={50} />
         <View style={styles.flex}>
-          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
             {name}
-          </Text>
-          <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+          </FullText>
+          <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
             {tags.join(', ')}
-          </Text>
+          </FullText>
           <View style={styles.metaRow}>
             <RatingStars average={item.ratingAverage} count={item.ratingCount} />
             {shop ? (

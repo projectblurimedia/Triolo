@@ -4,6 +4,7 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 export interface MapPoint {
   latitude: number;
@@ -262,9 +263,9 @@ export function LiveMap({ customer, worker, height, mover = 'worker', customerLa
     {distanceText ? (
       <View style={[styles.distance, { backgroundColor: near ? '#16A34A' : colors.surface, borderColor: near ? '#16A34A' : colors.border }]}>
         <FontAwesome6 name={near ? 'location-dot' : mover === 'delivery' ? 'truck-fast' : 'motorcycle'} size={14} color={near ? '#FFFFFF' : '#16A34A'} solid />
-        <Text style={[styles.distanceText, { color: near ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
+        <FullText style={[styles.distanceText, { color: near ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
           {distanceText}
-        </Text>
+        </FullText>
       </View>
     ) : null}
     </View>

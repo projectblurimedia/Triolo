@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { LoadingIndicator } from './LoadingIndicator';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { WorkerReviewsSummary } from '@/services/reviewsService';
+import { FullText } from '@/components/FullText';
 
 /**
  * The worker profile's glassy look, shared by partner-app (the worker's own Profile tab)
@@ -136,9 +137,9 @@ export function WorkerProfileHero({
           <Text style={styles.avatarText}>{initialsOf(name)}</Text>
         </LinearGradient>
       </View>
-      <Text style={styles.heroName} numberOfLines={1}>
+      <FullText style={styles.heroName} numberOfLines={1}>
         {name}
-      </Text>
+      </FullText>
       {subtitle ? <Text style={styles.heroSubtitle}>{subtitle}</Text> : null}
       {skills.length > 0 ? (
         <View style={styles.heroSkills}>
@@ -156,13 +157,13 @@ export function WorkerProfileHero({
           <View key={tile.label} style={styles.glassTile}>
             <View style={styles.tileValueRow}>
               <FontAwesome6 name={tile.icon} size={13} color={tile.gold ? STAR_GOLD : '#FFFFFF'} solid />
-              <Text style={styles.tileValue} numberOfLines={1}>
+              <FullText style={styles.tileValue} numberOfLines={1}>
                 {tile.value}
-              </Text>
+              </FullText>
             </View>
-            <Text style={styles.tileLabel} numberOfLines={1}>
+            <FullText style={styles.tileLabel} numberOfLines={1}>
               {tile.label}
-            </Text>
+            </FullText>
           </View>
         ))}
       </View>
@@ -263,16 +264,16 @@ export function WorkerReviewsSection({ summary, loading, error, title }: WorkerR
                     {active ? (
                       <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.sortFill}>
                         <FontAwesome6 name={option.icon} size={10} color="#FFFFFF" solid />
-                        <Text style={[styles.sortText, { color: '#FFFFFF' }]} numberOfLines={1}>
+                        <FullText style={[styles.sortText, { color: '#FFFFFF' }]} numberOfLines={1}>
                           {option.label}
-                        </Text>
+                        </FullText>
                       </LinearGradient>
                     ) : (
                       <View style={styles.sortFill}>
                         <FontAwesome6 name={option.icon} size={10} color={colors.textMuted} solid />
-                        <Text style={[styles.sortText, { color: colors.text }]} numberOfLines={1}>
+                        <FullText style={[styles.sortText, { color: colors.text }]} numberOfLines={1}>
                           {option.label}
-                        </Text>
+                        </FullText>
                       </View>
                     )}
                   </Pressable>
@@ -294,18 +295,18 @@ export function WorkerReviewsSection({ summary, loading, error, title }: WorkerR
                     <Text style={[styles.reviewAvatarText, { color: colors.primary }]}>{initialsOf(review.customerName)}</Text>
                   </View>
                   <View style={styles.flex}>
-                    <Text style={[styles.reviewName, { color: colors.text }]} numberOfLines={1}>
+                    <FullText style={[styles.reviewName, { color: colors.text }]} numberOfLines={1}>
                       {review.customerName}
-                    </Text>
+                    </FullText>
                     {review.rating ? <Stars value={review.rating} size={11} emptyColor={colors.border} /> : null}
                   </View>
                   <Text style={[styles.reviewDate, { color: colors.textMuted }]}>{formatDate(review.completedAt)}</Text>
                 </View>
                 {review.review ? <Text style={[styles.reviewText, { color: colors.text }]}>{review.review}</Text> : null}
                 {review.skillCategories.length > 0 ? (
-                  <Text style={[styles.reviewSkills, { color: colors.textMuted }]} numberOfLines={1}>
+                  <FullText style={[styles.reviewSkills, { color: colors.textMuted }]} numberOfLines={1}>
                     {review.skillCategories.map((key) => t(`workerProfile.skills.${key}`)).join(' · ')}
-                  </Text>
+                  </FullText>
                 ) : null}
               </View>
             ))}

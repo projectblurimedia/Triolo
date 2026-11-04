@@ -7,6 +7,7 @@ import { useAnswerStaffInvite, useStaffInvites } from '@/hooks/useBusinessMutati
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 const JOIN_GRADIENT = ['#16A34A', '#22C55E'] as const;
 
@@ -51,12 +52,12 @@ export function StaffInvitesCard() {
               <FontAwesome6 name="person-biking" size={17} color="#FFFFFF" solid />
             </LinearGradient>
             <View style={styles.flex}>
-              <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
+              <FullText style={[styles.title, { color: colors.text }]} numberOfLines={2}>
                 {t('staffInvite.title', { shop: invite.shopName })}
-              </Text>
-              <Text style={[styles.text, { color: colors.textMuted }]} numberOfLines={2}>
+              </FullText>
+              <FullText style={[styles.text, { color: colors.textMuted }]} numberOfLines={2}>
                 {t('staffInvite.text', { owner: invite.ownerName, name: invite.fullName })}
-              </Text>
+              </FullText>
             </View>
           </View>
           <View style={styles.actions}>

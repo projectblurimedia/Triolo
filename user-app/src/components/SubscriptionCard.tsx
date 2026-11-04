@@ -7,6 +7,7 @@ import { useMySubscription } from '@/hooks/useSubscription';
 import { openSubscribe } from '@/state/subscribeStore';
 import { formatDay } from '@/utils/formatDate';
 import { fonts, typography } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /** Profile's Triolo Plus card — gold and shining; only while the admin has plans on. */
 export function SubscriptionCard() {
@@ -32,9 +33,9 @@ export function SubscriptionCard() {
                 </View>
               ) : null}
             </View>
-            <Text style={styles.subtitle} numberOfLines={2}>
+            <FullText style={styles.subtitle} numberOfLines={2}>
               {active ? t('subscribe.activeUntil', { date: formatDay(active.endsAt) }) : t('subscribe.cardText')}
-            </Text>
+            </FullText>
           </View>
           {/* A running plan has nothing to change: no button, just its end date. */}
           {active ? null : (

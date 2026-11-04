@@ -7,6 +7,7 @@ import { BlurTargetView, BlurView } from 'expo-blur';
 import { ANDROID_REAL_BLUR } from '@/state/blurTargetStore';
 import { useThemeColors } from '@/theme';
 import { GlassPanel } from './GlassPanel';
+import { FullText } from '@/components/FullText';
 
 /**
  * The frosted-glass top of a profile page (worker, shop, person looking for work): soft brand
@@ -246,13 +247,13 @@ export function GlassProfileLayout({
               {avatar}
             </View>
             <View style={compactStyles.text}>
-              <Text style={[compactStyles.title, { color: colors.text }]} numberOfLines={titleLines}>
+              <FullText style={[compactStyles.title, { color: colors.text }]} numberOfLines={titleLines}>
                 {title}
-              </Text>
+              </FullText>
               {typeof subtitle === 'string' ? (
-                <Text style={[compactStyles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
+                <FullText style={[compactStyles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
                   {subtitle}
-                </Text>
+                </FullText>
               ) : (
                 subtitle
               )}

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { GlassBackdrop, GlassCard } from './Glass';
 import { ALL_TIME, DateRange, DateRangeSheet, rangeLabel } from './DateRangeSheet';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 export interface FilterOption<T extends string> {
   key: T;
@@ -49,16 +50,16 @@ export function ActivityFilter<T extends string>({
         </LinearGradient>
         <View style={styles.flex}>
           <View style={styles.currentRow}>
-            <Text style={[styles.current, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.current, { color: colors.text }]} numberOfLines={1}>
               {current.label}
-            </Text>
+            </FullText>
             <View style={[styles.count, { backgroundColor: `${colors.primary}14` }]}>
               <Text style={[styles.countText, { color: colors.primary }]}>{current.count}</Text>
             </View>
           </View>
-          <Text style={[styles.when, { color: colors.textMuted }]} numberOfLines={1}>
+          <FullText style={[styles.when, { color: colors.textMuted }]} numberOfLines={1}>
             {datesText ?? t('dateRange.all')}
-          </Text>
+          </FullText>
         </View>
         <Pressable
           onPress={() => setOpen(true)}
@@ -99,9 +100,9 @@ export function ActivityFilter<T extends string>({
       {datesText && onRangeChange ? (
         <View style={[styles.rangeChip, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}33` }]}>
           <FontAwesome6 name="calendar-check" size={11} color={colors.primary} solid />
-          <Text style={[styles.rangeText, { color: colors.primary }]} numberOfLines={1}>
+          <FullText style={[styles.rangeText, { color: colors.primary }]} numberOfLines={1}>
             {datesText}
-          </Text>
+          </FullText>
           <Pressable onPress={() => onRangeChange(ALL_TIME)} hitSlop={8} accessibilityLabel={t('dateRange.clear')} style={styles.rangeClear}>
             <FontAwesome6 name="xmark" size={10} color="#FFFFFF" solid />
           </Pressable>
@@ -145,9 +146,9 @@ export function ActivityFilter<T extends string>({
                     <View style={[styles.optionIcon, { backgroundColor: active ? colors.primary : `${colors.primary}14` }]}>
                       <FontAwesome6 name={option.icon} size={12} color={active ? '#FFFFFF' : colors.primary} solid />
                     </View>
-                    <Text style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
+                    <FullText style={[styles.optionText, { color: colors.text }]} numberOfLines={1}>
                       {option.label}
-                    </Text>
+                    </FullText>
                     <View style={[styles.optionCount, { backgroundColor: active ? colors.primary : `${colors.textMuted}1A` }]}>
                       <Text style={[styles.optionCountText, { color: active ? '#FFFFFF' : colors.textMuted }]}>{option.count}</Text>
                     </View>

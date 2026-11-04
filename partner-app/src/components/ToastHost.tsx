@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToastStore } from '@/state/toastStore';
 import { ANDROID_REAL_BLUR, useBlurTargetStore } from '@/state/blurTargetStore';
 import { colors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 const DISPLAY_DURATION = 3600;
 const ENTER_DURATION = 200;
@@ -264,13 +265,13 @@ export function ToastHost({ screenBlur = false }: { screenBlur?: boolean }) {
               </LinearGradient>
             </View>
             <View style={styles.textGroup}>
-              <Text style={[styles.title, { color: themeColors.text }]} numberOfLines={1}>
+              <FullText style={[styles.title, { color: themeColors.text }]} numberOfLines={1}>
                 {toast.title}
-              </Text>
+              </FullText>
               {toast.message ? (
-                <Text style={[styles.message, { color: themeColors.textMuted }]} numberOfLines={2}>
+                <FullText style={[styles.message, { color: themeColors.textMuted }]} numberOfLines={2}>
                   {toast.message}
-                </Text>
+                </FullText>
               ) : null}
             </View>
             <View style={[styles.closeButton, { borderColor: glass.border, backgroundColor: `${themeColors.text}0D` }]}>

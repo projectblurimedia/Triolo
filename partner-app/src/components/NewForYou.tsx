@@ -32,6 +32,7 @@ import { openSubscribe } from '@/state/subscribeStore';
 import { GOLD_DEEP } from './GoldCard';
 import { QuickLimitSheet } from './QuickLimitSheet';
 import { useMySubscription } from '@/hooks/useSubscription';
+import { FullText } from '@/components/FullText';
 
 type DeckItem = { key: string; createdAt: string } & ({ type: 'job'; offer: PendingOffer } | { type: 'order'; order: ShopOrder });
 
@@ -515,9 +516,9 @@ function RequestCard({
       <View style={[styles.detailIcon, { backgroundColor: `${colors.primary}14` }]}>
         <FontAwesome6 name={icon} size={11} color={colors.primary} solid />
       </View>
-      <Text style={[styles.detailText, { color: colors.text }]} numberOfLines={1}>
+      <FullText style={[styles.detailText, { color: colors.text }]} numberOfLines={1}>
         {text}
-      </Text>
+      </FullText>
       {right}
     </View>
   );
@@ -557,18 +558,18 @@ function RequestCard({
         </View>
         <View style={styles.flex}>
           <View style={styles.kindRow}>
-            <Text style={[styles.kind, { color: colors.primary }]} numberOfLines={1}>
+            <FullText style={[styles.kind, { color: colors.primary }]} numberOfLines={1}>
               {info.kind}
-            </Text>
+            </FullText>
             {fresh ? (
               <View style={[styles.newPill, { backgroundColor: brandColors.success }]}>
                 <Text style={styles.newPillText}>{t('newForYou.new')}</Text>
               </View>
             ) : null}
           </View>
-          <Text style={[styles.name, rich ? styles.nameRich : null, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.name, rich ? styles.nameRich : null, { color: colors.text }]} numberOfLines={1}>
             {info.name}
-          </Text>
+          </FullText>
         </View>
         <View style={[styles.metaPill, { backgroundColor: `${colors.primary}12` }]}>
           <FontAwesome6 name="location-arrow" size={10} color={colors.primary} solid />
@@ -598,19 +599,19 @@ function RequestCard({
           {item.type === 'order' && item.order.note ? row('quote-left', item.order.note, true) : null}
         </View>
       ) : (
-        <Text style={[styles.what, { color: colors.textMuted }]} numberOfLines={1}>
+        <FullText style={[styles.what, { color: colors.textMuted }]} numberOfLines={1}>
           {[item.type === 'order' ? orderLine : info.what, info.place].filter(Boolean).join(' · ')}
-        </Text>
+        </FullText>
       )}
 
       {noneLeft || fewLeft ? (
         <Pressable disabled={preview} onPress={() => openSubscribe(side)} style={[styles.limitNote, { backgroundColor: `${GOLD_DEEP}14`, borderColor: `${GOLD_DEEP}40` }]}>
           <FontAwesome6 name={noneLeft ? 'lock' : 'hourglass-half'} size={11} color={GOLD_DEEP} solid />
-          <Text style={[styles.limitNoteText, { color: colors.text }]} numberOfLines={2}>
+          <FullText style={[styles.limitNoteText, { color: colors.text }]} numberOfLines={2}>
             {noneLeft
               ? t(limit?.limit ? 'quickLimit.usedUp' : 'quickLimit.planNeeded', { limit: limit?.limit })
               : t('quickLimit.fewLeft', { count: limit?.remaining, limit: limit?.limit, used: Math.max(0, (limit?.limit ?? 0) - (limit?.remaining ?? 0)) })}
-          </Text>
+          </FullText>
           <FontAwesome6 name="crown" size={11} color={GOLD_DEEP} solid />
         </Pressable>
       ) : null}
@@ -667,9 +668,9 @@ function ItemsSheet({ visible, order, onClose }: { visible: boolean; order: Shop
               <FontAwesome6 name="list-check" size={14} color={colors.primary} solid />
             </View>
             <View style={styles.flex}>
-              <Text style={[styles.sheetTitle, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.sheetTitle, { color: colors.text }]} numberOfLines={1}>
                 {order.customerFullName}
-              </Text>
+              </FullText>
               <Text style={[styles.sheetSub, { color: colors.textMuted }]}>{orderListText(t, order)}</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={8} style={[styles.sheetClose, { borderColor: colors.border }]}>

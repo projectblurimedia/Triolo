@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleProp, Text, TextStyle } from 'react-native';
 import { fonts, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 interface HighlightTextProps {
   text: string;
@@ -16,9 +17,9 @@ export function HighlightText({ text, term, style, numberOfLines }: HighlightTex
   const needle = term?.trim().toLowerCase() ?? '';
   if (!needle) {
     return (
-      <Text style={style} numberOfLines={numberOfLines}>
+      <FullText style={style} numberOfLines={numberOfLines}>
         {text}
-      </Text>
+      </FullText>
     );
   }
   const parts: { value: string; hit: boolean }[] = [];
@@ -35,7 +36,7 @@ export function HighlightText({ text, term, style, numberOfLines }: HighlightTex
     from = at + needle.length;
   }
   return (
-    <Text style={style} numberOfLines={numberOfLines}>
+    <FullText style={style} numberOfLines={numberOfLines}>
       {parts.map((part, index) =>
         part.hit ? (
           <Text
@@ -48,7 +49,7 @@ export function HighlightText({ text, term, style, numberOfLines }: HighlightTex
           part.value
         ),
       )}
-    </Text>
+    </FullText>
   );
 }
 

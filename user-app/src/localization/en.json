@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Triolo",
+    "appName": "NearbyU",
     "continue": "Continue",
     "cancel": "Cancel",
     "close": "Close",
@@ -605,7 +605,7 @@
       "problemsPosted": "Problems posted",
       "finished": "Finished",
       "inProgress": "In progress",
-      "notDone": "Cancelled / no worker",
+      "notDone": "Cancelled",
       "rated": "Workers rated",
       "viewAll": "View all bookings"
     },
@@ -626,7 +626,11 @@
     "detailEmail": "Email",
     "manageWorkerInPartnerApp": "To change your services, use the Triolo Partner app.",
     "manageShopInPartnerApp": "To change your shop, use the Triolo Partner app.",
-    "accountSection": "Account"
+    "accountSection": "Account",
+    "viewAll": "View all",
+    "detailPlace": "Place",
+    "statExperience": "Experience",
+    "statDelivery": "Delivery"
   },
   "themePicker": {
     "title": "Choose Theme",
@@ -917,7 +921,15 @@
     "typeProblem": "Problem",
     "emptyActiveTitle": "No Active Bookings",
     "emptyHistoryTitle": "No Past Bookings Yet",
-    "emptyMessage": "Book a worker with Quick Book or post a problem to get started."
+    "emptyMessage": "Book a worker with Quick Book or post a problem to get started.",
+    "filters": {
+      "all": "All",
+      "problems": "Problems",
+      "finished": "Finished",
+      "notDone": "Not done",
+      "rated": "Rated",
+      "emptyTitle": "Nothing here yet"
+    }
   },
   "tracking": {
     "title": "Your Booking",
@@ -1155,7 +1167,14 @@
     "history": "History",
     "emptyActive": "No active orders",
     "emptyHistory": "No past orders yet",
-    "emptyMessage": "Prepare a list and send it to a nearby shop to pack."
+    "emptyMessage": "Prepare a list and send it to a nearby shop to pack.",
+    "filters": {
+      "all": "All",
+      "completed": "Completed",
+      "notDone": "Not done",
+      "rated": "Rated",
+      "emptyTitle": "Nothing here yet"
+    }
   },
   "favorites": {
     "workersTitle": "Favorite Workers",

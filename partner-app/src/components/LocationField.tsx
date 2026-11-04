@@ -10,6 +10,7 @@ import { fonts, typography, useThemeColors } from '@/theme';
 import { PlaceValue, placeFromCoords } from '@/utils/place';
 import { ensureLocationOn } from '@/utils/ensureLocationOn';
 import { showToast } from '@/state/toastStore';
+import { FullText } from '@/components/FullText';
 
 interface LocationFieldProps {
   label?: string;
@@ -59,9 +60,9 @@ export function LocationField({ label, value, onChange }: LocationFieldProps) {
             <FontAwesome6 name="location-dot" size={16} color={colors.success} solid />
           </View>
           <View style={styles.flex}>
-            <Text style={[styles.placeName, { color: colors.text }]} numberOfLines={2}>
+            <FullText style={[styles.placeName, { color: colors.text }]} numberOfLines={2}>
               {placeName(value.locationName) || value.locationName}
-            </Text>
+            </FullText>
             <View style={styles.setRow}>
               <FontAwesome6 name="circle-check" size={10} color={colors.success} solid />
               <Text style={[styles.setText, { color: colors.success }]}>{t('location.placeSet')}</Text>
@@ -81,9 +82,9 @@ export function LocationField({ label, value, onChange }: LocationFieldProps) {
           ) : (
             <FontAwesome6 name="location-crosshairs" size={15} color={colors.primary} solid />
           )}
-          <Text style={[styles.choiceText, { color: colors.primary }]} numberOfLines={1}>
+          <FullText style={[styles.choiceText, { color: colors.primary }]} numberOfLines={1}>
             {t(detecting ? 'location.detecting' : 'location.useCurrentShort')}
-          </Text>
+          </FullText>
         </Pressable>
         <Pressable
           style={[styles.choice, { borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -91,9 +92,9 @@ export function LocationField({ label, value, onChange }: LocationFieldProps) {
           disabled={detecting}
         >
           <FontAwesome6 name="map-location-dot" size={15} color={colors.text} solid />
-          <Text style={[styles.choiceText, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.choiceText, { color: colors.text }]} numberOfLines={1}>
             {t('location.selectOnMap')}
-          </Text>
+          </FullText>
         </Pressable>
       </View>
 

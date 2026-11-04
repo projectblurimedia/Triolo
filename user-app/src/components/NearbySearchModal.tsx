@@ -15,6 +15,7 @@ import { SearchResultCard } from './SearchResultCard';
 import { SectionHeader } from './SectionHeader';
 import { matchesTerm } from './HighlightText';
 import { formatDistanceValue, isWorkerResult, NearbyResult, NearbySearchMode } from '@/utils/nearbyResult';
+import { FullText } from '@/components/FullText';
 
 export type { NearbySearchMode, NearbyResult };
 
@@ -437,12 +438,12 @@ export function NearbySearchModal({ visible, onClose, mode }: NearbySearchModalP
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <FullText style={styles.headerTitle} numberOfLines={1}>
                 {t(isWorker ? 'nearbySearch.workersTitle' : 'nearbySearch.shopsTitle')}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              </FullText>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {t(isWorker ? 'nearbySearch.workersSubtitle' : 'nearbySearch.shopsSubtitle')}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>

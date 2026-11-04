@@ -17,6 +17,7 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDay } from '@/utils/formatDate';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { payInApp } from '@/utils/inAppPay';
+import { FullText } from '@/components/FullText';
 
 const PERKS = [
   { icon: 'bolt', key: 'perkQuickBook' },
@@ -215,12 +216,12 @@ export function SubscribeModal() {
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <FullText style={styles.headerTitle} numberOfLines={1}>
                 {t('subscribe.title')}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              </FullText>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {t('subscribe.subtitle')}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>

@@ -48,6 +48,7 @@ import { useAttentionCounts } from '@/hooks/useAttentionCounts';
 import { SmartImage } from '@/components/SmartImage';
 import { orderListText } from '@/utils/orderListText';
 import { GivenBackError } from '@/utils/afterAccept';
+import { FullText } from '@/components/FullText';
 
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const RECENT_LIMIT = 5;
@@ -189,9 +190,9 @@ export function HomeScreen() {
     text ? (
       <View style={styles.metaRow}>
         <FontAwesome6 name={icon} size={12} color={colors.textMuted} solid />
-        <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={2}>
+        <FullText style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={2}>
           {text}
-        </Text>
+        </FullText>
       </View>
     ) : null;
 
@@ -216,14 +217,14 @@ export function HomeScreen() {
         style={[styles.card, { backgroundColor: `${brandColors.pending}0A`, borderColor: `${brandColors.pending}99` }]}
       >
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
             {job.customerFullName}
-          </Text>
+          </FullText>
           {renderStatusPill(statusLabel, isWorkDone ? brandColors.warning : brandColors.success)}
         </View>
-        <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
+        <FullText style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>
           {skillLabel(job.skillCategories)}
-        </Text>
+        </FullText>
         <Text style={[styles.quotation, { color: colors.primary }]}>₹{job.quotationAmount.toLocaleString('en-IN')}</Text>
 
         <View style={[styles.customerRow, { backgroundColor: `${colors.primary}0F` }]}>
@@ -291,22 +292,22 @@ export function HomeScreen() {
           </LinearGradient>
         )}
         <View style={styles.problemInfo}>
-          <Text style={[styles.problemSkill, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.problemSkill, { color: colors.text }]} numberOfLines={1}>
             {skillLabel(problem.skillCategories)}
-          </Text>
+          </FullText>
           <Text style={[styles.problemPrice, { color: colors.primary }]}>₹{problem.quotationAmount.toLocaleString('en-IN')}</Text>
         </View>
         <View style={[styles.problemDistance, { backgroundColor: `${colors.primary}14` }]}>
-          <Text style={[styles.problemDistanceText, { color: colors.primary }]} numberOfLines={1}>
+          <FullText style={[styles.problemDistanceText, { color: colors.primary }]} numberOfLines={1}>
             {formatDistance(problem.distanceMeters)}
-          </Text>
+          </FullText>
         </View>
       </View>
       <View style={styles.problemMetaRow}>
         <FontAwesome6 name="location-dot" size={10} color={colors.textMuted} solid />
-        <Text style={[styles.problemMeta, { color: colors.textMuted }]} numberOfLines={1}>
+        <FullText style={[styles.problemMeta, { color: colors.textMuted }]} numberOfLines={1}>
           {placeName(problem.locationAddress) || t('problems.nearYou')}
-        </Text>
+        </FullText>
       </View>
       {/* Tap the card for the photos and everything else; Accept right here. */}
       <Pressable
@@ -360,15 +361,16 @@ export function HomeScreen() {
       <LinearGradient colors={tone ? [tone, `${tone}B3`] : headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sectionIcon}>
         <FontAwesome6 name={icon} size={12} color="#FFFFFF" solid />
       </LinearGradient>
-      <Text style={[styles.sectionRowTitle, { color: colors.text }]} numberOfLines={1}>
+      <FullText style={[styles.sectionRowTitle, { color: colors.text }]} numberOfLines={1}>
         {title}
-      </Text>
+      </FullText>
+      <View style={[styles.sectionRule, { backgroundColor: `${colors.primary}1F` }]} />
+      {/* The count at the right, like the customer app's section headers. */}
       {count !== undefined ? (
         <View style={[styles.sectionCount, { backgroundColor: `${tone ?? colors.primary}18` }]}>
           <Text style={[styles.sectionCountText, { color: tone ?? colors.primary }]}>{count}</Text>
         </View>
       ) : null}
-      <View style={[styles.sectionRule, { backgroundColor: `${colors.primary}1F` }]} />
     </View>
   );
 
@@ -479,14 +481,14 @@ export function HomeScreen() {
                 return (
                   <Pressable key={value} onPress={() => setPickedSide(value)} style={[styles.sideOption, active ? { backgroundColor: colors.primary } : null]}>
                     <FontAwesome6 name={SIDE_ICONS[value]} size={12} color={active ? '#FFFFFF' : colors.textMuted} solid />
-                    <Text
+                    <FullText
                       style={[styles.sideText, { color: active ? '#FFFFFF' : colors.textMuted }]}
                       numberOfLines={1}
                       adjustsFontSizeToFit
                       minimumFontScale={0.8}
                     >
                       {t(SIDE_LABELS[value])}
-                    </Text>
+                    </FullText>
                     {sideWaiting(value) ? (
                       <View style={[styles.sideDot, { backgroundColor: brandColors.error, borderColor: active ? '#FFFFFF' : colors.surface }]} />
                     ) : null}

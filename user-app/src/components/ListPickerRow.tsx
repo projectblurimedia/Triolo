@@ -8,6 +8,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { ListPhotoStrip } from './ListPhotoStrip';
 import { VoiceMessage } from './VoiceMessage';
 import { listCountText } from '@/utils/listPhotos';
+import { FullText } from '@/components/FullText';
 
 const PREVIEW_ITEMS = 4;
 
@@ -40,9 +41,9 @@ export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProp
             <>
               <FontAwesome6 name="basket-shopping" size={13} color={active ? '#FFFFFF' : colors.primary} solid />
               <View style={styles.text}>
-                <Text style={[styles.name, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
+                <FullText style={[styles.name, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
                   {list.name || t('chooseList.untitled')}
-                </Text>
+                </FullText>
                 <Text style={[styles.count, { color: active ? 'rgba(255,255,255,0.85)' : colors.textMuted }]}>
                   {listCountText(t, count, photoCount, list.voice?.seconds ?? null)}
                 </Text>
@@ -65,9 +66,9 @@ export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProp
       {selected?.voice ? <VoiceMessage uri={selected.voice.uri} seconds={selected.voice.seconds} /> : null}
       <ListPhotoStrip photos={(selected?.photos ?? []).map((photo) => photo.uri)} size={56} />
       {names.length > 0 ? (
-        <Text style={[styles.preview, { color: colors.textMuted }]} numberOfLines={1}>
+        <FullText style={[styles.preview, { color: colors.textMuted }]} numberOfLines={1}>
           {more > 0 ? `${shown} ${t('chooseList.more', { count: more })}` : shown}
-        </Text>
+        </FullText>
       ) : null}
     </View>
   );

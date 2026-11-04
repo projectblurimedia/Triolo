@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { fonts, headerGradient, typography } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -43,12 +44,12 @@ export function NearbyHero({ icon, title, subtitle, count, countCaption, onPress
             <FontAwesome6 name={icon} size={20} color="#FFFFFF" solid />
           </View>
           <View style={styles.flex}>
-            <Text style={styles.title} numberOfLines={1}>
+            <FullText style={styles.title} numberOfLines={1}>
               {title}
-            </Text>
-            <Text style={styles.caption} numberOfLines={2}>
+            </FullText>
+            <FullText style={styles.caption} numberOfLines={2}>
               {subtitle}
-            </Text>
+            </FullText>
           </View>
           {count != null ? (
             <View style={styles.countWrap}>

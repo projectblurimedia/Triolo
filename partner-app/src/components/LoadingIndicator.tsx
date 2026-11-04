@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, View } from 'react-native';
+import { BrandMotion } from './brand/BrandMotion';
 
 const DOT_COUNT = 3;
 
@@ -11,13 +12,24 @@ interface LoadingIndicatorProps {
   duration?: number;
 }
 
+// Below this the NearbyU mark is too small to read, so the old orbiting dots stay.
+const MARK_MIN = 20;
+// From this size up the loader also draws the rings and the three helpers.
+const RINGS_MIN = 56;
+
 /**
- * The app's signature loading motif — dots orbiting a center point — used everywhere a
- * loading state needs an affordance, instead of the platform's generic ActivityIndicator.
- * Extracted from LogoutOverlay's full-screen version (which additionally has a pulsing
- * center mark, appropriate at that larger scale but not needed for an inline spinner).
+ * The app's loader, used everywhere a loading state needs an affordance: the NearbyU motion on
+ * a loop (BrandMotion, docs/brand-nearbyu) — the pin drops, the road draws to the home, the home
+ * pops up; with rings and helpers at larger sizes. Tiny sizes keep the orbiting dots.
  */
-export function LoadingIndicator({ size = 22, color = '#FFFFFF', dotSize = 4, duration = 900 }: LoadingIndicatorProps) {
+export function LoadingIndicator(props: LoadingIndicatorProps) {
+  const { size = 22, color = '#FFFFFF' } = props;
+  if (size < MARK_MIN) return <OrbitDots {...props} />;
+  return <BrandMotion size={size} color={color} rings={size >= RINGS_MIN} mode="loop" />;
+}
+
+/** The earlier loader: dots orbiting a centre point (kept for the tiniest sizes). */
+function OrbitDots({ size = 22, color = '#FFFFFF', dotSize = 4, duration = 900 }: LoadingIndicatorProps) {
   const rotation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {

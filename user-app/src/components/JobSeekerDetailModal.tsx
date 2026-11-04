@@ -15,6 +15,7 @@ import { usePayHint } from '@/hooks/useSubscription';
 import { SmartImage } from './SmartImage';
 import { SealedAvatar, TrustedBadge } from './TrustedBadge';
 import { PhotoViewer } from './PhotoViewer';
+import { FullText } from '@/components/FullText';
 
 const CALL_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const PHOTO_SIZE = 104;
@@ -137,9 +138,9 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
               <View style={styles.flex}>
                 <Text style={[styles.phoneLabel, { color: colors.textMuted }]}>{t('hireStaff.phoneLabel')}</Text>
                 <View style={styles.hiddenRow}>
-                  <Text style={[styles.phone, { color: colors.text }]} numberOfLines={1}>
+                  <FullText style={[styles.phone, { color: colors.text }]} numberOfLines={1}>
                     {number ? t('hireStaff.readyToCall') : t('hireStaff.lockedToCall')}
-                  </Text>
+                  </FullText>
                   {number ? null : (
                     <View style={[styles.lockBadge, { backgroundColor: `${colors.primary}16` }]}>
                       <FontAwesome6 name="lock" size={10} color={colors.primary} solid />
@@ -153,9 +154,9 @@ export function JobSeekerDetailModal({ person, onClose }: { person: JobSeeker | 
               >
                 <LinearGradient colors={CALL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callButton}>
                   <FontAwesome6 name={number ? 'phone' : 'lock-open'} size={15} color="#FFFFFF" solid />
-                  <Text style={styles.callText} numberOfLines={1}>
+                  <FullText style={styles.callText} numberOfLines={1}>
                     {number ? t('hireStaff.callNow') : fee ? t('hireStaff.unlockFor', { amount: fee }) : t('hireStaff.showNumber')}
-                  </Text>
+                  </FullText>
                 </LinearGradient>
               </Pressable>
             </View>

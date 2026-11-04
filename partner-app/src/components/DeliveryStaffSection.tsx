@@ -13,6 +13,7 @@ import { ApiError } from '@/services/apiClient';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { showToast } from '@/state/toastStore';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 const MOBILE_PATTERN = /^[6-9]\d{9}$/;
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
@@ -91,9 +92,9 @@ function StaffEditor({
         <View key={row.key} style={[styles.editRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <StaffAvatar name={row.fullName} index={index} size={34} />
           <View style={styles.flex}>
-            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
               {row.fullName}
-            </Text>
+            </FullText>
           </View>
           {row.status ? <StatusPill status={row.status} /> : null}
           <Pressable
@@ -206,9 +207,9 @@ export function DeliveryStaffCard({ shopId }: { shopId: string }) {
         </View>
         <View style={styles.flex}>
           <Text style={styles.bandTitle}>{t('deliveryStaff.title')}</Text>
-          <Text style={styles.bandText} numberOfLines={1}>
+          <FullText style={styles.bandText} numberOfLines={1}>
             {t('deliveryStaff.cardLine', { count: list.length })}
-          </Text>
+          </FullText>
         </View>
         <View style={styles.bandAvatars}>
           {list.slice(0, 3).map((member, index) => (
@@ -225,9 +226,9 @@ export function DeliveryStaffCard({ shopId }: { shopId: string }) {
         >
           <StaffAvatar name={member.fullName} index={index} />
           <View style={styles.flex}>
-            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
               {member.fullName}
-            </Text>
+            </FullText>
           </View>
           {member.status !== 'active' ? <StatusPill status={member.status} /> : null}
           <Pressable

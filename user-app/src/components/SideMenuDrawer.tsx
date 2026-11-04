@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { GlassBackdropLayer, GlassFill } from './Glass';
 import { Portal } from './Portal';
+import { FullText } from '@/components/FullText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.85;
@@ -113,12 +114,12 @@ export function SideMenuDrawer({
                   <FontAwesome6 name={icon} size={22} color={colors.white} solid />
                 </View>
                 <View style={styles.headerText}>
-                  <Text style={styles.headerTitle} numberOfLines={1}>
+                  <FullText style={styles.headerTitle} numberOfLines={1}>
                     {title}
-                  </Text>
-                  <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  </FullText>
+                  <FullText style={styles.headerSubtitle} numberOfLines={1}>
                     {subtitle}
-                  </Text>
+                  </FullText>
                 </View>
               </View>
               <Pressable style={styles.closeButton} onPress={onClose} hitSlop={8}>

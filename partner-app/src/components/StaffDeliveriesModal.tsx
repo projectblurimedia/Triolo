@@ -21,6 +21,7 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { callPhone, openDirections } from '@/utils/tripLinks';
 import { placeName } from '@/utils/formatAddress';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 const DONE_GRADIENT = ['#16A34A', '#22C55E'] as const;
 const MAP_HEIGHT = Math.round(Dimensions.get('window').height * 0.4);
@@ -112,12 +113,12 @@ export function StaffDeliveriesModal() {
                     <View key={delivery.id} style={[styles.doneRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <FontAwesome6 name="circle-check" size={16} color={brandColors.success} solid />
                       <View style={styles.flex}>
-                        <Text style={[styles.doneName, { color: colors.text }]} numberOfLines={1}>
+                        <FullText style={[styles.doneName, { color: colors.text }]} numberOfLines={1}>
                           {delivery.customerFullName}
-                        </Text>
-                        <Text style={[styles.doneMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                        </FullText>
+                        <FullText style={[styles.doneMeta, { color: colors.textMuted }]} numberOfLines={1}>
                           {delivery.shopName}
-                        </Text>
+                        </FullText>
                       </View>
                       {delivery.totalAmount != null ? (
                         <Text style={[styles.doneAmount, { color: colors.text }]}>{formatRupees(delivery.totalAmount)}</Text>
@@ -152,16 +153,16 @@ function Summary({ delivery }: { delivery: StaffDelivery }) {
     <>
       <View style={styles.shopRow}>
         <FontAwesome6 name="store" size={11} color={colors.primary} solid />
-        <Text style={[styles.shopName, { color: colors.primary }]} numberOfLines={1}>
+        <FullText style={[styles.shopName, { color: colors.primary }]} numberOfLines={1}>
           {delivery.shopName}
-        </Text>
+        </FullText>
       </View>
-      <Text style={[styles.customer, { color: colors.text }]} numberOfLines={1}>
+      <FullText style={[styles.customer, { color: colors.text }]} numberOfLines={1}>
         {delivery.customerFullName}
-      </Text>
-      <Text style={[styles.place, { color: colors.textMuted }]} numberOfLines={1}>
+      </FullText>
+      <FullText style={[styles.place, { color: colors.textMuted }]} numberOfLines={1}>
         {[place, t('deliveries.itemsCount', { count: delivery.items.length })].filter(Boolean).join(' · ')}
-      </Text>
+      </FullText>
       {delivery.totalAmount != null ? (
         <Text style={[styles.cash, { color: brandColors.success }]}>{t('deliveries.cashLine', { amount: formatRupees(delivery.totalAmount) })}</Text>
       ) : null}
@@ -288,13 +289,13 @@ function TripModal({ delivery, me, onClose }: { delivery: StaffDelivery | null; 
             <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('deliveries.deliverTo')}</Text>
             <View style={styles.personRow}>
               <View style={styles.flex}>
-                <Text style={[styles.customer, { color: colors.text }]} numberOfLines={1}>
+                <FullText style={[styles.customer, { color: colors.text }]} numberOfLines={1}>
                   {delivery.customerFullName}
-                </Text>
+                </FullText>
                 {place ? (
-                  <Text style={[styles.place, { color: colors.textMuted }]} numberOfLines={1}>
+                  <FullText style={[styles.place, { color: colors.textMuted }]} numberOfLines={1}>
                     {place}
-                  </Text>
+                  </FullText>
                 ) : null}
               </View>
               <Pressable onPress={() => callPhone(delivery.customerMobileNumber)} style={[styles.round, { backgroundColor: brandColors.success }]}>
@@ -354,10 +355,10 @@ function TripModal({ delivery, me, onClose }: { delivery: StaffDelivery | null; 
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, gap: 4 }]}>
             <Text style={[styles.cardLabel, { color: colors.textMuted }]}>{t('deliveries.handOver', { count: delivery.items.length })}</Text>
             {delivery.items.map((item, index) => (
-              <Text key={`${item.name}-${index}`} style={[styles.item, { color: colors.text }]} numberOfLines={1}>
+              <FullText key={`${item.name}-${index}`} style={[styles.item, { color: colors.text }]} numberOfLines={1}>
                 {index + 1}. {item.name}
                 {item.quantity ? ` · ${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : ''}
-              </Text>
+              </FullText>
             ))}
           </View>
         </ScrollView>

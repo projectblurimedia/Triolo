@@ -68,6 +68,7 @@ export function MainTabNavigator() {
                 title={t(`mainTabs.${name}.title`)}
                 subtitle={t(`mainTabs.${name}.subtitle`)}
                 leadingIcon={TAB_ICONS[name]}
+                brand={name === 'Home'}
                 actions={[
                   {
                     icon: 'bell',

@@ -6,6 +6,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoadingIndicator } from './LoadingIndicator';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -178,9 +179,9 @@ export function IncomingRequestScreen({
 
             {state === 'ready' && headline ? (
               <>
-                <Text style={styles.headline} numberOfLines={1} adjustsFontSizeToFit>
+                <FullText style={styles.headline} numberOfLines={1} adjustsFontSizeToFit>
                   {headline}
-                </Text>
+                </FullText>
                 {headlineCaption ? <Text style={styles.headlineCaption}>{headlineCaption}</Text> : null}
               </>
             ) : null}
@@ -220,15 +221,15 @@ export function IncomingRequestScreen({
                     <Text style={styles.avatarText}>{initialsOf(personName)}</Text>
                   </LinearGradient>
                   <View style={styles.personText}>
-                    <Text style={[styles.personName, { color: colors.text }]} numberOfLines={1}>
+                    <FullText style={[styles.personName, { color: colors.text }]} numberOfLines={1}>
                       {personName}
-                    </Text>
+                    </FullText>
                     {personLine ? (
                       <View style={styles.personLineRow}>
                         <FontAwesome6 name="location-dot" size={11} color={colors.textMuted} solid />
-                        <Text style={[styles.personLine, { color: colors.textMuted }]} numberOfLines={1}>
+                        <FullText style={[styles.personLine, { color: colors.textMuted }]} numberOfLines={1}>
                           {personLine}
-                        </Text>
+                        </FullText>
                       </View>
                     ) : null}
                   </View>
@@ -241,9 +242,9 @@ export function IncomingRequestScreen({
                         style={[styles.chip, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}33` }]}
                       >
                         <FontAwesome6 name={chip.icon} size={12} color={colors.primary} solid />
-                        <Text style={[styles.chipText, { color: colors.primary }]} numberOfLines={1}>
+                        <FullText style={[styles.chipText, { color: colors.primary }]} numberOfLines={1}>
                           {chip.label}
-                        </Text>
+                        </FullText>
                       </View>
                     ))}
                   </View>

@@ -14,6 +14,7 @@ import { BadgeKind, PartnerPlan, planForKind, SUBSCRIPTION_MONTHS } from '@/serv
 import { openSubscribe } from '@/state/subscribeStore';
 import { formatDay } from '@/utils/formatDate';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -94,9 +95,9 @@ export function GrowScreen() {
               ]}
             >
               <FontAwesome6 name={kind === 'business' ? 'store' : 'briefcase'} size={11} color={active ? '#FFFFFF' : colors.primary} solid />
-              <Text style={[styles.postChipText, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.postChipText, { color: active ? '#FFFFFF' : colors.text }]} numberOfLines={1}>
                 {profile.name}
-              </Text>
+              </FullText>
             </Pressable>
           );
         })}
@@ -120,9 +121,9 @@ export function GrowScreen() {
           return (
             <Pressable key={value} onPress={() => setPickedPlan(value)} style={[styles.planChoiceOption, active ? { backgroundColor: GOLD_DEEP } : null]}>
               <FontAwesome6 name={PLAN_ICON[value]} size={11} color={active ? '#FFFFFF' : GOLD_DEEP} solid />
-              <Text style={[styles.planChoiceText, { color: active ? '#FFFFFF' : GOLD_DEEP }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              <FullText style={[styles.planChoiceText, { color: active ? '#FFFFFF' : GOLD_DEEP }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {t(`plans.names.${value}`)}
-              </Text>
+              </FullText>
             </Pressable>
           );
         })}
@@ -196,11 +197,11 @@ export function GrowScreen() {
           <View style={styles.heroFoot}>
             <View style={styles.heroStat}>
               <FontAwesome6 name={active ? 'hourglass-half' : 'gift'} size={11} color={GOLD_INK} solid />
-              <Text style={styles.heroStatText} numberOfLines={1}>
+              <FullText style={styles.heroStatText} numberOfLines={1}>
                 {active
                   ? t('plans.daysLeft', { count: daysLeft })
                   : t('plans.extra', { count: PLAN_PERKS[plan].length, amount: Math.round(prices['12'] / 12) })}
-              </Text>
+              </FullText>
             </View>
             {active ? null : (
               <Pressable onPress={() => openSubscribe(plan)} style={({ pressed }) => [styles.heroButton, { opacity: pressed ? 0.9 : 1 }]}>

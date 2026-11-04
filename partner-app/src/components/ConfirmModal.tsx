@@ -5,6 +5,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { LoadingIndicator } from './LoadingIndicator';
+import { FullText } from '@/components/FullText';
 
 interface ConfirmModalProps {
   visible: boolean;
@@ -60,9 +61,9 @@ export function ConfirmModal({
                 {loading ? (
                   <LoadingIndicator size={18} dotSize={3.5} />
                 ) : (
-                  <Text style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  <FullText style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     {confirmLabel}
-                  </Text>
+                  </FullText>
                 )}
               </LinearGradient>
             </Pressable>

@@ -14,6 +14,7 @@ import { showToast } from '@/state/toastStore';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, typography, useThemeColors } from '@/theme';
 import { payInApp } from '@/utils/inAppPay';
+import { FullText } from '@/components/FullText';
 
 type Step = 'offer' | 'starting' | 'waiting' | 'checking';
 
@@ -196,9 +197,9 @@ export function PayGateSheet() {
                 {PLUS_PERKS.map((perk) => (
                   <View key={perk.key} style={styles.perk}>
                     <FontAwesome6 name={perk.icon} size={11} color={GOLD_INK} solid />
-                    <Text style={styles.perkText} numberOfLines={1}>
+                    <FullText style={styles.perkText} numberOfLines={1}>
                       {t(perk.key)}
-                    </Text>
+                    </FullText>
                   </View>
                 ))}
               </View>

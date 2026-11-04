@@ -17,6 +17,7 @@ import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { formatDay } from '@/utils/formatDate';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { canPayInApp, payInApp } from '@/utils/inAppPay';
+import { FullText } from '@/components/FullText';
 
 // The app's own blue, like every other main card.
 const BOOST_GRADIENT = headerGradient;
@@ -129,12 +130,12 @@ export function BoostModal({ profile, onClose }: BoostModalProps) {
               <FontAwesome6 name="chevron-left" size={18} color="#FFFFFF" solid />
             </Pressable>
             <View style={styles.titleGroup}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <FullText style={styles.headerTitle} numberOfLines={1}>
                 {t('boost.title')}
-              </Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              </FullText>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {profile?.name ?? ''}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>

@@ -30,6 +30,7 @@ import { formatDistance } from '@/utils/formatDistance';
 import { placeName } from '@/utils/formatAddress';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { GivenBackError } from '@/utils/afterAccept';
+import { FullText } from '@/components/FullText';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 const MODAL_HANDOFF_MS = 350;
@@ -193,9 +194,9 @@ function NearbyProblems({ onDone }: { onDone: () => void }) {
           style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: `${colors.primary}26`, opacity: pressed ? 0.92 : 1 }]}
         >
           <View style={styles.cardTop}>
-            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
               {skillLabel(problem.skillCategories)}
-            </Text>
+            </FullText>
             <View style={[styles.pill, { backgroundColor: `${colors.primary}16` }]}>
               <FontAwesome6 name="location-arrow" size={10} color={colors.primary} solid />
               <Text style={[styles.pillText, { color: colors.primary }]}>
@@ -205,14 +206,14 @@ function NearbyProblems({ onDone }: { onDone: () => void }) {
           </View>
           <Text style={[styles.amount, { color: colors.primary }]}>₹{problem.quotationAmount.toLocaleString('en-IN')}</Text>
           {problem.locationAddress ? (
-            <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+            <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
               {placeName(problem.locationAddress)}
-            </Text>
+            </FullText>
           ) : null}
           {problem.description ? (
-            <Text style={[styles.description, { color: colors.text }]} numberOfLines={2}>
+            <FullText style={[styles.description, { color: colors.text }]} numberOfLines={2}>
               {problem.description}
-            </Text>
+            </FullText>
           ) : null}
           <View style={styles.viewRow}>
             <Text style={[styles.viewText, { color: colors.primary }]}>{t('problemDetail.viewDetails')}</Text>

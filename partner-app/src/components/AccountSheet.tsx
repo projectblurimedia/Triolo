@@ -7,6 +7,7 @@ import { GlassBackdrop, GlassCard } from './Glass';
 import { useAuthStore } from '@/state/authStore';
 import { useStaffShops } from '@/hooks/useBusinessMutations';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -41,9 +42,9 @@ export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: 
               <Text style={styles.avatarText}>{initialsOf(account.fullName)}</Text>
             </LinearGradient>
             <View style={styles.flex}>
-              <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
                 {account.fullName}
-              </Text>
+              </FullText>
               <Text style={[styles.caption, { color: colors.textMuted }]}>
                 {t(shops.length > 0 ? 'accountSheet.staffRole' : 'accountSheet.partnerRole')}
               </Text>
@@ -59,9 +60,9 @@ export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: 
               </View>
               <View style={styles.flex}>
                 <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{row.label}</Text>
-                <Text style={[styles.rowValue, { color: colors.text }]} numberOfLines={2}>
+                <FullText style={[styles.rowValue, { color: colors.text }]} numberOfLines={2}>
                   {row.value}
-                </Text>
+                </FullText>
               </View>
             </View>
           ))}

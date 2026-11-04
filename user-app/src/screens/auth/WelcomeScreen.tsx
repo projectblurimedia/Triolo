@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { NearbyMark } from '@/components/brand/NearbyMark';
+import { Wordmark } from '@/components/brand/Wordmark';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -9,6 +11,7 @@ import { Button } from '@/components/Button';
 import { LanguagePickerModal } from '@/components/LanguagePickerModal';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { AuthStackParamList } from '@/navigation/types';
+import { FullText } from '@/components/FullText';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 
@@ -91,12 +94,13 @@ export function WelcomeScreen({ navigation }: Props) {
           </Pressable>
 
           <View style={styles.brandIcon}>
-            <FontAwesome6 name="shapes" size={24} color="#0055D3" solid />
+            <NearbyMark size={42} color="#0055D3" />
           </View>
-          <Text style={styles.brandText}>{t('common.appName')}</Text>
-          <Text style={styles.headline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+          <Wordmark size={42} style={styles.brandName} />
+          <Text style={styles.brandTelugu}>నియర్‌బై యు</Text>
+          <FullText style={styles.headline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
             {t('welcome.headline')}
-          </Text>
+          </FullText>
           <Text style={styles.subline}>{t('welcome.subline')}</Text>
         </LinearGradient>
 
@@ -227,6 +231,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 4,
   },
+  brandName: { alignSelf: 'center', marginTop: 8 },
+  brandTelugu: { color: 'rgba(255,255,255,0.82)', fontSize: 15, marginTop: 4 },
   brandText: {
     color: '#FFFFFF',
     fontFamily: fonts.brand,

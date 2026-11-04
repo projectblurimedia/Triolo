@@ -25,6 +25,7 @@ import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { LoadingIndicator } from './LoadingIndicator';
 import { SmartImage } from './SmartImage';
 import { sealSizeFor, TrustedSeal } from './TrustedSeal';
+import { FullText } from '@/components/FullText';
 
 /*
  * (Copied between user-app and partner-app — keep in sync. Only `AD_APP` in adsService differs.)
@@ -406,18 +407,18 @@ function AdPlayer({
 
   const who = (
     <View style={styles.whoText}>
-      <Text style={styles.whoName} numberOfLines={1}>
+      <FullText style={styles.whoName} numberOfLines={1}>
         {ad.advertiserName}
-      </Text>
+      </FullText>
       {ad.description ? (
-        <Text style={styles.whoWords} numberOfLines={3}>
+        <FullText style={styles.whoWords} numberOfLines={3}>
           {ad.description}
-        </Text>
+        </FullText>
       ) : null}
       {ad.locationText ? (
-        <Text style={styles.whoPlace} numberOfLines={1}>
+        <FullText style={styles.whoPlace} numberOfLines={1}>
           {ad.locationText}
-        </Text>
+        </FullText>
       ) : null}
     </View>
   );
@@ -631,9 +632,9 @@ function ProfileAdCard({
         {card.trusted ? <TrustedSeal size={sealSizeFor(104)} style={styles.profileSeal} /> : null}
       </View>
       <View style={styles.profileBody}>
-        <Text style={[styles.profileName, { color: pal.name }]} numberOfLines={2}>
+        <FullText style={[styles.profileName, { color: pal.name }]} numberOfLines={2}>
           {card.name}
-        </Text>
+        </FullText>
         {card.kind === 'job_post' ? null : (
           <View style={styles.profileRating}>
             {card.ratingAverage == null || card.ratingCount === 0 ? (
@@ -656,18 +657,18 @@ function ProfileAdCard({
         {words ? (
           <View style={[styles.profileWords, { borderColor: `${look.gradient[0]}55`, backgroundColor: `${look.gradient[0]}${pal.tagAlpha}` }]}>
             <FontAwesome6 name="quote-left" size={12} color={accent} solid />
-            <Text style={[styles.profileWordsText, { color: pal.name }]} numberOfLines={4}>
+            <FullText style={[styles.profileWordsText, { color: pal.name }]} numberOfLines={4}>
               {words}
-            </Text>
+            </FullText>
           </View>
         ) : null}
         {tags.length > 0 ? (
           <View style={styles.profileTags}>
             {tags.map((tag) => (
               <View key={tag} style={[styles.profileTag, { backgroundColor: `${look.gradient[0]}${pal.tagAlpha}` }]}>
-                <Text style={[styles.profileTagText, { color: accent }]} numberOfLines={1}>
+                <FullText style={[styles.profileTagText, { color: accent }]} numberOfLines={1}>
                   {tag}
-                </Text>
+                </FullText>
               </View>
             ))}
           </View>
@@ -677,9 +678,9 @@ function ProfileAdCard({
             {facts.map((fact) => (
               <View key={fact.text} style={styles.profileFact}>
                 <FontAwesome6 name={fact.icon} size={12} color={pal.factIcon} solid />
-                <Text style={[styles.profileFactText, { color: pal.factText }]} numberOfLines={1}>
+                <FullText style={[styles.profileFactText, { color: pal.factText }]} numberOfLines={1}>
                   {fact.text}
-                </Text>
+                </FullText>
               </View>
             ))}
           </View>
@@ -905,13 +906,13 @@ export function HomeAdCarousel() {
                 ) : null}
               </View>
               <View style={styles.carouselFoot} pointerEvents="none">
-                <Text style={styles.carouselTitle} numberOfLines={1}>
+                <FullText style={styles.carouselTitle} numberOfLines={1}>
                   {ad.title || name}
-                </Text>
+                </FullText>
                 {ad.title && ad.title !== name ? (
-                  <Text style={styles.carouselBy} numberOfLines={1}>
+                  <FullText style={styles.carouselBy} numberOfLines={1}>
                     {name}
-                  </Text>
+                  </FullText>
                 ) : null}
               </View>
             </Pressable>

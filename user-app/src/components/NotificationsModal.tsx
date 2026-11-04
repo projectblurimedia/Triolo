@@ -19,6 +19,7 @@ import {
 import { AppNotification, NotificationType } from '@/services/notificationsService';
 import { showToast } from '@/state/toastStore';
 import { BlurScope } from './Glass';
+import { FullText } from '@/components/FullText';
 
 interface NotificationsModalProps {
   visible: boolean;
@@ -226,17 +227,17 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
           <View style={styles.cardBody}>
             {/* Title on the left, time (+ unread dot) on the right of the same line. */}
             <View style={styles.titleRow}>
-              <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+              <FullText style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
                 {item.title}
-              </Text>
+              </FullText>
               <Text style={[styles.cardTime, { color: item.isRead ? colors.textMuted : colors.primary }]}>
                 {formatRelativeTime(item.createdAt, t('notifications.justNow'))}
               </Text>
               {!item.isRead && !selectionMode ? <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} /> : null}
             </View>
-            <Text style={[styles.cardMessage, { color: colors.textMuted }]} numberOfLines={1} ellipsizeMode="tail">
+            <FullText style={[styles.cardMessage, { color: colors.textMuted }]} numberOfLines={1} ellipsizeMode="tail">
               {item.body}
-            </Text>
+            </FullText>
           </View>
         </Pressable>
       </SwipeableRow>
@@ -269,9 +270,9 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         ]}
       >
         <FontAwesome6 name={icon} size={12} color={filled ? '#FFFFFF' : colors.primary} solid />
-        <Text style={[styles.toolPillText, { color: filled ? '#FFFFFF' : colors.primary }]} numberOfLines={1}>
+        <FullText style={[styles.toolPillText, { color: filled ? '#FFFFFF' : colors.primary }]} numberOfLines={1}>
           {label}
-        </Text>
+        </FullText>
       </Pressable>
     );
     return (
@@ -281,9 +282,9 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         ) : (
           <View style={styles.toolSummaryRow}>
             <View style={[styles.toolDot, { backgroundColor: unreadCount > 0 ? colors.primary : colors.success }]} />
-            <Text style={[styles.toolSummary, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.toolSummary, { color: colors.text }]} numberOfLines={1}>
               {unreadCount > 0 ? t('notifications.unreadCount', { count: unreadCount }) : t('notifications.allCaughtUp')}
-            </Text>
+            </FullText>
           </View>
         )}
         <View style={styles.toolActions}>
@@ -425,13 +426,13 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                 <FontAwesome6 name={selectionMode && !detail ? 'xmark' : 'chevron-left'} size={18} color="#FFFFFF" solid />
               </Pressable>
               <View style={styles.titleGroup}>
-                <Text style={styles.headerTitle} numberOfLines={1}>
+                <FullText style={styles.headerTitle} numberOfLines={1}>
                   {headerTitle}
-                </Text>
+                </FullText>
                 {headerSubtitle ? (
-                  <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  <FullText style={styles.headerSubtitle} numberOfLines={1}>
                     {headerSubtitle}
-                  </Text>
+                  </FullText>
                 ) : null}
               </View>
             </View>

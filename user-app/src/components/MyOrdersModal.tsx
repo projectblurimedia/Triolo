@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -11,11 +11,12 @@ import { openOrderTracker } from '@/state/orderTrackerStore';
 import { CustomerOrder, formatRupees, isOrderOpen, orderStatusTitleKey, OrderStatus } from '@/services/ordersService';
 import { colors as brandColors, fonts, headerGradient, typography, useThemeColors } from '@/theme';
 import { PullToRefresh } from './PullToRefresh';
-import { CountBadge } from './CountBadge';
+import { FilterChips } from './FilterChips';
 import { orderShopName } from '@/utils/orderShopName';
 import { listCountText } from '@/utils/listPhotos';
+import { FullText } from '@/components/FullText';
 
-type Tab = 'active' | 'history';
+export type OrderFilter = 'active' | 'all' | 'completed' | 'notDone' | 'rated' | 'delivery' | 'pickup';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Manual, not toLocale* — Hermes on Android doesn't reliably ship full Intl data.
@@ -24,19 +25,58 @@ function formatDate(iso: string): string {
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-/** Bazaar menu → My Orders: every list sent to a shop, Active / History; a row opens its order screen. */
-export function MyOrdersModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+/** Bazaar menu → My Orders: every list sent to a shop, with filters; a row opens its order screen. */
+export function MyOrdersModal({
+  visible,
+  onClose,
+  initialFilter,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  /** Which filter to open on (Profile's stat tiles); All otherwise. */
+  initialFilter?: OrderFilter;
+}) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<Tab>('active');
+  const [filter, setFilter] = useState<OrderFilter>(initialFilter ?? 'all');
+  useEffect(() => {
+    if (visible) setFilter(initialFilter ?? 'all');
+  }, [visible, initialFilter]);
   const [refreshing, setRefreshing] = useState(false);
   const orders = useMyOrders(visible);
 
   const all = orders.data ?? [];
-  const active = all.filter(isOrderOpen);
-  const history = all.filter((order) => !isOrderOpen(order));
-  const list = tab === 'active' ? active : history;
+  const matches = (order: CustomerOrder, key: OrderFilter): boolean => {
+    switch (key) {
+      case 'active':
+        return isOrderOpen(order);
+      case 'completed':
+        return order.status === 'completed';
+      case 'notDone':
+        return ['cancelled', 'declined', 'expired'].includes(order.status);
+      case 'rated':
+        return order.shopRating != null;
+      case 'delivery':
+        return order.fulfillment === 'delivery';
+      case 'pickup':
+        return order.fulfillment !== 'delivery';
+      default:
+        return true;
+    }
+  };
+  const list = all.filter((order) => matches(order, filter));
+  const filterOptions = (
+    [
+      { key: 'all', icon: 'list', label: t('myOrders.filters.all') },
+      { key: 'active', icon: 'basket-shopping', label: t('myOrders.active') },
+      { key: 'completed', icon: 'bag-shopping', label: t('myOrders.filters.completed') },
+      { key: 'notDone', icon: 'ban', label: t('myOrders.filters.notDone') },
+      { key: 'rated', icon: 'star', label: t('myOrders.filters.rated') },
+      { key: 'delivery', icon: 'truck', label: t('sendList.delivery') },
+      { key: 'pickup', icon: 'store', label: t('sendList.pickup') },
+    ] as const
+  ).map((option) => ({ ...option, count: all.filter((order) => matches(order, option.key)).length }));
 
   const statusColor = (status: OrderStatus) => {
     if (status === 'completed') return brandColors.success;
@@ -69,19 +109,19 @@ export function MyOrdersModal({ visible, onClose }: { visible: boolean; onClose:
         <Avatar photoUrl={item.shop.photoUrl ?? undefined} name={orderShopName(item, t)} size={46} />
         <View style={styles.flex}>
           <View style={styles.titleRow}>
-            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.name, { color: colors.text }]} numberOfLines={1}>
               {orderShopName(item, t)}
-            </Text>
+            </FullText>
             <View style={[styles.pill, { backgroundColor: `${tone}1A` }]}>
-              <Text style={[styles.pillText, { color: tone }]} numberOfLines={1}>
+              <FullText style={[styles.pillText, { color: tone }]} numberOfLines={1}>
                 {t(orderStatusTitleKey(item))}
-              </Text>
+              </FullText>
             </View>
           </View>
-          <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+          <FullText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
             {listCountText(t, item.items.length, (item.listPhotoUrls ?? []).length, item.listVoiceUrl ? (item.listVoiceSeconds ?? 0) : null)} ·{' '}
             {t(item.fulfillment === 'delivery' ? 'sendList.delivery' : 'sendList.pickup')} · {formatDate(item.createdAt)}
-          </Text>
+          </FullText>
           {item.totalAmount != null ? (
             <Text style={[styles.total, { color: colors.primary }]}>{formatRupees(item.totalAmount)}</Text>
           ) : null}
@@ -109,20 +149,7 @@ export function MyOrdersModal({ visible, onClose }: { visible: boolean; onClose:
           </View>
         </LinearGradient>
 
-        <View style={[styles.segment, { backgroundColor: `${colors.primary}10` }]}>
-          {(['active', 'history'] as Tab[]).map((key) => (
-            <Pressable
-              key={key}
-              onPress={() => setTab(key)}
-              style={[styles.segmentItem, tab === key ? { backgroundColor: colors.surface } : null]}
-            >
-              <Text style={[styles.segmentText, { color: tab === key ? colors.primary : colors.textMuted }]}>
-                {t(key === 'active' ? 'myOrders.active' : 'myOrders.history')}
-              </Text>
-              {key === 'active' ? <CountBadge count={active.length} /> : null}
-            </Pressable>
-          ))}
-        </View>
+        <FilterChips options={filterOptions} value={filter} onChange={setFilter} />
 
         {orders.isLoading ? (
           <View style={styles.state}>
@@ -140,7 +167,7 @@ export function MyOrdersModal({ visible, onClose }: { visible: boolean; onClose:
                 <View style={styles.state}>
                   <FontAwesome6 name="bag-shopping" size={24} color={colors.textMuted} solid />
                   <Text style={[styles.stateTitle, { color: colors.text }]}>
-                    {t(tab === 'active' ? 'myOrders.emptyActive' : 'myOrders.emptyHistory')}
+                    {t(filter === 'active' ? 'myOrders.emptyActive' : 'myOrders.filters.emptyTitle')}
                   </Text>
                   <Text style={[styles.meta, styles.center, { color: colors.textMuted }]}>{t('myOrders.emptyMessage')}</Text>
                 </View>
@@ -169,11 +196,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 18 },
   headerSubtitle: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
-  segment: { flexDirection: 'row', borderRadius: 14, padding: 4, margin: 16, marginBottom: 6 },
-  segmentItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 11 },
-  // Fixed line height, no font padding: the text and the red count line up in the middle.
-  segmentText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 18, includeFontPadding: false, textAlignVertical: 'center' },
-  list: { padding: 16, gap: 12, flexGrow: 1 },
+  // 12 between the filters and the first card, as between the cards.
+  list: { padding: 16, paddingTop: 12, gap: 12, flexGrow: 1 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { ...typography.body, fontFamily: fonts.semiBold, flex: 1 },

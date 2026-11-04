@@ -24,6 +24,7 @@ import { showToast } from '@/state/toastStore';
 import { parseVoiceListText } from '@/utils/parseVoiceList';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { MainTabParamList } from '@/navigation/types';
+import { FullText } from '@/components/FullText';
 
 const MIC_SIZE = 84;
 const DELETE_GRADIENT = ['#ef4444', '#dc2626'] as const;
@@ -233,12 +234,12 @@ export function PrepareListScreen() {
         <View style={styles.wayIcon}>
           <FontAwesome6 name={icon} size={19} color="#FFFFFF" solid />
         </View>
-        <Text style={styles.wayTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+        <FullText style={styles.wayTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
           {title}
-        </Text>
-        <Text style={styles.waySub} numberOfLines={2}>
+        </FullText>
+        <FullText style={styles.waySub} numberOfLines={2}>
           {subtitle}
-        </Text>
+        </FullText>
       </LinearGradient>
     </Pressable>
   );
@@ -341,9 +342,9 @@ export function PrepareListScreen() {
           <FontAwesome6 name="list-check" size={16} color="#FFFFFF" solid />
         </LinearGradient>
         <View style={styles.flex}>
-          <Text style={[styles.listName, { color: colors.text }]} numberOfLines={1}>
+          <FullText style={[styles.listName, { color: colors.text }]} numberOfLines={1}>
             {list.name}
-          </Text>
+          </FullText>
           <Text style={[styles.listMeta, { color: colors.textMuted }]}>
             {[
               list.items.length || (!(list.photos ?? []).length && !list.voice) ? t('prepareList.itemsCount', { count: list.items.length }) : '',
@@ -371,9 +372,9 @@ export function PrepareListScreen() {
         {list.voice ? (
           <View style={[styles.previewItem, { backgroundColor: `${colors.primary}14`, borderColor: `${colors.primary}33` }]}>
             <FontAwesome6 name="microphone" size={10} color={colors.primary} solid />
-            <Text style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
               {formatVoiceLength(list.voice.seconds)}
-            </Text>
+            </FullText>
           </View>
         ) : null}
         {(list.photos ?? []).map((photo) => (
@@ -382,9 +383,9 @@ export function PrepareListScreen() {
         {list.items.map((item) => (
           <View key={item.id} style={[styles.previewItem, { backgroundColor: colors.background, borderColor: `${colors.primary}1F` }]}>
             <FontAwesome6 name="basket-shopping" size={10} color={colors.primary} solid />
-            <Text style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
+            <FullText style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
               {item.name}
-            </Text>
+            </FullText>
           </View>
         ))}
       </ScrollView>
@@ -499,9 +500,9 @@ export function PrepareListScreen() {
           </View>
           <View style={styles.flex}>
             <Text style={[styles.listeningTitle, { color: colors.text }]}>{t('prepareList.listening')}</Text>
-            <Text style={[styles.listeningText, { color: colors.textMuted }]} numberOfLines={3}>
+            <FullText style={[styles.listeningText, { color: colors.textMuted }]} numberOfLines={3}>
               {interimText || t('prepareList.exampleHint')}
-            </Text>
+            </FullText>
           </View>
         </View>
       ) : null}
@@ -658,9 +659,9 @@ export function PrepareListScreen() {
               <Text style={styles.editorHeaderTitle}>
                 {t(isEditingSaved ? 'prepareList.editingTitle' : 'prepareList.newListTitle')}
               </Text>
-              <Text style={styles.editorHeaderSubtitle} numberOfLines={1}>
+              <FullText style={styles.editorHeaderSubtitle} numberOfLines={1}>
                 {t('prepareList.editorSubtitle')}
-              </Text>
+              </FullText>
             </View>
           </LinearGradient>
           <ScrollView

@@ -27,6 +27,7 @@ import { ensureLocation } from '@/state/locationStore';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { getLocalizedErrorMessage } from '@/localization/errorMessages';
 import { fonts, headerGradient, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 // Lets the tracker finish fading in on top before this screen closes underneath it.
 const MODAL_HANDOFF_MS = 350;
@@ -156,9 +157,9 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
             </Pressable>
             <View style={styles.flex}>
               <Text style={styles.headerTitle}>{t('quickOrder.title')}</Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              <FullText style={styles.headerSubtitle} numberOfLines={1}>
                 {t('quickOrder.subtitle')}
-              </Text>
+              </FullText>
             </View>
           </View>
         </LinearGradient>

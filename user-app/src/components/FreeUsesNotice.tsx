@@ -7,6 +7,7 @@ import { useMySubscription } from '@/hooks/useSubscription';
 import { freeUseFor, PassKind } from '@/services/subscriptionsService';
 import { openSubscribe } from '@/state/subscribeStore';
 import { fonts, typography, useThemeColors } from '@/theme';
+import { FullText } from '@/components/FullText';
 
 /** Shown once this few free ones (or fewer) are left this month. */
 const FEW_LEFT = 2;
@@ -50,12 +51,12 @@ export function FreeUsesNotice({ kind, style }: { kind: PassKind; style?: object
         <FontAwesome6 name={left > 0 ? 'gift' : 'crown'} size={13} color={GOLD_DEEP} solid />
       </View>
       <View style={styles.text}>
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
+        <FullText style={[styles.title, { color: colors.text }]} numberOfLines={2}>
           {message}
-        </Text>
-        <Text style={[styles.cta, { color: GOLD_DEEP }]} numberOfLines={1}>
+        </FullText>
+        <FullText style={[styles.cta, { color: GOLD_DEEP }]} numberOfLines={1}>
           {t('freeUses.cta')}
-        </Text>
+        </FullText>
       </View>
       <FontAwesome6 name="chevron-right" size={12} color={GOLD_DEEP} solid />
     </Pressable>
