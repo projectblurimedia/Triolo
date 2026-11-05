@@ -16,7 +16,6 @@ import { ContinueSteps } from '@/components/ContinueSteps';
 import { askForLocation } from '@/utils/ensureLocationOn';
 import { HomeAdCarousel, useBusyAction } from '@/components/Ads';
 import { LocationNeededCard } from '@/components/LocationNeededCard';
-import { BackgroundAlertsCard } from '@/components/BackgroundAlertsCard';
 import { FindJobsButton } from '@/components/FindJobsButton';
 import { navigateToBookings } from '@/navigation/navigationRef';
 import { useQueryClient } from '@tanstack/react-query';
@@ -511,8 +510,6 @@ export function HomeScreen() {
           <StaffInvitesCard />
           {/* Delivery staff of a shop: the deliveries handed to them. */}
           <StaffDeliveriesCard />
-          {/* Job requests while the app is closed: the phone has to allow it. */}
-          <BackgroundAlertsCard />
           {/* New requests as a full-screen pop-up: Android 14+ needs it allowed. */}
           <PopupPermissionCard />
 

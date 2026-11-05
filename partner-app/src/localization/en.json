@@ -1345,16 +1345,6 @@
     "ordersCount_other": "{{count}} orders",
     "live": "LIVE"
   },
-  "backgroundAlerts": {
-    "title": "Get job requests even when the app is closed",
-    "offTitle": "Notifications are off",
-    "message": "Some phones stop NearbyU Partner when it's swiped away or battery saving is on, so requests only arrive when you open the app. In Settings:",
-    "stepAutostart": "Turn on Auto-start (or \"Allow background activity\").",
-    "stepBattery": "Battery → No restrictions (not \"Optimised\").",
-    "stepRecents": "Don't swipe the app away from recent apps — or lock it there.",
-    "stepNotifications": "Notifications → turn them on, so new jobs and orders can reach you.",
-    "done": "Done"
-  },
   "findOrders": {
     "button": "Find Orders Now",
     "searching": "Searching nearby…",
