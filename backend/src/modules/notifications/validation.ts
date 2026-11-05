@@ -7,6 +7,8 @@ export const registerPushTokenSchema = z.object({
   app: z.enum(['user', 'partner']).optional(),
   /** This build can show a full-screen pop-up for a new job / order (Partner app 1.3+). */
   fullScreen: z.boolean().optional(),
+  /** Sent by builds whose closed-app task runner survives the pop-up message (partner 1.8.0+). */
+  popupSafe: z.boolean().optional(),
 });
 
 export const unregisterPushTokenSchema = z.object({

@@ -2,7 +2,7 @@
   "expo": {
     "name": "NearbyU Partner",
     "slug": "triolo-partner",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -95,7 +95,7 @@
           "android": {
             "enableProguardInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "extraProguardRules": "-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }\n-keepattributes JavascriptInterface\n-keepattributes *Annotation*\n-dontwarn com.razorpay.**\n-keep class com.razorpay.** {*;}\n-optimizations !method/inlining/*\n-keepclasseswithmembers class * { public void onPayment*(...); }"
+            "extraProguardRules": "-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }\n-keepattributes JavascriptInterface\n-keepattributes *Annotation*\n-dontwarn com.razorpay.**\n-keep class com.razorpay.** {*;}\n-optimizations !method/inlining/*\n-keepclasseswithmembers class * { public void onPayment*(...); }\n-keep class expo.modules.adapters.react.apploader.** { *; }\n-keep class expo.modules.apploader.** { *; }\n-keep class expo.modules.taskManager.** { *; }\n-keep class * implements expo.modules.interfaces.taskManager.TaskConsumerInterface { *; }\n-keep class expo.modules.notifications.** { *; }\n-keep class expo.modules.location.** { *; }"
           }
         }
       ]

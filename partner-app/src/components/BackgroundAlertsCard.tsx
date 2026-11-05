@@ -36,9 +36,9 @@ export function BackgroundAlertsCard() {
     return () => subscription.remove();
   }, []);
 
-  // Many phones (Vivo, Oppo, Xiaomi, Realme…) fully stop an app that's swiped away, and a
-  // stopped app gets no notification at all until it's opened — so the steps stay until Done.
-  if (Platform.OS !== 'android' || done === null || (done && !notificationsOff)) return null;
+  // Only when notifications are off: job offers are normal notifications now, which phones
+  // deliver to a closed app like any other, so the auto-start / battery steps aren't needed.
+  if (Platform.OS !== 'android' || !notificationsOff || done === null) return null;
 
   const finish = () => {
     setDone(true);
