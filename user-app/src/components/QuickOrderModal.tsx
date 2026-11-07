@@ -35,8 +35,10 @@ const MODAL_HANDOFF_MS = 350;
 interface QuickOrderModalProps {
   visible: boolean;
   onClose: () => void;
-  /** No lists yet: go and make one (the Prepare List tab). */
+  /** Make a new list (the Prepare List tab); after saving it comes back here with that list. */
   onCreateList: () => void;
+  /** The list to start on (e.g. the one just made); otherwise the newest. */
+  initialListId?: string | null;
 }
 
 /**
@@ -45,7 +47,7 @@ interface QuickOrderModalProps {
  * delivers, for a delivery) gets it at once, and the first to accept gets the order — after
  * that it is an ordinary order, tracked on the order screen.
  */
-export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderModalProps) {
+export function QuickOrderModal({ visible, onClose, onCreateList, initialListId }: QuickOrderModalProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -59,10 +61,12 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
 
   useEffect(() => {
     if (!visible) return;
-    setListId(useListStore.getState().lists[0]?.id ?? null);
+    const saved = useListStore.getState().lists;
+    setListId(initialListId && saved.some((entry) => entry.id === initialListId) ? initialListId : (saved[0]?.id ?? null));
     setCategories([]);
     setFulfillment('delivery');
-  }, [visible]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, initialListId]);
 
   const list = lists.find((entry) => entry.id === listId) ?? null;
   const items = (list?.items ?? []).filter((item) => item.name.trim().length > 0);
@@ -185,7 +189,7 @@ export function QuickOrderModal({ visible, onClose, onCreateList }: QuickOrderMo
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {renderStepTitle(1, t('quickOrder.stepList'))}
               {/* One sideways row of small cards; the chosen list's items underneath. */}
-              <ListPickerRow lists={lists} selectedId={listId} onSelect={setListId} />
+              <ListPickerRow lists={lists} selectedId={listId} onSelect={setListId} onNew={onCreateList} />
             </View>
 
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

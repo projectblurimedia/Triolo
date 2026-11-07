@@ -16,13 +16,15 @@ interface ListPickerRowProps {
   lists: SavedList[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Shows a "+ New list" card first in the row. */
+  onNew?: () => void;
 }
 
 /**
  * Picking one of the saved lists in little room: one sideways row of small cards (name and
  * how many items), the chosen one filled blue, and its items in one line underneath.
  */
-export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProps) {
+export function ListPickerRow({ lists, selectedId, onSelect, onNew }: ListPickerRowProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const selected = lists.find((list) => list.id === selectedId) ?? null;
@@ -33,6 +35,14 @@ export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProp
   return (
     <View style={styles.wrap}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        {onNew ? (
+          <Pressable onPress={onNew} accessibilityRole="button" accessibilityLabel={t('chooseList.newList')}>
+            <View style={[styles.card, styles.newCard, { borderColor: colors.primary, backgroundColor: `${colors.primary}0D` }]}>
+              <FontAwesome6 name="plus" size={13} color={colors.primary} solid />
+              <Text style={[styles.name, { color: colors.primary }]}>{t('chooseList.newList')}</Text>
+            </View>
+          </Pressable>
+        ) : null}
         {lists.map((list) => {
           const active = list.id === selectedId;
           const count = list.items.filter((item) => item.name.trim()).length;
@@ -79,6 +89,7 @@ const styles = StyleSheet.create({
   row: { gap: 8, paddingRight: 4 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 9, height: 52, borderRadius: 14, paddingHorizontal: 12, maxWidth: 190 },
   cardOff: { borderWidth: 1 },
+  newCard: { borderWidth: 1.5, borderStyle: 'dashed' },
   text: { flexShrink: 1 },
   name: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 17 },
   count: { ...typography.caption, fontSize: 11, lineHeight: 14 },

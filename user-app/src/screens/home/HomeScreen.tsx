@@ -1,7 +1,8 @@
 import { ContinueSteps } from '@/components/ContinueSteps';
+import { useListReturnStore } from '@/state/listReturnStore';
 import { SectionHeader } from '@/components/SectionHeader';
 import { CardFill, useCardChrome } from '@/components/WorkerMiniCard';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { HomeAdCarousel } from '@/components/Ads';
 
 // How many service tiles Home shows before "See all".
@@ -83,6 +84,15 @@ export function HomeScreen() {
 
   const [quickBookVisible, setQuickBookVisible] = useState(false);
   const [quickOrderVisible, setQuickOrderVisible] = useState(false);
+  // Back from making a new list for Quick Order: reopen it with that list chosen.
+  const [quickOrderListId, setQuickOrderListId] = useState<string | null>(null);
+  const listReturn = useListReturnStore((state) => state.reopen);
+  useEffect(() => {
+    if (listReturn?.origin !== 'Home') return;
+    setQuickOrderListId(listReturn.listId);
+    setQuickOrderVisible(true);
+    useListReturnStore.getState().clearReopen();
+  }, [listReturn]);
   const [hireStaffVisible, setHireStaffVisible] = useState(false);
   const [chooseListVisible, setChooseListVisible] = useState(false);
   const [sendListId, setSendListId] = useState<string | null>(null);
@@ -363,9 +373,14 @@ export function HomeScreen() {
       <QuickBookModal visible={quickBookVisible} onClose={() => setQuickBookVisible(false)} />
       <QuickOrderModal
         visible={quickOrderVisible}
-        onClose={() => setQuickOrderVisible(false)}
+        initialListId={quickOrderListId}
+        onClose={() => {
+          setQuickOrderVisible(false);
+          setQuickOrderListId(null);
+        }}
         onCreateList={() => {
           setQuickOrderVisible(false);
+          useListReturnStore.getState().start('Home');
           navigation.navigate('PrepareList', { newList: Date.now() });
         }}
       />

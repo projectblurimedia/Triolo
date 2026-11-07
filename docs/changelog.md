@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format: date, module, s
 
 ## Unreleased
 
+- **Quick Order: make a new list on the way** (user-app): the list row starts with a dashed **+ New list** card (`ListPickerRow onNew`). It opens the Prepare List editor; after Save the app goes back to the tab Quick Order was opened from (Home or Bazaar menu) and reopens Quick Order with that list chosen (`state/listReturnStore.ts`: `start` / `done` / `reopen`, forgotten after 30 min or if the editor is left without saving; `QuickOrderModal initialListId`). OTA (customer 1.5.0). Vercel: triolo-admin.vercel.app removed from the nearbyu-admin project's domain list.
+
 - **Admin site online** (admin-web, explicit yes): https://admin.nearbyu.in (Vercel project triolo-admin, `admin-web/vercel.json` SPA rewrites). Only admin accounts can sign in; the server checks every admin request.
 
 - **nearbyu.in** (all): the domain (GoDaddy, nameservers ns1/ns2.vercel-dns.com) serves nearbyu.in + www (registration-web, legal pages), ads.nearbyu.in (ads-web) and api.nearbyu.in (backend); certificates issued with `vercel certs issue`. Both apps (eas.json `EXPO_PUBLIC_API_URL`, `config.ts` fallback, `legal.ts`) and all three sites now use them. The old triolo-*.vercel.app addresses stay attached so older installs keep working. Sites deployed; OTA for customer 1.5.0 and partner 1.7.0 / 1.8.0.

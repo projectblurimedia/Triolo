@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useListReturnStore } from '@/state/listReturnStore';
 import { StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SideMenuDrawer } from './SideMenuDrawer';
@@ -50,6 +51,15 @@ export function BazaarMenuDrawer({ visible, onClose }: BazaarMenuDrawerProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const [activeItem, setActiveItem] = useState<BazaarMenuItemKey | null>(null);
+  // Back from making a new list for Quick Order: reopen it with that list chosen.
+  const [quickOrderListId, setQuickOrderListId] = useState<string | null>(null);
+  const listReturn = useListReturnStore((state) => state.reopen);
+  useEffect(() => {
+    if (listReturn?.origin !== 'Bazaar') return;
+    setQuickOrderListId(listReturn.listId);
+    setActiveItem('quickOrder');
+    useListReturnStore.getState().clearReopen();
+  }, [listReturn]);
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
 
   return (
@@ -122,9 +132,14 @@ export function BazaarMenuDrawer({ visible, onClose }: BazaarMenuDrawerProps) {
       {/* Quick Order: the list to every matching shop nearby, first to accept gets it. */}
       <QuickOrderModal
         visible={activeItem === 'quickOrder'}
-        onClose={() => setActiveItem(null)}
+        initialListId={quickOrderListId}
+        onClose={() => {
+          setActiveItem(null);
+          setQuickOrderListId(null);
+        }}
         onCreateList={() => {
           setActiveItem(null);
+          useListReturnStore.getState().start('Bazaar');
           navigation.navigate('PrepareList', { newList: Date.now() });
         }}
       />

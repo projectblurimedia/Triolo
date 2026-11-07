@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useListReturnStore } from '@/state/listReturnStore';
 import { Animated, Easing, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,7 +23,8 @@ import { formatVoiceLength, pruneListVoices } from '@/utils/listVoice';
 import { VoiceRecorderCard } from '@/components/VoiceRecorderCard';
 import { showToast } from '@/state/toastStore';
 import { parseVoiceListText } from '@/utils/parseVoiceList';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '@/navigation/types';
 import { FullText } from '@/components/FullText';
 
@@ -116,6 +118,7 @@ export function PrepareListScreen() {
 
   // Opened with `newList` (e.g. from Send List when there are no lists): start a fresh list.
   const route = useRoute<RouteProp<MainTabParamList, 'PrepareList'>>();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const newListRequest = route.params?.newList;
   useEffect(() => {
     if (!newListRequest) return;
@@ -286,6 +289,9 @@ export function PrepareListScreen() {
     pruneListPhotos();
     pruneListVoices();
     setScreen('lists');
+    // Made from Quick Order: straight back there with this list chosen.
+    const origin = useListReturnStore.getState().done(result.id);
+    if (origin) navigation.navigate(origin);
   };
 
   useEffect(() => {
@@ -308,6 +314,7 @@ export function PrepareListScreen() {
   };
 
   const leaveEditor = () => {
+    useListReturnStore.getState().cancel();
     stopListening();
     discardDraft();
     pruneListPhotos();
@@ -323,6 +330,7 @@ export function PrepareListScreen() {
   };
 
   const handleNewList = () => {
+    useListReturnStore.getState().cancel();
     startNewList();
     setScreen('editor');
   };
