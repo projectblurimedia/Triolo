@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format: date, module, s
 
 ## Unreleased
 
+- **nearbyu.in** (all): the domain (GoDaddy, nameservers ns1/ns2.vercel-dns.com) serves nearbyu.in + www (registration-web, legal pages), ads.nearbyu.in (ads-web) and api.nearbyu.in (backend); certificates issued with `vercel certs issue`. Both apps (eas.json `EXPO_PUBLIC_API_URL`, `config.ts` fallback, `legal.ts`) and all three sites now use them. The old triolo-*.vercel.app addresses stay attached so older installs keep working. Sites deployed; OTA for customer 1.5.0 and partner 1.7.0 / 1.8.0.
+
 - **NearbyU on the ads and admin sites** (ads-web, admin-web): every visible Triolo / TRIOLO there (titles, pages, PDF bill) now says NearbyU; addresses and storage keys unchanged. ads-web deployed (triolo-ads.vercel.app); admin-web runs locally.
 
 - **NearbyU everywhere + send not-available items to another shop** (both apps, backend, registration-web): every user-visible "Triolo" (both apps' texts en / te, NearbyU Plus, Trusted by NearbyU, NearbyU Partner Plus, notification channel name, Razorpay checkout name, server notices / templates / SMS text, the website's forms and Privacy / Terms / Refund pages) now says NearbyU; menu drawers show the NearbyU mark (`SideMenuDrawer` draws it for the `shapes` brand slot); the logout screen lost the old icon over the brand loader. Translation key names and web addresses are unchanged. Customer order screen: under "Not available", **Make a new list** saves those items as a Prepare List (`listStore.addList`, named "Not at <shop>"), then **Send this list to a shop** opens Send List with it. Backend and website deployed; OTA for customer 1.5.0 and partner 1.7.0 / 1.8.0.

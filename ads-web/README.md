@@ -10,7 +10,7 @@ npm run dev          # http://localhost:5175 (also on the LAN)
 npm run build        # typecheck + production build
 ```
 
-It talks to the **production API** (`https://triolo-backend.vercel.app/api/v1`) by default. To use a local backend, create `.env.local` with `VITE_API_URL=http://<your-LAN-IP>:4000/api/v1`.
+It talks to the **production API** (`https://api.nearbyu.in/api/v1`) by default. To use a local backend, create `.env.local` with `VITE_API_URL=http://<your-LAN-IP>:4000/api/v1`.
 
 ## What a business does
 

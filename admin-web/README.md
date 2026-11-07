@@ -10,7 +10,7 @@ npm run dev          # http://localhost:5173 (also on the LAN, see vite.config.t
 npm run build        # typecheck + production build
 ```
 
-It talks to the **production API** (`https://triolo-backend.vercel.app/api/v1`) by default — admin actions are real. To use a local backend, create `.env.local` with `VITE_API_URL=http://<your-LAN-IP>:4000/api/v1`.
+It talks to the **production API** (`https://api.nearbyu.in/api/v1`) by default — admin actions are real. To use a local backend, create `.env.local` with `VITE_API_URL=http://<your-LAN-IP>:4000/api/v1`.
 
 Admin accounts are created with `backend/scripts/seedAdmin.ts` — there's no self-registration. Every `/admin/*` API call is checked server-side (`authorize('admin')`).
 

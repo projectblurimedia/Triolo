@@ -1,7 +1,7 @@
 import { Linking } from 'react-native';
 
 /** The public site with Triolo's legal pages (registration-web on Vercel). */
-export const LEGAL_SITE = 'https://triolo-web.vercel.app';
+export const LEGAL_SITE = 'https://nearbyu.in';
 
 export type LegalPage = 'privacy' | 'terms' | 'refunds';
 

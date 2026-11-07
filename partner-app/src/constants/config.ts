@@ -11,6 +11,6 @@
  * missing from a build profile; keep it in sync with eas.json's own value.
  */
 const LOCAL_URL = 'http://192.168.1.14:4000/api/v1';
-const FALLBACK_PROD_URL = 'https://triolo-backend.vercel.app/api/v1';
+const FALLBACK_PROD_URL = 'https://api.nearbyu.in/api/v1';
 
 export const API_BASE_URL = __DEV__ ? LOCAL_URL : process.env.EXPO_PUBLIC_API_URL || FALLBACK_PROD_URL;

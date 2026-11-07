@@ -4,7 +4,7 @@ import { useAuthStore } from '@/state/authStore';
  * The production API by default; `VITE_API_URL` (e.g. in a local `.env`) points it at a
  * local backend instead, e.g. http://192.168.1.14:4000/api/v1.
  */
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://triolo-backend.vercel.app/api/v1';
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api.nearbyu.in/api/v1';
 
 export interface ApiEnvelope<T> {
   success: boolean;
