@@ -4,6 +4,12 @@ import { ok } from '@/common/utils/response';
 import { AppError } from '@/common/errors/AppError';
 import { NotificationsService } from './service';
 
+/** Which app is asking (`?app=user|partner`); older builds send none and get every notification. */
+function appOf(req: Request): 'user' | 'partner' | undefined {
+  const app = req.query.app;
+  return app === 'user' || app === 'partner' ? app : undefined;
+}
+
 export class NotificationsController {
   constructor(private readonly service: NotificationsService) {}
 
@@ -11,7 +17,7 @@ export class NotificationsController {
     if (!req.account) {
       throw AppError.unauthorized();
     }
-    const result = await this.service.listForAccount(req.account.accountId);
+    const result = await this.service.listForAccount(req.account.accountId, appOf(req));
     return ok(res, result);
   });
 
@@ -27,7 +33,7 @@ export class NotificationsController {
     if (!req.account) {
       throw AppError.unauthorized();
     }
-    await this.service.markAllRead(req.account.accountId);
+    await this.service.markAllRead(req.account.accountId, appOf(req));
     return ok(res, null, 'All notifications marked as read');
   });
 

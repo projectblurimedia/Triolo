@@ -328,6 +328,8 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
 
 - **Closed-app crash on pop-up pushes** (explicit report): R8 (`expo-build-properties`, from partner 1.6.0) removed `expo.modules.adapters.react.apploader.RNHeadlessAppLoader`, which `AppLoaderProvider` loads by name from manifest meta-data; every data message to a closed app with a registered notification task crashed (`TaskService.executeTask` NPE) and took the job / order notification with it. Partner app.json `extraProguardRules` now keep apploader, taskManager, task consumers, notifications and location classes — **any new module that loads classes by name needs a keep rule too.** `PATCH /notifications/push-token` stores `full_screen` only with `popupSafe: true` (sent by partner 1.8.0+), so older builds get the plain notification only. Partner **1.8.0** APK.
 
+- **Per-app notification lists** (explicit request): `notifications.app` (migration `0073`) set in `NotificationsService.notify` from the push audience (`any` → NULL, shown in both); `notifyProfileViewed` / `notifyJobPostViewed` save `partner`. Both apps' `notificationsService` send `?app=` on list and read-all. New notification types need an `AUDIENCE_BY_TYPE` entry (it now decides the list too).
+
 ## Pending Modules (build order, current plan)
 
 1. ~~Auth~~ — done (localization support included)

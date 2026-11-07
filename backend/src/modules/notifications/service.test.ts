@@ -62,6 +62,7 @@ describe('NotificationsService.notifyProfileViewed', () => {
       actorAccountId: 'viewer-1',
       refKind: 'shop',
       refId: 'shop-1',
+      app: 'partner',
     });
   });
 
@@ -114,7 +115,7 @@ describe('NotificationsService.listForAccount', () => {
       items: [{ ...buildNotification(), createdAt: expect.any(Date), viewer: null, locked: true }],
       unreadCount: 1,
     });
-    expect(repo.findForAccount).toHaveBeenCalledWith('account-1', 50);
+    expect(repo.findForAccount).toHaveBeenCalledWith('account-1', 50, undefined);
   });
 });
 
@@ -132,7 +133,9 @@ describe('NotificationsService.markRead / markAllRead', () => {
     const service = new NotificationsService(repo as unknown as NotificationsRepository);
 
     await service.markAllRead('account-1');
-    expect(repo.markAllRead).toHaveBeenCalledWith('account-1');
+    expect(repo.markAllRead).toHaveBeenCalledWith('account-1', undefined);
+    await service.markAllRead('account-1', 'partner');
+    expect(repo.markAllRead).toHaveBeenCalledWith('account-1', 'partner');
   });
 });
 
@@ -200,6 +203,8 @@ describe('NotificationsService.notify', () => {
       type: 'problem_accepted',
       title: 'Worker Found',
       body: 'A worker accepted.',
+      // Saved for the customer app only: a partner signed in with the same number doesn't see it.
+      app: 'user',
     });
     expect(sendPushNotification).toHaveBeenCalledWith('device-token', 'Worker Found', 'A worker accepted.', {
       channelId: 'default',

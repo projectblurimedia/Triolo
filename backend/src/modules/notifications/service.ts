@@ -84,6 +84,7 @@ export class NotificationsService {
       actorAccountId: viewerAccountId,
       refKind: kind ?? null,
       refId: profile?.id ?? null,
+      app: 'partner',
     });
     // Tapping it opens this notification in the partner app (who it was).
     const data = { notificationId: saved?.id ?? '' };
@@ -118,6 +119,7 @@ export class NotificationsService {
       actorAccountId: viewerAccountId,
       refKind: 'job_post',
       refId: post.id,
+      app: 'partner',
     });
     const data = { notificationId: saved?.id ?? '', kind: 'job_post_view', postId: post.id };
     if (await revealsViewers(recipientAccountId, 'job_post')) {
@@ -224,16 +226,18 @@ export class NotificationsService {
     body: string,
     pushOptions?: PushNotificationOptions,
   ): Promise<void> {
-    await this.repository.create({ accountId, type, title, body });
-    await this.pushTo(accountId, pushOptions?.audience ?? AUDIENCE_BY_TYPE[type] ?? 'any', title, body, pushOptions);
+    const audience = pushOptions?.audience ?? AUDIENCE_BY_TYPE[type] ?? 'any';
+    // Saved for the same app the push goes to, so each app's list holds only its own.
+    await this.repository.create({ accountId, type, title, body, app: audience === 'any' ? null : audience });
+    await this.pushTo(accountId, audience, title, body, pushOptions);
   }
 
   async deleteNotifications(accountId: string, ids: string[]): Promise<number> {
     return this.repository.deleteMany(accountId, ids);
   }
 
-  async listForAccount(accountId: string): Promise<NotificationListResult> {
-    const result = await this.repository.findForAccount(accountId, DEFAULT_LIST_LIMIT);
+  async listForAccount(accountId: string, app?: PushApp): Promise<NotificationListResult> {
+    const result = await this.repository.findForAccount(accountId, DEFAULT_LIST_LIMIT, app);
     // Asked once per plan: each profile's views are shown on that profile's own plan.
     const reveals = new Map<string, boolean>();
     const paidFor = result.items.some((item) => item.type === 'profile_view') ? await unlockedProfileViews(accountId) : new Set<string>();
@@ -271,8 +275,8 @@ export class NotificationsService {
     await this.repository.markRead(accountId, id);
   }
 
-  async markAllRead(accountId: string): Promise<void> {
-    await this.repository.markAllRead(accountId);
+  async markAllRead(accountId: string, app?: PushApp): Promise<void> {
+    await this.repository.markAllRead(accountId, app);
   }
 }
 

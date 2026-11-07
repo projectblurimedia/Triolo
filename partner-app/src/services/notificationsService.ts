@@ -49,8 +49,8 @@ export interface NotificationListResult {
 }
 
 export const notificationsService = {
-  list: () => apiClient.get<NotificationListResult>('/notifications', true),
+  list: () => apiClient.get<NotificationListResult>('/notifications?app=partner', true),
   markRead: (id: string) => apiClient.patch<null>(`/notifications/${id}/read`, undefined, true),
-  markAllRead: () => apiClient.post<null>('/notifications/read-all', undefined, true),
+  markAllRead: () => apiClient.post<null>('/notifications/read-all?app=partner', undefined, true),
   deleteMany: (ids: string[]) => apiClient.post<{ deleted: number }>('/notifications/delete', { ids }, true),
 };

@@ -17,6 +17,9 @@ function mapNotification(row: QueryResultRow): AppNotification & { actorAccountI
   };
 }
 
+/** Rows for one app's list: that app's own, plus those for both (app IS NULL). No app given: all. */
+const APP_MATCH = (alias: string, param: number) => `$${param}::text IS NULL OR ${alias}.app IS NULL OR ${alias}.app = $${param}`;
+
 export class NotificationsRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -28,25 +31,40 @@ export class NotificationsRepository {
     actorAccountId?: string | null;
     refKind?: string | null;
     refId?: string | null;
+    /** The app whose list shows it; null = both. */
+    app?: PushApp | null;
   }): Promise<AppNotification> {
     const result = await this.pool.query(
-      `INSERT INTO notifications (account_id, type, title, body, actor_account_id, ref_kind, ref_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [params.accountId, params.type, params.title, params.body, params.actorAccountId ?? null, params.refKind ?? null, params.refId ?? null],
+      `INSERT INTO notifications (account_id, type, title, body, actor_account_id, ref_kind, ref_id, app)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        params.accountId,
+        params.type,
+        params.title,
+        params.body,
+        params.actorAccountId ?? null,
+        params.refKind ?? null,
+        params.refId ?? null,
+        params.app ?? null,
+      ],
     );
     return mapNotification(result.rows[0]);
   }
 
-  async findForAccount(accountId: string, limit: number): Promise<NotificationListResult> {
+  /** `app`: only that app's notifications (and those for both); none = every one (older app builds). */
+  async findForAccount(accountId: string, limit: number, app?: PushApp): Promise<NotificationListResult> {
     const [rows, unread] = await Promise.all([
       // The actor's (viewer's) name is read for display; the service decides who sees it.
       this.pool.query(
         `SELECT n.*, a.full_name AS actor_name, a.mobile_number AS actor_mobile
          FROM notifications n LEFT JOIN accounts a ON a.id = n.actor_account_id
-         WHERE n.account_id = $1 ORDER BY n.created_at DESC LIMIT $2`,
-        [accountId, limit],
+         WHERE n.account_id = $1 AND (${APP_MATCH('n', 3)}) ORDER BY n.created_at DESC LIMIT $2`,
+        [accountId, limit, app ?? null],
       ),
-      this.pool.query(`SELECT COUNT(*) FROM notifications WHERE account_id = $1 AND is_read = false`, [accountId]),
+      this.pool.query(
+        `SELECT COUNT(*) FROM notifications n WHERE n.account_id = $1 AND n.is_read = false AND (${APP_MATCH('n', 2)})`,
+        [accountId, app ?? null],
+      ),
     ]);
     return { items: rows.rows.map(mapNotification), unreadCount: Number(unread.rows[0].count) };
   }
@@ -81,8 +99,11 @@ export class NotificationsRepository {
     await this.pool.query(`UPDATE notifications SET is_read = true WHERE id = $1 AND account_id = $2`, [id, accountId]);
   }
 
-  async markAllRead(accountId: string): Promise<void> {
-    await this.pool.query(`UPDATE notifications SET is_read = true WHERE account_id = $1 AND is_read = false`, [accountId]);
+  async markAllRead(accountId: string, app?: PushApp): Promise<void> {
+    await this.pool.query(
+      `UPDATE notifications n SET is_read = true WHERE n.account_id = $1 AND n.is_read = false AND (${APP_MATCH('n', 2)})`,
+      [accountId, app ?? null],
+    );
   }
 
   /** Deletes only the caller's own notifications — ids belonging to anyone else are silently ignored. */

@@ -266,6 +266,7 @@ Each push goes to the right app by notification type (`AUDIENCE_BY_TYPE` in `not
 ### GET /notifications
 List the caller's own notifications, newest first, plus their unread count.
 - Auth: Bearer access token
+- Query: `app=user|partner` (optional) — only that app's notifications plus those for both apps; the unread count follows the same filter. Without it, every notification (older app builds). `POST /notifications/read-all` takes the same `app`.
 - 200: `{ success: true, data: { items: Array<{ id, accountId, type: "profile_view", title, body, isRead, createdAt }>, unreadCount: number } }` — capped at the 50 most recent
 
 ### PATCH /notifications/:id/read
