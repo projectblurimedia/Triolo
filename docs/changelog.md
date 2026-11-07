@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format: date, module, s
 
 ## Unreleased
 
+- **Registration: required marks, optional email, permission after sign-up** (both apps): every field a registration form checks has a red * (`RequiredMark`, copies in both apps; `TextField` / `LocationField` `required`; name and mobile in `PhoneVerification`). Customer sign-up needs only name, mobile and place — email is optional (checked only when typed). The notification permission is asked once registration is finished (`usePushNotifications` waits while `isCompletingRegistration`), not when the number is verified. OTA for customer 1.5.0 and partner 1.7.0 / 1.8.0.
+
 - **Each app shows only its own notifications** (backend, both apps; migration 0073): one number signed in to both apps saw the customer app's notifications in the partner app too. `notifications.app` (user / partner, NULL = both) is saved from the same audience the push uses; `GET /notifications` and `POST /notifications/read-all` take `?app=user|partner` (none = all, for older builds). Old rows were tagged by type; old cancellations / admin notices stay in both. OTA for customer 1.5.0 and partner 1.7.0 / 1.8.0; backend deployed.
 
 - **Background card removed** (partner-app): the "Get job requests even when the app is closed" card is gone (component and texts deleted) — closed-app delivery works without phone settings since the pop-up crash fix. OTA for 1.7.0 and 1.8.0.

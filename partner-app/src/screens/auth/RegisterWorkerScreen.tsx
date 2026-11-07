@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { RequiredMark } from '@/components/RequiredMark';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -203,7 +204,10 @@ export function RegisterWorkerScreen() {
             }}
           />
 
-          <Text style={[styles.label, { color: colors.textMuted }]}>{t('workerProfile.skillLabel')}</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            {t('workerProfile.skillLabel')}
+            <RequiredMark />
+          </Text>
           {/* One searchable list, A–Z: pick several; your own words become a new one (or reuse one
               another partner already added). */}
           <CategoryPicker
@@ -223,13 +227,14 @@ export function RegisterWorkerScreen() {
 
           <TextField
             label={t('workerProfile.experienceLabel')}
+            required
             value={experienceYears}
             onChangeText={setExperienceYears}
             keyboardType="number-pad"
             maxLength={2}
           />
 
-          <LocationField label={t('location.workerPlaceLabel')} value={place} onChange={setPlace} />
+          <LocationField label={t('location.workerPlaceLabel')} required value={place} onChange={setPlace} />
 
           <ImagePickerField label={t('workerProfile.portfolioLabel')} images={photos} onChange={setPhotos} />
 

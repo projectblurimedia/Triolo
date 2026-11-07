@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { RequiredMark } from './RequiredMark';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -177,6 +178,7 @@ export function PhoneVerification({
     <View style={styles.container}>
       <TextField
         label={t('auth.fullNameLabel')}
+        required
         value={fullName}
         onChangeText={onFullNameChange}
         importantForAutofill="no"
@@ -184,7 +186,10 @@ export function PhoneVerification({
         editable={!otpSent && !verified}
       />
 
-      <Text style={[styles.label, { color: colors.textMuted }]}>{t('auth.mobileNumberLabel')}</Text>
+      <Text style={[styles.label, { color: colors.textMuted }]}>
+        {t('auth.mobileNumberLabel')}
+        <RequiredMark />
+      </Text>
       <View style={styles.mobileRow}>
         <View style={styles.mobileField}>
           <TextField

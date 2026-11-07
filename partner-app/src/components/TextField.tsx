@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+import { RequiredMark } from './RequiredMark';
 import { StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import { colors, typography, useThemeColors } from '@/theme';
 
@@ -8,20 +9,27 @@ interface TextFieldProps extends TextInputProps {
   error?: string;
   /** Optional content absolutely positioned inside the input's right edge, vertically centered (e.g. a verified/pending status icon) — used by PhoneVerification's Mobile Number field. */
   rightIcon?: React.ReactNode;
+  /** Marks the label with a red * (the field must be filled in). */
+  required?: boolean;
   /** Overrides/merges into the outer container's style — used to zero out the default marginBottom when this field sits inside a row that manages its own spacing. */
   containerStyle?: StyleProp<ViewStyle>;
 }
 
 /** Forwards its ref to the TextInput, so a form can focus it (e.g. the OTP box after a wrong code). */
 export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
-  { label, error, rightIcon, containerStyle, style, ...inputProps },
+  { label, error, rightIcon, containerStyle, required, style, ...inputProps },
   ref,
 ) {
   const { colors: themeColors } = useThemeColors();
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label ? <Text style={[styles.label, { color: themeColors.textMuted }]}>{label}</Text> : null}
+      {label ? (
+        <Text style={[styles.label, { color: themeColors.textMuted }]}>
+          {label}
+          {required ? <RequiredMark /> : null}
+        </Text>
+      ) : null}
       <View style={styles.inputWrap}>
         <TextInput
           ref={ref}

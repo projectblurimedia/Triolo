@@ -1,4 +1,5 @@
 import React, { ReactNode, useEffect, useState } from 'react';
+import { RequiredMark } from './RequiredMark';
 import { placeName } from '@/utils/formatAddress';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -187,6 +188,7 @@ export function JobPostForm({
       {showNameField ? (
         <TextField
           label={t('auth.fullNameLabel')}
+          required
           value={fullName}
           onChangeText={setFullName}
           placeholder={t('auth.fullNamePlaceholder')}
@@ -197,7 +199,10 @@ export function JobPostForm({
 
       <WorkTypePicker value={workType} onChange={setWorkType} />
 
-      <Text style={[styles.label, { color: colors.textMuted }]}>{t('jobPost.payLabel')}</Text>
+      <Text style={[styles.label, { color: colors.textMuted }]}>
+        {t('jobPost.payLabel')}
+        <RequiredMark />
+      </Text>
       <View style={styles.payRow}>
         <View style={styles.flex}>
           <TextField
@@ -285,7 +290,7 @@ export function JobPostForm({
         placeholder={t('jobPost.aboutPlaceholder')}
       />
 
-      <LocationField label={t('jobPost.locationLabel')} value={place} onChange={setPlace} />
+      <LocationField label={t('jobPost.locationLabel')} required value={place} onChange={setPlace} />
 
       {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 

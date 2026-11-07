@@ -151,9 +151,12 @@ function openUpdateFromTap(response: Notifications.NotificationResponse): boolea
 export function usePushNotifications() {
   const { t } = useTranslation();
   const accessToken = useAuthStore((state) => state.accessToken);
+  // Verifying the number mid-registration already signs in; ask for notifications only once
+  // registration is finished, not in the middle of the form.
+  const registering = useAuthStore((state) => state.isCompletingRegistration);
 
   useEffect(() => {
-    if (!accessToken || Platform.OS !== 'android') {
+    if (!accessToken || registering || Platform.OS !== 'android') {
       return;
     }
 
@@ -216,7 +219,7 @@ export function usePushNotifications() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, t]);
+  }, [accessToken, registering, t]);
 
   // Handles a notification response while this app's JS is alive (foreground, or
   // backgrounded-but-not-killed) — the fully-killed case for Accept/Reject is instead

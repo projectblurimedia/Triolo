@@ -1,4 +1,5 @@
 import { DraftStaffEditor } from '@/components/DeliveryStaffSection';
+import { RequiredMark } from '@/components/RequiredMark';
 import { StaffDraft } from '@/services/businessesService';
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -205,9 +206,12 @@ export function RegisterBusinessScreen() {
             }}
           />
 
-          <TextField label={t('businessProfile.shopNameLabel')} value={shopName} onChangeText={setShopName} />
+          <TextField label={t('businessProfile.shopNameLabel')} required value={shopName} onChangeText={setShopName} />
 
-          <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.categoryLabel')}</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            {t('businessProfile.categoryLabel')}
+            <RequiredMark />
+          </Text>
           {/* One searchable list, A–Z: pick several; your own words become a new one (or reuse one
               another partner already added). */}
           <CategoryPicker
@@ -225,11 +229,14 @@ export function RegisterBusinessScreen() {
             style={styles.picker}
           />
 
-          <LocationField label={t('location.shopPlaceLabel')} value={place} onChange={setPlace} />
+          <LocationField label={t('location.shopPlaceLabel')} required value={place} onChange={setPlace} />
 
           <ImagePickerField label={t('businessProfile.photosLabel')} images={photos} onChange={setPhotos} />
 
-          <Text style={[styles.label, { color: colors.textMuted }]}>{t('businessProfile.deliveryLabel')}</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            {t('businessProfile.deliveryLabel')}
+            <RequiredMark />
+          </Text>
           <View style={styles.deliveryRow}>
             <Pressable onPress={() => setDeliveryAvailable(true)}>
               {deliveryAvailable === true ? (

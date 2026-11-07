@@ -58,9 +58,8 @@ export function RegisterScreen({ navigation }: Props) {
   const handleSubmit = async () => {
     setError(null);
     if (!verified) return;
-    const problem = !email.trim()
-      ? t('formErrors.email')
-      : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+    const problem =
+      email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
         ? t('formErrors.emailInvalid')
         : !location
           ? t('formErrors.location')
@@ -76,7 +75,7 @@ export function RegisterScreen({ navigation }: Props) {
     try {
       let account = await authService.updateProfile({
         fullName: fullName.trim(),
-        email: email.trim(),
+        email: email.trim() || undefined,
         latitude: location.latitude,
         longitude: location.longitude,
         locationAddress: location.locationName,
@@ -153,7 +152,7 @@ export function RegisterScreen({ navigation }: Props) {
               placeholder={t('auth.emailPlaceholder')}
               importantForAutofill="no"
             />
-            <LocationField label={t('editProfile.locationLabel')} value={location} onChange={setLocation} />
+            <LocationField label={t('editProfile.locationLabel')} required value={location} onChange={setLocation} />
 
             {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
             <Button label={t('auth.createAccount')} onPress={handleSubmit} loading={saving} disabled={!verified} />

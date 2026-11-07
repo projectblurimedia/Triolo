@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { RequiredMark } from './RequiredMark';
 import { placeName } from '@/utils/formatAddress';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -14,6 +15,8 @@ import { FullText } from '@/components/FullText';
 
 interface LocationFieldProps {
   label?: string;
+  /** Marks the label with a red *. */
+  required?: boolean;
   value: PlaceValue | null;
   onChange: (place: PlaceValue) => void;
 }
@@ -25,7 +28,7 @@ const GPS_TIMEOUT_MS = 15000;
  * set, it shows only the place name (village / town); the full address found for that point is
  * kept in the value for storage and never shown.
  */
-export function LocationField({ label, value, onChange }: LocationFieldProps) {
+export function LocationField({ label, required, value, onChange }: LocationFieldProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const [detecting, setDetecting] = useState(false);
@@ -52,7 +55,10 @@ export function LocationField({ label, value, onChange }: LocationFieldProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: colors.textMuted }]}>{label ?? t('location.addressLabel')}</Text>
+      <Text style={[styles.label, { color: colors.textMuted }]}>
+        {label ?? t('location.addressLabel')}
+        {required ? <RequiredMark /> : null}
+      </Text>
 
       {value ? (
         <View style={[styles.placeCard, { borderColor: `${colors.success}55`, backgroundColor: `${colors.success}0F` }]}>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { RequiredMark } from './RequiredMark';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -62,7 +63,10 @@ export function WorkTypePicker({ value, onChange }: WorkTypePickerProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: colors.textMuted }]}>{t('jobPost.categoryLabel')}</Text>
+      <Text style={[styles.label, { color: colors.textMuted }]}>
+        {t('jobPost.categoryLabel')}
+        <RequiredMark />
+      </Text>
       <Pressable
         style={[styles.field, { borderColor: colors.border, backgroundColor: colors.surface }]}
         onPress={() => setOpen(true)}

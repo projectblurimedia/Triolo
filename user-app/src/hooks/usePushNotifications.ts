@@ -35,9 +35,12 @@ Notifications.setNotificationHandler({
  */
 export function usePushNotifications() {
   const accessToken = useAuthStore((state) => state.accessToken);
+  // Verifying the number mid-registration already signs in; ask for notifications only once
+  // registration is finished, not in the middle of the form.
+  const registering = useAuthStore((state) => state.isCompletingRegistration);
 
   useEffect(() => {
-    if (!accessToken || Platform.OS !== 'android') {
+    if (!accessToken || registering || Platform.OS !== 'android') {
       return;
     }
 
@@ -72,7 +75,7 @@ export function usePushNotifications() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, registering]);
 
   // Tapping a Quick Book trip notification ("Worker has arrived", …) opens that booking's live
   // tracking screen. useLastNotificationResponse also catches the tap that cold-launched the
