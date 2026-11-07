@@ -139,8 +139,8 @@ const TRIP_TEMPLATES: Record<TripEvent, Record<PreferredLanguage, { title: strin
   },
   // → both sides; the admin's reason is added after the body.
   admin_cancelled: {
-    en: { title: 'Booking Cancelled by Triolo', body: 'Triolo support cancelled this booking.' },
-    te: { title: 'ట్రియోలో బుకింగ్‌ను రద్దు చేసింది', body: 'ట్రియోలో సపోర్ట్ ఈ బుకింగ్‌ను రద్దు చేసింది.' },
+    en: { title: 'Booking Cancelled by NearbyU', body: 'NearbyU support cancelled this booking.' },
+    te: { title: 'నియర్‌బై యు బుకింగ్‌ను రద్దు చేసింది', body: 'నియర్‌బై యు సపోర్ట్ ఈ బుకింగ్‌ను రద్దు చేసింది.' },
   },
   worker_cancelled: {
     en: { title: 'Worker Cancelled', body: 'Your worker had to cancel this booking. Please book again to find another worker.' },

@@ -264,13 +264,13 @@ describe('createOrder', () => {
     expect(notifications.notify.mock.calls[0][3]).toContain('voice message');
   });
 
-  it('refuses a voice message that was not uploaded through Triolo', async () => {
+  it('refuses a voice message that was not uploaded through NearbyU', async () => {
     await expect(
       service.createOrder('customer-1', { ...orderDto, listVoiceUrl: 'https://example.com/list.m4a' }),
     ).rejects.toMatchObject({ code: 'ORDER_VOICE_INVALID' });
   });
 
-  it('refuses a list photo that was not uploaded through Triolo', async () => {
+  it('refuses a list photo that was not uploaded through NearbyU', async () => {
     await expect(
       service.createOrder('customer-1', { ...orderDto, listPhotoUrls: ['https://example.com/list.jpg'] }),
     ).rejects.toMatchObject({ code: 'ORDER_PHOTO_INVALID' });
@@ -474,7 +474,7 @@ describe('admin cancel', () => {
     expect(notifications.notify).toHaveBeenCalledWith(
       'customer-1',
       'order_cancelled',
-      'Order Cancelled by Triolo',
+      'Order Cancelled by NearbyU',
       expect.stringContaining('Reason: Reported by customer'),
       expect.anything(),
     );

@@ -9,7 +9,7 @@ interface PageHeaderProps {
   subtitle?: string;
 }
 
-/** Website-only header — title plus a short subtitle; a back button (when given) sits beside the title in a rounded circular button (matching the mobile apps' GradientHeader iconButton), and a brand mark (the same `shapes` glyph the mobile apps use everywhere as their generic Triolo mark) sits beside the title too. Always the brand-blue gradient — Business registration is visually identical to Worker registration, no separate "shop" styling anywhere on this site. Mobile apps' GradientHeader is unaffected — see .cloud/architecture.md. */
+/** Website-only header — title plus a short subtitle; a back button (when given) sits beside the title in a rounded circular button (matching the mobile apps' GradientHeader iconButton), and a brand mark (the same `shapes` glyph the mobile apps use everywhere as their generic NearbyU mark) sits beside the title too. Always the brand-blue gradient — Business registration is visually identical to Worker registration, no separate "shop" styling anywhere on this site. Mobile apps' GradientHeader is unaffected — see .cloud/architecture.md. */
 export function PageHeader({ title, backTo, subtitle }: PageHeaderProps) {
   return (
     <div className="header">

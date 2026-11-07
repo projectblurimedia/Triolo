@@ -36,6 +36,8 @@ import { PullToRefresh } from './PullToRefresh';
 import { WaitCountdown } from './WaitCountdown';
 import { KeptPaymentNotice } from './KeptPaymentNotice';
 import { FullText } from '@/components/FullText';
+import { SendListModal } from './SendListModal';
+import { useListStore } from '@/state/listStore';
 
 type IconName = React.ComponentProps<typeof FontAwesome6>['name'];
 
@@ -89,6 +91,11 @@ export function OrderTrackingModal() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [stars, setStars] = useState(0);
   const [review, setReview] = useState('');
+  // The not-available items made into a list of their own, to send to another shop in one tap.
+  const lists = useListStore((state) => state.lists);
+  const addList = useListStore((state) => state.addList);
+  const [missingListIds, setMissingListIds] = useState<Record<string, string>>({});
+  const [sendListId, setSendListId] = useState<string | null>(null);
 
   useEffect(() => {
     setStars(0);
@@ -340,9 +347,41 @@ export function OrderTrackingModal() {
               </Text>
             </View>
             {missing.map((item) => renderItemRow(item, false))}
+            {renderMissingList(o, missing)}
           </View>
         ) : null}
       </>
+    );
+  };
+
+  /**
+   * Under "Not available": Make a new list of those items, then Send this list to a shop — another
+   * shop can pack what this one didn't have. (A list deleted since is made again.)
+   */
+  const renderMissingList = (o: CustomerOrder, missing: OrderItem[]) => {
+    const madeId = missingListIds[o.id];
+    const made = madeId && lists.some((list) => list.id === madeId) ? madeId : null;
+    if (made) {
+      return (
+        <View style={styles.missingAction}>
+          <Text style={[styles.missingNote, { color: colors.textMuted }]}>{t('orders.missingListMade')}</Text>
+          <Button label={t('orders.sendMissingList')} onPress={() => setSendListId(made)} />
+        </View>
+      );
+    }
+    const make = () => {
+      const id = addList(
+        t('orders.missingListName', { shop: orderShopName(o, t) }),
+        missing.map((item) => ({ name: item.name, quantity: item.quantity, unit: item.unit ?? '' })),
+      );
+      setMissingListIds((current) => ({ ...current, [o.id]: id }));
+      showToast({ variant: 'success', title: t('orders.missingListSaved') });
+    };
+    return (
+      <View style={styles.missingAction}>
+        <Text style={[styles.missingNote, { color: colors.textMuted }]}>{t('orders.missingListHint')}</Text>
+        <Button label={t('orders.makeMissingList')} onPress={make} />
+      </View>
     );
   };
 
@@ -620,11 +659,14 @@ export function OrderTrackingModal() {
           confirmLabel={t('late.cancelAndRate')}
         />
       </BlurScope>
+      <SendListModal visible={!!sendListId} listId={sendListId} onClose={() => setSendListId(null)} />
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  missingAction: { marginTop: 12, gap: 8 },
+  missingNote: { ...typography.caption, fontSize: 12, lineHeight: 17 },
   countdownGap: { marginBottom: 14 },
   findingHero: { alignItems: 'center', paddingTop: 16, paddingBottom: 18 },
   findingTitle: { ...typography.subheading, fontFamily: fonts.semiBold, marginTop: 24, textAlign: 'center' },

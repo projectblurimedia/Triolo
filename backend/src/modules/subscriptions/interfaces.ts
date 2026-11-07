@@ -1,5 +1,5 @@
 export const SUBSCRIPTION_AUDIENCES = ['customer', 'partner'] as const;
-/** customer = the Triolo app; partner = the Triolo Partner app. */
+/** customer = the NearbyU app; partner = the NearbyU Partner app. */
 export type SubscriptionAudience = (typeof SUBSCRIPTION_AUDIENCES)[number];
 
 export const SUBSCRIPTION_MONTHS = [1, 3, 6, 12] as const;
@@ -14,7 +14,7 @@ export type PartnerPlan = (typeof PARTNER_PLANS)[number];
 export type SubscriptionPlan = 'all' | PartnerPlan;
 
 export const BADGE_KINDS = ['service', 'business', 'job_post'] as const;
-/** Which profile a "Trusted by Triolo" badge is for: a worker's services, a shop or a job post. */
+/** Which profile a "Trusted by NearbyU" badge is for: a worker's services, a shop or a job post. */
 export type BadgeKind = (typeof BADGE_KINDS)[number];
 
 export interface SubscriptionSettings {
@@ -217,7 +217,7 @@ export interface MyBadges {
   profiles: MyProfileBadge[];
 }
 
-/** Profile ids with an active badge, per kind — the apps mark these "Trusted by Triolo". */
+/** Profile ids with an active badge, per kind — the apps mark these "Trusted by NearbyU". */
 export type TrustedIds = Record<BadgeKind, string[]>;
 
 export interface AdminSubscriptionRow extends Subscription {

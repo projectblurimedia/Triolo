@@ -33,7 +33,7 @@ export const AD_MEDIA_FOLDER = 'triolo/ads';
 
 export const AD_PAYMENT_METHODS = ['cash', 'upi', 'other'] as const;
 export type AdPaymentMethod = (typeof AD_PAYMENT_METHODS)[number];
-/** 'pending' = not paid yet; 'online' = paid through Razorpay on the Triolo Ads website. */
+/** 'pending' = not paid yet; 'online' = paid through Razorpay on the NearbyU Ads website. */
 export type AdPaymentState = AdPaymentMethod | 'pending' | 'online';
 
 /** How many ads one business may have waiting for review (or rejected) at a time. */
@@ -69,7 +69,7 @@ export type AdSpot = (typeof AD_SPOTS)[number];
 /** in_review / rejected: a self-booked ad not approved (yet); otherwise by its dates. */
 /**
  * What tapping the ad does: nothing (it just promotes), open a link, show directions to a
- * place, or open a Triolo profile — a worker's service ("Book Now"), a shop ("Order from this
+ * place, or open a NearbyU profile — a worker's service ("Book Now"), a shop ("Order from this
  * Shop") or a job post ("Contact").
  */
 export const AD_ACTION_TYPES = ['none', 'link', 'location', 'service', 'business', 'job_post'] as const;
@@ -105,7 +105,7 @@ export interface AdPromotedCard {
   payAmount: number | null;
   payPeriod: 'daily' | 'monthly' | null;
   placeName: string | null;
-  /** The profile has an active "Trusted by Triolo" badge. */
+  /** The profile has an active "Trusted by NearbyU" badge. */
   trusted?: boolean;
 }
 
@@ -137,7 +137,7 @@ export interface PromotionResolver {
   card(kind: AdPromotedKind, id: string): Promise<AdPromotedCard | null>;
 }
 
-/** unpaid: booked on the Triolo Ads website, waiting for its online payment (then in_review). */
+/** unpaid: booked on the NearbyU Ads website, waiting for its online payment (then in_review). */
 export type AdStatus = 'unpaid' | 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
 
 export interface AdSettings {
@@ -211,7 +211,7 @@ export interface Ad extends PublicAd {
   amount: number;
   paymentMethod: AdPaymentState;
   startDate: string;
-  /** The business account that booked it on the Triolo Ads website; null when the admin did. */
+  /** The business account that booked it on the NearbyU Ads website; null when the admin did. */
   ownerAccountId: string | null;
   reviewStatus: AdReviewStatus;
   /** Why it was rejected (shown to the business). */
@@ -219,7 +219,7 @@ export interface Ad extends PublicAd {
   reviewedAt: string | null;
   /** The phone number the admin used to find the promoted profile (refills the form). */
   promoteMobile: string | null;
-  /** Booked on the Triolo Ads website after online payment began: must be paid before review. */
+  /** Booked on the NearbyU Ads website after online payment began: must be paid before review. */
   needsPayment: boolean;
   razorpayOrderId: string | null;
   /** A boost bought in the partner app is paid through a payment link (opened in the browser). */
@@ -233,14 +233,14 @@ export interface Ad extends PublicAd {
   clicks: number;
   status: AdStatus;
   deletedAt: string | null;
-  /** Who removed it: the business itself (withdrawn) or the Triolo admin. */
+  /** Who removed it: the business itself (withdrawn) or the NearbyU admin. */
   deletedBy: 'owner' | 'admin' | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface SaveAdParams {
-  /** Left out when promoting a Triolo Partner profile (its own name is used). */
+  /** Left out when promoting a NearbyU Partner profile (its own name is used). */
   advertiserName?: string;
   advertiserPhone?: string | null;
   /** Kept for the list and the bill; defaults to the business name. */

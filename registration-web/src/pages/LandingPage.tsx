@@ -51,7 +51,7 @@ export function LandingPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Triolo Partner" />
+      <PageHeader title="NearbyU Partner" />
       <div className="body">
         {checking ? (
           <div className="loading-wrap">

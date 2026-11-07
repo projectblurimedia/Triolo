@@ -204,7 +204,7 @@ describe('AdsService', () => {
     expect(repository.pickManyAndCount).toHaveBeenCalledWith(16.7, 81.1, true, expect.any(Number));
     expect(ad).toMatchObject({ id: 'ad-1', advertiserName: AD.advertiserName, actionType: 'none' });
     expect(ad).not.toHaveProperty('amount');
-    // The partner app never gets Triolo Partner profile ads.
+    // The partner app never gets NearbyU Partner profile ads.
     repository.getSettings.mockResolvedValue({ ...SETTINGS, homePartner: true });
     await service.serveHome('partner', { latitude: 16.7, longitude: 81.1 }, null);
     expect(repository.pickManyAndCount).toHaveBeenLastCalledWith(16.7, 81.1, false, expect.any(Number));
@@ -472,7 +472,7 @@ describe('AdsService', () => {
       });
     });
 
-    it("on the ads website the given Triolo Partner number is used, not the signed-in account", async () => {
+    it("on the ads website the given NearbyU Partner number is used, not the signed-in account", async () => {
       const resolver = promotions();
       const { service, repository } = makeService(resolver);
       repository.setMedia.mockResolvedValue({ ad: AD, previousImages: [], previousVideo: null });

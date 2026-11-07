@@ -8,7 +8,7 @@ import { useAuthStore } from '@/state/authStore';
 import { LegalLinks } from './LegalPage';
 
 /**
- * Delete a Triolo account from the web (Google Play asks for a web way as well as the in-app
+ * Delete a NearbyU account from the web (Google Play asks for a web way as well as the in-app
  * one): sign in with the mobile number and its one-time code, read what happens, tick, delete.
  * The same `DELETE /account` the apps call.
  */
@@ -64,10 +64,10 @@ export function DeleteAccountPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Delete your account" subtitle="Triolo and Triolo Partner" backTo="/" />
+      <PageHeader title="Delete your account" subtitle="NearbyU and NearbyU Partner" backTo="/" />
       <div className="body legal">
         <p className="legal__intro">
-          You can also do this in the app: <b>Profile menu → Delete account</b>. One account covers both the Triolo and Triolo
+          You can also do this in the app: <b>Profile menu → Delete account</b>. One account covers both the NearbyU and NearbyU
           Partner apps.
         </p>
 
@@ -129,7 +129,7 @@ export function DeleteAccountPage() {
         {step === 'done' ? (
           <div className="card">
             <p>
-              <b>Your account was deleted.</b> Your details will be wiped in 30 days. Thank you for using Triolo.
+              <b>Your account was deleted.</b> Your details will be wiped in 30 days. Thank you for using NearbyU.
             </p>
           </div>
         ) : null}

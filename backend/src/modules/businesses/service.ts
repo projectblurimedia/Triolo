@@ -224,11 +224,11 @@ export class BusinessesService {
         language === 'te'
           ? {
               title: `${shop.shopName} డెలివరీకి ఆహ్వానించింది`,
-              body: 'Triolo Partner తెరిచి చేరండి లేదా తిరస్కరించండి.',
+              body: 'NearbyU Partner తెరిచి చేరండి లేదా తిరస్కరించండి.',
             }
           : {
               title: `${shop.shopName} invited you to deliver`,
-              body: 'Open Triolo Partner to join or decline.',
+              body: 'Open NearbyU Partner to join or decline.',
             };
       await this.notificationsService.notify(person.id, 'staff_invite', text.title, text.body, {
         audience: 'partner',

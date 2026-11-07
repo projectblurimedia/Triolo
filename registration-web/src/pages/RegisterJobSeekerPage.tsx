@@ -138,11 +138,11 @@ export function RegisterJobSeekerPage() {
         <div className="body">
           <p>✅ Your job post is live.</p>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-            Customers near you can now find you and call you. You can edit or hide it in the Triolo Partner app.
+            Customers near you can now find you and call you. You can edit or hide it in the NearbyU Partner app.
           </p>
           {photoFailed ? (
             <p style={{ fontSize: 13, color: 'var(--color-error)' }}>
-              Your photo didn&apos;t upload. You can add it later from the Triolo Partner app.
+              Your photo didn&apos;t upload. You can add it later from the NearbyU Partner app.
             </p>
           ) : null}
         </div>
@@ -213,7 +213,7 @@ export function RegisterJobSeekerPage() {
                 <dd style={{ margin: '2px 0 0' }}>{existingPost.isActive ? 'Live' : 'Hidden'}</dd>
               </dl>
               <p style={{ marginTop: 16, marginBottom: 0, fontSize: 13, color: 'var(--color-text-muted)' }}>
-                Edit or hide it in the Triolo Partner app.
+                Edit or hide it in the NearbyU Partner app.
               </p>
             </div>
           ) : null}

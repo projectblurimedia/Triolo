@@ -72,7 +72,7 @@ export function PhoneVerification({
     } catch (err) {
       if (err instanceof ApiError && err.code === 'ACCOUNT_NOT_FOUND') {
         if (nameMissing) {
-          setError('This number is new to Triolo — enter your full name to create your account, then click Verify.');
+          setError('This number is new to NearbyU — enter your full name to create your account, then click Verify.');
           return;
         }
         try {

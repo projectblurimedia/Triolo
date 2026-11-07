@@ -55,7 +55,7 @@ function toPublic(ad: Ad): PublicAd {
   };
 }
 
-/** A Triolo Partner profile ad: it shows the profile as a card, never a picture or video. */
+/** A NearbyU Partner profile ad: it shows the profile as a card, never a picture or video. */
 function isProfileAd(type?: string | null): boolean {
   return type === 'service' || type === 'business' || type === 'job_post';
 }
@@ -157,15 +157,15 @@ export class AdsService {
       action.actionPlace = params.actionPlace.trim();
     } else if (type !== 'none') {
       if (!this.promotions) throw AppError.badRequest('Promoting a profile is not available.', 'AD_ACTION_INVALID');
-      // Found by its Triolo Partner mobile number (a business's own account when it gives none).
+      // Found by its NearbyU Partner mobile number (a business's own account when it gives none).
       let accountId = ownerAccountId;
       const mobile = params.promoteMobile?.trim();
       if (mobile) {
         accountId = await this.promotions.accountIdByMobile(mobile);
-        if (!accountId) throw AppError.badRequest('No Triolo account has this mobile number.', 'AD_PROMOTE_ACCOUNT_NOT_FOUND');
+        if (!accountId) throw AppError.badRequest('No NearbyU account has this mobile number.', 'AD_PROMOTE_ACCOUNT_NOT_FOUND');
         action.promoteMobile = mobile;
       }
-      if (!accountId) throw AppError.badRequest('Enter the Triolo Partner mobile number.', 'AD_ACTION_INVALID');
+      if (!accountId) throw AppError.badRequest('Enter the NearbyU Partner mobile number.', 'AD_ACTION_INVALID');
       const profile = params.promotedPostId
         ? await this.promotions.find(type, accountId, params.promotedPostId)
         : await this.promotions.find(type, accountId);
@@ -228,7 +228,7 @@ export class AdsService {
     if (options.accountId && settings.actionGapSeconds > 0) {
       if (await this.repository.sawActionAdWithin(options.accountId, app, settings.actionGapSeconds)) return null;
     }
-    // Triolo Partner profile ads are for customers (book / order / contact): never in the partner app.
+    // NearbyU Partner profile ads are for customers (book / order / contact): never in the partner app.
     const ad = await this.repository.pickAndCount(excludeId, viewer.latitude, viewer.longitude, app === 'user');
     if (!ad) return null;
     if (options.accountId) {
@@ -237,7 +237,7 @@ export class AdsService {
     const served = toPublic(ad);
     if (ad.promoted && this.promotions) {
       served.promotedCard = await this.promotions.card(ad.promoted.kind, ad.promoted.id).catch(() => null);
-      // The Trusted by Triolo seal shows only for a profile whose owner bought it.
+      // The Trusted by NearbyU seal shows only for a profile whose owner bought it.
       if (served.promotedCard && this.subscriptionStatus) {
         const trusted = await this.subscriptionStatus.trustedIds().catch(() => null);
         served.promotedCard.trusted = !!trusted?.[ad.promoted.kind]?.includes(ad.promoted.id);
@@ -284,7 +284,7 @@ export class AdsService {
     await this.repository.recordClick(id);
   }
 
-  // --- Businesses booking their own ads (Triolo Ads website) ---
+  // --- Businesses booking their own ads (NearbyU Ads website) ---
 
   /** What a business sees before booking: today's prices and the rules. */
   async selfInfo() {
@@ -408,7 +408,7 @@ export class AdsService {
     if (!contact) throw AppError.notFound('Account not found.', 'ACCOUNT_NOT_FOUND');
     const link = await razorpayService.createPaymentLink({
       amountPaise: ad.amount * 100,
-      description: `Triolo boost — bill ${ad.billNumber}`,
+      description: `NearbyU boost — bill ${ad.billNumber}`,
       referenceId: `ad${ad.billNumber}-${Date.now()}`,
       customer: { name: contact.name, contact: contact.mobile },
       notes: { adId: ad.id },
@@ -616,10 +616,10 @@ export class AdsService {
   ): Promise<{ images: string[]; videoUrl: string | null; videoSeconds: number | null }> {
     if (!!imageUrl === !!videoUrl) throw AppError.badRequest('Add one image or one video.', 'AD_MEDIA_INVALID');
     if (imageUrl && !isOwnCloudinaryUrl(imageUrl, AD_MEDIA_FOLDER, 'image')) {
-      throw AppError.badRequest('The image was not uploaded through Triolo.', 'AD_MEDIA_INVALID');
+      throw AppError.badRequest('The image was not uploaded through NearbyU.', 'AD_MEDIA_INVALID');
     }
     if (videoUrl && !isOwnCloudinaryUrl(videoUrl, AD_MEDIA_FOLDER, 'video')) {
-      throw AppError.badRequest('The video was not uploaded through Triolo.', 'AD_MEDIA_INVALID');
+      throw AppError.badRequest('The video was not uploaded through NearbyU.', 'AD_MEDIA_INVALID');
     }
     const size = await mediaSize((imageUrl ?? videoUrl) as string, imageUrl ? 'image' : 'video');
     if (size && size.height >= size.width) {

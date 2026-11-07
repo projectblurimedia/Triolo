@@ -233,7 +233,7 @@ export function RegisterWorkerPage() {
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>We'll notify you once approved.</p>
           {photoFailed ? (
             <p style={{ fontSize: 13, color: 'var(--color-error)' }}>
-              Your photo didn't upload. You can add it later from the Triolo Partner app.
+              Your photo didn't upload. You can add it later from the NearbyU Partner app.
             </p>
           ) : null}
         </div>

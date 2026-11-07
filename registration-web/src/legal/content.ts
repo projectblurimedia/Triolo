@@ -22,7 +22,7 @@ export const PRIVACY: Record<Lang, LegalDoc> = {
   en: {
     title: 'Privacy Policy',
     subtitle: `Last updated ${LEGAL.lastUpdated}`,
-    intro: `${LEGAL.businessName} ("we") runs the Triolo app, the Triolo Partner app and these websites. This policy says what we collect, why, who sees it, how long we keep it, and your rights under India's Digital Personal Data Protection Act, 2023.`,
+    intro: `${LEGAL.businessName} ("we") runs the NearbyU app, the NearbyU Partner app and these websites. This policy says what we collect, why, who sees it, how long we keep it, and your rights under India's Digital Personal Data Protection Act, 2023.`,
     sections: [
       {
         heading: 'What we collect',
@@ -77,7 +77,7 @@ export const PRIVACY: Record<Lang, LegalDoc> = {
         heading: 'Safety, children and changes',
         body: [
           '• Data is sent over HTTPS and stored with access controls. No system is perfectly secure; we will tell you if a breach affects you.',
-          '• Triolo is for people aged 18 and over.',
+          '• NearbyU is for people aged 18 and over.',
           '• If we change this policy we will update the date above and tell you in the app for important changes.',
         ],
       },
@@ -87,7 +87,7 @@ export const PRIVACY: Record<Lang, LegalDoc> = {
   te: {
     title: 'గోప్యతా విధానం',
     subtitle: `చివరి మార్పు ${LEGAL.lastUpdated}`,
-    intro: `${LEGAL.businessName} ("మేము") Triolo యాప్, Triolo Partner యాప్ మరియు ఈ వెబ్‌సైట్లను నడుపుతుంది. మేము ఏమి సేకరిస్తాం, ఎందుకు, ఎవరు చూస్తారు, ఎంతకాలం ఉంచుతాం, భారతదేశ డిజిటల్ వ్యక్తిగత డేటా రక్షణ చట్టం, 2023 ప్రకారం మీ హక్కులు ఏమిటో ఈ విధానం చెబుతుంది.`,
+    intro: `${LEGAL.businessName} ("మేము") NearbyU యాప్, NearbyU Partner యాప్ మరియు ఈ వెబ్‌సైట్లను నడుపుతుంది. మేము ఏమి సేకరిస్తాం, ఎందుకు, ఎవరు చూస్తారు, ఎంతకాలం ఉంచుతాం, భారతదేశ డిజిటల్ వ్యక్తిగత డేటా రక్షణ చట్టం, 2023 ప్రకారం మీ హక్కులు ఏమిటో ఈ విధానం చెబుతుంది.`,
     sections: [
       {
         heading: 'మేము ఏమి సేకరిస్తాం',
@@ -142,7 +142,7 @@ export const PRIVACY: Record<Lang, LegalDoc> = {
         heading: 'భద్రత, పిల్లలు, మార్పులు',
         body: [
           '• డేటా HTTPS ద్వారా పంపి, నియంత్రిత యాక్సెస్‌తో దాస్తాం. ఏ వ్యవస్థా పూర్తిగా సురక్షితం కాదు; మీపై ప్రభావం ఉంటే చెబుతాం.',
-          '• Triolo 18 ఏళ్లు పైబడిన వారికి మాత్రమే.',
+          '• NearbyU 18 ఏళ్లు పైబడిన వారికి మాత్రమే.',
           '• విధానం మారితే పై తేదీ మారుస్తాం; ముఖ్యమైన మార్పులు యాప్‌లో చెబుతాం.',
         ],
       },
@@ -155,12 +155,12 @@ export const TERMS: Record<Lang, LegalDoc> = {
   en: {
     title: 'Terms of Use',
     subtitle: `Last updated ${LEGAL.lastUpdated}`,
-    intro: `These terms apply when you use the Triolo apps or websites. By signing up you agree to them.`,
+    intro: `These terms apply when you use the NearbyU apps or websites. By signing up you agree to them.`,
     sections: [
       {
-        heading: 'What Triolo is',
+        heading: 'What NearbyU is',
         body: [
-          'Triolo is a marketplace that connects customers with independent workers, shops and people looking for jobs. Triolo does not do the work, sell the goods or employ the workers. The work or sale is an agreement between you and the partner.',
+          'NearbyU is a marketplace that connects customers with independent workers, shops and people looking for jobs. NearbyU does not do the work, sell the goods or employ the workers. The work or sale is an agreement between you and the partner.',
         ],
       },
       {
@@ -175,15 +175,15 @@ export const TERMS: Record<Lang, LegalDoc> = {
         heading: 'Partners (workers, shops, job posts)',
         body: [
           '• Give true details about your skills, shop, prices and experience. We may verify them and may reject or remove a profile.',
-          '• "Verified" or "Trusted by Triolo" means we checked some details — it is not a guarantee of the quality of the work.',
+          '• "Verified" or "Trusted by NearbyU" means we checked some details — it is not a guarantee of the quality of the work.',
           '• Accept only jobs and orders you can do, arrive when you said, and use the PIN to start or hand over.',
-          '• Partners collect payment for their work or goods directly from the customer. Triolo does not hold that money.',
+          '• Partners collect payment for their work or goods directly from the customer. NearbyU does not hold that money.',
         ],
       },
       {
         heading: 'Fees, plans and payments',
         body: [
-          '• Some actions may need a small fee or a plan (Triolo Plus, partner plans, Trusted badge, Boost, ads). Prices are shown before you pay, through Razorpay.',
+          '• Some actions may need a small fee or a plan (NearbyU Plus, partner plans, Trusted badge, Boost, ads). Prices are shown before you pay, through Razorpay.',
           '• Monthly free uses or free accepts may be offered; their number can change.',
           '• Refunds follow our Refund Policy.',
         ],
@@ -201,17 +201,17 @@ export const TERMS: Record<Lang, LegalDoc> = {
         heading: 'Cancellations',
         body: [
           '• A customer can cancel a request until it is accepted, and a late worker or stalled order with Cancel & Rate.',
-          '• After the arrival PIN is used, or once a shop starts packing, only the partner or Triolo can cancel.',
+          '• After the arrival PIN is used, or once a shop starts packing, only the partner or NearbyU can cancel.',
         ],
       },
       {
         heading: 'Ads',
-        body: ['Ads are from local businesses and reviewed by Triolo. The advertiser is responsible for what the ad promises.'],
+        body: ['Ads are from local businesses and reviewed by NearbyU. The advertiser is responsible for what the ad promises.'],
       },
       {
         heading: 'Liability',
         body: [
-          'We work to keep Triolo running, but it is provided "as is". As a marketplace, Triolo is not responsible for the quality, safety or legality of the work or goods, or for losses from dealings between users, to the extent the law allows. If we are found responsible, our liability is limited to the fees you paid Triolo in the last 3 months.',
+          'We work to keep NearbyU running, but it is provided "as is". As a marketplace, NearbyU is not responsible for the quality, safety or legality of the work or goods, or for losses from dealings between users, to the extent the law allows. If we are found responsible, our liability is limited to the fees you paid NearbyU in the last 3 months.',
         ],
       },
       {
@@ -224,12 +224,12 @@ export const TERMS: Record<Lang, LegalDoc> = {
   te: {
     title: 'వినియోగ నిబంధనలు',
     subtitle: `చివరి మార్పు ${LEGAL.lastUpdated}`,
-    intro: 'Triolo యాప్‌లు లేదా వెబ్‌సైట్లు వాడినప్పుడు ఈ నిబంధనలు వర్తిస్తాయి. సైన్ అప్ చేస్తే మీరు వీటికి అంగీకరించినట్టే.',
+    intro: 'NearbyU యాప్‌లు లేదా వెబ్‌సైట్లు వాడినప్పుడు ఈ నిబంధనలు వర్తిస్తాయి. సైన్ అప్ చేస్తే మీరు వీటికి అంగీకరించినట్టే.',
     sections: [
       {
-        heading: 'Triolo అంటే',
+        heading: 'NearbyU అంటే',
         body: [
-          'Triolo కస్టమర్లను స్వతంత్ర వర్కర్లు, షాపులు, ఉద్యోగం కోరేవారితో కలిపే మార్కెట్‌ప్లేస్. Triolo పని చేయదు, వస్తువులు అమ్మదు, వర్కర్లను ఉద్యోగంలో పెట్టుకోదు. పని లేదా అమ్మకం మీకు, పార్ట్‌నర్‌కు మధ్య ఒప్పందం.',
+          'NearbyU కస్టమర్లను స్వతంత్ర వర్కర్లు, షాపులు, ఉద్యోగం కోరేవారితో కలిపే మార్కెట్‌ప్లేస్. NearbyU పని చేయదు, వస్తువులు అమ్మదు, వర్కర్లను ఉద్యోగంలో పెట్టుకోదు. పని లేదా అమ్మకం మీకు, పార్ట్‌నర్‌కు మధ్య ఒప్పందం.',
         ],
       },
       {
@@ -244,15 +244,15 @@ export const TERMS: Record<Lang, LegalDoc> = {
         heading: 'పార్ట్‌నర్‌లు',
         body: [
           '• మీ నైపుణ్యాలు, షాప్, ధరల గురించి నిజమైన వివరాలు ఇవ్వండి. మేము ధృవీకరించవచ్చు, ప్రొఫైల్ తిరస్కరించవచ్చు లేదా తొలగించవచ్చు.',
-          '• "Verified" లేదా "Trusted by Triolo" అంటే కొన్ని వివరాలు చూశాం — పని నాణ్యతకు హామీ కాదు.',
+          '• "Verified" లేదా "Trusted by NearbyU" అంటే కొన్ని వివరాలు చూశాం — పని నాణ్యతకు హామీ కాదు.',
           '• చేయగలిగిన పనులు, ఆర్డర్‌లే అంగీకరించండి, చెప్పిన సమయానికి రండి, PIN వాడండి.',
-          '• పని లేదా వస్తువుల డబ్బు పార్ట్‌నర్ నేరుగా కస్టమర్ నుండి తీసుకుంటారు. Triolo ఆ డబ్బు ఉంచుకోదు.',
+          '• పని లేదా వస్తువుల డబ్బు పార్ట్‌నర్ నేరుగా కస్టమర్ నుండి తీసుకుంటారు. NearbyU ఆ డబ్బు ఉంచుకోదు.',
         ],
       },
       {
         heading: 'ఫీజులు, ప్లాన్‌లు, పేమెంట్లు',
         body: [
-          '• కొన్ని పనులకు చిన్న ఫీజు లేదా ప్లాన్ (Triolo Plus, పార్ట్‌నర్ ప్లాన్‌లు, Trusted బ్యాడ్జ్, Boost, ప్రకటనలు) అవసరం కావచ్చు. చెల్లించే ముందు ధర Razorpay ద్వారా చూపిస్తాం.',
+          '• కొన్ని పనులకు చిన్న ఫీజు లేదా ప్లాన్ (NearbyU Plus, పార్ట్‌నర్ ప్లాన్‌లు, Trusted బ్యాడ్జ్, Boost, ప్రకటనలు) అవసరం కావచ్చు. చెల్లించే ముందు ధర Razorpay ద్వారా చూపిస్తాం.',
           '• నెలకు ఉచిత వాడకాలు ఇవ్వవచ్చు; వాటి సంఖ్య మారవచ్చు.',
           '• రీఫండ్‌లు మా రీఫండ్ విధానం ప్రకారం.',
         ],
@@ -270,14 +270,14 @@ export const TERMS: Record<Lang, LegalDoc> = {
         heading: 'రద్దులు',
         body: [
           '• అంగీకరించే వరకు కస్టమర్ రిక్వెస్ట్ రద్దు చేయవచ్చు; ఆలస్యమైన వర్కర్ లేదా ఆగిన ఆర్డర్‌ను Cancel & Rate తో.',
-          '• రాక PIN వాడిన తర్వాత లేదా షాప్ ప్యాకింగ్ మొదలెట్టాక, పార్ట్‌నర్ లేదా Triolo మాత్రమే రద్దు చేయగలరు.',
+          '• రాక PIN వాడిన తర్వాత లేదా షాప్ ప్యాకింగ్ మొదలెట్టాక, పార్ట్‌నర్ లేదా NearbyU మాత్రమే రద్దు చేయగలరు.',
         ],
       },
-      { heading: 'ప్రకటనలు', body: ['ప్రకటనలు స్థానిక వ్యాపారాలవి, Triolo పరిశీలిస్తుంది. ప్రకటనలో హామీలకు ప్రకటనదారే బాధ్యులు.'] },
+      { heading: 'ప్రకటనలు', body: ['ప్రకటనలు స్థానిక వ్యాపారాలవి, NearbyU పరిశీలిస్తుంది. ప్రకటనలో హామీలకు ప్రకటనదారే బాధ్యులు.'] },
       {
         heading: 'బాధ్యత',
         body: [
-          'Triolo "ఉన్నది ఉన్నట్టు" అందిస్తాం. మార్కెట్‌ప్లేస్‌గా, పని లేదా వస్తువుల నాణ్యత, భద్రతకు, వినియోగదారుల మధ్య లావాదేవీల నష్టాలకు, చట్టం అనుమతించినంత వరకు Triolo బాధ్యత వహించదు. బాధ్యత ఉన్నట్టు తేలితే, గత 3 నెలల్లో మీరు Triolo కు చెల్లించిన ఫీజుల వరకే.',
+          'NearbyU "ఉన్నది ఉన్నట్టు" అందిస్తాం. మార్కెట్‌ప్లేస్‌గా, పని లేదా వస్తువుల నాణ్యత, భద్రతకు, వినియోగదారుల మధ్య లావాదేవీల నష్టాలకు, చట్టం అనుమతించినంత వరకు NearbyU బాధ్యత వహించదు. బాధ్యత ఉన్నట్టు తేలితే, గత 3 నెలల్లో మీరు NearbyU కు చెల్లించిన ఫీజుల వరకే.',
         ],
       },
       { heading: 'చట్టం, వివాదాలు', body: [`ఈ నిబంధనలు భారత చట్టాల ప్రకారం. ${LEGAL.city} కోర్టులకు అధికార పరిధి. ముందుగా మమ్మల్ని సంప్రదించండి.`] },
@@ -290,18 +290,18 @@ export const REFUNDS: Record<Lang, LegalDoc> = {
   en: {
     title: 'Refund & Cancellation Policy',
     subtitle: `Last updated ${LEGAL.lastUpdated}`,
-    intro: 'All payments to Triolo go through Razorpay. Money you pay a worker or shop for their work or goods is paid to them directly and is not covered here — contact them, or us if you need help.',
+    intro: 'All payments to NearbyU go through Razorpay. Money you pay a worker or shop for their work or goods is paid to them directly and is not covered here — contact them, or us if you need help.',
     sections: [
       {
         heading: 'Fee for one booking, order or problem post',
         body: [
-          '• If it does not go ahead through no fault of yours — nobody accepts before your waiting time ends, the worker or shop declines or cancels, Triolo cancels it, or you cancel a late worker or stalled order — the fee is kept as a credit and your next one of the same kind is free. You will see "Using your earlier payment".',
+          '• If it does not go ahead through no fault of yours — nobody accepts before your waiting time ends, the worker or shop declines or cancels, NearbyU cancels it, or you cancel a late worker or stalled order — the fee is kept as a credit and your next one of the same kind is free. You will see "Using your earlier payment".',
           '• A free monthly use that did not go ahead is simply given back to the month.',
           '• If you cancel a request after a worker or shop has accepted on time, the fee is used.',
         ],
       },
       {
-        heading: 'Triolo Plus, partner plans and Trusted badge',
+        heading: 'NearbyU Plus, partner plans and Trusted badge',
         body: [
           '• They start as soon as the payment succeeds and are not refundable after that, including when you delete your account.',
           '• If money was taken but the plan or badge did not start, write to us — we refund it in full within 5–7 working days.',
@@ -310,9 +310,9 @@ export const REFUNDS: Record<Lang, LegalDoc> = {
       {
         heading: 'Ads and Boost',
         body: [
-          '• Paid online and rejected by Triolo, or withdrawn by you before it is approved: refunded in full, automatically, to the same payment method. Banks usually take 5–7 working days.',
+          '• Paid online and rejected by NearbyU, or withdrawn by you before it is approved: refunded in full, automatically, to the same payment method. Banks usually take 5–7 working days.',
           '• Once approved and running: not refundable.',
-          '• Removed by Triolo for breaking the ad rules: not refundable.',
+          '• Removed by NearbyU for breaking the ad rules: not refundable.',
         ],
       },
       {
@@ -325,18 +325,18 @@ export const REFUNDS: Record<Lang, LegalDoc> = {
   te: {
     title: 'రీఫండ్ & రద్దు విధానం',
     subtitle: `చివరి మార్పు ${LEGAL.lastUpdated}`,
-    intro: 'Triolo కు చెల్లింపులన్నీ Razorpay ద్వారా. వర్కర్ లేదా షాప్‌కు వారి పని / వస్తువుల కోసం చెల్లించే డబ్బు నేరుగా వారికే — అది ఇక్కడ వర్తించదు.',
+    intro: 'NearbyU కు చెల్లింపులన్నీ Razorpay ద్వారా. వర్కర్ లేదా షాప్‌కు వారి పని / వస్తువుల కోసం చెల్లించే డబ్బు నేరుగా వారికే — అది ఇక్కడ వర్తించదు.',
     sections: [
       {
         heading: 'ఒక బుకింగ్, ఆర్డర్ లేదా సమస్య పోస్ట్ ఫీజు',
         body: [
-          '• మీ తప్పు లేకుండా జరగకపోతే — సమయం ముగిసేలోపు ఎవరూ అంగీకరించకపోతే, వర్కర్ / షాప్ తిరస్కరిస్తే లేదా రద్దు చేస్తే, Triolo రద్దు చేస్తే, లేదా ఆలస్యమైన వర్కర్ / ఆగిన ఆర్డర్‌ను మీరు రద్దు చేస్తే — ఫీజు క్రెడిట్‌గా ఉంటుంది, అదే రకం తదుపరిది ఉచితం.',
+          '• మీ తప్పు లేకుండా జరగకపోతే — సమయం ముగిసేలోపు ఎవరూ అంగీకరించకపోతే, వర్కర్ / షాప్ తిరస్కరిస్తే లేదా రద్దు చేస్తే, NearbyU రద్దు చేస్తే, లేదా ఆలస్యమైన వర్కర్ / ఆగిన ఆర్డర్‌ను మీరు రద్దు చేస్తే — ఫీజు క్రెడిట్‌గా ఉంటుంది, అదే రకం తదుపరిది ఉచితం.',
           '• జరగని నెలవారీ ఉచిత వాడకం ఆ నెలకే తిరిగి వస్తుంది.',
           '• సమయానికి అంగీకరించిన తర్వాత మీరు రద్దు చేస్తే, ఫీజు వాడినట్టే.',
         ],
       },
       {
-        heading: 'Triolo Plus, పార్ట్‌నర్ ప్లాన్‌లు, Trusted బ్యాడ్జ్',
+        heading: 'NearbyU Plus, పార్ట్‌నర్ ప్లాన్‌లు, Trusted బ్యాడ్జ్',
         body: [
           '• పేమెంట్ విజయవంతమైన వెంటనే మొదలవుతాయి; తర్వాత రీఫండ్ ఉండదు, అకౌంట్ తొలగించినా కూడా.',
           '• డబ్బు కట్ అయి ప్లాన్ / బ్యాడ్జ్ మొదలవకపోతే, మాకు రాయండి — 5–7 పని దినాల్లో పూర్తి రీఫండ్.',
@@ -345,9 +345,9 @@ export const REFUNDS: Record<Lang, LegalDoc> = {
       {
         heading: 'ప్రకటనలు, Boost',
         body: [
-          '• ఆన్‌లైన్‌లో చెల్లించి Triolo తిరస్కరిస్తే, లేదా ఆమోదానికి ముందు మీరు ఉపసంహరిస్తే: అదే పేమెంట్ పద్ధతికి ఆటోమేటిక్‌గా పూర్తి రీఫండ్ (సాధారణంగా 5–7 పని దినాలు).',
+          '• ఆన్‌లైన్‌లో చెల్లించి NearbyU తిరస్కరిస్తే, లేదా ఆమోదానికి ముందు మీరు ఉపసంహరిస్తే: అదే పేమెంట్ పద్ధతికి ఆటోమేటిక్‌గా పూర్తి రీఫండ్ (సాధారణంగా 5–7 పని దినాలు).',
           '• ఆమోదించి నడుస్తున్న తర్వాత: రీఫండ్ లేదు.',
-          '• నియమాలు ఉల్లంఘించినందుకు Triolo తొలగిస్తే: రీఫండ్ లేదు.',
+          '• నియమాలు ఉల్లంఘించినందుకు NearbyU తొలగిస్తే: రీఫండ్ లేదు.',
         ],
       },
       { heading: 'విఫలమైన లేదా రెండుసార్లు చెల్లింపులు', body: ['డబ్బు కట్ అయి పేమెంట్ విఫలమైతే లేదా రెండుసార్లు కట్ అయితే, సాధారణంగా 5–7 పని దినాల్లో ఆటోమేటిక్‌గా తిరిగి వస్తుంది. రాకపోతే పేమెంట్ IDతో మాకు రాయండి.'] },

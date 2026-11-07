@@ -97,7 +97,7 @@ adsRouter.get(
   }),
 );
 
-// --- Businesses booking their own ads (the Triolo Ads website). Any signed-in account. ---
+// --- Businesses booking their own ads (the NearbyU Ads website). Any signed-in account. ---
 
 adsRouter.get(
   '/self/info',
@@ -150,7 +150,7 @@ adsRouter.delete(
   ),
 );
 
-// Online payment for a business's own booking (Razorpay checkout on the Triolo Ads website).
+// Online payment for a business's own booking (Razorpay checkout on the NearbyU Ads website).
 adsRouter.post(
   '/self/:id/pay',
   authenticate,

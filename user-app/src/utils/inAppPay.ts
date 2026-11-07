@@ -55,7 +55,7 @@ export async function payInApp(target: InAppPayTarget): Promise<'paid' | 'cancel
       order_id: order.orderId,
       amount: order.amount,
       currency: order.currency || 'INR',
-      name: 'Triolo',
+      name: 'NearbyU',
       description: order.description,
       prefill: order.prefill ? { name: order.prefill.name, contact: order.prefill.contact } : undefined,
       theme: { color: '#0055D3' },

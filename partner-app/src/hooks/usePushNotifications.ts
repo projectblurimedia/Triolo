@@ -165,7 +165,7 @@ export function usePushNotifications() {
     (async () => {
       try {
         await Notifications.setNotificationChannelAsync(ALERTS_CHANNEL, {
-          name: 'Triolo',
+          name: 'NearbyU',
           importance: Notifications.AndroidImportance.HIGH,
           sound: NOTIFICATION_SOUND,
         });

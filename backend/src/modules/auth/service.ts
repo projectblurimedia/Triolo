@@ -301,7 +301,7 @@ export class AuthService {
 
   /**
    * The account with this number, made (active, no password — they sign in with OTP) if there is
-   * none yet: a shop owner adding delivery staff who have never used Triolo.
+   * none yet: a shop owner adding delivery staff who have never used NearbyU.
    */
   async findOrCreateByMobile(
     mobileNumber: string,

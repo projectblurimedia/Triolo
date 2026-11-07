@@ -51,7 +51,7 @@ function parseQuery<S extends ZodTypeAny>(schema: S, req: Request): z.infer<S> {
   return result.data;
 }
 
-/** The apps: subscription plans and "Trusted by Triolo" badges. */
+/** The apps: subscription plans and "Trusted by NearbyU" badges. */
 export const subscriptionsRouter = Router();
 
 subscriptionsRouter.get(

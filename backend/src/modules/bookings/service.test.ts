@@ -693,8 +693,8 @@ describe('admin cancel', () => {
     expect(notifications.notify).toHaveBeenCalledWith(
       'account-1',
       'booking_cancelled',
-      'Booking Cancelled by Triolo',
-      'Triolo support cancelled this booking. Reason: Safety report',
+      'Booking Cancelled by NearbyU',
+      'NearbyU support cancelled this booking. Reason: Safety report',
       expect.anything(),
     );
     expect(listener.onProblemTripCancelled).toHaveBeenCalledWith('post-1');

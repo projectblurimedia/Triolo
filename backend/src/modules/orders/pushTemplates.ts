@@ -61,8 +61,8 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
       body: 'The customer cancelled because the order made no progress for over an hour, and rated your shop.',
     }),
     cancelled_by_admin: ({ shop }) => ({
-      title: 'Order Cancelled by Triolo',
-      body: `Triolo support cancelled the order with ${shop}.`,
+      title: 'Order Cancelled by NearbyU',
+      body: `NearbyU support cancelled the order with ${shop}.`,
     }),
   },
   te: {
@@ -106,8 +106,8 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
       body: 'ఆర్డర్ గంటకు పైగా ముందుకు సాగనందున కస్టమర్ రద్దు చేసి, మీ షాప్‌కు రేటింగ్ ఇచ్చారు.',
     }),
     cancelled_by_admin: ({ shop }) => ({
-      title: 'ట్రియోలో ఆర్డర్‌ను రద్దు చేసింది',
-      body: `${shop}తో ఉన్న ఆర్డర్‌ను ట్రియోలో సపోర్ట్ రద్దు చేసింది.`,
+      title: 'నియర్‌బై యు ఆర్డర్‌ను రద్దు చేసింది',
+      body: `${shop}తో ఉన్న ఆర్డర్‌ను నియర్‌బై యు సపోర్ట్ రద్దు చేసింది.`,
     }),
   },
 };

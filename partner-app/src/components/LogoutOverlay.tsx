@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FontAwesome6 } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { LoadingIndicator } from './LoadingIndicator';
 import { fonts, headerGradient, typography } from '@/theme';
@@ -43,7 +42,6 @@ export function LogoutOverlay() {
             <LoadingIndicator size={RING_SIZE} dotSize={10} color="rgba(255, 255, 255, 0.85)" duration={1800} />
           </View>
           <Animated.View style={[styles.mark, { transform: [{ scale: markScale }] }]}>
-            <FontAwesome6 name="shapes" size={28} color="#FFFFFF" solid />
           </Animated.View>
         </View>
         <Text style={styles.label}>{t('common.loggingOut')}</Text>

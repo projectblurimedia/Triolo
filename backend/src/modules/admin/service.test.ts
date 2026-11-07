@@ -79,7 +79,7 @@ describe('AdminService', () => {
       'acc-1',
       'admin_notice',
       'Account Suspended',
-      'Triolo has suspended your account for 7 days. Reason: Fake reviews',
+      'NearbyU has suspended your account for 7 days. Reason: Fake reviews',
       expect.anything(),
     );
   });

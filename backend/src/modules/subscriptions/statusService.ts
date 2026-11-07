@@ -203,7 +203,7 @@ export class SubscriptionStatusService {
 
   private trustedCache: { at: number; value: TrustedIds } | null = null;
 
-  /** Profiles with an active Trusted by Triolo badge (cached a minute). */
+  /** Profiles with an active Trusted by NearbyU badge (cached a minute). */
   async trustedIds(): Promise<TrustedIds> {
     if (this.trustedCache && Date.now() - this.trustedCache.at < 60 * 1000) return this.trustedCache.value;
     const value = await this.repository.trustedIds();

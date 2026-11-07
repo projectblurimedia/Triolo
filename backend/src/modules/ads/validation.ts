@@ -10,7 +10,7 @@ const phone = z
   .or(z.literal(''));
 
 const adFields = z.object({
-  // Left out when promoting a Triolo Partner profile: the profile's own name is used.
+  // Left out when promoting a NearbyU Partner profile: the profile's own name is used.
   advertiserName: z.string().trim().max(80).optional(),
   advertiserPhone: phone,
   title: optionalText(80),
@@ -80,7 +80,7 @@ function checkAction(body: AdFields, ctx: z.RefinementCtx, needsMobile: boolean)
   }
   const promotes = body.actionType === 'service' || body.actionType === 'business' || body.actionType === 'job_post';
   if (needsMobile && promotes && !body.promoteMobile) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter the Triolo Partner mobile number', path: ['promoteMobile'] });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter the NearbyU Partner mobile number', path: ['promoteMobile'] });
   }
   if (!promotes && (body.advertiserName?.length ?? 0) < 2) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter the business name', path: ['advertiserName'] });
@@ -111,15 +111,15 @@ export const adSettingsSchema = z
   .partial();
 
 /**
- * A business booking its own ad on the Triolo Ads website: like the admin's form, minus how it
+ * A business booking its own ad on the NearbyU Ads website: like the admin's form, minus how it
  * was paid (online payment comes later — it's 'pending' until then) and with its image or
  * video required.
  */
 export const selfAdSchema = adFields
   .omit({ paymentMethod: true })
-  // A Triolo Partner profile ad shows the profile itself: no picture or video.
+  // A NearbyU Partner profile ad shows the profile itself: no picture or video.
   .refine((body) => promotes(body.actionType) || !!body.imageUrl !== !!body.videoUrl, 'Add one image or one video')
-  // Promoting a Triolo Partner profile needs its mobile number here too (the admin reviews it).
+  // Promoting a NearbyU Partner profile needs its mobile number here too (the admin reviews it).
   .superRefine((body, ctx) => checkAction(body, ctx, true));
 
 export const reviewAdSchema = z

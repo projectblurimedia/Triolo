@@ -29,7 +29,7 @@ export async function sendOtpSms(mobileNumber: string, otp: string): Promise<voi
     let response = await post({ route: 'otp', variables_values: otp });
     let body = (await response.json().catch(() => null)) as { return?: boolean; status_code?: number; message?: unknown } | null;
     if (!body?.return && body?.status_code === 996) {
-      response = await post({ route: 'q', message: `Your Triolo code is ${otp}. Do not share it with anyone.`, flash: '0' });
+      response = await post({ route: 'q', message: `Your NearbyU code is ${otp}. Do not share it with anyone.`, flash: '0' });
       body = (await response.json().catch(() => null)) as typeof body;
     }
     if (!response.ok || !body?.return) {

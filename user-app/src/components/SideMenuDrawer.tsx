@@ -1,4 +1,6 @@
 import React, { PropsWithChildren, useEffect, useRef, useState } from 'react';
+// 'shapes' (the brand slot) draws the NearbyU mark.
+import { NearbyMark } from './brand/NearbyMark';
 import { Animated, BackHandler, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -111,7 +113,7 @@ export function SideMenuDrawer({
             <View style={[styles.headerRow, { paddingTop: insets.top + 14 }]}>
               <View style={styles.headerLeft}>
                 <View style={styles.headerIcon}>
-                  <FontAwesome6 name={icon} size={22} color={colors.white} solid />
+                  {icon === 'shapes' ? <NearbyMark size={28} /> : <FontAwesome6 name={icon} size={22} color={colors.white} solid />}
                 </View>
                 <View style={styles.headerText}>
                   <FullText style={styles.headerTitle} numberOfLines={1}>

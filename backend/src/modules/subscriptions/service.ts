@@ -40,12 +40,12 @@ function badgeRemovedText(language: 'en' | 'te', kind: BadgeKind, reason: string
   if (language === 'te') {
     const what = kind === 'service' ? 'మీ సేవల ప్రొఫైల్' : kind === 'business' ? 'మీ షాప్' : 'మీ జాబ్ పోస్ట్';
     return {
-      title: '"Trusted by Triolo" బ్యాడ్జ్ తొలగించబడింది',
+      title: '"Trusted by NearbyU" బ్యాడ్జ్ తొలగించబడింది',
       body: `${what} నుండి బ్యాడ్జ్ తొలగించబడింది. కారణం: ${reason}. మళ్లీ పొందడానికి ప్రొఫైల్‌లో కొనవచ్చు.`,
     };
   }
   return {
-    title: '"Trusted by Triolo" badge removed',
+    title: '"Trusted by NearbyU" badge removed',
     body: `The badge was removed from your ${BADGE_LABEL[kind]}. Reason: ${reason}. You can buy it again from your profile.`,
   };
 }
@@ -59,23 +59,23 @@ interface Deps {
 
 /**
  * Subscriptions (customers: no ads + booking / ordering; partners: first to hear of jobs, no
- * ads, first in searches, who viewed their profile) and "Trusted by Triolo" badges per profile.
+ * ads, first in searches, who viewed their profile) and "Trusted by NearbyU" badges per profile.
  * Paid with Razorpay payment links the apps open in the browser; `check*` asks Razorpay and
  * starts what was paid for. Owns `subscription_settings`, `subscriptions` and `profile_badges`;
  * reads profiles through the workers / businesses / job-seekers services.
  */
 /** What a pay-per-use payment is for (shown on the Razorpay page). */
 const PASS_LABEL: Record<PassKind, string> = {
-  quick_book: 'Triolo — one Quick Book',
-  direct_book: 'Triolo — book a particular worker',
-  quick_order: 'Triolo — one Quick Order',
-  shop_order: 'Triolo — order from a particular shop',
-  post_problem: 'Triolo — post a problem',
-  staff_contact: "Triolo — a job seeker's phone number",
-  accept: 'Triolo Partner — accept a personal booking or order',
-  job_post: 'Triolo Partner — publish a job post',
-  job_post_viewer: 'Triolo Partner — see who viewed your job post',
-  profile_viewer: 'Triolo Partner — see who viewed your profile',
+  quick_book: 'NearbyU — one Quick Book',
+  direct_book: 'NearbyU — book a particular worker',
+  quick_order: 'NearbyU — one Quick Order',
+  shop_order: 'NearbyU — order from a particular shop',
+  post_problem: 'NearbyU — post a problem',
+  staff_contact: "NearbyU — a job seeker's phone number",
+  accept: 'NearbyU Partner — accept a personal booking or order',
+  job_post: 'NearbyU Partner — publish a job post',
+  job_post_viewer: 'NearbyU Partner — see who viewed your job post',
+  profile_viewer: 'NearbyU Partner — see who viewed your profile',
 };
 
 /** Which partner plan a payment is for (shown on the Razorpay page). */
@@ -242,12 +242,12 @@ export class SubscriptionsService {
       const subscription = await this.repository.findSubscription(id);
       if (!subscription || subscription.accountId !== accountId) throw AppError.notFound('Not found.', 'SUBSCRIPTION_NOT_FOUND');
       if (subscription.status !== 'unpaid') throw AppError.conflict('Already paid.', 'ALREADY_PAID');
-      return { amount: subscription.amount, description: `Triolo subscription — ${subscription.months} month${subscription.months === 1 ? '' : 's'}` };
+      return { amount: subscription.amount, description: `NearbyU subscription — ${subscription.months} month${subscription.months === 1 ? '' : 's'}` };
     }
     const badge = await this.repository.findBadge(id);
     if (!badge || badge.accountId !== accountId) throw AppError.notFound('Not found.', 'BADGE_NOT_FOUND');
     if (badge.status !== 'unpaid') throw AppError.conflict('Already paid.', 'ALREADY_PAID');
-    return { amount: badge.amount, description: 'Trusted by Triolo badge' };
+    return { amount: badge.amount, description: 'Trusted by NearbyU badge' };
   }
 
   /** A Razorpay order for something started with a checkout above, for the app's in-app payment screen. */
@@ -340,7 +340,7 @@ export class SubscriptionsService {
     const planName = partnerPlan ? ` ${PLAN_LABEL[partnerPlan]}` : '';
     const link = await razorpayService.createPaymentLink({
       amountPaise: amount * 100,
-      description: `Triolo ${audience === 'customer' ? '' : 'Partner '}subscription${planName} — ${months} month${months === 1 ? '' : 's'}`,
+      description: `NearbyU ${audience === 'customer' ? '' : 'Partner '}subscription${planName} — ${months} month${months === 1 ? '' : 's'}`,
       referenceId: `sub-${subscription.id}`,
       customer: { name: contact.name, contact: contact.mobile },
       notes: { subscriptionId: subscription.id, audience, plan: partnerPlan ?? 'all' },
@@ -424,7 +424,7 @@ export class SubscriptionsService {
     if (inApp) return { id: badge.id, amount: settings.badgePrice, paymentUrl: null };
     const link = await razorpayService.createPaymentLink({
       amountPaise: settings.badgePrice * 100,
-      description: `"Trusted by Triolo" badge — ${mine.name}`,
+      description: `"Trusted by NearbyU" badge — ${mine.name}`,
       referenceId: `bdg-${badge.id}`,
       customer: { name: contact.name, contact: contact.mobile },
       notes: { badgeId: badge.id, kind },
@@ -453,7 +453,7 @@ export class SubscriptionsService {
     return { ...(await this.getMyBadges(accountId)), paid };
   }
 
-  /** Every profile with an active badge (both apps show "Trusted by Triolo" on these). */
+  /** Every profile with an active badge (both apps show "Trusted by NearbyU" on these). */
   async trustedIds(): Promise<TrustedIds> {
     if (this.trustedCache && Date.now() - this.trustedCache.at < TRUSTED_TTL_MS) return this.trustedCache.value;
     const value = await this.repository.trustedIds();

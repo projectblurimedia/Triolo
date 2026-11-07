@@ -82,6 +82,8 @@ interface ListState {
   saveDraft: (fallbackName: string) => SaveResult;
   discardDraft: () => void;
   deleteList: (id: string) => void;
+  /** Saves a new list of these items (name made unique) and returns its id. */
+  addList: (name: string, items: Array<Omit<PrepareListItem, 'id'>>) => string;
   setHydrated: () => void;
 }
 
@@ -199,6 +201,15 @@ export const useListStore = create<ListState>()(
       },
       discardDraft: () => set({ draft: EMPTY_DRAFT }),
       deleteList: (id) => set((state) => ({ lists: state.lists.filter((list) => list.id !== id) })),
+      addList: (name, newItems) => {
+        const { lists } = get();
+        const id = generateId('list');
+        const now = new Date().toISOString();
+        const items = cleanItems(newItems.map((item) => ({ ...item, id: generateId('item') })));
+        const list = { id, name: uniqueName(lists, name, null), items, photos: [], voice: null, createdAt: now, updatedAt: now };
+        set({ lists: [list, ...lists] });
+        return id;
+      },
       setHydrated: () => set({ isHydrated: true }),
     }),
     {
