@@ -87,6 +87,8 @@ export interface CustomerOrder {
   billVoiceUrl?: string | null;
   billVoiceSeconds?: number | null;
   billAmount?: number | null;
+  /** Set by the shop at handover; 'unpaid' means the customer still owes the shop. */
+  paymentStatus?: 'paid' | 'unpaid' | null;
   /** When its photos / voice messages were removed (30 days after the order ended). */
   mediaDeletedAt?: string | null;
   shop: {

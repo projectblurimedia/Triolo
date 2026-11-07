@@ -13,7 +13,9 @@ export type OrderEvent =
   | 'cancelled_by_shop'
   | 'cancelled_by_customer'
   | 'cancelled_late'
-  | 'cancelled_by_admin';
+  | 'cancelled_by_admin'
+  /** The shop reminds a customer who hasn't paid for a completed order. */
+  | 'payment_due';
 
 export interface OrderTemplateValues {
   shop: string;
@@ -64,6 +66,10 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
       title: 'Order Cancelled by NearbyU',
       body: `NearbyU support cancelled the order with ${shop}.`,
     }),
+    payment_due: ({ shop, total }) => ({
+      title: 'Payment pending',
+      body: `You haven't paid ${total} to ${shop}. Contact the shop for more details.`,
+    }),
   },
   te: {
     placed: ({ count, photos, voice }) => ({
@@ -108,6 +114,10 @@ const TEMPLATES: Record<PreferredLanguage, Record<OrderEvent, Template>> = {
     cancelled_by_admin: ({ shop }) => ({
       title: 'నియర్‌బై యు ఆర్డర్‌ను రద్దు చేసింది',
       body: `${shop}తో ఉన్న ఆర్డర్‌ను నియర్‌బై యు సపోర్ట్ రద్దు చేసింది.`,
+    }),
+    payment_due: ({ shop, total }) => ({
+      title: 'చెల్లింపు బాకీ ఉంది',
+      body: `మీరు ${shop}కి ${total} చెల్లించలేదు. మరిన్ని వివరాలకు షాప్‌ను సంప్రదించండి.`,
     }),
   },
 };

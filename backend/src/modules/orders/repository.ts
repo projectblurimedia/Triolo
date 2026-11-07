@@ -91,6 +91,9 @@ function mapOrder(row: QueryResultRow, items: ShopOrderItem[]): ShopOrder {
     billVoiceUrl: row.bill_voice_url ?? null,
     billVoiceSeconds: row.bill_voice_seconds ?? null,
     billAmount: toNumber(row.bill_amount),
+    paymentStatus: row.payment_status ?? null,
+    paidAt: row.paid_at ?? null,
+    paymentRemindedAt: row.payment_reminded_at ?? null,
   };
 }
 
@@ -809,7 +812,7 @@ export class OrdersRepository {
   }
 
   /** The customer's PIN, entered by the shop at handover. Attempts counted under a row lock. */
-  async verifyPin(id: string, businessId: string, pin: string): Promise<VerifyOrderPinResult> {
+  async verifyPin(id: string, businessId: string, pin: string, paid = true): Promise<VerifyOrderPinResult> {
     return this.inTransaction(async (client) => {
       const current = await client.query(
         `SELECT * FROM shop_orders WHERE id = $1 AND business_id = $2 AND status = ANY($3::shop_order_status[]) FOR UPDATE`,
@@ -829,14 +832,50 @@ export class OrdersRepository {
 
       const updated = await client.query(
         `WITH updated AS (
-           UPDATE shop_orders SET status = 'completed', completed_at = now(), pin = NULL, updated_at = now()
+           UPDATE shop_orders
+           SET status = 'completed', completed_at = now(), pin = NULL, updated_at = now(),
+               payment_status = $2, paid_at = CASE WHEN $2 = 'paid' THEN now() END
            WHERE id = $1
            RETURNING *
          ) ${NOTIFY_CUSTOMER}`,
-        [id],
+        [id, paid ? 'paid' : 'unpaid'],
       );
       return { outcome: 'verified', transition: (await this.toTransition(updated.rows[0], client)) as OrderTransition } as const;
     });
+  }
+
+  /** A completed order the customer hadn't paid for is now paid (never the other way). */
+  async markPaid(id: string, businessId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE shop_orders SET payment_status = 'paid', paid_at = now(), updated_at = now()
+       WHERE id = $1 AND business_id = $2 AND status = 'completed' AND payment_status = 'unpaid'`,
+      [id, businessId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /**
+   * Records a "please pay" reminder unless one went out in the last `minHours`. Returns the
+   * customer and amount, 'too_soon', or null when the order isn't a completed, unpaid one.
+   */
+  async markPaymentReminded(
+    id: string,
+    businessId: string,
+    minHours: number,
+  ): Promise<{ accountId: string; totalAmount: number | null } | 'too_soon' | null> {
+    const updated = await this.pool.query(
+      `UPDATE shop_orders SET payment_reminded_at = now()
+       WHERE id = $1 AND business_id = $2 AND status = 'completed' AND payment_status = 'unpaid'
+         AND (payment_reminded_at IS NULL OR payment_reminded_at < now() - make_interval(hours => $3::int))
+       RETURNING account_id, total_amount`,
+      [id, businessId, minHours],
+    );
+    if (updated.rows[0]) return { accountId: updated.rows[0].account_id, totalAmount: toNumber(updated.rows[0].total_amount) };
+    const unpaid = await this.pool.query(
+      `SELECT 1 FROM shop_orders WHERE id = $1 AND business_id = $2 AND status = 'completed' AND payment_status = 'unpaid'`,
+      [id, businessId],
+    );
+    return (unpaid.rowCount ?? 0) > 0 ? 'too_soon' : null;
   }
 
   async cancelByShop(id: string, businessId: string, reason: string | null): Promise<OrderTransition | null> {

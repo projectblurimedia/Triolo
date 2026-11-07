@@ -63,6 +63,9 @@ function rupees(amount: number | null): string {
  * Flow and cancellation rules follow docs/product-specification.md §3. Depends on
  * BusinessesService and NotificationsService only (never their tables), like bookings.
  */
+/** A shop can remind a customer to pay at most once in this many hours. */
+export const PAYMENT_REMINDER_HOURS = 6;
+
 export class OrdersService {
   constructor(
     private readonly repository: OrdersRepository,
@@ -484,9 +487,10 @@ export class OrdersService {
     await this.notify(result, delivery ? 'out_for_delivery' : 'ready', delivery ? 'order_out_for_delivery' : 'order_ready');
   }
 
-  async verifyPin(ownerAccountId: string, orderId: string, pin: string): Promise<void> {
+  /** `paid`: whether the customer paid at handover (the shop's choice, default yes). */
+  async verifyPin(ownerAccountId: string, orderId: string, pin: string, paid = true): Promise<void> {
     const { shop } = await this.shopForOrder(ownerAccountId, orderId);
-    const result = await this.repository.verifyPin(orderId, shop.id, pin);
+    const result = await this.repository.verifyPin(orderId, shop.id, pin, paid);
     if (result.outcome === 'not_found') throw await this.transitionError(orderId, 'This order is not waiting for a PIN.');
     if (result.outcome === 'locked') {
       throw AppError.conflict('Too many wrong PIN attempts.', 'ORDER_PIN_LOCKED');
@@ -495,6 +499,30 @@ export class OrdersService {
       throw AppError.badRequest('That PIN is not correct.', 'ORDER_PIN_INVALID', { attemptsLeft: result.attemptsLeft });
     }
     await this.notify(result.transition, 'completed', 'order_completed');
+  }
+
+  /** The customer paid later: an unpaid order becomes paid (it can't go back to unpaid). */
+  async markOrderPaid(ownerAccountId: string, orderId: string): Promise<void> {
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
+    if (!(await this.repository.markPaid(orderId, shop.id))) {
+      throw AppError.conflict('Only a completed, unpaid order can be marked paid.', 'ORDER_NOT_UNPAID');
+    }
+  }
+
+  /** Tells the customer they still owe the shop for this order (at most every few hours). */
+  async remindPayment(ownerAccountId: string, orderId: string): Promise<void> {
+    const { shop } = await this.shopForOrder(ownerAccountId, orderId);
+    const result = await this.repository.markPaymentReminded(orderId, shop.id, PAYMENT_REMINDER_HOURS);
+    if (result === null) throw AppError.conflict('Only a completed, unpaid order can be reminded.', 'ORDER_NOT_UNPAID');
+    if (result === 'too_soon') {
+      throw AppError.conflict('A reminder was sent recently.', 'PAYMENT_REMINDER_TOO_SOON', { hours: PAYMENT_REMINDER_HOURS });
+    }
+    const language = await this.repository.languageOf(result.accountId);
+    const text = orderTemplate('payment_due', language, { shop: shop.shopName, total: rupees(result.totalAmount) });
+    await this.notificationsService.notify(result.accountId, 'order_payment_due', text.title, text.body, {
+      data: { kind: 'order_payment_due', orderId },
+      channelId: 'default',
+    });
   }
 
   async cancelByShop(ownerAccountId: string, orderId: string, reason?: string): Promise<void> {
@@ -612,10 +640,10 @@ export class OrdersService {
   }
 
   /** Staff hand the order over with the customer's PIN (cash already collected). */
-  async staffVerifyPin(staffAccountId: string, orderId: string, pin: string): Promise<StaffDelivery> {
+  async staffVerifyPin(staffAccountId: string, orderId: string, pin: string, paid = true): Promise<StaffDelivery> {
     const delivery = await this.getMyDelivery(staffAccountId, orderId);
     if (delivery.staffStatus !== 'accepted') throw AppError.conflict('Accept this delivery first.', 'DELIVERY_NOT_ACCEPTED');
-    const result = await this.repository.verifyPin(orderId, delivery.shopId, pin);
+    const result = await this.repository.verifyPin(orderId, delivery.shopId, pin, paid);
     if (result.outcome === 'not_found') throw await this.transitionError(orderId, 'This order is not waiting for a PIN.');
     if (result.outcome === 'locked') throw AppError.conflict('Too many wrong PIN attempts.', 'ORDER_PIN_LOCKED');
     if (result.outcome === 'wrong') {

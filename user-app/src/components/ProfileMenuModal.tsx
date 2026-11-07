@@ -21,7 +21,10 @@ const LOGOUT_GRADIENT = ['#ef4444', '#dc2626'] as const;
 const PURPLE_GRADIENT = ['#7C3AED', '#A78BFA'] as const;
 const GREEN_GRADIENT = ['#16A34A', '#4ADE80'] as const;
 const TEAL_GRADIENT = ['#0891B2', '#22D3EE'] as const;
-const SLATE_GRADIENT = ['#475569', '#94A3B8'] as const;
+// Privacy / Terms / Refunds: one colour each (the old grey read as disabled).
+const PRIVACY_GRADIENT = ['#0D9488', '#2DD4BF'] as const;
+const TERMS_GRADIENT = ['#4F46E5', '#818CF8'] as const;
+const REFUNDS_GRADIENT = ['#DB2777', '#F472B6'] as const;
 const DELETE_GRADIENT = ['#ef4444', '#f87171'] as const;
 
 interface ProfileMenuModalProps {
@@ -101,9 +104,9 @@ export function ProfileMenuModal({ visible, onClose }: ProfileMenuModalProps) {
 
 
         <Text style={[styles.sectionTitle, styles.sectionGap, { color: colors.textMuted }]}>{t('legal.section')}</Text>
-        <DrawerMenuItem icon="shield-halved" gradient={SLATE_GRADIENT} title={t('legal.privacy')} subtitle={t('legal.privacySub')} onPress={() => openLegalPage('privacy')} />
-        <DrawerMenuItem icon="file-contract" gradient={SLATE_GRADIENT} title={t('legal.terms')} subtitle={t('legal.termsSub')} onPress={() => openLegalPage('terms')} />
-        <DrawerMenuItem icon="rotate-left" gradient={SLATE_GRADIENT} title={t('legal.refunds')} subtitle={t('legal.refundsSub')} onPress={() => openLegalPage('refunds')} />
+        <DrawerMenuItem icon="shield-halved" gradient={PRIVACY_GRADIENT} title={t('legal.privacy')} subtitle={t('legal.privacySub')} onPress={() => openLegalPage('privacy')} />
+        <DrawerMenuItem icon="file-contract" gradient={TERMS_GRADIENT} title={t('legal.terms')} subtitle={t('legal.termsSub')} onPress={() => openLegalPage('terms')} />
+        <DrawerMenuItem icon="rotate-left" gradient={REFUNDS_GRADIENT} title={t('legal.refunds')} subtitle={t('legal.refundsSub')} onPress={() => openLegalPage('refunds')} />
         <DrawerMenuItem
           icon="user-xmark"
           gradient={DELETE_GRADIENT}

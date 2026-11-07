@@ -1,7 +1,6 @@
 import { useState } from 'react';
+import { NearbyMark } from '../components/NearbyMark';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBullhorn } from '@fortawesome/free-solid-svg-icons';
 import { authService } from '@/services/authService';
 import { ApiError } from '@/services/apiClient';
 import { getErrorMessage } from '@/services/errorMessages';
@@ -90,7 +89,7 @@ export function LoginPage() {
       <div className="login-card glass">
         <div className="login-head">
           <span className="brand-mark">
-            <FontAwesomeIcon icon={faBullhorn} />
+            <NearbyMark size={28} />
           </span>
           <h1>NearbyU Ads</h1>
           <p>{subtitle}</p>

@@ -25,7 +25,8 @@ export type NotificationType =
   | 'staff_invite'
   | 'delivery_declined'
   | 'booking_nearby'
-  | 'order_nearby';
+  | 'order_nearby'
+  | 'order_payment_due';
 
 export const MAX_BULK_DELETE = 100;
 
@@ -83,6 +84,7 @@ export const AUDIENCE_BY_TYPE: Record<NotificationType, PushAudience> = {
   booking_cancelled: 'any',
   booking_nearby: 'user',
   order_nearby: 'user',
+  order_payment_due: 'user',
   order_placed: 'partner',
   order_accepted: 'user',
   order_declined: 'user',

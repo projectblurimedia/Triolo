@@ -19,10 +19,10 @@ export function useMyDeliveries(enabled = true) {
 export function useVerifyDeliveryPin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, pin }: { id: string; pin: string }) => {
+    mutationFn: async ({ id, pin, paid = true }: { id: string; pin: string; paid?: boolean }) => {
       // Location on, like every other partner step.
       await requireLocation();
-      return deliveriesService.verifyPin(id, pin);
+      return deliveriesService.verifyPin(id, pin, paid);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: DELIVERIES_QUERY_KEY }),
   });

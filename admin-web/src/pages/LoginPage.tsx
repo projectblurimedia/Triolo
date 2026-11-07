@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { NearbyMark } from '../components/NearbyMark';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShapes } from '@fortawesome/free-solid-svg-icons';
 import { authService } from '@/services/authService';
 import { getErrorMessage } from '@/services/errorMessages';
 import { useAuthStore } from '@/state/authStore';
@@ -55,7 +55,7 @@ export function LoginPage() {
       <div className="login-card glass">
         <div className="login-head">
           <span className="brand-mark">
-            <FontAwesomeIcon icon={faShapes} />
+            <NearbyMark size={28} />
           </span>
           <h1>NearbyU Admin</h1>
           <p>{step === 'phone' ? 'Sign in with your admin mobile number' : `Enter the OTP sent to ${mobileNumber}`}</p>

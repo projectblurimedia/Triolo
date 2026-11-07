@@ -121,12 +121,13 @@ export function QuickOrderModal({ visible, onClose, onCreateList, initialListId 
     }
   };
 
-  const renderStepTitle = (number: number, title: string) => (
+  const renderStepTitle = (number: number, title: string, action?: React.ReactNode) => (
     <View style={styles.stepTitleRow}>
       <LinearGradient colors={headerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.stepNumber}>
         <Text style={styles.stepNumberText}>{number}</Text>
       </LinearGradient>
-      <Text style={[styles.stepTitle, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.stepTitle, styles.flex, { color: colors.text }]}>{title}</Text>
+      {action}
     </View>
   );
 
@@ -187,9 +188,20 @@ export function QuickOrderModal({ visible, onClose, onCreateList, initialListId 
             </View>
 
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {renderStepTitle(1, t('quickOrder.stepList'))}
+              {renderStepTitle(
+                1,
+                t('quickOrder.stepList'),
+                <Pressable
+                  onPress={onCreateList}
+                  accessibilityRole="button"
+                  style={[styles.newListButton, { borderColor: `${colors.primary}55`, backgroundColor: `${colors.primary}0F` }]}
+                >
+                  <FontAwesome6 name="plus" size={11} color={colors.primary} solid />
+                  <Text style={[styles.newListText, { color: colors.primary }]}>{t('chooseList.newList')}</Text>
+                </Pressable>,
+              )}
               {/* One sideways row of small cards; the chosen list's items underneath. */}
-              <ListPickerRow lists={lists} selectedId={listId} onSelect={setListId} onNew={onCreateList} />
+              <ListPickerRow lists={lists} selectedId={listId} onSelect={setListId} />
             </View>
 
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -261,6 +273,8 @@ const styles = StyleSheet.create({
   stepNumber: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   stepNumberText: { color: '#FFFFFF', fontFamily: fonts.semiBold, fontSize: 12, includeFontPadding: false },
   stepTitle: { ...typography.body, fontFamily: fonts.semiBold },
+  newListButton: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
+  newListText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderRadius: 14, padding: 12 },
   listName: { ...typography.body, fontFamily: fonts.semiBold },
   listMeta: { ...typography.caption, fontSize: 12, marginTop: 1 },

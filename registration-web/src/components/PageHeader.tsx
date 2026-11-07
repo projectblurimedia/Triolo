@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
+import { NearbyMark } from './NearbyMark';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronLeft, faShapes } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 
 interface PageHeaderProps {
   title: string;
@@ -20,7 +21,7 @@ export function PageHeader({ title, backTo, subtitle }: PageHeaderProps) {
           </Link>
         ) : null}
         <span className="header__iconButton header__logo" aria-hidden="true">
-          <FontAwesomeIcon icon={faShapes} />
+          <NearbyMark size={24} />
         </span>
         <div>
           <p className="header__title">{title}</p>

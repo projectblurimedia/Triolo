@@ -97,6 +97,8 @@ export interface ShopOrderItem {
   addedByShop: boolean;
 }
 
+export type OrderPaymentStatus = 'paid' | 'unpaid';
+
 export interface ShopOrder {
   id: string;
   accountId: string;
@@ -141,6 +143,11 @@ export interface ShopOrder {
   billVoiceUrl: string | null;
   billVoiceSeconds: number | null;
   billAmount: number | null;
+  /** Set when the order is handed over: did the customer pay? "unpaid" can later become "paid". */
+  paymentStatus: OrderPaymentStatus | null;
+  paidAt: Date | null;
+  /** The shop's last "please pay" reminder to the customer. */
+  paymentRemindedAt: Date | null;
   /** When the photos / voice messages above were removed (30 days after the order ended). */
   mediaDeletedAt?: Date | null;
 }

@@ -1164,7 +1164,9 @@
     "missingListName": "{{shop}} లో లేనివి",
     "missingListSaved": "కొత్త లిస్ట్ సేవ్ అయింది",
     "missingListMade": "Prepare List లో సేవ్ అయింది. వేరే షాప్‌కు పంపండి:",
-    "sendMissingList": "ఈ లిస్ట్‌ను షాప్‌కు పంపండి"
+    "sendMissingList": "ఈ లిస్ట్‌ను షాప్‌కు పంపండి",
+    "paymentPendingTitle": "చెల్లింపు బాకీ ఉంది",
+    "paymentPendingMessage": "మీరు {{shop}}కి {{amount}} బాకీ ఉన్నారు. మరిన్ని వివరాలకు షాప్‌ను సంప్రదించండి."
   },
   "myOrders": {
     "title": "నా ఆర్డర్లు",
@@ -1421,7 +1423,9 @@
     "more": "+{{count}} మరిన్ని",
     "subtitleShop": "{{shop}} కి పంపడానికి ఒక లిస్ట్ ఎంచుకోండి",
     "stepSend": "షాప్‌కి పంపండి",
-    "nextShop": "కొనసాగించండి"
+    "nextShop": "కొనసాగించండి",
+    "itemsInList_one": "ఈ లిస్ట్‌లో {{count}} వస్తువు",
+    "itemsInList_other": "ఈ లిస్ట్‌లో {{count}} వస్తువులు"
   },
   "ads": {
     "tag": "ప్రాయోజితం",

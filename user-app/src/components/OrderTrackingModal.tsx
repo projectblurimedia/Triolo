@@ -287,6 +287,18 @@ export function OrderTrackingModal() {
     const missing = o.items.filter((item) => item.status === 'unavailable');
     return (
       <>
+        {/* The shop marked this order not paid: say how much is owed, and to whom. */}
+        {o.status === 'completed' && o.paymentStatus === 'unpaid' ? (
+          <View style={[styles.card, styles.paymentDue, { backgroundColor: `${brandColors.error}0D`, borderColor: `${brandColors.error}55` }]}>
+            <FontAwesome6 name="clock" size={16} color={brandColors.error} solid />
+            <View style={styles.flex}>
+              <Text style={[styles.paymentDueTitle, { color: brandColors.error }]}>{t('orders.paymentPendingTitle')}</Text>
+              <Text style={[styles.meta, { color: colors.text }]}>
+                {t('orders.paymentPendingMessage', { amount: formatRupees(o.totalAmount ?? 0), shop: orderShopName(o, t) })}
+              </Text>
+            </View>
+          </View>
+        ) : null}
         {/* What the customer sent first (their recording / photos), then the shop's bill. */}
         {o.listVoiceUrl ? (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -666,6 +678,8 @@ export function OrderTrackingModal() {
 
 const styles = StyleSheet.create({
   missingAction: { marginTop: 12, gap: 8 },
+  paymentDue: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  paymentDueTitle: { ...typography.body, fontFamily: fonts.semiBold },
   missingNote: { ...typography.caption, fontSize: 12, lineHeight: 17 },
   countdownGap: { marginBottom: 14 },
   findingHero: { alignItems: 'center', paddingTop: 16, paddingBottom: 18 },

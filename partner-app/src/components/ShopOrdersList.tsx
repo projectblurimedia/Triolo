@@ -13,11 +13,11 @@ import { ALL_TIME, DateRange, inRange } from './DateRangeSheet';
 import { orderListText } from '@/utils/orderListText';
 import { FullText } from '@/components/FullText';
 
-export type ShopFilter = 'all' | 'new' | 'active' | 'done' | 'cancelled';
+export type ShopFilter = 'all' | 'new' | 'active' | 'done' | 'paid' | 'unpaid' | 'cancelled';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Manual, not toLocale* — Hermes on Android doesn't reliably ship full Intl data.
-function formatDate(iso: string): string {
+export function formatDate(iso: string): string {
   const date = new Date(iso);
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${date.getDate()} ${MONTHS[date.getMonth()]}, ${date.getHours()}:${minutes}`;
@@ -62,6 +62,8 @@ export function ShopOrdersList({
     active: activeOrders,
     done: ended.filter((order) => order.status === 'completed'),
     cancelled: ended.filter((order) => order.status !== 'completed'),
+    paid: ended.filter((order) => order.status === 'completed' && order.paymentStatus !== 'unpaid'),
+    unpaid: ended.filter((order) => order.status === 'completed' && order.paymentStatus === 'unpaid'),
   };
 
   const tone = (status: ShopOrderStatus) => {
@@ -118,7 +120,21 @@ export function ShopOrdersList({
             {t(order.fulfillment === 'delivery' ? 'shopOrders.delivery' : 'shopOrders.pickup')} · {formatDate(order.createdAt)}
           </FullText>
           {order.totalAmount != null ? (
-            <Text style={[styles.total, { color: colors.primary }]}>{formatRupees(order.totalAmount)}</Text>
+            <View style={styles.totalRow}>
+              <Text style={[styles.total, { color: colors.primary }]}>{formatRupees(order.totalAmount)}</Text>
+              {order.status === 'completed' && order.paymentStatus ? (
+                <View
+                  style={[
+                    styles.payPill,
+                    { backgroundColor: order.paymentStatus === 'paid' ? `${brandColors.success}1A` : `${brandColors.error}1A` },
+                  ]}
+                >
+                  <Text style={[styles.pillText, { color: order.paymentStatus === 'paid' ? brandColors.success : brandColors.error }]}>
+                    {t(order.paymentStatus === 'paid' ? 'payment.paid' : 'payment.notPaid')}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           ) : null}
         </View>
         <FontAwesome6 name="chevron-right" size={12} color={colors.textMuted} solid />
@@ -202,6 +218,8 @@ const styles = StyleSheet.create({
   pillText: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 10 },
   meta: { ...typography.caption, fontSize: 12 },
   total: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 14 },
+  totalRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  payPill: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   state: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 40, paddingHorizontal: 20 },
   stateTitle: { ...typography.body, fontFamily: fonts.semiBold, textAlign: 'center' },
   center: { textAlign: 'center' },

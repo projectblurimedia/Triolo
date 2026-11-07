@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { NearbyMark } from './NearbyMark';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
@@ -12,7 +13,6 @@ import {
   faClipboardList,
   faRightFromBracket,
   faScrewdriverWrench,
-  faShapes,
   faStore,
   faUsers,
   faBasketShopping,
@@ -184,7 +184,7 @@ export function Layout() {
           <div className="sidebar-panel glass">
             <div className="sidebar-brand">
               <span className="brand-mark">
-                <FontAwesomeIcon icon={faShapes} />
+                <NearbyMark size={24} />
               </span>
               <div className="brand-text">
                 <div className="brand-name">NearbyU Admin</div>

@@ -1,4 +1,6 @@
 import { useMyShops } from '@/hooks/useBusinessMutations';
+import { formatDate } from './ShopOrdersList';
+import { PaymentChoice } from './PaymentChoice';
 import React, { useEffect, useRef, useState } from 'react';
 import { placeName } from '@/utils/formatAddress';
 import { Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -139,7 +141,11 @@ export function ShopOrderModal() {
   );
   const packed = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.packed(id));
   const ready = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.ready(id));
-  const verifyPin = useShopOrderAction(({ id, pin }: { id: string; pin: string }) => shopOrdersService.verifyPin(id, pin));
+  const verifyPin = useShopOrderAction(({ id, pin, paid }: { id: string; pin: string; paid: boolean }) =>
+    shopOrdersService.verifyPin(id, pin, paid),
+  );
+  const markPaid = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.markPaid(id));
+  const remindPayment = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.remindPayment(id));
   const cancel = useShopOrderAction(({ id }: { id: string }) => shopOrdersService.cancel(id));
 
   const [draft, setDraft] = useState<Draft>({});
@@ -153,6 +159,9 @@ export function ShopOrderModal() {
   const [removed, setRemoved] = useState<string[]>([]);
   const [focusNameId, setFocusNameId] = useState<string | null>(null);
   const [pin, setPin] = useState('');
+  // At handover: did the customer pay? Paid by default.
+  const [paidChoice, setPaidChoice] = useState(true);
+  const [confirmPaid, setConfirmPaid] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const pinInputRef = useRef<TextInput>(null);
   // Ticking an item as packed jumps straight to its price box, scrolled above the keyboard.
@@ -190,6 +199,7 @@ export function ShopOrderModal() {
     setDirty(false);
     setPin('');
     setPinError(null);
+    setPaidChoice(true);
   }, [orderId]);
 
   // This modal draws edge-to-edge, so Android doesn't resize it for the keyboard on its own.
@@ -432,7 +442,7 @@ export function ShopOrderModal() {
 
   const handleVerifyPin = (o: ShopOrder) => {
     verifyPin.mutate(
-      { id: o.id, pin },
+      { id: o.id, pin, paid: paidChoice },
       {
         onSuccess: () => {
           Keyboard.dismiss();
@@ -1042,6 +1052,7 @@ export function ShopOrderModal() {
         />
       </Pressable>
       {pinError ? <Text style={[styles.pinError, { color: brandColors.error }]}>{pinError}</Text> : null}
+      <PaymentChoice paid={paidChoice} onChange={setPaidChoice} />
       <View style={styles.fullWidth}>
         <Button
           label={t('shopOrders.verifyPin')}
@@ -1056,6 +1067,58 @@ export function ShopOrderModal() {
       </View>
     </View>
   );
+
+  /**
+   * A completed order: paid, or not paid yet — then Mark as paid (once, it can't go back) and
+   * Notify customer (tells them how much they owe and to contact the shop).
+   */
+  const renderPayment = (o: ShopOrder) => {
+    if (o.status !== 'completed' || !o.paymentStatus) return null;
+    const paidNow = o.paymentStatus === 'paid';
+    const tone = paidNow ? brandColors.success : brandColors.error;
+    return (
+      <View style={[styles.card, { backgroundColor: `${tone}0D`, borderColor: `${tone}55`, gap: 10 }]}>
+        <View style={styles.paymentRow}>
+          <FontAwesome6 name={paidNow ? 'circle-check' : 'clock'} size={16} color={tone} solid />
+          <View style={styles.flex}>
+            <Text style={[styles.paymentTitle, { color: tone }]}>{t(paidNow ? 'payment.paid' : 'payment.notPaid')}</Text>
+            <Text style={[styles.meta, { color: colors.textMuted }]}>
+              {paidNow
+                ? o.paidAt
+                  ? t('payment.paidOn', { date: formatDate(o.paidAt) })
+                  : t('payment.paidAtHandover')
+                : t('payment.owes', { amount: formatRupees(o.totalAmount ?? 0) })}
+            </Text>
+          </View>
+        </View>
+        {paidNow ? null : (
+          <>
+            <Text style={[styles.meta, { color: colors.textMuted }]}>{t('payment.unpaidHint')}</Text>
+            <View style={styles.paymentActions}>
+              <View style={styles.flex}>
+                <Button
+                  label={t('payment.notifyCustomer')}
+                  loading={remindPayment.isPending}
+                  onPress={() =>
+                    remindPayment.mutate(
+                      { id: o.id },
+                      {
+                        onSuccess: () => showToast({ variant: 'success', title: t('payment.notifiedTitle'), message: t('payment.notifiedMessage') }),
+                        onError,
+                      },
+                    )
+                  }
+                />
+              </View>
+              <View style={styles.flex}>
+                <Button label={t('payment.markPaid')} gradient={DONE_GRADIENT} onPress={() => setConfirmPaid(true)} />
+              </View>
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
 
   const renderRating = (o: ShopOrder) =>
     o.status === 'completed' ? (
@@ -1194,6 +1257,7 @@ export function ShopOrderModal() {
             </Text>
           </View>
         ) : null}
+        {renderPayment(o)}
         {renderRating(o)}
         {o.mediaDeletedAt ? (
           <View style={[styles.mediaGone, { backgroundColor: `${colors.textMuted}12`, borderColor: `${colors.textMuted}33` }]}>
@@ -1304,6 +1368,29 @@ export function ShopOrderModal() {
           />
         ) : null}
 
+        {/* Not paid → paid is final: ask first. */}
+        <ConfirmModal
+          visible={confirmPaid}
+          icon="circle-check"
+          gradient={DONE_GRADIENT}
+          title={t('payment.confirmPaidTitle')}
+          message={t('payment.confirmPaidMessage')}
+          confirmLabel={t('payment.markPaid')}
+          loading={markPaid.isPending}
+          onConfirm={() => {
+            if (!order) return;
+            markPaid.mutate(
+              { id: order.id },
+              {
+                onSuccess: () => showToast({ variant: 'success', title: t('payment.markedPaidTitle') }),
+                onError,
+                onSettled: () => setConfirmPaid(false),
+              },
+            );
+          }}
+          onCancel={() => setConfirmPaid(false)}
+        />
+
         <ConfirmModal
           visible={confirm !== null}
           icon={confirm === 'decline' ? 'circle-xmark' : 'ban'}
@@ -1335,6 +1422,9 @@ export function ShopOrderModal() {
 }
 
 const styles = StyleSheet.create({
+  paymentRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  paymentTitle: { ...typography.body, fontFamily: fonts.semiBold, fontSize: 15 },
+  paymentActions: { flexDirection: 'row', gap: 10 },
   container: { flex: 1 },
   flex: { flex: 1 },
   fullWidth: { alignSelf: 'stretch' },

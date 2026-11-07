@@ -45,7 +45,7 @@ export class OrdersController {
   });
 
   staffVerifyPin = asyncHandler(async (req: Request, res: Response) => {
-    return ok(res, await this.service.staffVerifyPin(requireAccountId(req), req.params.id, req.body.pin), 'Delivered');
+    return ok(res, await this.service.staffVerifyPin(requireAccountId(req), req.params.id, req.body.pin, req.body.paid !== false), 'Delivered');
   });
 
   /** After accepting: the shop watched the ad ({ via: 'ad' }) or pays ({ via: 'pay' }). */
@@ -141,8 +141,18 @@ export class OrdersController {
   });
 
   verifyPin = asyncHandler(async (req: Request, res: Response) => {
-    await this.service.verifyPin(requireAccountId(req), req.params.id, req.body.pin);
+    await this.service.verifyPin(requireAccountId(req), req.params.id, req.body.pin, req.body.paid !== false);
     return ok(res, null, 'Order completed');
+  });
+
+  markPaid = asyncHandler(async (req: Request, res: Response) => {
+    await this.service.markOrderPaid(requireAccountId(req), req.params.id);
+    return ok(res, null, 'Marked as paid');
+  });
+
+  remindPayment = asyncHandler(async (req: Request, res: Response) => {
+    await this.service.remindPayment(requireAccountId(req), req.params.id);
+    return ok(res, null, 'Customer notified');
   });
 
   shopCancel = asyncHandler(async (req: Request, res: Response) => {

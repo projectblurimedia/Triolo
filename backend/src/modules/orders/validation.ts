@@ -83,6 +83,8 @@ export const saveItemsSchema = z.object({
 
 export const verifyOrderPinSchema = z.object({
   pin: z.string().regex(/^\d{4}$/, 'Enter the 4-digit PIN'),
+  /** Did the customer pay at handover? Defaults to yes. */
+  paid: z.boolean().optional(),
 });
 
 export const rateOrderSchema = z.object({

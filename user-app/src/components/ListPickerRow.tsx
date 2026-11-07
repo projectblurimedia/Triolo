@@ -10,39 +10,28 @@ import { VoiceMessage } from './VoiceMessage';
 import { listCountText } from '@/utils/listPhotos';
 import { FullText } from '@/components/FullText';
 
-const PREVIEW_ITEMS = 4;
+// Past this many items the box scrolls instead of growing.
+const ITEMS_BEFORE_SCROLL = 6;
 
 interface ListPickerRowProps {
   lists: SavedList[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  /** Shows a "+ New list" card first in the row. */
-  onNew?: () => void;
 }
 
 /**
  * Picking one of the saved lists in little room: one sideways row of small cards (name and
  * how many items), the chosen one filled blue, and its items in one line underneath.
  */
-export function ListPickerRow({ lists, selectedId, onSelect, onNew }: ListPickerRowProps) {
+export function ListPickerRow({ lists, selectedId, onSelect }: ListPickerRowProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
   const selected = lists.find((list) => list.id === selectedId) ?? null;
-  const names = (selected?.items ?? []).map((item) => item.name).filter(Boolean);
-  const shown = names.slice(0, PREVIEW_ITEMS).join(', ');
-  const more = names.length - PREVIEW_ITEMS;
+  const items = (selected?.items ?? []).filter((item) => item.name.trim());
 
   return (
     <View style={styles.wrap}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {onNew ? (
-          <Pressable onPress={onNew} accessibilityRole="button" accessibilityLabel={t('chooseList.newList')}>
-            <View style={[styles.card, styles.newCard, { borderColor: colors.primary, backgroundColor: `${colors.primary}0D` }]}>
-              <FontAwesome6 name="plus" size={13} color={colors.primary} solid />
-              <Text style={[styles.name, { color: colors.primary }]}>{t('chooseList.newList')}</Text>
-            </View>
-          </Pressable>
-        ) : null}
         {lists.map((list) => {
           const active = list.id === selectedId;
           const count = list.items.filter((item) => item.name.trim()).length;
@@ -75,10 +64,24 @@ export function ListPickerRow({ lists, selectedId, onSelect, onNew }: ListPicker
       </ScrollView>
       {selected?.voice ? <VoiceMessage uri={selected.voice.uri} seconds={selected.voice.seconds} /> : null}
       <ListPhotoStrip photos={(selected?.photos ?? []).map((photo) => photo.uri)} size={56} />
-      {names.length > 0 ? (
-        <FullText style={[styles.preview, { color: colors.textMuted }]} numberOfLines={1}>
-          {more > 0 ? `${shown} ${t('chooseList.more', { count: more })}` : shown}
-        </FullText>
+      {/* Every item of the chosen list, for reference while ordering. */}
+      {items.length > 0 ? (
+        <View style={[styles.itemsBox, { backgroundColor: `${colors.primary}08`, borderColor: `${colors.primary}26` }]}>
+          <Text style={[styles.itemsTitle, { color: colors.textMuted }]}>{t('chooseList.itemsInList', { count: items.length })}</Text>
+          <ScrollView style={styles.itemsScroll} nestedScrollEnabled showsVerticalScrollIndicator={items.length > ITEMS_BEFORE_SCROLL}>
+            {items.map((item, index) => (
+              <View key={item.id} style={[styles.itemRow, index > 0 ? { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}>
+                <Text style={[styles.itemIndex, { color: colors.primary }]}>{index + 1}.</Text>
+                <FullText style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
+                  {item.name}
+                </FullText>
+                {item.quantity || item.unit ? (
+                  <Text style={[styles.itemQty, { color: colors.textMuted }]}>{[item.quantity, item.unit].filter(Boolean).join(' ')}</Text>
+                ) : null}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       ) : null}
     </View>
   );
@@ -89,9 +92,14 @@ const styles = StyleSheet.create({
   row: { gap: 8, paddingRight: 4 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 9, height: 52, borderRadius: 14, paddingHorizontal: 12, maxWidth: 190 },
   cardOff: { borderWidth: 1 },
-  newCard: { borderWidth: 1.5, borderStyle: 'dashed' },
   text: { flexShrink: 1 },
   name: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: 17 },
   count: { ...typography.caption, fontSize: 11, lineHeight: 14 },
-  preview: { ...typography.caption, fontSize: 12, paddingHorizontal: 2 },
+  itemsBox: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  itemsTitle: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 11, letterSpacing: 0.4, marginBottom: 4 },
+  itemsScroll: { maxHeight: 6 * 34 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 34 },
+  itemIndex: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12, width: 22 },
+  itemName: { ...typography.body, fontSize: 14, flex: 1 },
+  itemQty: { ...typography.caption, fontFamily: fonts.semiBold, fontSize: 12 },
 });

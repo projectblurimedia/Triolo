@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { PaymentChoice } from './PaymentChoice';
 import { Dimensions, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome6 } from '@expo/vector-icons';
@@ -225,6 +226,8 @@ function TripModal({ delivery, me, onClose }: { delivery: StaffDelivery | null; 
   const insets = useSafeAreaInsets();
   const verify = useVerifyDeliveryPin();
   const [pin, setPin] = useState('');
+  // Did the customer pay at the door? Paid unless the staff member says otherwise.
+  const [paid, setPaid] = useState(true);
   const [pinError, setPinError] = useState<string | null>(null);
   const pinRef = useRef<TextInput>(null);
   if (!delivery) return null;
@@ -232,7 +235,7 @@ function TripModal({ delivery, me, onClose }: { delivery: StaffDelivery | null; 
 
   const submit = () =>
     verify.mutate(
-      { id: delivery.id, pin },
+      { id: delivery.id, pin, paid },
       {
         onSuccess: () => {
           Keyboard.dismiss();
@@ -347,6 +350,7 @@ function TripModal({ delivery, me, onClose }: { delivery: StaffDelivery | null; 
               />
             </Pressable>
             {pinError ? <Text style={[styles.pinError, { color: brandColors.error }]}>{pinError}</Text> : null}
+            <PaymentChoice paid={paid} onChange={setPaid} />
             <View style={styles.fullWidth}>
               <Button label={t('shopOrders.verifyPin')} onPress={submit} loading={verify.isPending} disabled={pin.length !== 4} gradient={DONE_GRADIENT} />
             </View>

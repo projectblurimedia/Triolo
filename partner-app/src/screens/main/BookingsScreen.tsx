@@ -42,7 +42,7 @@ import { FullText } from '@/components/FullText';
 type Side = 'services' | 'shop' | 'job';
 // Activity is a record of what you did: requests waiting for an answer live in New for you.
 type JobFilter = 'all' | 'active' | 'done' | 'cancelled';
-type ShopFilter = 'all' | 'active' | 'done' | 'cancelled';
+type ShopFilter = 'all' | 'active' | 'done' | 'paid' | 'unpaid' | 'cancelled';
 type Row = { kind: 'offer'; key: string; offer: PendingOffer } | { kind: 'entry'; key: string; entry: HistoryEntry };
 const SIDE_ICONS = {
   services: 'screwdriver-wrench',
@@ -483,6 +483,8 @@ export function BookingsScreen() {
     active: shopAll.filter((order) => ['accepted', 'preparing', 'packed', 'ready_for_pickup', 'out_for_delivery'].includes(order.status)).length,
     done: shopAll.filter((order) => order.status === 'completed').length,
     cancelled: shopAll.filter((order) => ['cancelled', 'declined', 'expired'].includes(order.status)).length,
+    paid: shopAll.filter((order) => order.status === 'completed' && order.paymentStatus !== 'unpaid').length,
+    unpaid: shopAll.filter((order) => order.status === 'completed' && order.paymentStatus === 'unpaid').length,
   };
   const shopOptions = [
     {
@@ -502,6 +504,18 @@ export function BookingsScreen() {
       label: t('activity.filterDone'),
       icon: 'circle-check' as const,
       count: shopCounts.done,
+    },
+    {
+      key: 'paid' as const,
+      label: t('payment.paid'),
+      icon: 'indian-rupee-sign' as const,
+      count: shopCounts.paid,
+    },
+    {
+      key: 'unpaid' as const,
+      label: t('payment.notPaid'),
+      icon: 'clock' as const,
+      count: shopCounts.unpaid,
     },
     {
       key: 'cancelled' as const,

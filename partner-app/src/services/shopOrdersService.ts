@@ -84,6 +84,10 @@ export interface ShopOrder {
   billVoiceUrl?: string | null;
   billVoiceSeconds?: number | null;
   billAmount?: number | null;
+  /** Set at handover: did the customer pay? "unpaid" can later be marked paid (not back). */
+  paymentStatus?: 'paid' | 'unpaid' | null;
+  paidAt?: string | null;
+  paymentRemindedAt?: string | null;
   /** When its photos / voice messages were removed (30 days after the order ended). */
   mediaDeletedAt?: string | null;
   customerFullName: string;
@@ -145,7 +149,11 @@ export const shopOrdersService = {
   /** The owner delivering it himself: where he is now. */
   updateDeliveryLocation: (id: string, latitude: number, longitude: number) =>
     apiClient.put<null>(`/orders/${id}/delivery-location`, { latitude, longitude }, true),
-  verifyPin: (id: string, pin: string) => apiClient.post<null>(`/orders/${id}/verify-pin`, { pin }, true),
+  verifyPin: (id: string, pin: string, paid = true) => apiClient.post<null>(`/orders/${id}/verify-pin`, { pin, paid }, true),
+  /** A not-paid order, paid later. */
+  markPaid: (id: string) => apiClient.post<null>(`/orders/${id}/paid`, undefined, true),
+  /** Tells the customer how much they still owe this shop. */
+  remindPayment: (id: string) => apiClient.post<null>(`/orders/${id}/remind-payment`, undefined, true),
   cancel: (id: string, reason?: string) => apiClient.post<null>(`/orders/${id}/shop-cancel`, { reason }, true),
 };
 

@@ -1164,7 +1164,9 @@
     "missingListName": "Not at {{shop}}",
     "missingListSaved": "New list saved",
     "missingListMade": "Saved in Prepare List. Send it to another shop:",
-    "sendMissingList": "Send this list to a shop"
+    "sendMissingList": "Send this list to a shop",
+    "paymentPendingTitle": "Payment pending",
+    "paymentPendingMessage": "You owe {{amount}} to {{shop}}. Contact the shop for more details."
   },
   "myOrders": {
     "title": "My Orders",
@@ -1421,7 +1423,9 @@
     "more": "+{{count}} more",
     "subtitleShop": "Choose a list to send to {{shop}}",
     "stepSend": "Send to the shop",
-    "nextShop": "Continue"
+    "nextShop": "Continue",
+    "itemsInList_one": "{{count}} ITEM IN THIS LIST",
+    "itemsInList_other": "{{count}} ITEMS IN THIS LIST"
   },
   "ads": {
     "tag": "Sponsored",

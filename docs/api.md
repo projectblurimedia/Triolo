@@ -565,14 +565,16 @@ Common errors: `404 ORDER_NOT_FOUND` (also for a malformed id), `409 ORDER_INVAL
 - `PUT /orders/:id/items` — body `{ items: Array<{ id?, name?, status, price? }> }`; while `accepted`/`preparing` (moves to `preparing`) → `ShopSideOrder`. An entry without `id` is a new item the shop typed in (needs `name`; e.g. read from the list's photos) and is saved with `addedByShop: true`; a shop-added item left out of the list is removed, and its `name` can be changed. The customer's own items can only be marked.
 - `POST /orders/:id/packed` — sends the bill. 400 `ORDER_ITEMS_PENDING` / `ORDER_PRICE_MISSING` / `ORDER_NOTHING_PACKED`.
 - `POST /orders/:id/ready` — `packed` → `ready_for_pickup` or `out_for_delivery` (by fulfillment), PIN generated.
-- `POST /orders/:id/verify-pin` — body `{ pin }` → `completed`. 400 `ORDER_PIN_INVALID` (`details.attemptsLeft`), 409 `ORDER_PIN_LOCKED`.
+- `POST /orders/:id/verify-pin` — body `{ pin, paid? }` → `completed`; `paid` (default true) sets `paymentStatus` `paid` / `unpaid`. 400 `ORDER_PIN_INVALID` (`details.attemptsLeft`), 409 `ORDER_PIN_LOCKED`.
+- `POST /orders/:id/paid` — owner: a completed `unpaid` order becomes `paid` (never back). 409 `ORDER_NOT_UNPAID`.
+- `POST /orders/:id/remind-payment` — owner: notifies the customer (`order_payment_due`, en / te) how much they owe this shop. At most every `PAYMENT_REMINDER_HOURS` (6): 409 `PAYMENT_REMINDER_TOO_SOON` (`details.hours`); 409 `ORDER_NOT_UNPAID` otherwise.
 - `POST /orders/:id/shop-cancel` — body `{ reason? }`, any step before `completed`.
 - `POST /orders/:id/assign-delivery` — body `{ staffAccountId: uuid | null }`, delivery orders only. A `packed` order goes out for delivery first (PIN generated); then it is handed to that staff member (`delivery_assigned` notification), or back to the owner with `null`. 400 `ORDER_NOT_DELIVERY` / `STAFF_NOT_FOUND`, 409 `ORDER_INVALID_STATE` unless `packed` / `out_for_delivery`.
 
 ### Delivery staff
 Only what is needed at the door — no prices per item, no other orders.
 - `GET /orders/staff/deliveries` → `StaffDelivery[]` (`{ id, status, shopId, shopName, customerFullName, customerMobileNumber, latitude, longitude, locationAddress, note, items: [{ name, quantity, unit }] (packed only), totalAmount (cash to collect), assignedAt, completedAt, pinAttemptsLeft }`). `GET /orders/staff/deliveries/:id` → one; 404 `DELIVERY_NOT_FOUND`.
-- `POST /orders/staff/deliveries/:id/verify-pin` — body `{ pin }` → `completed`, records who delivered it; the customer is told, and the owner gets `delivery_completed` ("collect ₹X from your staff"). Same PIN errors as the shop's.
+- `POST /orders/staff/deliveries/:id/verify-pin` — body `{ pin, paid? }` (as the owner's) → `completed`, records who delivered it; the customer is told, and the owner gets `delivery_completed` ("collect ₹X from your staff"). Same PIN errors as the shop's.
 
 ## Favorites Module
 

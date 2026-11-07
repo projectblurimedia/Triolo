@@ -565,7 +565,9 @@
     "VOICE_REQUIRED": "Record a voice message first.",
     "ORDER_VOICE_INVALID": "This voice message could not be used. Please record it again.",
     "ORDER_VOICE_TOO_LONG": "The voice message is too long. Keep it under 3 minutes.",
-    "ACCOUNT_DELETED": "This account was deleted. The number can sign up again 30 days after it was deleted."
+    "ACCOUNT_DELETED": "This account was deleted. The number can sign up again 30 days after it was deleted.",
+    "ORDER_NOT_UNPAID": "This order is not waiting for payment.",
+    "PAYMENT_REMINDER_TOO_SOON": "You reminded this customer recently. Try again in a few hours."
   },
   "problems": {
     "myJobsTitle": "My Jobs",
@@ -1892,5 +1894,21 @@
     "notificationTitle": "Delivering an order",
     "notificationBody": "The customer sees you coming on the map.",
     "mapTitle": "Your delivery"
+  },
+  "payment": {
+    "question": "Did the customer pay?",
+    "paid": "Paid",
+    "notPaid": "Not paid",
+    "paidOn": "Paid on {{date}}",
+    "paidAtHandover": "Paid at handover",
+    "owes": "The customer owes {{amount}}",
+    "unpaidHint": "Mark it paid once they pay — after that it can’t be changed.",
+    "markPaid": "Mark as paid",
+    "confirmPaidTitle": "Mark as paid?",
+    "confirmPaidMessage": "Once marked paid, it can’t be changed back to not paid.",
+    "notifyCustomer": "Notify customer",
+    "notifiedTitle": "Customer notified",
+    "notifiedMessage": "They were told how much they owe and to contact your shop.",
+    "markedPaidTitle": "Marked as paid"
   }
 }

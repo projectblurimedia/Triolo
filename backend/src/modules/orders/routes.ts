@@ -66,6 +66,9 @@ ordersRouter.put('/:id/items', authenticate, validateBody(saveItemsSchema), cont
 ordersRouter.post('/:id/packed', authenticate, controller.packed);
 ordersRouter.post('/:id/ready', authenticate, controller.ready);
 ordersRouter.post('/:id/verify-pin', authenticate, validateBody(verifyOrderPinSchema), controller.verifyPin);
+// After handover: an unpaid order paid later, and a "please pay" reminder to the customer.
+ordersRouter.post('/:id/paid', authenticate, controller.markPaid);
+ordersRouter.post('/:id/remind-payment', authenticate, controller.remindPayment);
 // The owner sends a delivery with staff ({ staffAccountId }, or null to take it back).
 ordersRouter.post('/:id/assign-delivery', authenticate, validateBody(assignDeliverySchema), controller.assignDelivery);
 ordersRouter.post('/:id/shop-cancel', authenticate, validateBody(shopCancelSchema), controller.shopCancel);

@@ -36,5 +36,6 @@ export const deliveriesService = {
   /** Where I am while delivering, so the shop owner sees it on the map. */
   updateLocation: (id: string, latitude: number, longitude: number) =>
     apiClient.put<null>(`/orders/staff/deliveries/${id}/location`, { latitude, longitude }, true),
-  verifyPin: (id: string, pin: string) => apiClient.post<StaffDelivery>(`/orders/staff/deliveries/${id}/verify-pin`, { pin }, true),
+  verifyPin: (id: string, pin: string, paid = true) =>
+    apiClient.post<StaffDelivery>(`/orders/staff/deliveries/${id}/verify-pin`, { pin, paid }, true),
 };

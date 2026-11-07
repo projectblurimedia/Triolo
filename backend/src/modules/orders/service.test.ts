@@ -81,6 +81,9 @@ function buildOrder(overrides: Partial<ShopOrder> = {}): ShopOrder {
     billPhotoUrls: [],
     billVoiceUrl: null,
     billVoiceSeconds: null,
+    paymentStatus: null,
+    paidAt: null,
+    paymentRemindedAt: null,
     billAmount: null,
     ...overrides,
   };
@@ -134,6 +137,8 @@ beforeEach(() => {
     markPacked: jest.fn(),
     markReady: jest.fn(),
     verifyPin: jest.fn(),
+    markPaid: jest.fn(),
+    markPaymentReminded: jest.fn(),
     cancelByShop: jest.fn(),
     languageOf: jest.fn().mockResolvedValue('te'),
     statusOf: jest.fn(),
@@ -456,6 +461,39 @@ describe('shop steps', () => {
     businesses.getMyProfile.mockResolvedValue(null);
     await expect(service.acceptOrder('someone', 'order-1')).rejects.toMatchObject({ code: 'BUSINESS_PROFILE_NOT_FOUND' });
     expect(await service.listShopOrders('someone')).toEqual([]);
+  });
+});
+
+describe('payment after handover', () => {
+  it('passes the paid or not paid choice with the PIN (paid by default)', async () => {
+    repo.verifyPin.mockResolvedValue({ outcome: 'verified', transition: transition({ status: 'completed' }) });
+    await service.verifyPin('owner-1', 'order-1', '1234');
+    expect(repo.verifyPin).toHaveBeenLastCalledWith('order-1', expect.any(String), '1234', true);
+    await service.verifyPin('owner-1', 'order-1', '1234', false);
+    expect(repo.verifyPin).toHaveBeenLastCalledWith('order-1', expect.any(String), '1234', false);
+  });
+
+  it('marks an unpaid order paid, and refuses anything else', async () => {
+    repo.markPaid.mockResolvedValueOnce(true);
+    await service.markOrderPaid('owner-1', 'order-1');
+    repo.markPaid.mockResolvedValueOnce(false);
+    await expect(service.markOrderPaid('owner-1', 'order-1')).rejects.toMatchObject({ code: 'ORDER_NOT_UNPAID' });
+  });
+
+  it('reminds the customer how much they owe, at most every few hours', async () => {
+    repo.markPaymentReminded.mockResolvedValueOnce({ accountId: 'customer-1', totalAmount: 250 });
+    await service.remindPayment('owner-1', 'order-1');
+    expect(notifications.notify).toHaveBeenCalledWith(
+      'customer-1',
+      'order_payment_due',
+      expect.any(String),
+      expect.stringContaining('250'),
+      expect.objectContaining({ data: { kind: 'order_payment_due', orderId: 'order-1' } }),
+    );
+    repo.markPaymentReminded.mockResolvedValueOnce('too_soon');
+    await expect(service.remindPayment('owner-1', 'order-1')).rejects.toMatchObject({ code: 'PAYMENT_REMINDER_TOO_SOON' });
+    repo.markPaymentReminded.mockResolvedValueOnce(null);
+    await expect(service.remindPayment('owner-1', 'order-1')).rejects.toMatchObject({ code: 'ORDER_NOT_UNPAID' });
   });
 });
 

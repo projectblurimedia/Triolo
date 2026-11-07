@@ -336,6 +336,8 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
 
 - **Vercel projects renamed** (explicit request): nearbyu-backend (was triolo-backend), nearbyu-web, nearbyu-ads, nearbyu-admin. Renaming kept every alias. **triolo-backend.vercel.app is kept on purpose** (installs that have not taken the nearbyu OTA still call it); triolo-web / triolo-ads aliases kept for old in-app links; triolo-admin.vercel.app removed (admin only at admin.nearbyu.in). `vercel logs triolo-backend.vercel.app` still works. **OTP SMS:** Fast2SMS answers 999 "complete one transaction of 100 INR" until the account is recharged — the code is then only in the logs.
 
+- **Shop order payment status** (explicit request; decided without asking, reversible: reminder at most every 6 h — `PAYMENT_REMINDER_HOURS`; staff see the same choice as the owner): `shop_orders.payment_status` set by verify-pin `paid` (default true) from `PaymentChoice` (partner-app); `POST /orders/:id/paid` (unpaid → paid only) and `/remind-payment` (`order_payment_due` to the customer app). Activity shop filters `paid` / `unpaid`. Websites have `components/NearbyMark.tsx` + `public/favicon.svg` (copies in the three sites — keep in sync).
+
 ## Pending Modules (build order, current plan)
 
 1. ~~Auth~~ — done (localization support included)
