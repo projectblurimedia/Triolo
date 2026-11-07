@@ -53,7 +53,7 @@ export async function payForAd(ad: Ad, prefill: { name?: string; contact?: strin
       order_id: order.orderId,
       amount: order.amount,
       currency: order.currency,
-      name: 'Triolo Ads',
+      name: 'NearbyU Ads',
       description: order.description,
       prefill: { name: prefill.name, contact: prefill.contact },
       theme: { color: '#0055D3' },

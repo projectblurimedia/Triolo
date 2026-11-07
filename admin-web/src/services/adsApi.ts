@@ -1,10 +1,10 @@
 import { apiClient } from './apiClient';
 import type { Page } from './adminApi';
 
-/** in_review / rejected: booked by a business on the Triolo Ads website, not approved (yet). */
+/** in_review / rejected: booked by a business on the NearbyU Ads website, not approved (yet). */
 export type AdStatus = 'unpaid' | 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
 /** 'pending' = not paid yet (a business's own booking, until you record how it was paid). */
-/** 'online' = paid by the business through Razorpay on the Triolo Ads website. */
+/** 'online' = paid by the business through Razorpay on the NearbyU Ads website. */
 export type AdPaymentMethod = 'cash' | 'upi' | 'other' | 'pending' | 'online';
 export type AdPlanDays = 1 | 3 | 7 | 30;
 /** Bought by days (a plan) or by views (a number of views at the per-view price). */
@@ -111,7 +111,7 @@ export interface Ad {
   /** YYYY-MM-DD, India date. */
   startDate: string;
   endDate: string;
-  /** The business account that booked it on the Triolo Ads website; null when you did. */
+  /** The business account that booked it on the NearbyU Ads website; null when you did. */
   ownerAccountId: string | null;
   reviewStatus: 'pending' | 'approved' | 'rejected';
   /** Why it was rejected (the business sees it). */
@@ -140,7 +140,7 @@ export interface SaveAd {
   /** The ad's image or video, already uploaded; saved together with the ad. */
   imageUrl?: string | null;
   videoUrl?: string | null;
-  /** Left out when promoting a Triolo Partner profile (its name is used). */
+  /** Left out when promoting a NearbyU Partner profile (its name is used). */
   advertiserName?: string;
   advertiserPhone: string;
   title?: string;

@@ -63,7 +63,7 @@ export function DashboardPage() {
   const topbar = (
     <Topbar
       title="Dashboard"
-      subtitle="Everything happening on Triolo, at a glance"
+      subtitle="Everything happening on NearbyU, at a glance"
       actions={
         <button className="btn btn-ghost" onClick={reload}>
           <FontAwesomeIcon icon={faRotate} /> Refresh

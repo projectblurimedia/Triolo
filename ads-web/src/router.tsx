@@ -4,7 +4,7 @@ import { RequireLogin } from '@/components/RequireLogin';
 import { LoginPage } from '@/pages/LoginPage';
 import { AdDetailPage, AdEditPage, AdNewPage, HowItWorksPage, MyAdsPage } from '@/pages/AdsPages';
 
-// The Triolo Ads website: businesses book their own ads; Triolo reviews them in admin-web.
+// The NearbyU Ads website: businesses book their own ads; NearbyU reviews them in admin-web.
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {

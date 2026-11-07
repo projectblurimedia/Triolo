@@ -13,7 +13,7 @@ import { Dropdown, DropdownOption } from '@/components/Dropdown';
 import type { PlaceValue } from '@/utils/place';
 
 // Kept the same in admin-web and ads-web (`mine` = the ads website, where a business promotes
-// its own Triolo Partner profile).
+// its own NearbyU Partner profile).
 
 export type AdActionType = 'none' | 'link' | 'location' | 'service' | 'business' | 'job_post';
 export type AdPromotedKind = 'service' | 'business' | 'job_post';
@@ -26,7 +26,7 @@ export interface AdActionValue {
   promoteKind: AdPromotedKind;
   linkUrl: string;
   place: PlaceValue | null;
-  /** The ad's mobile number: the Triolo Partner account's when promoting (required), else optional. */
+  /** The ad's mobile number: the NearbyU Partner account's when promoting (required), else optional. */
   mobile: string;
 }
 
@@ -54,7 +54,7 @@ function choiceOptions(mine: boolean): DropdownOption<ActionChoice>[] {
     { value: 'location', label: 'Show directions', description: 'Opens the maps app with the way to a place', icon: faDiamondTurnRight },
     {
       value: 'promote',
-      label: mine ? 'Promote my Triolo Partner profile' : 'Promote a Triolo Partner profile',
+      label: mine ? 'Promote my NearbyU Partner profile' : 'Promote a NearbyU Partner profile',
       description: 'A worker, shop or job post — Book Now / Order / Contact',
       icon: faIdBadge,
     },
@@ -70,7 +70,7 @@ export const ACTION_LABEL: Record<AdActionType, string> = {
   job_post: 'Promotes a job post — Contact',
 };
 
-/** Whether the ad promotes a Triolo Partner profile (then the business name comes from it). */
+/** Whether the ad promotes a NearbyU Partner profile (then the business name comes from it). */
 export function promotesProfile(value: AdActionValue): boolean {
   return value.choice === 'promote';
 }
@@ -92,7 +92,7 @@ export function actionFromAd(ad: AdActionSource): AdActionValue {
 /** What's missing for the chosen action, or null when it's complete. */
 export function actionProblem(value: AdActionValue): string | null {
   if (value.choice === 'promote' && !/^\d{10}$/.test(value.mobile)) {
-    return 'Enter the 10-digit mobile number of the Triolo Partner account.';
+    return 'Enter the 10-digit mobile number of the NearbyU Partner account.';
   }
   if (value.choice !== 'promote' && value.mobile && !/^\d{10}$/.test(value.mobile)) {
     return 'Enter a 10-digit mobile number, or leave it empty.';
@@ -125,7 +125,7 @@ interface FieldProps {
 }
 
 /**
- * Top of the ad form: "When people tap the ad" (nothing / link / directions / a Triolo Partner
+ * Top of the ad form: "When people tap the ad" (nothing / link / directions / a NearbyU Partner
  * profile), then the mobile number — required when promoting a profile (it finds the profile),
  * optional otherwise — and, when promoting, which profile.
  */
@@ -151,10 +151,10 @@ export function AdActionTop({ value, onChange, mine, disabled }: FieldProps) {
         <span>
           {promote
             ? mine
-              ? 'Your Triolo Partner mobile number *'
-              : 'Triolo Partner mobile number *'
+              ? 'Your NearbyU Partner mobile number *'
+              : 'NearbyU Partner mobile number *'
             : mine
-              ? 'Mobile number (optional — for Triolo to reach you)'
+              ? 'Mobile number (optional — for NearbyU to reach you)'
               : 'Mobile number (optional — on the bill)'}
         </span>
         <input
@@ -163,7 +163,7 @@ export function AdActionTop({ value, onChange, mine, disabled }: FieldProps) {
           inputMode="numeric"
           maxLength={10}
           disabled={disabled}
-          placeholder={promote ? '10-digit Triolo Partner number' : '10-digit mobile number'}
+          placeholder={promote ? '10-digit NearbyU Partner number' : '10-digit mobile number'}
         />
       </label>
 

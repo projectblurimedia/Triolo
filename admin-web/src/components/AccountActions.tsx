@@ -54,7 +54,7 @@ export function AccountActions({
                 : 'Account active again',
           message:
             action === 'reactivate'
-              ? `${account.fullName} can use Triolo again.`
+              ? `${account.fullName} can use NearbyU again.`
               : `${account.fullName} has been signed out and told why.`,
         });
       }
@@ -130,7 +130,7 @@ export function AccountActions({
         icon={faRotateLeft}
         tone="success"
         title={`Reactivate ${account.fullName}?`}
-        message="They can log in and use Triolo again straight away."
+        message="They can log in and use NearbyU again straight away."
         confirmLabel="Reactivate"
         onConfirm={({ reason, days }) => run(reason, days)}
         onClose={() => setAction(null)}

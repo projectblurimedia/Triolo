@@ -57,7 +57,7 @@ export function LoginPage() {
           <span className="brand-mark">
             <FontAwesomeIcon icon={faShapes} />
           </span>
-          <h1>Triolo Admin</h1>
+          <h1>NearbyU Admin</h1>
           <p>{step === 'phone' ? 'Sign in with your admin mobile number' : `Enter the OTP sent to ${mobileNumber}`}</p>
         </div>
         <form

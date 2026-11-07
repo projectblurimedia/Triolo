@@ -187,7 +187,7 @@ export function Layout() {
                 <FontAwesomeIcon icon={faShapes} />
               </span>
               <div className="brand-text">
-                <div className="brand-name">Triolo Admin</div>
+                <div className="brand-name">NearbyU Admin</div>
                 <div className="brand-sub">Control centre</div>
               </div>
             </div>

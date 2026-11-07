@@ -22,7 +22,7 @@ interface AuthState {
   clearSession: () => void;
 }
 
-/** The business's session on the Triolo Ads website, kept in localStorage across visits. */
+/** The business's session on the NearbyU Ads website, kept in localStorage across visits. */
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({

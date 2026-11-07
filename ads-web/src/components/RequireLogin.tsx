@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/state/authStore';
 
-/** Every page but /login needs a signed-in business (any Triolo account). */
+/** Every page but /login needs a signed-in business (any NearbyU account). */
 export function RequireLogin({ children }: { children: ReactNode }) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const location = useLocation();

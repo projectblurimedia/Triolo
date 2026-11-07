@@ -27,7 +27,7 @@ function itemForPath(pathname: string): NavItem {
   return ITEMS[0];
 }
 
-/** Every page of the Triolo Ads website: the glass sidebar (a drawer on small screens) and the page. */
+/** Every page of the NearbyU Ads website: the glass sidebar (a drawer on small screens) and the page. */
 export function Layout() {
   const account = useAuthStore((state) => state.account);
   const clearSession = useAuthStore((state) => state.clearSession);
@@ -49,7 +49,7 @@ export function Layout() {
                 <FontAwesomeIcon icon={faBullhorn} />
               </span>
               <div className="brand-text">
-                <div className="brand-name">Triolo Ads</div>
+                <div className="brand-name">NearbyU Ads</div>
                 <div className="brand-sub">Advertise to people nearby</div>
               </div>
             </div>

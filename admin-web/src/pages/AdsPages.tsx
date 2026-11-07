@@ -160,7 +160,7 @@ const AD_APPS: {
 }[] = [
   {
     label: 'Customer app',
-    note: 'Triolo — ads before the last tap of each action',
+    note: 'NearbyU — ads before the last tap of each action',
     icon: faMobileScreen,
     gradient: 'linear-gradient(135deg,#0055d3,#1d76fa)',
     setting: 'actionUser',
@@ -207,7 +207,7 @@ const AD_APPS: {
   },
   {
     label: 'Partner app',
-    note: 'Triolo Partner — never shows Triolo Partner profile ads',
+    note: 'NearbyU Partner — never shows NearbyU Partner profile ads',
     icon: faHandshake,
     gradient: 'linear-gradient(135deg,#7c3aed,#a78bfa)',
     setting: 'actionPartner',
@@ -693,7 +693,7 @@ function AdForm({ ad }: { ad?: Ad }) {
         ? { kind: 'image', url: ad.imageUrls[0] }
         : null,
   );
-  // What tapping the ad does (nothing / link / directions / a Triolo profile).
+  // What tapping the ad does (nothing / link / directions / a NearbyU profile).
   const [action, setAction] = useState<AdActionValue>(() => (ad ? actionFromAd(ad) : EMPTY_ACTION));
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState('');
@@ -819,7 +819,7 @@ function AdForm({ ad }: { ad?: Ad }) {
       setProgress('Saving the ad…');
       const body: SaveAd = {
         ...form,
-        // A promoted Triolo Partner profile's own name is used.
+        // A promoted NearbyU Partner profile's own name is used.
         advertiserName: promotesProfile(action) ? undefined : form.advertiserName,
         ...uploaded,
         ...actionBody(action),
@@ -1178,7 +1178,7 @@ export function AdDetailPage() {
             <FontAwesomeIcon icon={faBullhorn} /> Waiting for your review
           </div>
           <p className="muted" style={{ margin: '0 0 12px', fontSize: 14 }}>
-            {ad.advertiserName} booked this on the Triolo Ads website. It is not shown in the apps until you approve it — then it
+            {ad.advertiserName} booked this on the NearbyU Ads website. It is not shown in the apps until you approve it — then it
             runs {dayLabel(ad.startDate)} – {dayLabel(ad.endDate)}. Payment:{' '}
             {ad.paymentMethod === 'online'
               ? `${rupees(ad.amount)} paid online — rejecting refunds it automatically.`
@@ -1350,7 +1350,7 @@ export function AdDetailPage() {
                 {ad.refundId ? ` · refunded (${ad.refundId})` : ''}
               </InfoRow>
               <InfoRow icon={faStore} label="Booked by">
-                {ad.ownerAccountId ? 'The business, on the Triolo Ads website' : 'You (admin)'}
+                {ad.ownerAccountId ? 'The business, on the NearbyU Ads website' : 'You (admin)'}
               </InfoRow>
               <InfoRow icon={faStore} label="Billed to">
                 {ad.advertiserName}

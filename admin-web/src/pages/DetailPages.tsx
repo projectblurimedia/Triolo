@@ -1111,7 +1111,7 @@ export function ProblemDetailPage() {
 
               {problem.status === 'closed' ? (
                 <Notice tone="muted" icon={faCircleXmark}>
-                  Closed by Triolo admin on {formatDateTime(problem.closedAt)}
+                  Closed by NearbyU admin on {formatDateTime(problem.closedAt)}
                   {problem.closedReason ? ` — “${problem.closedReason}”` : ''}
                 </Notice>
               ) : null}

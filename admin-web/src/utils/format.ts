@@ -237,7 +237,7 @@ export const problemStatus = (status: ProblemStatus) => PROBLEM[status] ?? { lab
 
 export const cancelledByLabel = (by: string | null | undefined) =>
   by === 'admin'
-    ? 'Triolo admin'
+    ? 'NearbyU admin'
     : by === 'worker'
       ? 'the worker'
       : by === 'shop'

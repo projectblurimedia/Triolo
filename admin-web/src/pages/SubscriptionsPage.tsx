@@ -432,7 +432,7 @@ export function SubscriptionsPage() {
 
   return (
     <>
-      <Topbar title="Subscriptions" subtitle="Plans for customers and partners, and Trusted by Triolo badges" />
+      <Topbar title="Subscriptions" subtitle="Plans for customers and partners, and Trusted by NearbyU badges" />
 
       <div className="stats">
         {[
@@ -481,7 +481,7 @@ export function SubscriptionsPage() {
 
         <div className={`ad-spots${master ? '' : ' disabled'}`}>
           <PlanSection
-            title="Customer app (Triolo Plus)"
+            title="Customer app (NearbyU Plus)"
             note="Customers subscribe to book and order"
             icon={faMobileScreen}
             gradient="linear-gradient(135deg,#0055d3,#1d76fa)"
@@ -580,7 +580,7 @@ export function SubscriptionsPage() {
       </div>
 
       <PlanCard
-        title="Trusted by Triolo badge"
+        title="Trusted by NearbyU badge"
         icon={faShieldHalved}
         gradient="linear-gradient(135deg,#16a34a,#22c55e)"
         on={settings.badgeEnabled}
@@ -738,7 +738,7 @@ export function SubscriptionsPage() {
         icon={faTrash}
         tone="danger"
         title="Remove this Trusted badge?"
-        message={`${removing?.profileName ?? 'This profile'} loses the "Trusted by Triolo" badge. The partner is told your reason and can buy it again.`}
+        message={`${removing?.profileName ?? 'This profile'} loses the "Trusted by NearbyU" badge. The partner is told your reason and can buy it again.`}
         confirmLabel="Remove Badge"
         askReason
         reasonRequired

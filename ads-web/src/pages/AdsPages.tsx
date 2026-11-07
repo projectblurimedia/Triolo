@@ -59,19 +59,19 @@ import { rupees, timeAgo, Tone } from '@/utils/format';
 import { payForAd } from '@/utils/razorpayCheckout';
 
 const STATUS: Record<AdStatus, { label: string; tone: Tone; help: string }> = {
-  unpaid: { label: 'Waiting for payment', tone: 'warning', help: 'Pay for it to send it to Triolo for review.' },
-  in_review: { label: 'In review', tone: 'warning', help: 'Triolo is checking your ad. It is not shown yet.' },
+  unpaid: { label: 'Waiting for payment', tone: 'warning', help: 'Pay for it to send it to NearbyU for review.' },
+  in_review: { label: 'In review', tone: 'warning', help: 'NearbyU is checking your ad. It is not shown yet.' },
   rejected: { label: 'Not approved', tone: 'error', help: 'Change it as asked and send it again.' },
   scheduled: { label: 'Approved · starts soon', tone: 'info', help: 'Approved — it starts showing on its start date.' },
-  running: { label: 'Showing now', tone: 'success', help: 'People near you see it when they open the Triolo apps.' },
+  running: { label: 'Showing now', tone: 'success', help: 'People near you see it when they open the NearbyU apps.' },
   ended: { label: 'Ended', tone: 'muted', help: 'Its days are over.' },
   deleted: { label: 'Withdrawn', tone: 'muted', help: 'You took it back.' },
 };
 
-/** The ad's status, telling apart an ad the business withdrew from one Triolo removed. */
+/** The ad's status, telling apart an ad the business withdrew from one NearbyU removed. */
 function statusOf(ad: Ad): { label: string; tone: Tone; help: string } {
   if (ad.status === 'deleted' && ad.deletedBy !== 'owner') {
-    return { label: 'Removed by Triolo', tone: 'error', help: 'Triolo took this ad down. For questions, contact Triolo support.' };
+    return { label: 'Removed by NearbyU', tone: 'error', help: 'NearbyU took this ad down. For questions, contact NearbyU support.' };
   }
   return STATUS[ad.status];
 }
@@ -134,7 +134,7 @@ export function MyAdsPage() {
     <>
       <Topbar
         title="My Ads"
-        subtitle="Book ads that people near your business see in the Triolo apps"
+        subtitle="Book ads that people near your business see in the NearbyU apps"
         actions={
           <Link to="/new" className="btn btn-primary">
             <FontAwesomeIcon icon={faPlus} /> Book an Ad
@@ -151,8 +151,8 @@ export function MyAdsPage() {
           <div className="welcome">
             <h2>Hi {account?.fullName?.split(' ')[0] ?? 'there'} — reach customers near your shop</h2>
             <p>
-              Your wide picture or short video slides by at the top of Home in the Triolo apps — to everyone, or with directions, to people near your place.
-              Book it here in a few minutes; Triolo checks it and it goes live on your start date.
+              Your wide picture or short video slides by at the top of Home in the NearbyU apps — to everyone, or with directions, to people near your place.
+              Book it here in a few minutes; NearbyU checks it and it goes live on your start date.
             </p>
             <Link to="/new" className="btn">
               <FontAwesomeIcon icon={faPlus} /> Book your first ad
@@ -203,19 +203,19 @@ function HowItWorksSteps() {
   const steps = [
     {
       title: 'Make your ad',
-      text: 'One picture or a short video (up to 30 seconds), vertical or wide. Choose what tapping it does: a link, directions, or your Triolo profile.',
+      text: 'One picture or a short video (up to 30 seconds), vertical or wide. Choose what tapping it does: a link, directions, or your NearbyU profile.',
     },
     {
       title: 'Choose where and when',
       text: 'Pick 1 day, 3 days, a week or a month, and the start date. Want directions to your shop? Pin it on the map.',
     },
     {
-      title: 'Triolo checks it',
+      title: 'NearbyU checks it',
       text: 'We review every ad so the apps stay clean and safe — usually within a day. If something needs fixing, we tell you why.',
     },
     {
       title: 'It goes live nearby',
-      text: 'People see it in the Home slider of the Triolo apps. Watch the views and opens here.',
+      text: 'People see it in the Home slider of the NearbyU apps. Watch the views and opens here.',
     },
   ];
   return (
@@ -235,7 +235,7 @@ export function HowItWorksPage() {
   const info = useApi(() => adsApi.info(), []);
   return (
     <>
-      <Topbar title="How It Works" subtitle="Booking an ad in the Triolo apps" />
+      <Topbar title="How It Works" subtitle="Booking an ad in the NearbyU apps" />
       <HowItWorksSteps />
       <div className="glass card" style={{ marginTop: 16 }}>
         <div className="card-title">
@@ -263,7 +263,7 @@ export function HowItWorksPage() {
           <FontAwesomeIcon icon={faWallet} /> Payment
         </div>
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          You pay online right after booking — UPI, debit / credit card or net banking, through Razorpay. Then Triolo reviews
+          You pay online right after booking — UPI, debit / credit card or net banking, through Razorpay. Then NearbyU reviews
           your ad. If it isn't approved, or you withdraw it before approval, your money is refunded in full.
         </p>
       </div>
@@ -315,7 +315,7 @@ function AdForm({ ad }: { ad?: Ad }) {
   const navigate = useNavigate();
   const info = useApi(() => adsApi.info(), []);
   const [advertiserName, setAdvertiserName] = useState(ad?.advertiserName ?? '');
-  // What tapping the ad does (nothing / link / directions / your Triolo profile).
+  // What tapping the ad does (nothing / link / directions / your NearbyU profile).
   const [action, setAction] = useState<AdActionValue>(() => (ad ? actionFromAd(ad) : EMPTY_ACTION));
   const [description, setDescription] = useState(ad?.description ?? '');
   const [orientation, setOrientation] = useState<AdOrientation>(ad?.orientation ?? 'vertical');
@@ -428,7 +428,7 @@ function AdForm({ ad }: { ad?: Ad }) {
         mediaBody = media.kind === 'image' ? { imageUrl: media.url } : { videoUrl: media.url };
       }
       const body = {
-        // A promoted Triolo Partner profile's own name is used.
+        // A promoted NearbyU Partner profile's own name is used.
         advertiserName: promotesProfile(action) ? undefined : advertiserName.trim(),
         description: description.trim() || undefined,
         ...actionBody(action),
@@ -445,7 +445,7 @@ function AdForm({ ad }: { ad?: Ad }) {
       if (saved.status === 'unpaid') {
         await payWithToast(saved);
       } else {
-        showToast({ variant: 'success', title: 'Sent for review', message: 'Triolo checks your ad — usually within a day.' });
+        showToast({ variant: 'success', title: 'Sent for review', message: 'NearbyU checks your ad — usually within a day.' });
       }
       navigate(`/ads/${saved.id}`, { replace: true });
     } catch (err) {
@@ -707,7 +707,7 @@ function AdForm({ ad }: { ad?: Ad }) {
 export function AdNewPage() {
   return (
     <>
-      <Topbar title="Book an Ad" subtitle="Triolo checks every ad before it's shown" />
+      <Topbar title="Book an Ad" subtitle="NearbyU checks every ad before it's shown" />
       <BackLink to="/" label="My ads" />
       <AdForm />
     </>

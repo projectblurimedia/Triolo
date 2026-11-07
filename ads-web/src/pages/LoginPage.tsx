@@ -11,7 +11,7 @@ import { Spinner } from '@/components/ui';
 type Step = 'phone' | 'name' | 'otp';
 
 /**
- * Sign in with a mobile number and an OTP — the same Triolo account as the apps. A number
+ * Sign in with a mobile number and an OTP — the same NearbyU account as the apps. A number
  * with no account yet is asked for a name and gets one, so any business can start here.
  */
 export function LoginPage() {
@@ -92,7 +92,7 @@ export function LoginPage() {
           <span className="brand-mark">
             <FontAwesomeIcon icon={faBullhorn} />
           </span>
-          <h1>Triolo Ads</h1>
+          <h1>NearbyU Ads</h1>
           <p>{subtitle}</p>
         </div>
         <form

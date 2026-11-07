@@ -1,6 +1,6 @@
 import { apiClient } from './apiClient';
 
-/** in_review = waiting for Triolo to check it; only approved ads are shown in the apps. */
+/** in_review = waiting for NearbyU to check it; only approved ads are shown in the apps. */
 export type AdStatus = 'unpaid' | 'in_review' | 'rejected' | 'scheduled' | 'running' | 'ended' | 'deleted';
 export type AdPlanDays = 1 | 3 | 7 | 30;
 export type AdOrientation = 'vertical' | 'horizontal';
@@ -28,9 +28,9 @@ export interface Ad {
   /** What tapping the ad does. */
   actionType: AdActionType;
   destination: { latitude: number; longitude: number; name: string } | null;
-  /** The Triolo Partner profile it promotes. */
+  /** The NearbyU Partner profile it promotes. */
   promoted: { kind: AdPromotedKind; id: string; name: string } | null;
-  /** The Triolo Partner number that profile was found by. */
+  /** The NearbyU Partner number that profile was found by. */
   promoteMobile: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -50,14 +50,14 @@ export interface Ad {
   startDate: string;
   endDate: string;
   reviewStatus: 'pending' | 'approved' | 'rejected';
-  /** Why Triolo rejected it. */
+  /** Why NearbyU rejected it. */
   reviewNote: string | null;
   reviewedAt: string | null;
   impressions: number;
   clicks: number;
   status: AdStatus;
   deletedAt: string | null;
-  /** Who removed it: the business (withdrawn) or Triolo. */
+  /** Who removed it: the business (withdrawn) or NearbyU. */
   deletedBy?: 'owner' | 'admin' | null;
   createdAt: string;
   updatedAt: string;
@@ -77,7 +77,7 @@ export interface AdInfo {
 }
 
 export interface SaveOwnAd {
-  /** Left out when promoting a Triolo Partner profile (its name is used). */
+  /** Left out when promoting a NearbyU Partner profile (its name is used). */
   advertiserName?: string;
   advertiserPhone?: string;
   promoteMobile?: string;

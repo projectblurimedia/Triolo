@@ -1,5 +1,5 @@
 /*
- * Triolo Admin — the same visual language as the mobile apps: brand-blue gradient, Poppins,
+ * NearbyU Admin — the same visual language as the mobile apps: brand-blue gradient, Poppins,
  * frosted-glass panels over soft colour, gradient icon squares like the apps' drawer menus,
  * and glass confirmation cards over a dimmed page.
  */
@@ -2715,7 +2715,7 @@ a.row:hover {
   }
 }
 
-/* A Triolo Partner profile ad: no media, the apps draw the profile as a card. */
+/* A NearbyU Partner profile ad: no media, the apps draw the profile as a card. */
 .profile-ad-note {
   display: flex;
   gap: 12px;

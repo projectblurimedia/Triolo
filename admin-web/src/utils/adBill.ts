@@ -28,7 +28,7 @@ export function downloadAdBill(ad: Ad): void {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text('Triolo', left, 15);
+  doc.text('NearbyU', left, 15);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text('Local services & shops near you', left, 22);
@@ -77,7 +77,7 @@ export function downloadAdBill(ad: Ad): void {
   doc.setFontSize(8.5);
   doc.setTextColor(91, 100, 114);
   doc.text(`${adPlanText(ad)} · ${dayLabel(ad.startDate)} to ${dayLabel(ad.endDate)}`, left + 3, y);
-  doc.text('Shown in the Triolo customer and partner apps', left + 3, y + 5);
+  doc.text('Shown in the NearbyU customer and partner apps', left + 3, y + 5);
 
   y += 13;
   doc.setDrawColor(220, 226, 236);
@@ -101,7 +101,7 @@ export function downloadAdBill(ad: Ad): void {
   if (ad.status === 'deleted') {
     doc.setTextColor(220, 38, 38);
     doc.setFontSize(9);
-    doc.text('This ad was stopped (deleted) by Triolo.', left + 32, y);
+    doc.text('This ad was stopped (deleted) by NearbyU.', left + 32, y);
   }
 
   // Footer.
@@ -109,7 +109,7 @@ export function downloadAdBill(ad: Ad): void {
   doc.setTextColor(91, 100, 114);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text('Thank you for advertising with Triolo.', width / 2, bottom - 5, { align: 'center' });
+  doc.text('Thank you for advertising with NearbyU.', width / 2, bottom - 5, { align: 'center' });
   doc.text('This is a computer-generated bill.', width / 2, bottom, { align: 'center' });
 
   doc.save(`${billNumber(ad)}.pdf`);
