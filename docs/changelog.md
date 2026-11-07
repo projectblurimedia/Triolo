@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format: date, module, s
 
 ## Unreleased
 
+- **Admin site online** (admin-web, explicit yes): https://admin.nearbyu.in (Vercel project triolo-admin, `admin-web/vercel.json` SPA rewrites). Only admin accounts can sign in; the server checks every admin request.
+
 - **nearbyu.in** (all): the domain (GoDaddy, nameservers ns1/ns2.vercel-dns.com) serves nearbyu.in + www (registration-web, legal pages), ads.nearbyu.in (ads-web) and api.nearbyu.in (backend); certificates issued with `vercel certs issue`. Both apps (eas.json `EXPO_PUBLIC_API_URL`, `config.ts` fallback, `legal.ts`) and all three sites now use them. The old triolo-*.vercel.app addresses stay attached so older installs keep working. Sites deployed; OTA for customer 1.5.0 and partner 1.7.0 / 1.8.0.
 
 - **NearbyU on the ads and admin sites** (ads-web, admin-web): every visible Triolo / TRIOLO there (titles, pages, PDF bill) now says NearbyU; addresses and storage keys unchanged. ads-web deployed (triolo-ads.vercel.app); admin-web runs locally.

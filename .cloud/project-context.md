@@ -332,7 +332,7 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
 
 - **Not-available items → another shop** (explicit request): OrderTrackingModal's Not available card has Make a new list (`listStore.addList(name, items)`, unique name "Not at <shop>") and then Send this list to a shop (`SendListModal listId`).
 
-- **Domain nearbyu.in** (bought by the user at GoDaddy; DNS on Vercel nameservers, so records are managed with `vercel dns` / `vercel domains`): nearbyu.in + www → project triolo-web, ads.nearbyu.in → triolo-ads, api.nearbyu.in → triolo-backend. Apps and sites point at these; **keep the triolo-*.vercel.app aliases** until old installs are gone (they still call triolo-backend). If a new subdomain's https fails after DNS is fine, run `vercel certs issue <domain>`. admin-web is not hosted yet (admin.nearbyu.in waits for the user's yes).
+- **Domain nearbyu.in** (bought by the user at GoDaddy; DNS on Vercel nameservers, so records are managed with `vercel dns` / `vercel domains`): nearbyu.in + www → project triolo-web, ads.nearbyu.in → triolo-ads, api.nearbyu.in → triolo-backend. Apps and sites point at these; **keep the triolo-*.vercel.app aliases** until old installs are gone (they still call triolo-backend). If a new subdomain's https fails after DNS is fine, run `vercel certs issue <domain>`. admin-web is hosted (explicit yes): Vercel project triolo-admin, admin.nearbyu.in (also triolo-admin.vercel.app); admin-only sign-in, enforced server-side.
 
 ## Pending Modules (build order, current plan)
 
