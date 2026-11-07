@@ -334,6 +334,8 @@ This superseded an earlier design (role chosen once at registration, Worker/Busi
 
 - **Domain nearbyu.in** (bought by the user at GoDaddy; DNS on Vercel nameservers, so records are managed with `vercel dns` / `vercel domains`): nearbyu.in + www → project triolo-web, ads.nearbyu.in → triolo-ads, api.nearbyu.in → triolo-backend. Apps and sites point at these; **keep the triolo-*.vercel.app aliases** until old installs are gone (they still call triolo-backend). If a new subdomain's https fails after DNS is fine, run `vercel certs issue <domain>`. admin-web is hosted (explicit yes): Vercel project triolo-admin, admin.nearbyu.in (also triolo-admin.vercel.app); admin-only sign-in, enforced server-side.
 
+- **Vercel projects renamed** (explicit request): nearbyu-backend (was triolo-backend), nearbyu-web, nearbyu-ads, nearbyu-admin. Renaming kept every alias. **triolo-backend.vercel.app is kept on purpose** (installs that have not taken the nearbyu OTA still call it); triolo-web / triolo-ads aliases kept for old in-app links; triolo-admin.vercel.app removed (admin only at admin.nearbyu.in). `vercel logs triolo-backend.vercel.app` still works. **OTP SMS:** Fast2SMS answers 999 "complete one transaction of 100 INR" until the account is recharged — the code is then only in the logs.
+
 ## Pending Modules (build order, current plan)
 
 1. ~~Auth~~ — done (localization support included)
